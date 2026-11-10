@@ -1,0 +1,11 @@
+{
+ "revision": 3,
+ "stage": "post",
+ "applies": "any",
+ "inputs": [
+  "test_host_key",
+  "test_authorized_key"
+ ],
+ "status": "dev",
+ "validated": true
+}

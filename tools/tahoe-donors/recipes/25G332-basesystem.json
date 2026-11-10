@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "origin": {
+    "build": "25G332",
+    "installer_sha256": "e7d52c10b58b199ea0060e14ad5c74417514d3a2b19cb9ca39422bc53103196b",
+    "declaration": "pipeline/inputs/25G332/installer; extraction tree from pipeline/stages/unpack.sh; installer hash declared here, selected donor file bytes hashed during extraction",
+    "source": "25G332 Intel BaseSystem (BaseSystem-x86_64.dmg from the installer); metadata from installer sys.tsv",
+    "experiment": "exp/basesystem-donors: Tahoe-installer-free donor test"
+  },
+  "system_roots": [
+    "System/DriverKit",
+    "System/Library/CoreServices/PlatformSupport.plist",
+    "System/Library/CoreServices/WiFiMigratorPlugin.bundle",
+    "System/Library/CoreServices/boot.efi",
+    "System/Library/DriverExtensions",
+    "System/Library/HIDPlugins",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.plist",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.ram.plist",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.spb.plist",
+    "System/Library/PrivateFrameworks/DiskImages2.framework/Versions/A/XPCServices/diskimagescontroller.xpc",
+    "System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/CursorAsset_base",
+    "System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer",
+    "System/Library/SystemConfiguration/EAPOLController.bundle",
+    "System/Library/UserEventPlugins/com.apple.cts.plugin",
+    "System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.autohotspot.bundle",
+    "System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.diagnostics.bundle",
+    "System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.join.bundle",
+    "System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.recommend.bundle",
+    "usr/libexec/airportd",
+    "usr/libexec/diskimagesiod",
+    "usr/standalone"
+  ],
+  "build_tools": [
+    "usr/bin/kmutil"
+  ],
+  "required_image_roles": [
+    "system",
+    "build-tools",
+    "driverkit-cache",
+    "preboot",
+    "extensions"
+  ],
+  "preboot_exclude": [
+    "cryptex1/current/os.dmg",
+    "cryptex1/current/os.clone.dmg",
+    "cryptex1/current/app.dmg",
+    "System/Library/CoreServices/SystemVersion.plist",
+    "boot/System/Library/CoreServices/SystemVersion.plist",
+    "cryptex1/current/SystemVersion.plist"
+  ],
+  "extensions_roots": [
+    "System/Library/Extensions"
+  ],
+  "excluded_names": [
+    ".DS_Store"
+  ],
+  "exclusion_reason": "Observed host Finder metadata absent from Apple sys.tsv; not an installer donor",
+  "required_driverkit_families": [
+    "dyld_shared_cache_x86_64"
+  ],
+  "optional_driverkit_families": [
+    "dyld_shared_cache_x86_64h"
+  ],
+  "driverkit_source_images": {
+    "dyld_shared_cache_x86_64": "unpack/out/BaseSystem-x86_64.dmg"
+  },
+  "replacement_policy": "replace-maximal-declared-roots",
+  "legacy_framework_base_roots": [],
+  "framework_base_reason": "Experiment: keep Golden Gate graphics frameworks; OCLP overlays apply on top."
+}

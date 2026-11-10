@@ -1,0 +1,2 @@
+# dev-access (dev set only): the test laptop's SSH host key (private, never in git) and the host's client public key
+474bf917fa13edb56ea2e807159dd0cfcb61c6959172fe1dfc94cbabe422dd26  store/inputs/dev-access/ssh_host_ed25519_key

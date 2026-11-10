@@ -1,0 +1,9 @@
+HostKey /private/var/root/.testssh/ssh_host_ed25519_key
+AuthorizedKeysFile /private/var/root/.testssh/authorized_keys
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UsePAM no
+UseDNS no
+Subsystem sftp /usr/libexec/sftp-server
