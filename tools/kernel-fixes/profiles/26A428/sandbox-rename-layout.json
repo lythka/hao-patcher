@@ -1,0 +1,11 @@
+{
+  "kernel_sha256": "ce09da26bf61813cee503e40872c3b901e2ed3f146ca50ced8a077d344b492e9",
+  "donor_sha256": "1ba0231c2dbce4eac3513d31230b57317ea0a0ec8b8a407f95825ab3cad9d283",
+  "ops_offset": 32,
+  "completion_offset": 440,
+  "callback_symbol": "_hook_vnode_notify_end_rename_swap",
+  "register_prefix_hex": "554889e54157415641554154534883ec28",
+  "return_address": "0xffffff80004c5a78",
+  "return_prefix_hex": "4489f84881c4a80200005b415c415d415e415f5dc3",
+  "evidence": "Live rwlock watchpoints show two unreleased locks in Sandbox begin_rename_swap (old will slot 0x1d0), followed by more pairs on subsequent rename swaps. Donor policy_ops end callback is at 0x1b8; target has no end dispatch. Restore completion at the sole normal vn_rename epilogue, after success notifications and on errors; callback drains pending swaps for current thread and takes no arguments. Its no-pending path only locks/unlocks the list. Capture callback during normal mac_policy_register; validate donor UUID."
+}

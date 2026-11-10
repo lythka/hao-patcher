@@ -1,0 +1,7 @@
+{
+  "kernel_sha256": "ce09da26bf61813cee503e40872c3b901e2ed3f146ca50ced8a077d344b492e9",
+  "donor_sha256": "30265121599b132b8b5fa68224e55d1289f49ade6133625e1b0cb609b2a4e5c2",
+  "callback_offset": 352,
+  "callback_symbol": "__ZN28EndpointSecurityEventManager34es_proc_notify_service_port_deriveEP5ucredP22mach_service_port_info",
+  "evidence": "Target mac_proc_check_service_port_derive calls policy_ops+0x160 and consumes EAX as errno. Tahoe source declares this slot void proc_notify_service_port_derive(cred, mach_service_port_info*). Live callback EndpointSecurity returns leftover pointer 0xffffff8b70e88000; target treats it as denial, mach_port_construct returns53, libxpc traps. Target still constructs full 256-byte mach_service_port_info including domain byte at offset255. Adapt only UUID-bound EndpointSecurity slot to notify then return0; retain other policies."
+}

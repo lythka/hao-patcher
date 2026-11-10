@@ -1,0 +1,108 @@
+#!/opt/homebrew/bin/python3.14
+"""make PAYLOAD ORIGINAL_SYSTEM ARTIFACTS: build observers and their fixed identity map."""
+import argparse
+import datetime
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+HERE = Path(__file__).resolve().parent
+TOP = HERE.parents[1]
+DYLIB = '/usr/lib/gg-code-identity.dylib'
+OBSERVERS = (
+    'System/Library/PrivateFrameworks/TCC.framework/Support/tccd',
+    'System/Library/PrivateFrameworks/BackgroundTaskManagement.framework/Versions/A/Resources/backgroundtaskmanagementd',
+)
+
+def module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    result = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(result)
+    return result
+
+mapping = module('identity_mapping', HERE/'src/map.py')
+macho_path = HERE/'src/macho.py'
+macho = module('identity_macho', macho_path)
+
+def run(*args):
+    return subprocess.check_output(list(map(str, args)), text=True).strip()
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+def main(payload, original, artifacts, live_text_runtime=None):
+    payload, original, artifacts = map(lambda p: Path(p).resolve(), (payload, original, artifacts))
+    manifest_path = payload/'embed/manifest.json'
+    manifest = json.loads(manifest_path.read_text())
+    live_text_record = None
+    if live_text_runtime:
+        adapter = module('identity_live_text', HERE/'src/live_text.py')
+        manifest, live_text_record = adapter.transform(manifest, payload, original, live_text_runtime)
+    entries = mapping.rows(manifest, original)
+    sources = [HERE/'make', HERE/'patch.json', *sorted((HERE/'src').glob('*')), macho_path]
+    source_hashes = {str(p.relative_to(TOP)): sha(p) for p in sources if p.is_file()}
+    with tempfile.TemporaryDirectory(prefix='gg-identity-') as tmp:
+        tmp = Path(tmp)
+        replacements = []
+        for relative in OBSERVERS:
+            source = original/relative
+            data = source.read_bytes()
+            slices = macho.slices(data)
+            x86 = [(arch, body) for arch, body in slices.items() if arch[0] == 0x1000007]
+            if len(x86) != 1:
+                raise ValueError(f'expected one native observer slice: {relative}')
+            native = bytearray(x86[0][1])
+            macho.add_load_dylib(native, DYLIB.encode(), 0x1000007)
+            thin = tmp/'observer-thin'
+            thin.write_bytes(native)
+            run('codesign', '-f', '-s', '-', '--preserve-metadata=identifier,entitlements,flags,runtime', thin)
+            changed = macho.combine(thin.read_bytes(), data)
+            # Re-sign only Intel: never destroy the original ARM signatures.
+            for arch, body in slices.items():
+                if arch[0] != 0x1000007 and macho.slices(changed)[arch] != body:
+                    raise ValueError('original slice changed')
+            target = tmp/'replace'/relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(changed); target.chmod(0o755)
+            digest = sha(target)
+            entries.append(('/'+relative, '/'+relative, mapping.architecture(data), bytes.fromhex(digest)))
+            replacements.append({'path': relative, 'source_sha256': sha(source), 'sha256': digest})
+        (tmp/'identity_map.h').write_text(mapping.header(entries))
+        binary = tmp/'gg-code-identity.dylib'
+        run('xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O2', '-Wall', '-Wextra',
+            '-Werror', '-Wno-deprecated-declarations', '-dynamiclib', '-Wl,-not_for_dyld_shared_cache', '-I', tmp,
+            '-framework', 'CoreFoundation', '-framework', 'Security', '-install_name', DYLIB,
+            HERE/'src/identity.c', '-o', binary)
+        run('codesign', '-f', '-s', '-', binary)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        digest = sha(binary)
+        out = artifacts/f'code-identity-{now:%Y%m%d}-{digest[:12]}'
+        out.mkdir()
+        import shutil
+        shutil.copytree(tmp/'replace', out/'replace')
+        shutil.copy2(binary, out/binary.name)
+        (out/'build.json').write_text(json.dumps({
+            'unit': 'patches/golden-gate-code-identity', 'revision': json.loads((HERE/'patch.json').read_text())['revision'],
+            'commit': run('git', '-C', TOP, 'rev-parse', 'HEAD'),
+            'dirty': bool(run('git', '-C', TOP, 'status', '--porcelain')),
+            'date': now.isoformat(), 'inputs': source_hashes,
+            'payload': str(payload), 'payload_manifest_sha256': sha(manifest_path),
+            'live_text': live_text_record,
+            'identity_paths': len(entries), 'executables': len(manifest['files']) + len(OBSERVERS),
+            'sha256': digest, 'replacements': replacements,
+            'validation': 'local prototype; target TCC and Login Items acceptance pending',
+        }, indent=2)+'\n')
+        print(out)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('payload')
+    parser.add_argument('original')
+    parser.add_argument('artifacts')
+    parser.add_argument('--live-text-runtime', help='runtime artifact installed by golden-gate-live-text')
+    args = parser.parse_args()
+    main(args.payload, args.original, args.artifacts, args.live_text_runtime)

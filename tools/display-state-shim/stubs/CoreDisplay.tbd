@@ -1,0 +1,8 @@
+--- !tapi-tbd
+tbd-version:     4
+targets:         [ x86_64-macos ]
+install-name:    '/System/Library/Frameworks/CoreDisplay.framework/Versions/A/CoreDisplay'
+exports:
+  - targets:     [ x86_64-macos ]
+    symbols:     [ __CGXGetDisplaySystemState ]
+...

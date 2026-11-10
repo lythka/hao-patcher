@@ -1,0 +1,17 @@
+{
+  "kernel_sha256": "ce09da26bf61813cee503e40872c3b901e2ed3f146ca50ced8a077d344b492e9",
+  "donor_sha256": "75cf092ed653c5d52afeec21096b36c077ceec36a276542f74c0b162428556ce",
+  "insert_offset": 408,
+  "donor_size": 528,
+  "trust_version_offset": 280,
+  "trust_version": 4,
+  "entitlements_version_offset": 408,
+  "entitlements_version": 2,
+  "anchor_offset": 448,
+  "anchor_symbol": "__Z38OSEntitlementsBridge_matchBoolWithProcP4procPKc",
+  "evidence": {
+    "donor": "Matching live/KDK AMFI UUID 8998D378-7467-3CCC-B015-6E61E9586CF0. Live interface at 0xffffff80097e30f0: OSEntitlements.version 2 at +0x198, matchBoolWithProc at +0x1c0, matchString at +0x1c8. Source xnu-12377.121.6 libkern/libkern/amfi/amfi.h matches this layout.",
+    "target": "set_exception_ports_validation at 0xffffff8000281b63 calls +0x1c8 with proc and entitlement name. IOCurrentTaskHasStringEntitlement calls +0x1d8, copyClientEntitlement calls +0x1e8, ubc_cs_blob_add calls adjustContext at +0x1a8. All eight bytes later than donor.",
+    "new_slot": "query_trust_cache_with_length at 0xffffff8000822e34 loads optional callback +0x198; if null, 0xffffff8000822e59 calls legacy query at +0x130. Insert a null pointer and retain donor trust-cache version 4."
+  }
+}

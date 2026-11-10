@@ -1,0 +1,24 @@
+{
+  "collection_sha256": "6494d8e386e072fc2509bf500bbe83e0990554046fe11fda0df6e146738adaf0",
+  "donor_sha256": "7abec149c0e42695fa2f6e4c1975dccfda57459e0a604bee591840b86dcb8d08",
+  "donor_uuid": "766df6d31eec34dba9adef72a36fb2a8",
+  "identifier": "com.apple.iokit.IOSurface",
+  "symbol": "__ZN23IOSurfaceRootUserClient11s_set_valueEPS_PvP25IOExternalMethodArguments",
+  "header_address": "0xffffff8002bf4000",
+  "header_offset": "0x2af4000",
+  "entry_address": "0xffffff8002c0e0d6",
+  "entry_offset": "0x2b0e0d6",
+  "prefix_hex": "554889e541574156415541545350",
+  "function_hex": "554889e5415741564155415453504989d54989ff4c8b7258488b7a404885ff7434488b07be00100000ff90000200004885c0745e4889c3488b004889dfff90180100004989c4498b7d40488b07ff90c8010000eb0a4d8b6530418b453831db41bdc20200e04d85e4741883f80d72134c89ff4c89e689c24c89f1e8072800004189c54885db7411488b034889dfff5028eb0641bdc80200e04489e84883c4085b415c415d415e415f5dc3",
+  "unit": "tools/kernel-foundation",
+  "revision": 35,
+  "operation": "iosurface-layout",
+  "date": "2026-11-08T13:04:59.730886+00:00",
+  "commit": "55ea285cad0c965e702b8c12545b77f96222e05b",
+  "dirty": false,
+  "inputs": {
+    "donor_iosurface": "store/cache/kdk-25G330/System/Library/Extensions/IOSurface.kext/Contents/MacOS/IOSurface",
+    "donor_file_sha256": "7d683b0567eaafc0c19379cc3e04f2752d35338ba1b8115f32bf6db55154bd31",
+    "boot_kc": "store/inputs/darwin27-kc-26A428-6494d8e386e0/BootKernelExtensions.kc"
+  }
+}

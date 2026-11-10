@@ -1,0 +1,692 @@
+#!/usr/bin/python3 -I
+"""vmctl: drive an ssdvm VM through its in-process VNC server (no window, no host permissions).
+
+  vmctl VMDIR shot OUT.png               framebuffer screenshot
+  vmctl VMDIR type 'text'                type text (US layout)
+  vmctl VMDIR key KEY [KEY...]           keys/chords, vncdotool names: enter, esc, tab, cmd-q, ctrl-f2, ...
+  vmctl VMDIR burst DIR SECONDS [KEY]    record every frame for SECONDS (after pressing KEY) as DIR/t+<ms>.png
+  vmctl VMDIR click X Y                  left click at framebuffer pixel X,Y (1440x900)
+  vmctl VMDIR exec-gui 'cmd'             full macOS only: run as the logged-in user in Terminal (GUI session)
+  vmctl VMDIR up                         drive startup picker / language / Recovery app to Terminal, start the agent
+  vmctl VMDIR state                      picker | language | recovery | other
+  vmctl VMDIR exec 'shell command'       run a command in the guest via the agent, print output, exit with its rc
+  vmctl VMDIR vncd                       (internal) single-session VNC broker, started on demand
+  vmctl VMDIR init-agent [PORT]          persist this VM's port and identity (idempotent)
+  vmctl VMDIR agent-port|agent-id        read validated per-VM configuration
+  vmctl VMDIR pin-agent-route IP IFACE   pin host link-local endpoint; install generated guest agent afterward
+  vmctl VMDIR agent-install             print the guest installer for delivery as text through exec
+  vmctl VMDIR serve                      authenticated HTTP side for the full-macOS root agent
+  vmctl VMDIR serve-bootstrap PORT       legacy migration only, with this VM isolated by start.sh
+
+Recovery command channel: the virtiofs share (ssdvm run --share DIR, tag "ssd").
+Full macOS uses HTTP on the configured per-VM port with a matching guest identity.
+`up` types one line into the recoveryOS Terminal: mount_virtiofs ssd /tmp/s; sh /tmp/s/.agent/agent.sh. The agent
+runs DIR/.agent/<id>.cmd and leaves <id>.out / <id>.rc. Anything else in DIR is visible in the guest at /tmp/s.
+"""
+import signal, hashlib, ipaddress, json, os, re, socket, struct, subprocess, sys, threading, time, uuid
+from pathlib import Path
+
+AGENT = r'''#!/bin/sh
+# ssd command agent for the VM's recoveryOS: runs <id>.cmd files dropped by vmctl into the virtiofs share
+A=${1:-/tmp/s/.agent}
+echo "ssd agent up: $A"
+while :; do
+  for c in "$A"/*.cmd; do
+    [ -e "$c" ] || break
+    id=${c%.cmd}
+    mv "$c" "$id.run" 2>/dev/null || continue
+    /bin/sh "$id.run" > "$id.part" 2>&1; rc=$?
+    mv "$id.part" "$id.out"; echo $rc > "$id.rc.part"; mv "$id.rc.part" "$id.rc"; rm -f "$id.run"
+  done
+  sleep 0.3
+done
+'''
+
+
+def share_dir(vmdir):
+    j = Path(vmdir) / "vnc.json"
+    d = json.loads(j.read_text()).get("share") if j.exists() else None
+    return Path(d) if d else Path(vmdir).resolve().parent / "share"
+
+
+def agent_dir(vmdir):
+    q = share_dir(vmdir) / ".agent"
+    q.mkdir(parents=True, exist_ok=True)
+    (q / "agent.sh").write_text(AGENT)
+    return q
+
+
+class VNC:
+    """Minimal RFB 3.8 client (raw encoding, VNC auth). vncdotool hung on this server after the guest's mode change."""
+    KEYSYMS = {"enter": 0xff0d, "return": 0xff0d, "esc": 0xff1b, "tab": 0xff09, "bsp": 0xff08, "space": 0x20,
+               "left": 0xff51, "up": 0xff52, "right": 0xff53, "down": 0xff54, "del": 0xffff, "home": 0xff50,
+               "end": 0xff57, "pgup": 0xff55, "pgdn": 0xff56, "shift": 0xffe1, "ctrl": 0xffe3, "alt": 0xffe9,
+               "option": 0xffe9, "cmd": 0xffeb, "meta": 0xffe7, **{f"f{i}": 0xffbd + i for i in range(1, 13)}}
+    SHIFTED = '~!@#$%^&*()_+{}|:"<>?ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+    def __init__(self, vmdir):
+        from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
+        from cryptography.hazmat.primitives.ciphers import Cipher, modes
+        j = json.loads((Path(vmdir) / "vnc.json").read_text())
+        try:
+            os.kill(j["pid"], 0)
+        except OSError:
+            sys.exit("vmctl: VM is not running (stale vnc.json)")
+        self.s = socket.create_connection(("localhost", j["port"]), timeout=30)
+        self.rx(12)
+        self.s.sendall(b"RFB 003.008\n")
+        if 2 not in self.rx(self.rx(1)[0]):
+            sys.exit("vmctl: server does not offer VNC auth")
+        self.s.sendall(b"\x02")
+        ch = self.rx(16)
+        key = bytes(int(f"{b:08b}"[::-1], 2) for b in (j["password"].encode() + b"\0" * 8)[:8])
+        e = Cipher(TripleDES(key * 3), modes.ECB()).encryptor()
+        self.s.sendall(e.update(ch) + e.finalize())
+        if struct.unpack(">I", self.rx(4))[0]:
+            sys.exit("vmctl: VNC auth failed")
+        self.s.sendall(b"\x01")                              # shared
+        self.w, self.h = struct.unpack(">HH", self.rx(4))
+        bpp, _, big, _, _, _, _, self.rs, self.gs, self.bs = struct.unpack(">BBBBHHHBBB3x", self.rx(16))
+        self.rx(struct.unpack(">I", self.rx(4))[0])
+        if bpp != 32 or big:                                    # SetPixelFormat makes this server drop the link
+            sys.exit(f"vmctl: unexpected pixel format bpp={bpp} big={big}")
+        # raw + DesktopSize: without the DesktopSize pseudo-encoding _VZVNCServer aborts the whole VM process
+        # ("It is unclear if we can support clients that don't support this pseudo encoding")
+        self.s.sendall(struct.pack(">BxHii", 2, 2, 0, -223))
+
+    def rx(self, n):
+        b = bytearray()
+        while len(b) < n:
+            c = self.s.recv(min(n - len(b), 1 << 20))
+            if not c:
+                raise EOFError("VNC server closed the connection")
+            b += c
+        return bytes(b)
+
+    def start_reader(self):
+        """Keep a local framebuffer current, like a normal viewer. This server answers a FramebufferUpdateRequest
+        only when something changed (even non-incremental ones after the first), so a request-per-shot client hangs
+        on a static screen."""
+        from PIL import Image
+        self.lock, self.fresh = threading.Lock(), threading.Event()
+        self.fb = Image.new("RGB", (self.w, self.h))
+        self.dead = None
+        self.send(struct.pack(">BBHHHH", 3, 0, 0, 0, self.w, self.h))
+        threading.Thread(target=self.reader, daemon=True).start()
+        if not self.fresh.wait(30):
+            raise TimeoutError("no first frame from the VNC server")
+
+    def send(self, b):
+        with self.lock:
+            self.s.sendall(b)
+
+    def reader(self):
+        from PIL import Image
+        idx = {0: 0, 8: 1, 16: 2, 24: 3}
+        self.s.settimeout(None)
+        try:
+            while True:
+                t = self.rx(1)[0]
+                if t == 2:                                           # bell
+                    continue
+                if t == 3:                                           # cut text
+                    self.rx(3)
+                    self.rx(struct.unpack(">I", self.rx(4))[0])
+                    continue
+                if t != 0:
+                    raise ValueError(f"unexpected VNC message {t}")
+                self.rx(1)
+                fb = self.fb.copy()
+                for _ in range(struct.unpack(">H", self.rx(2))[0]):
+                    x, y, w, h, enc = struct.unpack(">HHHHi", self.rx(12))
+                    if enc == -223:                                  # DesktopSize: guest changed mode
+                        self.w, self.h = w, h
+                        fb = Image.new("RGB", (w, h))
+                        continue
+                    if enc != 0:
+                        raise ValueError(f"unexpected encoding {enc}")
+                    px = Image.frombytes("RGBA", (w, h), self.rx(w * h * 4)).split()   # bytes in memory order
+                    fb.paste(Image.merge("RGB", (px[idx[self.rs]], px[idx[self.gs]], px[idx[self.bs]])), (x, y))
+                self.fb = fb
+                self.fresh.set()
+                self.send(struct.pack(">BBHHHH", 3, 1, 0, 0, self.w, self.h))
+        except Exception as e:
+            self.dead = e
+
+    def shot(self, path):
+        if self.dead:
+            raise ConnectionError(f"VNC reader stopped: {self.dead!r}")
+        self.fresh.clear()
+        self.fresh.wait(0.7)                                         # take a pending update if one is in flight
+        self.fb.save(path)
+
+    def burst(self, outdir, duration, key=None):
+        """Save every framebuffer update for `duration` s (after optionally pressing `key`) as outdir/t+NNNN.png,
+        NNNN = ms since the key press. Returns the frame count."""
+        out = Path(outdir)
+        out.mkdir(parents=True, exist_ok=True)
+        self.fresh.clear()
+        t0 = time.time()
+        if key:
+            self.press(key)
+        frames = [(0.0, self.fb)]
+        while time.time() - t0 < duration:
+            if self.fresh.wait(0.05):
+                self.fresh.clear()
+                frames.append((time.time() - t0, self.fb))
+        for t, fb in frames:
+            fb.save(out / f"t+{int(t * 1000):05d}.png")
+        return len(frames)
+
+    def key(self, sym, down):
+        self.send(struct.pack(">BBxxI", 4, 1 if down else 0, sym))
+
+    def press(self, name):
+        """'a', 'A', '|', 'enter', 'cmd-q', 'ctrl-f2', 'cmd-shift-t'"""
+        parts = name.split("-") if len(name) > 1 and name not in ("-",) else [name]
+        if len(parts) > 1 and parts[-1] == "":
+            parts = parts[:-2] + ["-"]
+        mods, k = parts[:-1], parts[-1]
+        sym = int(k, 16) if k.startswith("0x") else self.KEYSYMS.get(k.lower()) if len(k) > 1 else ord(k)
+        if sym is None:
+            sys.exit(f"vmctl: unknown key {name}")
+        mods = [self.KEYSYMS[m] for m in mods]
+        if len(k) == 1 and k in self.SHIFTED:
+            mods.append(self.KEYSYMS["shift"])
+        for m in mods:
+            self.key(m, True)
+        self.key(sym, True)
+        time.sleep(0.02)
+        self.key(sym, False)
+        for m in reversed(mods):
+            self.key(m, False)
+        time.sleep(0.02)
+
+    def type(self, text):
+        for ch in text:
+            self.press(ch)
+
+    def click(self, x, y, button=1):
+        self.send(struct.pack(">BBHH", 5, 0, x, y))
+        time.sleep(0.05)
+        self.send(struct.pack(">BBHH", 5, button, x, y))
+        time.sleep(0.08)
+        self.send(struct.pack(">BBHH", 5, 0, x, y))
+
+    def move(self, x, y):
+        self.send(struct.pack(">BBHH", 5, 0, x, y))
+
+    def disconnect(self):
+        self.s.close()
+
+
+HTTP_AGENT = r'''#!/bin/sh
+# ssd command agent for the VM's full macOS (root LaunchDaemon). virtiofs files are TCC-blocked for daemons, so commands
+# come over HTTP from vmctl's server on the host's VM bridge. A pinned link-local endpoint needs neither DHCP
+# nor a default route. Unmigrated configurations retain the legacy IPv6-default-router discovery.
+M=/private/var/ssdshare
+mkdir -p "$M"
+mount | grep -q " $M " || /sbin/mount_virtiofs ssd "$M"
+R="@HOST_LINK_LOCAL@"
+I="@GUEST_INTERFACE@"
+while [ -z "$R" ]; do
+  R=$(route -n get -inet6 default 2>/dev/null | awk '/gateway:/{print $2}')
+  I=$(route -n get -inet6 default 2>/dev/null | awk '/interface:/{print $2}')
+  [ -n "$R" ] && break; sleep 2
+done
+H="http://[${R%%%*}%25$I]:@PORT@"
+export SSDVM_AGENT_ID=@IDENTITY@
+echo "ssd http agent: $H"
+umask 077
+blocked=/tmp/ssdvm-agent-blocked.$SSDVM_AGENT_ID
+if [ -e "$blocked" ]; then
+  echo "ssd agent: unresolved delivery failure in $blocked; refusing new commands" >&2
+  exit 1
+fi
+# Retry only transport delivery, never command execution. On exhaustion keep the
+# reservation and local evidence for reviewed recovery; do not claim another job.
+agent_transfer() {
+  phase=$1; shift
+  attempt=1
+  while [ "$attempt" -le 5 ]; do
+    if curl -gsSf --connect-timeout 5 --max-time 30 -H "X-SSDVM-Agent: $SSDVM_AGENT_ID" "$@"; then
+      return 0
+    fi
+    echo "ssd agent: $id $phase delivery failed (attempt $attempt/5)" >&2
+    [ "$attempt" -lt 5 ] && sleep 2
+    attempt=$((attempt + 1))
+  done
+  echo "ssd agent: $id $phase exhausted; retained local spool and host reservation" >&2
+  printf "%s %s\n" "$id" "$phase" > "$blocked"
+  return 1
+}
+while :; do
+  id=$(curl -gsf -H "X-SSDVM-Agent: $SSDVM_AGENT_ID" -m 70 "$H/next") || { sleep 2; continue; }
+  [ -n "$id" ] || continue
+  agent_transfer command "$H/cmd/$id" -o /tmp/ssdc.$id.part || exit 1
+  mv /tmp/ssdc.$id.part /tmp/ssdc.$id || exit 1
+  /bin/sh /tmp/ssdc.$id > /tmp/ssdo.$id 2>&1; rc=$?
+  agent_transfer result -H "X-RC: $rc" --data-binary @/tmp/ssdo.$id "$H/out/$id" > /dev/null || exit 1
+  rm -f /tmp/ssdc.$id /tmp/ssdo.$id
+done
+'''
+
+
+def agent_config(vmdir):
+    path = Path(vmdir).resolve()
+    config = json.loads((path / "agent.json").read_text())
+    if (config.get("schema") != 1 or config.get("vm") != str(path)
+            or type(config.get("port")) is not int or not 1024 <= config["port"] <= 65535
+            or not re.fullmatch(r"[a-f0-9]{32}", config.get("identity", ""))):
+        raise ValueError("invalid agent.json or copied VM configuration; initialize this VM separately")
+    route = config.get('host_link_local')
+    interface = config.get('guest_interface')
+    if route is not None or interface is not None:
+        if (not isinstance(route, str) or '%' in route
+                or not ipaddress.IPv6Address(route).is_link_local
+                or not isinstance(interface, str) or not re.fullmatch(r'en[0-9]+', interface)):
+            raise ValueError('invalid pinned agent link-local route')
+    return config
+
+
+def pin_agent_route(vmdir, address, interface):
+    config = agent_config(vmdir)
+    if '%' in address or not ipaddress.IPv6Address(address).is_link_local or not re.fullmatch(r'en[0-9]+', interface):
+        raise ValueError('invalid pinned agent link-local route')
+    config.update(host_link_local=str(ipaddress.IPv6Address(address)), guest_interface=interface)
+    path = Path(vmdir) / 'agent.json'
+    temporary = path.with_suffix('.json.new')
+    with temporary.open('x') as stream:
+        json.dump(config, stream, indent=2)
+        stream.write('\n')
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+    return config
+
+
+def init_agent(vmdir, port=None):
+    path = Path(vmdir).resolve()
+    if not path.is_dir():
+        raise ValueError("VM directory does not exist")
+    config_path = path / "agent.json"
+    if config_path.exists():
+        config = agent_config(vmdir)
+        if port is not None and config["port"] != int(port):
+            raise ValueError("agent port already configured; refusing host/guest mismatch")
+        return config
+    port = int(port) if port is not None else 20000 + int(hashlib.sha256(str(path).encode()).hexdigest()[:8], 16) % 30000
+    if not 1024 <= port <= 65535:
+        raise ValueError("agent port must be 1024..65535")
+    config = dict(schema=1, vm=str(path), port=port, identity=uuid.uuid4().hex)
+    fd = os.open(config_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(config, f, indent=2)
+        f.write("\n")
+    return config
+
+
+def guest_agent(config):
+    return (HTTP_AGENT.replace("@PORT@", str(config["port"])).replace("@IDENTITY@", config["identity"])
+            .replace('@HOST_LINK_LOCAL@', config.get('host_link_local', ''))
+            .replace('@GUEST_INTERFACE@', config.get('guest_interface', '')))
+
+
+def agent_install(vmdir):
+    """Text sent via exec; guest scripts never execute from the virtiofs share."""
+    script = guest_agent(agent_config(vmdir))
+    return """set -eu
+install -d -m 755 /usr/local/ssdvm
+cat > /usr/local/ssdvm/http-agent.sh.new <<'SSDVM_AGENT_SCRIPT'
+%sSSDVM_AGENT_SCRIPT
+chmod 755 /usr/local/ssdvm/http-agent.sh.new
+mv /usr/local/ssdvm/http-agent.sh.new /usr/local/ssdvm/http-agent.sh
+cat > /Library/LaunchDaemons/local.ssdvm.agent.plist <<'SSDVM_AGENT_PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>local.ssdvm.agent</string>
+<key>ProgramArguments</key><array><string>/bin/sh</string><string>/usr/local/ssdvm/http-agent.sh</string></array>
+<key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+<key>StandardOutPath</key><string>/var/log/ssdvm-http-agent.log</string>
+<key>StandardErrorPath</key><string>/var/log/ssdvm-http-agent.log</string>
+</dict></plist>
+SSDVM_AGENT_PLIST
+chown root:wheel /usr/local/ssdvm/http-agent.sh /Library/LaunchDaemons/local.ssdvm.agent.plist
+chmod 644 /Library/LaunchDaemons/local.ssdvm.agent.plist
+# Reply before replacing the agent executing this command.
+/bin/sh -c 'trap "" HUP; sleep 2; if launchctl print system/local.ssdvm.agent >/dev/null 2>&1; then exec launchctl kickstart -k system/local.ssdvm.agent; else exec launchctl bootstrap system /Library/LaunchDaemons/local.ssdvm.agent.plist; fi' >/var/log/ssdvm-agent-install.log 2>&1 </dev/null &
+echo AGENT-INSTALLED
+""" % script
+
+
+def bridge_if():
+    out = subprocess.run(["ifconfig"], capture_output=True, text=True).stdout
+    cur = None
+    for line in out.splitlines():
+        if line and not line[0].isspace():
+            cur = line.split(":")[0]
+        elif cur and cur.startswith("bridge") and "member: vmenet" in line:
+            return cur
+    sys.exit("vmctl: no VM bridge interface (is the VM running?)")
+
+
+def agent_server(vmdir, bootstrap_port=None, interface=None):
+    """Per-VM port and identity, bound to the VM bridge (IPV6_BOUND_IF).
+    bootstrap_port is only for migrating an isolated legacy guest during start.sh.
+    """
+    import http.server
+    config = agent_config(vmdir)
+    q = agent_dir(vmdir)
+    (q / "http-agent.sh").write_text(guest_agent(config))
+    bridge = bridge_if() if interface is None else interface
+    if config.get('host_link_local'):
+        text = subprocess.check_output(['ifconfig', bridge], text=True)
+        addresses = [line.split()[1].split('%')[0] for line in text.splitlines()
+                     if line.strip().startswith('inet6 ')]
+        if config['host_link_local'] not in addresses:
+            raise ValueError('pinned agent host address missing from VM bridge')
+    idx = socket.if_nametoindex(bridge)
+
+    class S(http.server.ThreadingHTTPServer):
+        address_family = socket.AF_INET6
+
+        def server_bind(self):
+            self.socket.setsockopt(socket.IPPROTO_IPV6, 125, struct.pack("I", idx))   # IPV6_BOUND_IF
+            super().server_bind()
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def reply(self, body, code=200):
+            b = body.encode() if isinstance(body, str) else body
+            self.send_response(code)
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+
+        def authorized(self):
+            if bootstrap_port is None and self.headers.get("X-SSDVM-Agent") != config["identity"]:
+                self.reply("wrong VM agent", 403)
+                return False
+            return True
+
+        def do_GET(self):
+            if not self.authorized():
+                return
+            if self.path == "/next":
+                end = time.time() + 60
+                while time.time() < end:
+                    for c in sorted(q.glob("*.cmd"), key=os.path.getmtime):
+                        try:
+                            c.rename(c.with_suffix(".run"))
+                        except OSError:
+                            continue
+                        return self.reply(c.stem)
+                    time.sleep(0.3)
+                return self.reply("")
+            if self.path.startswith("/cmd/"):
+                f = q / (Path(self.path).name + ".run")
+                return self.reply(f.read_bytes()) if f.exists() else self.reply("", 404)
+            self.reply("", 404)
+
+        def do_POST(self):
+            if not self.authorized():
+                return
+            if self.path.startswith("/out/"):
+                cid = Path(self.path).name
+                (q / (cid + ".out")).write_bytes(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                (q / (cid + ".rc.part")).write_text(self.headers.get("X-RC", "?"))
+                (q / (cid + ".rc.part")).rename(q / (cid + ".rc"))
+                (q / (cid + ".run")).unlink(missing_ok=True)
+                return self.reply("ok")
+            self.reply("", 404)
+
+    return S(("::", bootstrap_port if bootstrap_port is not None else config["port"]), H)
+
+
+def serve(vmdir, bootstrap_port=None):
+    with agent_server(vmdir, bootstrap_port) as server:
+        server.serve_forever()
+
+
+def exec_cmd(vmdir, cmd, timeout=600, gui=False):
+    q = agent_dir(vmdir) if not gui else share_dir(vmdir) / ".agent-gui"
+    cid = uuid.uuid4().hex[:12]
+    tmp = q / (cid + ".tmp")
+    tmp.write_text(cmd + "\n")
+    tmp.rename(q / (cid + ".cmd"))
+    end = time.time() + timeout
+    while time.time() < end:
+        rc = q / (cid + ".rc")
+        if rc.exists():
+            out = (q / (cid + ".out")).read_bytes()
+            sys.stdout.buffer.write(out)
+            r = rc.read_text().strip()
+            for x in (rc, q / (cid + ".out")):
+                x.unlink(missing_ok=True)
+            return int(r) if r.isdigit() else 1
+        time.sleep(0.3)
+    sys.exit(f"vmctl: no reply within {timeout}s (agent running in the guest Terminal? try: vmctl VMDIR up)")
+
+
+def close_vnc(vmdir):
+    marker = Path(str(Path(vmdir).resolve()) + '.run') / 'vncd.pid'
+    if not marker.exists():
+        return
+    pid = int(marker.read_text().strip())
+    command = subprocess.run(['ps', '-p', str(pid), '-o', 'command='], capture_output=True, text=True).stdout.strip()
+    expected = str(Path(__file__).resolve()) + ' ' + str(Path(vmdir).resolve()) + ' vncd'
+    if expected in command:
+        os.kill(pid, signal.SIGTERM)
+    marker.unlink(missing_ok=True)
+
+
+def vncd(vmdir):
+    """Hold ONE VNC session for the VM's lifetime. Rapid connect/disconnect cycles tripped an assertion in
+    _VZVNCServer (addAccessorObserver) that killed the whole VM, so all VNC traffic goes through this broker."""
+    sock = Path(vmdir) / "vnc.sock"
+    sock.unlink(missing_ok=True)
+    c = VNC(vmdir)
+    c.start_reader()
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(str(sock))
+    srv.listen(4)
+    while True:
+        conn, _ = srv.accept()
+        with conn:
+            f = conn.makefile("rwb")
+            try:
+                req = json.loads(f.readline())
+                op, a = req["op"], req.get("args", [])
+                if op == "shot":
+                    c.shot(a[0])
+                elif op == "type":
+                    c.type(a[0])
+                elif op == "key":
+                    for k in a:
+                        c.press(k)
+                elif op == "click":
+                    c.click(int(a[0]), int(a[1]))
+                elif op == "move":
+                    c.move(int(a[0]), int(a[1]))
+                elif op == "burst":
+                    n = c.burst(a[0], float(a[1]), a[2] if len(a) > 2 else None)
+                    f.write(json.dumps({"ok": True, "frames": n}).encode() + b"\n")
+                    f.flush()
+                    continue
+                else:
+                    raise ValueError(f"unknown op {op}")
+                f.write(b'{"ok": true}\n')
+            except (EOFError, ConnectionError, TimeoutError) as e:
+                f.write(json.dumps({"ok": False, "error": f"VNC link lost: {e}"}).encode() + b"\n")
+                f.flush()
+                sock.unlink(missing_ok=True)
+                sys.exit(1)
+            except Exception as e:
+                f.write(json.dumps({"ok": False, "error": repr(e)}).encode() + b"\n")
+            f.flush()
+
+
+def vnc_call(vmdir, op, *args):
+    sock = Path(vmdir) / "vnc.sock"
+    for _ in range(100):                      # ssdvm writes vnc.json once the listener is confined to lo0
+        if (Path(vmdir) / "vnc.json").exists():
+            break
+        time.sleep(0.2)
+    def connect():
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(120)
+        s.connect(str(sock))
+        return s
+    try:
+        s = connect()
+    except OSError:
+        sock.unlink(missing_ok=True)                                  # stale socket from a dead broker
+        log = open(Path(vmdir) / "vncd.log", "a")
+        child = subprocess.Popen([sys.executable, "-I", __file__, vmdir, "vncd"], stdout=log, stderr=log, start_new_session=True)
+        run = Path(str(Path(vmdir).resolve()) + '.run')
+        run.mkdir(exist_ok=True)
+        (run / 'vncd.pid').write_text(str(child.pid) + '\n')
+        for _ in range(100):
+            time.sleep(0.2)
+            try:
+                s = connect()
+                break
+            except OSError:
+                continue
+        else:
+            sys.exit("vmctl: VNC broker did not start; see vncd.log")
+    f = s.makefile("rwb")
+    f.write(json.dumps({"op": op, "args": list(args)}).encode() + b"\n")
+    f.flush()
+    r = json.loads(f.readline())
+    s.close()
+    if not r["ok"]:
+        sys.exit(f"vmctl: {r['error']}")
+    return r
+
+
+def screen_state(vmdir):
+    from PIL import Image
+    p = Path(vmdir) / "state.png"
+    vnc_call(vmdir, "shot", str(p))
+    im = Image.open(p).convert("RGB")
+
+    def cnt(box, f):
+        return sum(1 for x in range(box[0], box[2], 2) for y in range(box[1], box[3], 2) if f(*im.getpixel((x, y))))
+    # screen positions for a 26.6.2 (25G83) recoveryOS at 1440x900
+    if cnt((800, 370, 860, 430), lambda r, g, b: r > 150 and g > 150 and b > 150) > 300:
+        return "picker"
+    if cnt((680, 222, 760, 302), lambda r, g, b: b > 180 and r < 60) > 300:
+        return "language"
+    if cnt((520, 176, 572, 228), lambda r, g, b: g > 140 and b > 140 and r < 120) > 150:
+        return "recovery"
+    return "other"
+
+
+def agent_alive(vmdir, timeout=15):
+    q = agent_dir(vmdir)
+    cid = "ping" + uuid.uuid4().hex[:8]
+    (q / (cid + ".cmd")).write_text("echo pong\n")
+    end = time.time() + timeout
+    while time.time() < end:
+        if (q / (cid + ".rc")).exists():
+            for x in ("rc", "out"):
+                (q / f"{cid}.{x}").unlink(missing_ok=True)
+            return True
+        time.sleep(0.3)
+    for x in ("cmd", "run"):
+        (q / f"{cid}.{x}").unlink(missing_ok=True)
+    return False
+
+
+def up(vmdir, timeout=600):
+    """From VM start (ssdvm run --recovery) to a working command agent in recoveryOS Terminal."""
+    agent_dir(vmdir)
+    if agent_alive(vmdir, 3):
+        print("agent already up")
+        return
+    end, opened = time.time() + timeout, False
+    while time.time() < end:
+        st = screen_state(vmdir)
+        if st == "picker":                         # startup options: Options, then Continue
+            vnc_call(vmdir, "click", 831, 403)
+            time.sleep(1)
+            vnc_call(vmdir, "click", 831, 531)
+            time.sleep(20)
+        elif st == "language":
+            vnc_call(vmdir, "click", 1086, 720)
+            time.sleep(5)
+        elif st == "recovery" and not opened:      # Utilities > Terminal (the cmd chord does not get through VNC)
+            vnc_call(vmdir, "click", 243, 14)
+            time.sleep(1)
+            vnc_call(vmdir, "click", 249, 96)
+            time.sleep(5)
+            vnc_call(vmdir, "type", "mkdir -p /tmp/s && mount_virtiofs ssd /tmp/s; sh /tmp/s/.agent/agent.sh")
+            vnc_call(vmdir, "key", "enter")
+            opened = True
+            if agent_alive(vmdir, 20):
+                print("agent up")
+                return
+        elif opened and agent_alive(vmdir, 5):
+            print("agent up")
+            return
+        else:
+            time.sleep(5)
+    sys.exit("vmctl: recoveryOS agent did not come up; look at state.png")
+
+
+def main():
+    if len(sys.argv) < 3:
+        sys.exit(__doc__)
+    vmdir, op, args = sys.argv[1], sys.argv[2], sys.argv[3:]
+    if op == "close-vnc":
+        return close_vnc(vmdir)
+    if op == "vncd":
+        return vncd(vmdir)
+    if op == "init-agent":
+        print(init_agent(vmdir, args[0] if args else None)["port"])
+        return
+    if op == "pin-agent-route":
+        if len(args) != 2:
+            raise ValueError('pin-agent-route requires host link-local IPv6 and guest enN interface')
+        pin_agent_route(vmdir, args[0], args[1])
+        return
+    if op == "agent-port":
+        print(agent_config(vmdir)["port"])
+        return
+    if op == "agent-id":
+        print(agent_config(vmdir)["identity"])
+        return
+    if op == "agent-install":
+        print(agent_install(vmdir), end="")
+        return
+    if op == "serve":
+        return serve(vmdir)
+    if op == "serve-bootstrap":
+        port = int(args[0])
+        if not 1024 <= port <= 65535:
+            raise ValueError("bootstrap port must be 1024..65535")
+        return serve(vmdir, port)
+    if op == "exec-gui":                     # full macOS: as the logged-in user, inside Terminal (Aqua session)
+        sys.exit(exec_cmd(vmdir, " ".join(args), gui=True))
+    if op == "exec":
+        sys.exit(exec_cmd(vmdir, " ".join(args)))
+    if op == "up":
+        return up(vmdir)
+    if op == "state":
+        return print(screen_state(vmdir))
+    if op == "shot":
+        return vnc_call(vmdir, "shot", str(Path(args[0]).resolve()))
+    if op == "type":
+        return vnc_call(vmdir, "type", " ".join(args))
+    if op in ("key", "click", "move"):
+        return vnc_call(vmdir, op, *args)
+    if op == "burst":                         # burst OUTDIR SECONDS [KEY]
+        return print(vnc_call(vmdir, "burst", str(Path(args[0]).resolve()), *args[1:]).get("frames"), "frames")
+    sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

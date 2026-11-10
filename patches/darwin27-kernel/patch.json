@@ -1,0 +1,18 @@
+{
+  "revision": 3,
+  "stage": "oclp-hook",
+  "applies": {
+    "models": [
+      "MacBookPro9,2"
+    ],
+    "builds": [
+      "25G332"
+    ]
+  },
+  "inputs": [
+    "darwin27_kernel",
+    "tahoe_kmutil"
+  ],
+  "status": "experiment",
+  "validated": false
+}

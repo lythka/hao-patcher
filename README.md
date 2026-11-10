@@ -1,0 +1,105 @@
+# hao-patcher
+
+hao-patcher builds macOS 27 (Golden Gate, 26A428) disk images for the
+**13-inch 2012 MacBook Pro (MacBookPro9,2)** with Intel HD 4000 graphics.
+
+macOS 27 does not support Intel Macs, so hao-patcher builds the image in layers. It
+installs Golden Gate's own System and Data, then adds the Intel kernel extensions,
+drivers and boot files that macOS 26 (Tahoe) still ships. It adds legacy hardware
+support from OpenCore Legacy Patcher, a set of compatibility fixes, and
+[hao-runtime](https://github.com/lythka/hao-runtime), which runs Golden Gate's
+ARM-only programs on the Intel CPU.
+
+![macOS 27 desktop and Control Center on MacBookPro9,2](docs/images/desktop-intel.jpg)
+
+## Status
+
+Experimental. MacBookPro9,2 is the only supported model. The results below come
+from images built with an earlier version of this pipeline, which started from Tahoe.
+The current pipeline starts from Golden Gate. Its images have booted to a working
+system but have not yet been tested end to end.
+
+| Area | State |
+|---|---|
+| Startup | Setup Assistant, account creation and Finder work. |
+| Graphics | Accelerated HD 4000 desktop; newer Metal features are incomplete. |
+| Hardware | Wi-Fi, speakers, brightness, keyboard and trackpad work. |
+| Safari | Works natively on Intel. |
+| Control Center | Panels open and reopen. |
+| Maps | Rendering, search, zoom and pan work. |
+| Photos | Opens; Live Text inside Photos does not work yet. |
+| Other apps | Varies by app; Weather does not work yet. |
+| Sleep and updates | Not yet tested. |
+
+## Requirements
+
+- **Target:** MacBookPro9,2 (Ivy Bridge, Intel HD 4000).
+- **Build host:** an Apple silicon Mac with the Xcode command-line tools,
+  Python 3.14 and an arm64 macOS virtual machine for disk operations.
+- **Inputs:** the Golden Gate 26A428 IPSW, the Tahoe 25G332 installer, the
+  Tahoe 25G330 Kernel Debug Kit, OCLP 3.0.0-rc.5 support files and a hao-runtime
+  payload. [Build inputs](docs/inputs.md) lists exact downloads and checksums.
+
+This repository contains no Apple software. You supply every Apple input, and the
+builder writes its images to your machine. There is no end-user installer yet.
+
+## Building
+
+```sh
+git clone https://github.com/lythka/hao-patcher.git
+cd hao-patcher
+# Prepare the inputs (docs/inputs.md), then:
+python3.14 -I pipeline/golden-run pipeline/assemblies/mbp92-golden-first.json \
+  --repo /path/to/new-image-repository
+```
+
+[Building an image](docs/building.md) covers input preparation, what the build does
+and how to test the result in QEMU before installing it on hardware.
+
+## Fixes
+
+Each fix has an installation recipe in `patches/` and its source and builder in `tools/`,
+`cache/` or the patch's own `build/` folder.
+
+| Fix | Recipe | Source |
+|---|---|---|
+| Intel kernel, boot and platform repairs | `hao-opencore`, `golden-gate-code-identity`, `darwin27-sandbox-disk-space` | [tools/kernel-fixes](tools/kernel-fixes), [tools/kernel-foundation](tools/kernel-foundation) |
+| Metal libraries and framebuffer | `golden-gate-metal-libraries`, `golden-gate-metal-framebuffer` | [tools/metal-fixes](tools/metal-fixes), [cache/metallib](cache/metallib) |
+| Legacy Metal selectors | `metalold-selectors` | [patches/metalold-selectors/build](patches/metalold-selectors/build) |
+| CoreSpotlight API adapter | `golden-gate-corespotlight-compat` | [patches/golden-gate-corespotlight-compat/build](patches/golden-gate-corespotlight-compat/build) |
+| Display and WindowServer adapters | `golden-gate-windowserver-filter` | [tools/display-fixes](tools/display-fixes), [tools/display-state-shim](tools/display-state-shim) |
+| Pre-login audio | `golden-gate-userspace` input | [tools/audiomxd-fix](tools/audiomxd-fix) |
+| ARM-only programs | `hao-runtime`, `hao-opencore` | [hao-runtime](https://github.com/lythka/hao-runtime) payload |
+
+[patches/README.md](patches/README.md) describes the recipe format, and
+[patches/TRACKER.md](patches/TRACKER.md) lists every recipe with its stage and
+validation state.
+
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `pipeline/` | Image assembly, input rows, targets and patch sets |
+| `patches/` | Installation recipes, one folder per fix |
+| `tools/` | Fix builders, input preparation, builder VM, image and QEMU tools |
+| `cache/` | Metal library and shader generators |
+| `docs/` | Architecture, inputs and build guide |
+| `store/` | Your local inputs, images and build records (ignored by Git) |
+
+See [architecture](docs/architecture.md) for how the pieces fit together and
+[CONTRIBUTING.md](CONTRIBUTING.md) for tests and conventions.
+
+## Credits
+
+Built on [OpenCore Legacy Patcher](https://github.com/dortania/OpenCore-Legacy-Patcher),
+[OpenCore](https://github.com/acidanthera/OpenCorePkg),
+[Lilu](https://github.com/acidanthera/Lilu),
+[MacKernelSDK](https://github.com/acidanthera/MacKernelSDK),
+[MetallibSupportPkg](https://github.com/dortania/MetallibSupportPkg),
+[Apple's XNU sources](https://github.com/apple-oss-distributions/xnu) and
+[QEMU](https://www.qemu.org/). Each tool's NOTICE.md lists the third-party source it carries.
+
+## License
+
+Original code is available under the [MIT license](LICENSE). Third-party code and
+Apple components keep their own terms; see [NOTICE.md](NOTICE.md).

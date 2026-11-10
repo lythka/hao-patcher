@@ -1,0 +1,5 @@
+#!/bin/sh
+# ssdimg launcher: needs Python 3.14+ (built-in zstd).
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+PY="${SSDIMG_PYTHON:-/opt/homebrew/bin/python3.14}"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" exec "$PY" -m ssdimg "$@"

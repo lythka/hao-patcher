@@ -1,0 +1,47 @@
+{
+  "darwin": "27.0",
+  "userspace_build": "26A428",
+  "officially_supported_models": [
+    "MacBookPro9,2"
+  ],
+  "fixed_beyond_max": "0x2000000001",
+  "map_jit_flag": "0x4000000000",
+  "definitions": {
+    "amfi-layout.json": {
+      "sha256": "c58c82091b362043c3b56d177181b7ab571209c08ecd128246beb9759b7aa451",
+      "source_row": "amfi_layout_26A428"
+    },
+    "commpage-exec-entry.json": {
+      "sha256": "d027846fc738bfa6d990a1fbfcb79def24c6a24b8211aa18c8974896c4a3f608",
+      "source_row": "darwin27_commpage_exec_entry"
+    },
+    "commpage-fixed-entry.json": {
+      "sha256": "4dbaf16ec394edb869151d5fdf99a7c712450c76e6f930bd3d5036277b58c67f",
+      "source_row": "darwin27_commpage_fixed_entry"
+    },
+    "sandbox-rename-layout.json": {
+      "sha256": "5f543f79eeeb428e3909e77246aac470e1fc501578271c49cb61dde0d3be2709",
+      "source_row": "sandbox_rename_layout_26A428"
+    },
+    "endpoint-port-policy.json": {
+      "sha256": "cf13c2e54b82f67600db5cc90e1e828d08f02b851e1da5dc1ae9639ee256ee90",
+      "source_row": "endpointsecurity_port_policy_26A428"
+    },
+    "sandbox-op-layout.json": {
+      "sha256": "62226e0eac50ede379b4ce7240e371b5a95a62ecbbcfbe0403599081db923142",
+      "source_row": "sandbox_op_layout_26A428"
+    },
+    "early-vm.json": {
+      "sha256": "ed7652572a5bcc307022c3a90515242a247b5069c90275685b0b7c90221097ce",
+      "source_row": "darwin27_early_vm_capture"
+    },
+    "vm-test-layout.json": {
+      "sha256": "cf3c5bd584fe21054015f7416dd2d717edc12a9e9d177cb7c8067202644073f5",
+      "source_row": "darwin27_vm_test_layout"
+    },
+    "iosurface-layout.json": {
+      "sha256": "aeecc6232000f72e9b6662f7b7895de15387732628df58abcdd3d7a462e45e07",
+      "source": "IntelCommpage build input"
+    }
+  }
+}

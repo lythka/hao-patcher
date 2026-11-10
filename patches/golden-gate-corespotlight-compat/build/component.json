@@ -1,0 +1,32 @@
+{
+  "applies": {
+    "architecture": "x86_64",
+    "darwin": 27,
+    "models": [
+      "MacBookPro9,2"
+    ],
+    "target_builds": [
+      "26A428"
+    ]
+  },
+  "build_recipe": "python3 patch build --output /absolute/path/to/artifacts",
+  "compatibility": "26A428 native x86_64 CoreSpotlight/corespotlightd and managedcorespotlightd; MacBookPro9,2. Constructor adds the getter only when absent.",
+  "dependencies": [],
+  "exports": [],
+  "name": "golden-gate-corespotlight-compat",
+  "notes": "Self-contained source, build and offline installation in https://github.com/lythka/hao-patcher. Requires macOS Xcode SDK/tools; installation requires a separately supplied writable Golden Gate System volume.",
+  "officially_supported_models": [
+    "MacBookPro9,2"
+  ],
+  "outputs": [
+    "corespotlight_compat.dylib"
+  ],
+  "patches": [
+    "golden-gate-corespotlight-compat"
+  ],
+  "schema": 1,
+  "validation": "Host tests pass; offline installation and live daemon stability need validation.",
+  "version": "v0.2.0",
+  "visibility": "public",
+  "main_provided_inputs": []
+}

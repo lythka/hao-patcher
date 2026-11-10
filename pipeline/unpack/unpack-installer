@@ -1,0 +1,585 @@
+#!/usr/bin/python3 -I
+"""unpack-installer: the pristine System tree, cryptexes and BaseSystem from a macOS installer, on the host, as the
+user (no root, no VM). The result matches Apple's post.bom entry for entry (for 25G325: 486,604 entries, 299,962
+files).
+
+  unpack-installer [--dry-run] [--no-attach] [--keep-intermediates] [--no-x86-cryptex] [--hash-input] INPUT OUTDIR
+  unpack-installer --verify-only OUTDIR --manifest FILE --scratch DIR
+
+INPUT: an "Install macOS <name>.app", an InstallAssistant.pkg (SharedSupport.dmg, a top-level member of the flat
+pkg, is taken out with xar and checked against the TOC's SHA-1) or a SharedSupport.dmg. OUTDIR must not exist (or be empty); nothing is ever overwritten.
+--dry-run: print the plan (members, sizes, commands, free space) and change nothing; it attaches SharedSupport.dmg
+read-only to read the zip directory and detaches it again (--no-attach: plan without member counts).
+--verify-only: re-run the checks on an existing OUTDIR without writing into it (listings it needs are regenerated
+in --scratch, or reused when they cannot be regenerated, and the manifest says which).
+Writes OUTDIR/unpack-manifest.json (schema 1): every produced tree and file with its hash, every step, every check.
+Exit 0 = all checks pass, 1 = a check failed, 2 = usage / refused, 3 = a step failed.
+"""
+import argparse, datetime, glob, hashlib, json, os, plistlib, platform, re, shutil, subprocess, sys, tempfile, time, zipfile
+import xml.etree.ElementTree as ET
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+PY = [sys.executable, "-I"]
+ASSET_DIR = "com_apple_MobileAsset_MacSoftwareUpdate"
+PV2 = "AssetData/payloadv2/"
+PAYLOAD_RE = re.compile(r"^AssetData/payloadv2/payload\.(\d{3})$")
+PV2_META = ("links.txt", "firmlinks_payload", "fixup.manifest", "data_payload", "prepare_payload", "payload_chunks.txt")
+IMAGE_PATCHES = ("cryptex-app", "cryptex-system-arm64e", "cryptex-system-x86_64")
+TOP_FILES = ("Info.plist", "AssetData/Info.plist", "AssetData/post.bom", "AssetData/pre.bom", "AssetData/payload.bom",
+             "AssetData/payload.bom.signature", "AssetData/payloadv2.bom", "AssetData/payloadv2.bom.signature")
+
+
+def die(msg, code=2):
+    print("unpack-installer: " + msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def hashes(p, algos=("sha1", "sha256")):
+    hs = [hashlib.new(a) for a in algos]
+    with open(p, "rb") as f:
+        for b in iter(lambda: f.read(1 << 22), b""):
+            for h in hs:
+                h.update(b)
+    return {a: h.hexdigest() for a, h in zip(algos, hs)}
+
+
+def pkg_member(pkg, name="SharedSupport.dmg"):
+    """the TOC entry of a top-level member of a flat (xar) pkg: size, offset, encoding, extracted SHA-1"""
+    r = subprocess.run(["/usr/bin/xar", "--dump-toc=/dev/stdout", "-f", pkg], capture_output=True)
+    if r.returncode != 0:
+        die("xar --dump-toc %s failed: %s" % (pkg, r.stderr.decode(errors="replace").strip()), 3)
+    for f in ET.fromstring(r.stdout).find("toc").findall("file"):  # top level only
+        if f.findtext("name") == name and f.findtext("type") == "file":
+            d = f.find("data")
+            ck = d.find("extracted-checksum") if d is not None else None
+            if d is None or ck is None:
+                break
+            return {"member": name, "size": int(d.findtext("size")), "offset": int(d.findtext("offset")),
+                    "encoding": d.find("encoding").get("style"), "checksum_style": ck.get("style"), "checksum": ck.text}
+    die("%s has no top-level %s with a data checksum in its TOC (not a full InstallAssistant.pkg?)" % (pkg, name))
+
+
+def sha256(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for b in iter(lambda: f.read(1 << 22), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
+def wanted(name, x86_cryptex=True):
+    """the zip members the 10-22 run extracted (zip/ in the work folder): payload chunks and payloadv2 metadata, the
+    image and BaseSystem patches, the BOMs, AssetData/boot (minus the Apple-silicon kernelcaches, the encrypted
+    141-*.dmg.aea and, under boot/EFI, every firmware-updater binary for other Macs: only its .plist files),
+    Restore (chunklists, AppleDiagnostics), usr (SU ramdisks), META-INF"""
+    if name.endswith("/"):
+        return False
+    if PAYLOAD_RE.match(name) or name in TOP_FILES:
+        return True
+    if name.startswith(PV2):
+        rest = name[len(PV2):]
+        if rest in PV2_META:
+            return True
+        if rest.startswith("image_patches/"):
+            p = rest.split("/", 1)[1]
+            return p in IMAGE_PATCHES and (x86_cryptex or p != "cryptex-system-x86_64")
+        return rest == "basesystem_patches/x86_64BaseSystem.dmg"
+    if name.startswith("AssetData/boot/"):
+        b = name[len("AssetData/boot/"):]
+        if b.startswith("EFI/"):
+            return b.endswith(".plist")
+        return not b.startswith("kernelcache.release.") and not ("/" not in b and b.endswith(".dmg.aea"))
+    return name.startswith(("AssetData/Restore/", "AssetData/usr/", "META-INF/"))
+
+
+class Runner:
+    def __init__(self, out, dry):
+        self.out, self.dry, self.steps = out, dry, []
+
+    def run(self, name, cmd, cwd=None, stdout=None, stderr=None, check=True):
+        shown = " ".join(_q(c) for c in cmd) + (" > " + stdout if stdout else "") + (" 2> " + stderr if stderr else "")
+        rec = {"step": name, "cmd": shown, "cwd": cwd}
+        if self.dry:
+            rec["dry_run"] = True; self.steps.append(rec); return rec
+        print("== %s: %s" % (name, shown), file=sys.stderr)
+        t = time.time()
+        fo = open(stdout, "wb") if stdout else None
+        fe = open(stderr, "wb") if stderr else None
+        try:
+            r = subprocess.run(cmd, cwd=cwd, stdout=fo, stderr=fe)
+        finally:
+            for f in (fo, fe):
+                if f:
+                    f.close()
+        rec.update(rc=r.returncode, seconds=round(time.time() - t, 1))
+        self.steps.append(rec)
+        if check and r.returncode != 0:
+            self.fail(name, rec)
+        return rec
+
+    def fail(self, name, rec):
+        man = os.path.join(self.out, "unpack-manifest.partial.json")
+        if not os.path.exists(man):
+            json.dump({"schema": 1, "kind": "unpack-manifest", "failed_step": name, "steps": self.steps},
+                      open(man, "w"), indent=1)
+        die("step %s failed (rc %s); partial manifest %s" % (name, rec.get("rc"), man), 3)
+
+
+def _q(s):
+    return s if re.match(r"^[\w@%+=:,./-]+$", s) else "'" + s.replace("'", "'\\''") + "'"
+
+
+def find_shared_support(inp):
+    """-> (kind, path to SharedSupport.dmg or None, needs_xar)"""
+    inp = os.path.abspath(inp)
+    if inp.endswith(".app") and os.path.isdir(inp):
+        d = os.path.join(inp, "Contents/SharedSupport/SharedSupport.dmg")
+        if not os.path.exists(d):
+            die("%s has no Contents/SharedSupport/SharedSupport.dmg (a stub installer app?)" % inp)
+        return "Install macOS app", d, False
+    if inp.endswith(".pkg") and os.path.isfile(inp):
+        pkg_member(inp)  # dies unless SharedSupport.dmg is a top-level member
+        return "InstallAssistant.pkg", inp, True
+    if inp.endswith(".dmg") and os.path.isfile(inp):
+        return "SharedSupport.dmg", inp, False
+    die("INPUT must be an Install macOS .app, an InstallAssistant.pkg or a SharedSupport.dmg: %s" % inp)
+
+
+def app_info(inp):
+    try:
+        p = plistlib.load(open(os.path.join(inp, "Contents/Info.plist"), "rb"))
+        return {"bundle_version": p.get("CFBundleShortVersionString"), "installer_build": p.get("DTPlatformBuild"),
+                "name": p.get("CFBundleDisplayName") or p.get("CFBundleName")}
+    except (OSError, ValueError):
+        return {}
+
+
+def attach(dmg, mnt):
+    r = subprocess.run(["/usr/bin/hdiutil", "attach", "-readonly", "-nobrowse", "-noautoopen", "-noverify",
+                        "-mountpoint", mnt, "-plist", dmg], capture_output=True)
+    if r.returncode != 0:
+        die("hdiutil attach -readonly %s failed: %s" % (dmg, r.stderr.decode(errors="replace").strip()), 3)
+    ents = plistlib.loads(r.stdout).get("system-entities", [])
+    devs = [e["dev-entry"] for e in ents if "dev-entry" in e]
+    return sorted(devs, key=len)[0] if devs else None
+
+
+def detach(dev):
+    if dev:
+        subprocess.run(["/usr/bin/hdiutil", "detach", dev], capture_output=True)
+
+
+def asset_info(mnt):
+    zips = sorted(glob.glob(os.path.join(mnt, ASSET_DIR, "*.zip")))
+    if len(zips) != 1:
+        die("expected exactly one %s/*.zip in SharedSupport.dmg, found %d" % (ASSET_DIR, len(zips)), 3)
+    info = {"zip": os.path.basename(zips[0]), "zip_size": os.path.getsize(zips[0])}
+    xml = os.path.join(mnt, ASSET_DIR + ".xml")
+    if os.path.exists(xml):
+        try:
+            assets = plistlib.load(open(xml, "rb")).get("Assets", [])
+            if assets:
+                info.update({k: assets[0].get(k) for k in ("Build", "OSVersion", "ProductVersion") if assets[0].get(k)})
+        except (OSError, ValueError):
+            pass
+    return zips[0], info
+
+
+def plan_members(zp, x86):
+    with zipfile.ZipFile(zp) as z:
+        infos = z.infolist()
+    sel = [i for i in infos if wanted(i.filename, x86)]
+    payload = sorted((i for i in sel if PAYLOAD_RE.match(i.filename)), key=lambda i: i.filename)
+    nums = [int(PAYLOAD_RE.match(i.filename).group(1)) for i in payload]
+    if nums != list(range(len(nums))):
+        die("payload chunks are not numbered 000..%03d without gaps" % (len(nums) - 1), 3)
+    return sel, payload, len(infos)
+
+
+def steps_after_unzip(R, out, payload_names, x86, ripatch):
+    z = os.path.join(out, "zip")
+    pv2 = os.path.join(z, PV2)
+    R.run("pbzx-payload", PY + [os.path.join(HERE, "pbzx.py"), "-o", os.path.join(out, "payload.yaa")] +
+          [os.path.join(z, n) for n in payload_names])
+    ext = R.run("aa-extract", ["/usr/bin/aa", "extract", "-v", "-exclude-field", "uid,gid,flg", "-i",
+                               os.path.join(out, "payload.yaa"), "-d", os.path.join(out, "tree")],
+                stdout=os.path.join(out, "extract.log"), stderr=os.path.join(out, "extract.err"), check=False)
+    R.run("hard-links", PY + [os.path.join(HERE, "links.py"), os.path.join(out, "tree"), pv2 + "links.txt"],
+          stdout=os.path.join(out, "links.log"))
+    R.run("aa-list-payload", ["/usr/bin/aa", "list", "-i", os.path.join(out, "payload.yaa"), "-list-format", "json"],
+          stdout=os.path.join(out, "payload-list.json"))
+    if not R.dry and ext.get("rc") != 0:
+        attr_fixup(R, out, ext)
+    R.run("pbzx-fixup", PY + [os.path.join(HERE, "pbzx.py"), "-o", os.path.join(out, "fixup.yaa"), pv2 + "fixup.manifest"])
+    R.run("aa-list-fixup", ["/usr/bin/aa", "list", "-i", os.path.join(out, "fixup.yaa"), "-list-format", "json"],
+          stdout=os.path.join(out, "fixup-list.json"))
+    R.run("xattrs", PY + [os.path.join(HERE, "yaa.py"), os.path.join(out, "payload.yaa")],
+          stdout=os.path.join(out, "payload-xattrs.txt"))
+    o = os.path.join(out, "out")
+    for p in IMAGE_PATCHES:
+        if p == "cryptex-system-x86_64" and not x86:
+            continue
+        R.run("ripatch-" + p, [ripatch, "-", os.path.join(o, p + ".img"), pv2 + "image_patches/" + p],
+              stderr=os.path.join(o, p + ".log"))
+    R.run("bx50-basesystem", PY + [os.path.join(HERE, "bx50full.py"), pv2 + "basesystem_patches/x86_64BaseSystem.dmg",
+                                   os.path.join(o, "BaseSystem-x86_64.dmg")], stdout=os.path.join(o, "BaseSystem-x86_64.log"))
+    R.run("chmod-tree", ["/bin/chmod", "-R", "u+rwX", os.path.join(out, "tree")])  # mode-0 files must be readable to cksum
+
+
+EACCES_RE = re.compile(r"^Permission denied: open: (/.+)$")
+AA_ERR_OK = re.compile(r"^(Error 0x[0-9a-f]+|applyEntryAttributes failed)$")
+
+
+def attr_fixup(R, out, ext):
+    """aa extract as the user cannot open an entry below a directory whose archive mode has no owner x bit (25G241:
+    Templates/Data/.../dslocal/nodes/Default is 0600, its subdirectories 0700). Whether aa hits this depends on the
+    order its writer threads apply directory attributes, so it varies from run to run. Accept rc 1 only when every error is that case, then apply the failed entries'
+    archive mode and mtime ourselves (ancestors made u+rwx first, as the chmod-tree step does anyway)."""
+    tree = os.path.realpath(os.path.join(out, "tree"))
+    err = open(os.path.join(out, "extract.err"), errors="replace").read().splitlines()
+    denied, bad = [], []
+    for l in err:
+        m = EACCES_RE.match(l.strip())
+        if m:
+            denied.append(m.group(1))
+        elif AA_ERR_OK.match(l.strip()):
+            pass
+        elif l[:1] not in (" ", "\t") and re.search(r"(?i)error|fail|denied|cannot|invalid|unable", l):  # indented = aa's settings/stats
+            bad.append(l)
+    arch = {(e["PAT"] or "."): e for e in json.load(open(os.path.join(out, "payload-list.json")))}
+    fixed, opened = [], set()
+    for p in denied:
+        rp = os.path.realpath(p)
+        rel = os.path.relpath(rp, tree)
+        e = arch.get(rel)
+        anc, d = [], os.path.dirname(rel)
+        while d:
+            if d in arch and not arch[d]["MOD"] & 0o100:
+                anc.append(d)
+            d = os.path.dirname(d)
+        if not rp.startswith(tree + os.sep) or e is None or not anc:
+            bad.append("unexplained EACCES: " + p); continue
+        for a in reversed(anc):
+            ap_ = os.path.join(tree, a)
+            os.chmod(ap_, os.lstat(ap_).st_mode & 0o7777 | 0o700); opened.add(a)
+        os.chmod(rp, e["MOD"] & 0o777)  # set-id bits are dropped for the user anyway
+        if "MTM" in e:
+            os.utime(rp, (e["MTM"], e["MTM"]), follow_symlinks=False)
+        fixed.append({"path": rel, "mode": "%o" % (e["MOD"] & 0o777), "mtime": e.get("MTM"), "blocked_by": anc})
+    rec = {"step": "aa-extract-attr-fixup", "aa_rc": ext.get("rc"), "fixed": fixed, "ancestors_made_u+rwx": sorted(opened),
+           "unexplained": bad}
+    R.steps.append(rec)
+    print("== aa-extract-attr-fixup: aa rc %s; %d entries re-applied, %d unexplained" % (ext.get("rc"), len(fixed), len(bad)),
+          file=sys.stderr)
+    if bad or not fixed:
+        R.fail("aa-extract", dict(ext, unexplained=bad))
+
+
+def build_ripatch(R, out):
+    b = os.path.join(out, "bin"); os.makedirs(b, exist_ok=True)
+    exe = os.path.join(b, "ripatch")
+    R.run("build-ripatch", ["/usr/bin/cc", "-O2", "-Wall", "-o", exe, os.path.join(HERE, "ripatch.c")])
+    return exe
+
+
+def checks(R, out, scratch, reuse_ok):
+    """bomcheck, chunklist, cryptex digest lines, BaseSystem SHA-1 line. Listings go to scratch."""
+    res, z = {}, os.path.join(out, "zip")
+    pv2 = os.path.join(z, PV2)
+    pb = os.path.join(scratch, "post-bom.txt")
+    R.run("lsbom-post", ["/usr/bin/lsbom", "-p", "fMUGsc", os.path.join(z, "AssetData/post.bom")], stdout=pb)
+    tc = os.path.join(scratch, "tree-cksum.txt")
+    R.run("cksum-tree", ["/bin/sh", "-c", "find . -type f -print0 | xargs -0 cksum"], cwd=os.path.join(out, "tree"),
+          stdout=tc, stderr=os.path.join(scratch, "tree-cksum.err"), check=False)
+    fl = os.path.join(out, "fixup-list.json")
+    if reuse_ok:  # verify-only: regenerate the fixup listing in scratch and compare with the stored one
+        fy = os.path.join(scratch, "fixup.yaa")
+        R.run("pbzx-fixup", PY + [os.path.join(HERE, "pbzx.py"), "-o", fy, pv2 + "fixup.manifest"])
+        fl2 = os.path.join(scratch, "fixup-list.json")
+        R.run("aa-list-fixup", ["/usr/bin/aa", "list", "-i", fy, "-list-format", "json"], stdout=fl2)
+        res["fixup_list_regenerated_equal"] = os.path.exists(fl) and sha256(fl) == sha256(fl2)
+        fl = fl2 if not os.path.exists(fl) else fl
+        os.remove(fy)
+    bj = os.path.join(scratch, "bomcheck.json")
+    r = R.run("bomcheck", PY + [os.path.join(HERE, "bomcheck.py"), "--post-bom", pb, "--tree-cksum", tc,
+                                "--payload-list", os.path.join(out, "payload-list.json"), "--fixup-list", fl,
+                                "--links", pv2 + "links.txt", "--json", bj], stdout=os.path.join(scratch, "bomcheck.txt"),
+              check=False)
+    res["bomcheck"] = json.load(open(bj)) if os.path.exists(bj) else {"ok": False, "rc": r.get("rc")}
+    res["bomcheck"]["ok"] = r.get("rc") == 0 and res["bomcheck"].get("ok", False)
+    o = os.path.join(out, "out")
+    r = R.run("chunklist-basesystem", PY + [os.path.join(HERE, "chunklist.py"), os.path.join(z, "AssetData/Restore/BaseSystem.chunklist"),
+                                            os.path.join(o, "BaseSystem-x86_64.dmg")],
+              stdout=os.path.join(scratch, "chunklist.txt"), check=False)
+    res["basesystem_chunklist"] = {"ok": r.get("rc") == 0, "result": open(os.path.join(scratch, "chunklist.txt")).read().strip()}
+    bl = os.path.join(o, "BaseSystem-x86_64.log")
+    res["basesystem_sha1"] = {"ok": None, "note": "no log (the 10-22 run printed it to the terminal)"} if not os.path.exists(bl) \
+        else {"ok": "MATCH" in open(bl).read().split(), "result": open(bl).read().strip()}
+    cr = {}
+    for p in IMAGE_PATCHES:
+        lg = os.path.join(o, p + ".log")
+        if not os.path.exists(lg):
+            continue
+        t = open(lg, errors="replace").read()
+        m = re.search(r"Output variant <[^>]*> \| (\d+) bytes .*digest=([0-9a-f]{64})", t)
+        img = os.path.join(o, p + ".img")
+        cr[p] = {"ok": "Digest match. Output reconstructed." in t and "RawImagePatch returned 0" in t and m is not None
+                 and os.path.exists(img) and os.path.getsize(img) == int(m.group(1)),
+                 "apple_digest": m.group(2) if m else None, "size": int(m.group(1)) if m else None}
+    res["cryptexes"] = cr
+    return res
+
+
+def tree_listing(tree, cks, out_path):
+    """one line per entry: type mode size path crc|link (sorted) -> sha256 of the listing, counts"""
+    crc = {}
+    for line in open(cks, encoding="utf-8", errors="surrogateescape"):
+        c, s, p = line.rstrip("\n").split(" ", 2); crc[p[2:]] = c
+    n = {"d": 0, "f": 0, "l": 0, "o": 0}
+    lines = []
+    for dp, dns, fns in os.walk(tree):
+        for nm in dns + fns:
+            p = os.path.join(dp, nm); rel = os.path.relpath(p, tree); st = os.lstat(p)
+            t = "l" if os.path.islink(p) else "d" if os.path.isdir(p) else "f" if os.path.isfile(p) else "o"
+            n[t] += 1
+            v = os.readlink(p) if t == "l" else crc.get(rel, "") if t == "f" else ""
+            lines.append("%s\t%o\t%d\t%s\t%s" % (t, st.st_mode & 0o7777, st.st_size if t == "f" else 0, rel, v))
+    lines.sort()
+    data = ("\n".join(lines) + "\n").encode("utf-8", "surrogateescape")
+    with open(out_path, "wb") as f:
+        f.write(data)
+    return {"entries": n, "listing": out_path, "listing_sha256": hashlib.sha256(data).hexdigest(),
+            "note": "listing = type, mode, size, path, POSIX cksum CRC or symlink target; modes are after chmod u+rwX"}
+
+
+def file_records(out, names):
+    rec = []
+    for n in names:
+        p = os.path.join(out, n)
+        if os.path.isfile(p):
+            print("  sha256 %s" % n, file=sys.stderr)
+            rec.append({"path": n, "size": os.path.getsize(p), "sha256": sha256(p)})
+    return rec
+
+
+def host():
+    v = subprocess.run(["/usr/bin/sw_vers"], capture_output=True, text=True).stdout
+    d = dict(l.split(":", 1) for l in v.splitlines() if ":" in l)
+    cc = subprocess.run(["/usr/bin/cc", "--version"], capture_output=True, text=True).stdout.splitlines()
+    return {"macos": d.get("ProductVersion", "").strip(), "build": d.get("BuildVersion", "").strip(),
+            "arch": platform.machine(), "cc": cc[0] if cc else None, "python": platform.python_version()}
+
+
+def outputs_list(out):
+    o = [os.path.join("out", f) for f in sorted(os.listdir(os.path.join(out, "out")))] if os.path.isdir(os.path.join(out, "out")) else []
+    return o + ["payload-list.json", "fixup-list.json", "payload-xattrs.txt", "bin/ripatch"]
+
+
+def verify_only(a):
+    out = os.path.abspath(a.outdir)
+    for p in ("tree", "zip/AssetData/post.bom", "zip/" + PV2 + "links.txt", "payload-list.json", "out"):
+        if not os.path.exists(os.path.join(out, p)):
+            die("%s: missing %s (not an unpack-installer output folder)" % (out, p))
+    if os.path.exists(a.manifest):
+        die("%s exists; refusing to overwrite" % a.manifest)
+    if os.path.realpath(a.scratch).startswith(os.path.realpath(out) + os.sep):
+        die("--scratch must be outside OUTDIR (verify-only never writes into OUTDIR)")
+    if os.path.exists(a.scratch) and os.listdir(a.scratch):
+        die("--scratch %s is not empty" % a.scratch)
+    os.makedirs(a.scratch, exist_ok=True)
+    R = Runner(a.scratch, False)
+    res = checks(R, out, a.scratch, True)
+    res["reused"] = ["payload-list.json (payload.yaa was deleted after the run; cannot be regenerated without re-unzipping)"]
+    tree = tree_listing(os.path.join(out, "tree"), os.path.join(a.scratch, "tree-cksum.txt"),
+                        os.path.join(a.scratch, "tree-listing.tsv"))
+    files = file_records(out, outputs_list(out))
+    ok = res["bomcheck"]["ok"] and res["basesystem_chunklist"]["ok"] and all(c["ok"] for c in res["cryptexes"].values()) \
+        and res.get("fixup_list_regenerated_equal", True) and res["basesystem_sha1"]["ok"] is not False
+    man = {"schema": 1, "kind": "unpack-manifest", "mode": "verify-only", "tool": "pipeline/unpack/unpack-installer",
+           "created": datetime.datetime.now().isoformat(timespec="seconds"), "outdir": out, "host": host(),
+           "outputs": {"tree": dict(tree, path="tree"), "files": files}, "checks": res, "steps": R.steps, "ok": ok}
+    json.dump(man, open(a.manifest, "w"), indent=1)
+    man["_path"] = os.path.abspath(a.manifest)
+    summary(man)
+    return 0 if ok else 1
+
+
+def summary(man):
+    c = man["checks"]; b = c.get("bomcheck", {})
+    print("unpack-installer %s: %s" % (man["mode"], "OK" if man["ok"] else "FAIL"))
+    if b:
+        cnt = b.get("counts", {})
+        print("  post.bom: %s/%s entries matched, %s/%s files size+CRC; problems: %s" % (
+            cnt.get("entries-matched"), b.get("post_bom_entries"), cnt.get("file-size+crc-match"), b.get("bom_files"),
+            {k: v for k, v in cnt.items() if k not in ("entries-matched", "file-size+crc-match")} or "none"))
+    if "basesystem_chunklist" in c:
+        print("  BaseSystem chunklist: " + c["basesystem_chunklist"]["result"])
+    print("  BaseSystem SHA-1 vs BXDIFF50 header: %s" % (c.get("basesystem_sha1", {}).get("result") or c.get("basesystem_sha1", {}).get("note")))
+    for k, v in c.get("cryptexes", {}).items():
+        print("  %s: %s (Apple digest %s, %s bytes)" % (k, "digest match" if v["ok"] else "FAIL", (v["apple_digest"] or "?")[:16], v["size"]))
+    if "fixup_list_regenerated_equal" in c:
+        print("  fixup-list.json regenerated from fixup.manifest: %s" % ("identical" if c["fixup_list_regenerated_equal"] else "DIFFERS"))
+    t = man.get("outputs", {}).get("tree")
+    if t:
+        print("  tree: %s; listing sha256 %s" % (t["entries"], t["listing_sha256"][:16]))
+    print("  manifest: %s" % man.get("_path", ""))
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("input", nargs="?"); ap.add_argument("outdir")
+    ap.add_argument("--dry-run", action="store_true"); ap.add_argument("--no-attach", action="store_true")
+    ap.add_argument("--keep-intermediates", action="store_true", help="keep payload.yaa, chunks and patches")
+    ap.add_argument("--no-x86-cryptex", action="store_true", help="skip cryptex-system-x86_64 (the MBP9,2 uses arm64e)")
+    ap.add_argument("--hash-input", action="store_true", help="SHA-256 the SharedSupport.dmg / pkg (18 GB read)")
+    ap.add_argument("--verify-only", action="store_true"); ap.add_argument("--manifest"); ap.add_argument("--scratch")
+    a = ap.parse_args()
+    if a.verify_only:
+        if a.input:
+            die("--verify-only takes OUTDIR only")
+        if not (a.manifest and a.scratch):
+            die("--verify-only needs --manifest FILE and --scratch DIR")
+        sys.exit(verify_only(a))
+    if not a.input:
+        die("INPUT and OUTDIR are required")
+    kind, ss, needs_xar = find_shared_support(a.input)
+    out = os.path.abspath(a.outdir)
+    if os.path.exists(out) and os.listdir(out):
+        die("%s exists and is not empty; refusing to overwrite" % out)
+    x86 = not a.no_x86_cryptex
+    plan = {"input": {"path": os.path.abspath(a.input), "kind": kind, "shared_support": ss if not needs_xar else
+                      "(inside the pkg: xar -xf <pkg> SharedSupport.dmg)", "size": os.path.getsize(ss)}}
+    if kind == "Install macOS app":
+        plan["input"]["app"] = app_info(os.path.abspath(a.input))
+    if needs_xar:
+        plan["input"]["pkg_member"] = pkg_member(ss)
+    if a.hash_input:
+        plan["input"]["sha256"] = sha256(ss)
+    if a.dry_run:
+        return dry_run(a, plan, ss, needs_xar, out, x86)
+    os.makedirs(out, exist_ok=True)
+    for d in ("zip", "out", "work"):
+        os.makedirs(os.path.join(out, d))
+    R = Runner(out, False)
+    if needs_xar:
+        R.run("xar-shared-support", ["/usr/bin/xar", "-xf", ss, "-C", os.path.join(out, "work"), "SharedSupport.dmg"])
+        ss = os.path.join(out, "work", "SharedSupport.dmg")
+        pm = plan["input"]["pkg_member"]
+        print("== check-shared-support: size + %s vs the pkg TOC" % pm["checksum_style"], file=sys.stderr)
+        h = hashes(ss, ("sha1", "sha256") if pm["checksum_style"] != "sha256" else ("sha256",))
+        plan["input"]["shared_support_sha256"] = h["sha256"]
+        xar_ck = {"ok": os.path.getsize(ss) == pm["size"] and h.get(pm["checksum_style"]) == pm["checksum"],
+                  "size": os.path.getsize(ss), "toc_size": pm["size"], pm["checksum_style"]: h.get(pm["checksum_style"]),
+                  "toc_checksum": pm["checksum"]}
+        if not xar_ck["ok"]:
+            R.fail("check-shared-support", {"rc": "TOC mismatch %s" % xar_ck})
+    mnt = os.path.join(out, "work", "mnt-ss"); os.makedirs(mnt)
+    dev = attach(ss, mnt)
+    try:
+        zp, info = asset_info(mnt)
+        plan["input"]["asset"] = info
+        sel, payload, total = plan_members(zp, x86)
+        lst = os.path.join(out, "work", "members.txt")
+        open(lst, "w").write("".join(i.filename + "\n" for i in sel))
+        R.run("unzip", ["/usr/bin/unzip", "-q", zp] + [i.filename for i in sel] + ["-d", os.path.join(out, "zip")])
+    finally:
+        detach(dev)
+    ripatch = build_ripatch(R, out)
+    steps_after_unzip(R, out, [i.filename for i in payload], x86, ripatch)
+    scratch = os.path.join(out, "checks"); os.makedirs(scratch)
+    res = checks(R, out, scratch, False)
+    if needs_xar:
+        res["shared_support_vs_pkg_toc"] = xar_ck
+    tree = tree_listing(os.path.join(out, "tree"), os.path.join(scratch, "tree-cksum.txt"), os.path.join(out, "tree-listing.tsv"))
+    files = file_records(out, outputs_list(out) + ["zip/AssetData/boot/SystemVersion.plist"])
+    removed = []
+    if not a.keep_intermediates:  # NOTES section "Artifacts kept": deleted after use, regenerable in ~1 min
+        for p in [os.path.join(out, "payload.yaa"), os.path.join(out, "fixup.yaa")] + \
+                 [os.path.join(out, "zip", i.filename) for i in payload] + \
+                 glob.glob(os.path.join(out, "zip", PV2, "image_patches/*")) + \
+                 glob.glob(os.path.join(out, "zip", PV2, "basesystem_patches/*")) + \
+                 ([os.path.join(out, "work", "SharedSupport.dmg")] if needs_xar else []):  # the copy taken out of the pkg
+            if os.path.exists(p):
+                os.remove(p); removed.append(os.path.relpath(p, out))
+    sv = os.path.join(out, "zip/AssetData/boot/SystemVersion.plist")
+    if os.path.exists(sv):
+        s = plistlib.load(open(sv, "rb"))
+        plan["input"]["build"], plan["input"]["version"] = s.get("ProductBuildVersion"), s.get("ProductVersion")
+    ok = res["bomcheck"]["ok"] and res["basesystem_chunklist"]["ok"] and res["basesystem_sha1"]["ok"] and \
+        all(c["ok"] for c in res["cryptexes"].values()) and res.get("shared_support_vs_pkg_toc", {"ok": True})["ok"]
+    man = {"schema": 1, "kind": "unpack-manifest", "mode": "unpack", "tool": "pipeline/unpack/unpack-installer",
+           "created": datetime.datetime.now().isoformat(timespec="seconds"), "outdir": out, "host": host(),
+           "input": plan["input"], "members": {"zip_entries": total, "extracted": len(sel), "payload_chunks": len(payload)},
+           "outputs": {"tree": dict(tree, path="tree"), "files": files}, "removed_intermediates": removed,
+           "checks": res, "steps": R.steps, "ok": ok}
+    mp = os.path.join(out, "unpack-manifest.json")
+    json.dump(man, open(mp, "w"), indent=1)
+    man["_path"] = mp
+    summary(man)
+    sys.exit(0 if ok else 1)
+
+
+def dry_run(a, plan, ss, needs_xar, out, x86):
+    R = Runner(out, True)
+    plan["outdir"] = out
+    zp = "<SharedSupport>/%s/<asset>.zip" % ASSET_DIR
+    if needs_xar:
+        R.run("xar-shared-support", ["/usr/bin/xar", "-xf", ss, "-C", os.path.join(out, "work"), "SharedSupport.dmg"])
+        R.steps.append({"step": "check-shared-support", "cmd": "size + %s of work/SharedSupport.dmg == pkg TOC (%d bytes, %s)"
+                        % (plan["input"]["pkg_member"]["checksum_style"], plan["input"]["pkg_member"]["size"],
+                           plan["input"]["pkg_member"]["checksum"]), "dry_run": True})
+        plan["members_note"] = ("pkg input: member counts need the extracted SharedSupport.dmg (an 18 GB copy), so the "
+                                "dry run lists the steps only; run it on the .dmg after `xar -xf` for the counts")
+    R.run("attach-readonly", ["/usr/bin/hdiutil", "attach", "-readonly", "-nobrowse", "-noautoopen", "-noverify",
+                              "-mountpoint", os.path.join(out, "work/mnt-ss"), ss if not needs_xar else "work/SharedSupport.dmg"])
+    payload_names = ["AssetData/payloadv2/payload.%03d" % i for i in range(3)] + ["..."]
+    if not a.no_attach and not needs_xar:
+        mnt = tempfile.mkdtemp(prefix="unpack-dry-")
+        dev = attach(ss, mnt)
+        try:
+            zp_real, info = asset_info(mnt)
+            plan["input"]["asset"] = info
+            sel, payload, total = plan_members(zp_real, x86)
+            zp = os.path.join("<SharedSupport>", ASSET_DIR, info["zip"])
+            groups = {}
+            for i in sel:
+                g = "payload chunks" if PAYLOAD_RE.match(i.filename) else "/".join(i.filename.split("/")[:3])
+                x = groups.setdefault(g, [0, 0]); x[0] += 1; x[1] += i.file_size
+            plan["members"] = {"zip_entries": total, "extract": len(sel), "extract_bytes": sum(i.file_size for i in sel),
+                               "payload_chunks": len(payload), "groups": {k: {"files": v[0], "bytes": v[1]} for k, v in sorted(groups.items())}}
+            payload_names = [i.filename for i in payload]
+        finally:
+            detach(dev)
+            os.rmdir(mnt)
+    R.run("unzip", ["/usr/bin/unzip", "-q", zp, "<%s members>" % plan.get("members", {}).get("extract", "selected"),
+                    "-d", os.path.join(out, "zip")])
+    R.run("build-ripatch", ["/usr/bin/cc", "-O2", "-Wall", "-o", os.path.join(out, "bin/ripatch"), os.path.join(HERE, "ripatch.c")])
+    shown = payload_names if len(payload_names) <= 4 else payload_names[:2] + ["... (%d chunks)" % len(payload_names)]
+    steps_after_unzip(R, out, shown, x86, os.path.join(out, "bin/ripatch"))
+    checks_plan = [("lsbom-post", "lsbom -p fMUGsc zip/AssetData/post.bom > checks/post-bom.txt"),
+                   ("cksum-tree", "(cd tree && find . -type f -print0 | xargs -0 cksum) > checks/tree-cksum.txt"),
+                   ("bomcheck", "bomcheck.py --post-bom ... --tree-cksum ... --payload-list payload-list.json --fixup-list fixup-list.json --links zip/AssetData/payloadv2/links.txt"),
+                   ("chunklist-basesystem", "chunklist.py zip/AssetData/Restore/BaseSystem.chunklist out/BaseSystem-x86_64.dmg"),
+                   ("cryptex-digests", "RawImagePatch logs must say 'Digest match. Output reconstructed.'"),
+                   ("manifest", "unpack-manifest.json: tree listing sha256, sha256 of every out/ file")]
+    for n, c in checks_plan:
+        R.steps.append({"step": n, "cmd": c, "dry_run": True})
+    if not a.keep_intermediates:
+        R.steps.append({"step": "cleanup", "cmd": "rm payload.yaa fixup.yaa zip/AssetData/payloadv2/payload.NNN image_patches/* basesystem_patches/*"
+                        + (" work/SharedSupport.dmg" if needs_xar else ""), "dry_run": True})
+    st = os.statvfs(os.path.dirname(out) if not os.path.exists(out) else out)
+    plan["free_bytes_at_outdir"] = st.f_bavail * st.f_frsize
+    plan["space_note"] = ("peak need ~ extracted members + payload.yaa (~2.4x the payload chunks) + tree (~11 GB for "
+                          "25G325) + cryptexes (~9.6 GB) + BaseSystem (~1.5 GB); 25G325 peaks near 60 GB"
+                          + ("; pkg input adds the SharedSupport.dmg copy (%d bytes) until cleanup" % plan["input"]["pkg_member"]["size"]
+                             if needs_xar else ""))
+    plan["steps"] = R.steps
+    plan["host"] = host()
+    print(json.dumps(plan, indent=1))
+    print("\nDRY RUN: nothing was written (SharedSupport.dmg was attached read-only to read the zip directory and "
+          "detached)." if not (a.no_attach or needs_xar) else "\nDRY RUN: nothing was written or attached.", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main() or 0)

@@ -1,0 +1,77 @@
+#!/bin/zsh
+# recovery TARGET MACOS_BUILD PATCH_SET: the macOS Recovery for TARGET from MACOS_BUILD's BaseSystem and the set's
+# recovery patches, on this Apple silicon Mac, plus the netrec disk the NetBoot server serves.
+#   host: BaseSystem + the set's recovery patches (each make.sh builds its binaries) -> builder VM, root:
+#   stages/recovery.sh (patches, kernel collection) -> host: stages/netrec.sh (the target's OpenCore + the BaseSystem)
+# Output OUT (default store/recovery/TARGET-MACOS_BUILD-PATCH_SET): BaseSystem.dmg, http/<model>/{netrec.img,
+# netrec.md5,boot.ipxe} (a NetBoot srv tree), volume/{BaseSystem.dmg (a clone), BaseSystem.chunklist (unsigned,
+# stages/chunklist.py), patches.txt} (what patches/rec-install-volume puts on an image's Recovery volume),
+# patches.txt, recovery.log, build.log. Stops at the first failing step.
+# The root-patched System (kexts, kmutil, kernel) comes from an image pipeline/run built for the same target and build:
+# SYSIMG (default store/images/TARGET-MACOS_BUILD-stock/work/disk.img); an APFS clone of it is the VM's USB disk.
+# Env: VM (builder clone), VMBIN, VMCTL, RUN (work folder), OUT, SYSIMG, GROW (BaseSystem size, default 3200m)
+set -eu
+TARGET=${1:?target}; BUILD=${2:?macOS build}; SET=${3:?patch set}
+P=${0:A:h}; TOP=${P:h}; L=(python3 -I $P/lock.py)
+TJ=$P/targets/$TARGET.json; LOCK=$P/inputs/$BUILD; COMMON=$P/inputs/common; ST=$TOP/store
+VM=${VM:-$ST/vm/builder/vm}
+export VMBIN=${VMBIN:-$ST/vm/bin} VMCTL=${VMCTL:-$P/vm/vmctl}
+STAMP=$(date +%Y%m%d-%H%M%S)
+RUN=${RUN:-$ST/runs/recovery-$TARGET-$BUILD-$SET-$STAMP}; SH=$RUN/share
+OUT=${OUT:-$ST/recovery/$TARGET-$BUILD-$SET}
+SYSIMG=${SYSIMG:-$ST/images/$TARGET-$BUILD-stock/work/disk.img}
+mkdir -p $SH/in $SH/rec; exec > >(tee $RUN/build.log) 2>&1
+t0=$(date +%s); step() { echo "== $1 ($(( $(date +%s)-t0 )) s)"; }
+echo "recovery $TARGET $BUILD $SET ($(git -C $TOP rev-parse --short HEAD)) -> $RUN"
+guest() {   # as pipeline/run's guest(): the script's text through the agent, detached; judged by its LOG on the share
+    local script=$1 log=$SH/$2 t=$(date +%s); shift 2
+    $VMCTL $VM exec "( $* $(cat $script)
+) >/dev/null 2>&1 </dev/null & echo started" | grep -q started || { echo "recovery: could not start ${script:t}"; $P/vm/stop.sh $VM; exit 1; }
+    until [[ -f $log ]] && grep -q '^RESULT rc=' $log; do
+        (( $(date +%s) - t > ${GUEST_TIMEOUT:-1800} )) && { echo "recovery: ${script:t}: no RESULT"; $P/vm/stop.sh $VM; exit 1; }
+        sleep 5
+    done
+    grep -E '^(STEP|FAIL|BaseSystem|System|total)' $log
+    grep -q '^RESULT rc=0' $log || { echo "recovery: ${script:t} failed"; tail -20 $log; $P/vm/stop.sh $VM; exit 1; }
+}
+
+step inputs
+cp -c $($L path $LOCK unpack)/out/BaseSystem-x86_64.dmg $SH/in/BaseSystem.dmg
+python3 -I $P/patches.py plan $P/sets/$SET.txt $TJ $BUILD > $RUN/plan.txt
+awk '$1 == "recovery"' $RUN/plan.txt > $SH/patches.txt
+python3 -I $P/patches.py revisions $(cut -d' ' -f2 $SH/patches.txt) > $RUN/revisions.txt
+row() { if [[ -f $LOCK/$1 ]]; then $L path $LOCK $1; else $L path $COMMON $1; fi; }   # the build's row, else common's
+i=0
+while read -r stage name ins; do
+    i=$((i + 1)); d=$SH/rec/$(printf %02d $i)-$name
+    recipe=$(python3 -I $P/patches.py path $name)
+    ditto $recipe $d; mkdir -p $d/inputs
+    for n in ${=ins}; do cp -Rc $(row $n) $d/inputs/$n; done
+    [[ ! -f $d/make.sh ]] || sh $recipe/make.sh $d/build   # host build of the patch's binaries
+done < $SH/patches.txt
+cut -d' ' -f2 $SH/patches.txt | tr '\n' ' '; echo
+
+step system
+cp -c $SYSIMG $RUN/system.img
+D=$(hdiutil attach -readonly -nomount -noverify -imagekey diskimage-class=CRawDiskImage $RUN/system.img | awk '/GUID_partition_scheme/ {print $1; exit}')
+SYSU=$(diskutil apfs list -plist | python3 -I -c '
+import plistlib, sys
+d = sys.argv[1].removeprefix("/dev/")
+for c in plistlib.loads(sys.stdin.buffer.read())["Containers"]:
+    if any(s["DeviceIdentifier"].startswith(d + "s") for s in c["PhysicalStores"]):
+        print(" ".join(v["APFSVolumeUUID"] for v in c["Volumes"] if "System" in v.get("Roles", [])))' $D)
+hdiutil detach $D >/dev/null
+echo "System volume $SYSU in $SYSIMG"
+
+step vm;    python3 -I $P/vm/clones.py start $VM $SH --usb $RUN/system.img
+step build; guest $P/stages/recovery.sh out/recovery.log "S=/private/var/ssdshare SYSU=$SYSU GROW=${GROW:-3200m};"
+step stop;  $P/vm/stop.sh $VM; rm -f $RUN/system.img
+step netrec
+rm -rf $OUT; mkdir -p $OUT
+mv $SH/out/BaseSystem.dmg $OUT/BaseSystem.dmg
+cp $SH/patches.txt $SH/out/*.log $OUT/
+mkdir $OUT/volume; cp -c $OUT/BaseSystem.dmg $SH/patches.txt $OUT/volume/
+python3 -I $P/stages/chunklist.py create $OUT/volume/BaseSystem.dmg $OUT/volume/BaseSystem.chunklist
+$P/stages/netrec.sh $TJ $OUT/BaseSystem.dmg $OUT
+step done
+cp $RUN/build.log $OUT/

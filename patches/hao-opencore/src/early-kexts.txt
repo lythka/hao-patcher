@@ -1,0 +1,6 @@
+# Tahoe MBP9,2 early display and wired-network roots.
+# Same roots as patches/rec-display-ethernet/kexts.txt; dependencies come from
+# the root-patched Tahoe bundles.
+com.apple.driver.AppleIntelFramebufferCapri
+com.apple.driver.AppleIntelHD4000Graphics
+com.apple.iokit.AppleBCM5701Ethernet

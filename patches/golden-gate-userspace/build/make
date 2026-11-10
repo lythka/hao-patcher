@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Extract a stored IPSW's userspace images for a hybrid Intel build."""
+import argparse
+from datetime import datetime, timezone
+import hashlib
+import json
+from pathlib import Path
+import plistlib
+import shutil
+import subprocess
+import zipfile
+
+UNIT = 'patches/golden-gate-userspace/build'
+REVISION = 2
+ROLES = {'filesystem': 'OS', 'os': 'Cryptex1,SystemOS',
+         'app': 'Cryptex1,AppOS', 'rosetta': 'Cryptex1,RosettaOS'}
+
+
+def digest(path):
+    h = hashlib.sha256()
+    with path.open('rb') as stream:
+        for block in iter(lambda: stream.read(8 << 20), b''):
+            h.update(block)
+    return h.hexdigest()
+
+
+def select_identity(manifest, board):
+    choices = [item for item in manifest['BuildIdentities']
+               if item['Info'].get('DeviceClass') == board
+               and item['Info'].get('Variant') == 'Customer Erase Install (IPSW)']
+    if len(choices) != 1:
+        raise ValueError(f'{board}: expected one erase identity, found {len(choices)}')
+    return choices[0]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--ipsw', type=Path, required=True)
+    parser.add_argument('--board', required=True)
+    parser.add_argument('--out', type=Path, required=True)
+    args = parser.parse_args()
+    args.out.mkdir(mode=0o755, parents=True)
+    payload = args.out / 'payload'
+    sources = args.out / 'sources'
+    payload.mkdir(mode=0o755)
+    sources.mkdir(mode=0o755)
+    top = Path(__file__).resolve().parents[3]
+    record = dict(unit=UNIT, revision=REVISION,
+                  date=datetime.now(timezone.utc).isoformat(),
+                  commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=top, text=True).strip(),
+                  dirty=bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=top)),
+                  ipsw=str(args.ipsw.resolve()), board=args.board,
+                  dependencies={'ipsw': subprocess.check_output(['ipsw', 'version'], text=True).strip()},
+                  components={}, status='building')
+
+    def save():
+        (args.out / 'build.json').write_text(json.dumps(record, indent=2) + '\n')
+
+    save()
+    try:
+        print('Hashing source IPSW', flush=True)
+        record['ipsw_sha256'] = digest(args.ipsw)
+        with zipfile.ZipFile(args.ipsw) as archive, (args.out / 'extract.log').open('w') as log:
+            raw = archive.read('BuildManifest.plist')
+            manifest = plistlib.loads(raw)
+            identity = select_identity(manifest, args.board)
+            record['build'] = manifest['ProductBuildVersion']
+            record['version'] = manifest['ProductVersion']
+            (sources / 'BuildManifest.plist').write_bytes(raw)
+            (payload / 'identity.plist').write_bytes(plistlib.dumps(identity))
+            for role, key in ROLES.items():
+                name = identity['Manifest'][key]['Info']['Path']
+                source = sources / Path(name).name
+                print(f'Extracting {role}: {name}', flush=True)
+                with archive.open(name) as src, source.open('wb') as dst:
+                    shutil.copyfileobj(src, dst, 8 << 20)
+                output = payload / f'{role}.dmg'
+                if name.endswith('.aea'):
+                    decoded = sources / f'decrypted-{role}'
+                    decoded.mkdir(mode=0o755)
+                    subprocess.run(['ipsw', 'fw', 'aea', str(source), '--output', str(decoded)],
+                                   stdout=log, stderr=subprocess.STDOUT, check=True)
+                    image = decoded / source.name.removesuffix('.aea')
+                else:
+                    image = source
+                # Keep the exact extraction as provenance; APFS clone avoids a second allocation.
+                subprocess.run(['cp', '-c', str(image), str(output)], check=True)
+                record['components'][role] = dict(member=name, sha256=digest(output),
+                                                   size=output.stat().st_size)
+                save()
+        metadata = {key: record[key] for key in ('unit', 'revision', 'commit', 'build', 'version',
+                                                 'ipsw_sha256', 'board', 'components')}
+        (payload / 'userspace.json').write_text(json.dumps(metadata, indent=2) + '\n')
+        record['status'] = 'complete'
+        record['validation'] = 'Extracted and hashed; image installation and boot remain untested.'
+        print(f'Userspace images ready: {payload}', flush=True)
+    except Exception as error:
+        record['status'] = 'failed'
+        record['error'] = str(error)
+        raise
+    finally:
+        save()
+
+
+if __name__ == '__main__':
+    main()

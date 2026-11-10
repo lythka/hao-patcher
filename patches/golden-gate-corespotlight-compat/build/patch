@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Build or install the CoreSpotlight repair using only this checkout."""
+import argparse
+from pathlib import Path
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parent
+PATCH = ROOT.parent  # this builder lives in the recipe's build/ folder
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest='command', required=True)
+    build = commands.add_parser('build', help='compile and sign a new artifact')
+    build.add_argument('--output', type=Path, required=True)
+    install = commands.add_parser('install', help='patch an offline, writable System volume as root')
+    install.add_argument('--system', type=Path, required=True)
+    install.add_argument('--artifact', type=Path, required=True,
+                         help='artifact directory produced by build')
+    args = parser.parse_args()
+    if args.command == 'build':
+        args.output.mkdir(parents=True, exist_ok=True)
+        subprocess.run([sys.executable, '-I', str(PATCH / 'make'), str(args.output.resolve())], check=True)
+    else:
+        system = args.system.resolve()
+        if system == Path('/'):
+            parser.error('select an offline System volume, not the running system')
+        subprocess.run(['sh', str(PATCH / 'src/kc-hook.sh'), str(system),
+                        str(args.artifact.resolve() / 'corespotlight_compat.dylib'), sys.executable], check=True)
+
+
+if __name__ == '__main__':
+    main()

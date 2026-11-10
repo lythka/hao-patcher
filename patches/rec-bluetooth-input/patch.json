@@ -1,0 +1,11 @@
+{
+ "revision": 1,
+ "stage": "recovery",
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
+  ]
+ },
+ "status": "product",
+ "validated": false
+}

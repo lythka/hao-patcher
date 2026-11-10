@@ -1,0 +1,300 @@
+{
+ "model": "MacBookPro9,2",
+ "board_id": "Mac-6F01561E16C75D06",
+ "gpu": "Intel HD Graphics 4000 (Ivy Bridge)",
+ "esp": {
+  "path": "store/cache/esp/01-pristine-ESP.tar",
+  "sha256": "eb0c24ba486d9057ab329eb2f4ea06edd706c5c2b0ce10a1e5cf1826cdd4d156",
+  "note": "the ESP as OCLP 3.0.0-rc.3 installed it on this model (EFI/OC, CoreServices/boot.efi, .VolumeIcon.icns)"
+ },
+ "oclp_hardware_profile": {
+  "format": 1,
+  "sources": {
+   "model, board_id, firmware_vendor, ambient_light_sensor, pcie_webcam, pci": "The IODeviceTree of a MacBookPro9,2 (ioreg -p IODeviceTree -a)",
+   "cpu.name": "sysctl machdep.cpu.brand_string on a MacBookPro9,2",
+   "cpu.flags, cpu.leafs": "OCLP datasets/example_data.py MacBookPro92_Stock (same i5-3210M). Patch sets read only 'AVX2 in leafs' (AMD classes)",
+   "third_party_sata_ssd": "A third-party SATA SSD (affects the OpenCore build only)",
+   "t1_chip": "No 2012 Mac has a T1 chip",
+   "selected patch sets": "The nine patch sets OCLP selects for MacBookPro9,2 on Darwin 25, in the order of oclp_patch_sets_record."
+  },
+  "model": "MacBookPro9,2",
+  "board_id": "Mac-6F01561E16C75D06",
+  "firmware_vendor": "Apple",
+  "cpu": {
+   "name": "Intel(R) Core(TM) i5-3210M CPU @ 2.50GHz",
+   "flags": [
+    "FPU",
+    "VME",
+    "DE",
+    "PSE",
+    "TSC",
+    "MSR",
+    "PAE",
+    "MCE",
+    "CX8",
+    "APIC",
+    "SEP",
+    "MTRR",
+    "PGE",
+    "MCA",
+    "CMOV",
+    "PAT",
+    "PSE36",
+    "CLFSH",
+    "DS",
+    "ACPI",
+    "MMX",
+    "FXSR",
+    "SSE",
+    "SSE2",
+    "SS",
+    "HTT",
+    "TM",
+    "PBE",
+    "SSE3",
+    "PCLMULQDQ",
+    "DTES64",
+    "MON",
+    "DSCPL",
+    "VMX",
+    "EST",
+    "TM2",
+    "SSSE3",
+    "CX16",
+    "TPR",
+    "PDCM",
+    "SSE4.1",
+    "SSE4.2",
+    "x2APIC",
+    "POPCNT",
+    "AES",
+    "PCID",
+    "XSAVE",
+    "OSXSAVE",
+    "TSCTMR",
+    "AVX1.0",
+    "RDRAND",
+    "F16C"
+   ],
+   "leafs": []
+  },
+  "ambient_light_sensor": true,
+  "pcie_webcam": false,
+  "t1_chip": false,
+  "third_party_sata_ssd": true,
+  "oclp_patch_sets_record": [
+   "Metal 3802 Common",
+   "Metal 3802 .metallibs Tahoe",
+   "Big Sur GVA",
+   "Monterey OpenCL",
+   "Big Sur OpenCL",
+   "Tahoe Graphics",
+   "Intel Ivy Bridge",
+   "Modern Wireless Common",
+   "Modern Audio"
+  ],
+  "pci": [
+   {
+    "name": "MCHC",
+    "vendor_id": "0x8086",
+    "device_id": "0x0154",
+    "class_code": "0x060000",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/MCHC@0",
+    "pci_path": "PciRoot(0x0)/Pci(0x0,0x0)"
+   },
+   {
+    "name": "P0P2",
+    "vendor_id": "0x8086",
+    "device_id": "0x0151",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/P0P2@10000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1,0x0)"
+   },
+   {
+    "name": "UPSB",
+    "vendor_id": "0x8086",
+    "device_id": "0x1513",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/P0P2@10000/UPSB@0",
+    "pci_path": "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)"
+   },
+   {
+    "name": "DSB0",
+    "vendor_id": "0x8086",
+    "device_id": "0x1513",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/P0P2@10000/UPSB@0/DSB0@0",
+    "pci_path": "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)"
+   },
+   {
+    "name": "NHI0",
+    "vendor_id": "0x8086",
+    "device_id": "0x1513",
+    "class_code": "0x088000",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/P0P2@10000/UPSB@0/DSB0@0/NHI0@0",
+    "pci_path": "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)"
+   },
+   {
+    "name": "DSB1",
+    "vendor_id": "0x8086",
+    "device_id": "0x1513",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/P0P2@10000/UPSB@0/DSB1@30000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)/Pci(0x3,0x0)"
+   },
+   {
+    "name": "DSB2",
+    "vendor_id": "0x8086",
+    "device_id": "0x1513",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/P0P2@10000/UPSB@0/DSB2@40000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)/Pci(0x4,0x0)"
+   },
+   {
+    "name": "DSB3",
+    "vendor_id": "0x8086",
+    "device_id": "0x1513",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/P0P2@10000/UPSB@0/DSB3@50000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)/Pci(0x5,0x0)"
+   },
+   {
+    "name": "DSB4",
+    "vendor_id": "0x8086",
+    "device_id": "0x1513",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/P0P2@10000/UPSB@0/DSB4@60000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)/Pci(0x6,0x0)"
+   },
+   {
+    "name": "IGPU",
+    "vendor_id": "0x8086",
+    "device_id": "0x0166",
+    "class_code": "0x030000",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/IGPU@20000",
+    "pci_path": "PciRoot(0x0)/Pci(0x2,0x0)",
+    "model": "Intel HD Graphics 4000"
+   },
+   {
+    "name": "XHC1",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e31",
+    "class_code": "0x0c0330",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/XHC1@140000",
+    "pci_path": "PciRoot(0x0)/Pci(0x14,0x0)"
+   },
+   {
+    "name": "pci8086,1e3a",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e3a",
+    "class_code": "0x078000",
+    "pci_path": "PciRoot(0x0)/Pci(0x16,0x0)"
+   },
+   {
+    "name": "EHC2",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e2d",
+    "class_code": "0x0c0320",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/EHC2@1a0000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1a,0x0)"
+   },
+   {
+    "name": "HDEF",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e20",
+    "class_code": "0x040300",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/HDEF@1b0000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1b,0x0)"
+   },
+   {
+    "name": "RP01",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e10",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/RP01@1c0000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1c,0x0)"
+   },
+   {
+    "name": "GIGE",
+    "vendor_id": "0x14e4",
+    "device_id": "0x16b4",
+    "class_code": "0x020000",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/RP01@1c0000/GIGE@0",
+    "pci_path": "PciRoot(0x0)/Pci(0x1c,0x0)/Pci(0x0,0x0)",
+    "model": "Broadcom 57765-B0"
+   },
+   {
+    "name": "SDXC",
+    "vendor_id": "0x14e4",
+    "device_id": "0x16bc",
+    "class_code": "0x080501",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/RP01@1c0000/SDXC@1",
+    "pci_path": "PciRoot(0x0)/Pci(0x1c,0x0)/Pci(0x0,0x1)"
+   },
+   {
+    "name": "RP02",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e12",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/RP02@1c0001",
+    "pci_path": "PciRoot(0x0)/Pci(0x1c,0x1)"
+   },
+   {
+    "name": "ARPT",
+    "vendor_id": "0x14e4",
+    "device_id": "0x4331",
+    "class_code": "0x028000",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/RP02@1c0001/ARPT@0",
+    "pci_path": "PciRoot(0x0)/Pci(0x1c,0x1)/Pci(0x0,0x0)"
+   },
+   {
+    "name": "RP03",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e14",
+    "class_code": "0x060400",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/RP03@1c0002",
+    "pci_path": "PciRoot(0x0)/Pci(0x1c,0x2)"
+   },
+   {
+    "name": "FRWR",
+    "vendor_id": "0x11c1",
+    "device_id": "0x5901",
+    "class_code": "0x0c0010",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/RP03@1c0002/FRWR@0",
+    "pci_path": "PciRoot(0x0)/Pci(0x1c,0x2)/Pci(0x0,0x0)"
+   },
+   {
+    "name": "EHC1",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e26",
+    "class_code": "0x0c0320",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/EHC1@1d0000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1d,0x0)"
+   },
+   {
+    "name": "LPCB",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e57",
+    "class_code": "0x060100",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/LPCB@1f0000",
+    "pci_path": "PciRoot(0x0)/Pci(0x1f,0x0)"
+   },
+   {
+    "name": "SATA",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e03",
+    "class_code": "0x010601",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/SATA@1f0002",
+    "pci_path": "PciRoot(0x0)/Pci(0x1f,0x2)"
+   },
+   {
+    "name": "SBUS",
+    "vendor_id": "0x8086",
+    "device_id": "0x1e22",
+    "class_code": "0x0c0500",
+    "acpi_path": "IOACPIPlane:/_SB/PCI0@0/SBUS@1f0003",
+    "pci_path": "PciRoot(0x0)/Pci(0x1f,0x3)"
+   }
+  ]
+ }
+}

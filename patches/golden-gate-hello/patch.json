@@ -1,0 +1,8 @@
+{
+ "revision": 1,
+ "stage": "oclp-hook",
+ "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332"]},
+ "inputs": ["hello_metallib_golden_gate", "libhelloblur"],
+ "status": "experiment",
+ "validated": false
+}

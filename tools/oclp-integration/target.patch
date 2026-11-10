@@ -1,0 +1,2519 @@
+diff --git a/opencore_legacy_patcher/application_entry.py b/opencore_legacy_patcher/application_entry.py
+index c1b7d454b5d3e4c450ae0b404b7fba708ad64e0e..946fe32203d54681df71b117977b8307354ea1c7 100644
+--- a/opencore_legacy_patcher/application_entry.py
++++ b/opencore_legacy_patcher/application_entry.py
+@@ -77,7 +77,12 @@ class OpenCoreLegacyPatcher:
+         self.constants.detected_os_version = os_data.detect_os_version()
+ 
+         # Generate computer data
+-        self.constants.computer = device_probe.Computer.probe()
++        cli_args = utilities.check_cli_args()
++        if cli_args is not None and cli_args.hardware_profile:
++            logging.info(f"Hardware profile: {cli_args.hardware_profile} (this machine's hardware is not probed)")
++            self.constants.computer = device_probe.Computer.from_profile(cli_args.hardware_profile)
++        else:
++            self.constants.computer = device_probe.Computer.probe()
+         self.computer = self.constants.computer
+         self.constants.booted_oc_disk = utilities.find_disk_off_uuid(utilities.clean_device_path(self.computer.opencore_path))
+         if self.constants.computer.firmware_vendor:
+diff --git a/opencore_legacy_patcher/constants.py b/opencore_legacy_patcher/constants.py
+index 520d4181987f1ce9c33d8e8bdfb160ea96ac8bdd..05e96cc2285682645dc6a16ae85ef304faa5937a 100644
+--- a/opencore_legacy_patcher/constants.py
++++ b/opencore_legacy_patcher/constants.py
+@@ -168,6 +168,10 @@ class Constants:
+         self.computer: device_probe.Computer = None  # type: ignore
+         self.custom_model:     Optional[str] = None
+ 
++        ## Target patching (ssd-tools derivative, see sys_patch/target.py)
++        self.target       = None  # PatchTarget when patching a non-booted volume, None for the booted system
++        self.target_hooks: Optional[str] = None  # Directory of hook scripts run before the snapshot
++
+         ## OpenCore Settings
+         self.opencore_debug: bool = False # Enable OpenCore debug
+         self.boot_efi:       bool = False # Use EFI/BOOT/BOOTx64.efi vs boot.efi bootstrap
+diff --git a/opencore_legacy_patcher/detections/device_probe.py b/opencore_legacy_patcher/detections/device_probe.py
+index b17f1b36a4b64c2d5873b4cd0a4d89d359e46531..b2cc6fe8e6f00e0cc1d8b27ed6e2b8495ec786fc 100644
+--- a/opencore_legacy_patcher/detections/device_probe.py
++++ b/opencore_legacy_patcher/detections/device_probe.py
+@@ -3,6 +3,7 @@ device_probe.py: Hardware probing
+ """
+ 
+ import enum
++import json
+ import itertools
+ import subprocess
+ import plistlib
+@@ -655,6 +656,73 @@ class Computer:
+     firmware_vendor: Optional[str] = None
+     rosetta_active: Optional[bool] = False
+ 
++    @staticmethod
++    def from_profile(path: str) -> "Computer":
++        """
++        Hardware recorded from the target Mac instead of probed from the running one, for root patching a
++        target install from another machine (ex. a VM without the target's GPU or Wi-Fi card).
++
++        The profile (JSON) holds the probed hardware: model, board ID, firmware vendor, CPU, the PCI devices
++        (vendor/device ID, class code, IORegistry name) and the USB-derived flags. PCI devices are classified
++        by the same classes as a probe (GPU arch, Wi-Fi chipset, ...). Runtime state (OCLP/OpenCore NVRAM,
++        Secure Boot, Rosetta, installed root patches) is still read from the running machine.
++        """
++        profile = json.loads(Path(path).read_text())
++        if profile.get("format") != 1:
++            raise ValueError(f"{path}: unsupported hardware profile format {profile.get('format')}")
++
++        computer = Computer()
++        computer.real_model     = computer.reported_model    = profile["model"]
++        computer.real_board_id  = computer.reported_board_id = profile["board_id"]
++        computer.firmware_vendor = profile.get("firmware_vendor")
++        computer.cpu = CPU(profile["cpu"]["name"], profile["cpu"]["flags"], profile["cpu"]["leafs"])
++        for key in ["bluetooth_chipset", "internal_keyboard_type", "trackpad_type", "ambient_light_sensor",
++                    "third_party_sata_ssd", "pcie_webcam", "t1_chip"]:
++            if key in profile:
++                setattr(computer, key, profile[key])
++
++        for entry in profile["pci"]:
++            device = PCIDevice(int(entry["vendor_id"], 16), int(entry["device_id"], 16), int(entry["class_code"], 16))
++            fields = {
++                "name":      entry.get("name"),
++                "model":     entry.get("model"),
++                "acpi_path": entry.get("acpi_path"),
++                "pci_path":  entry.get("pci_path"),
++            }
++            if device.class_code in GPU.CLASS_CODES:
++                vendor = device.vendor_detect(inherits=GPU)
++                if vendor:
++                    gpu = vendor(device.vendor_id, device.device_id, device.class_code, **fields)
++                    computer.gpus.append(gpu)
++                    if fields["name"] == "IGPU":
++                        computer.igpu = gpu
++                    elif fields["name"] == "GFX0":
++                        computer.dgpu = gpu
++            elif device.class_code in WirelessCard.CLASS_CODES:
++                vendor = device.vendor_detect(inherits=WirelessCard)
++                if vendor and computer.wifi is None:
++                    computer.wifi = vendor(device.vendor_id, device.device_id, device.class_code, **fields)
++            elif device.class_code in EthernetController.CLASS_CODES:
++                vendor = device.vendor_detect(inherits=EthernetController)
++                if vendor:
++                    computer.ethernet.append(vendor(device.vendor_id, device.device_id, device.class_code, **fields))
++            else:
++                for kind, target in [
++                    (SATAController, computer.storage), (SASController, computer.storage), (NVMeController, computer.storage),
++                    (XHCIController, computer.usb_controllers), (EHCIController, computer.usb_controllers),
++                    (OHCIController, computer.usb_controllers), (UHCIController, computer.usb_controllers),
++                    (SDXCController, computer.sdxc_controller),
++                ]:
++                    if device.class_code in kind.CLASS_CODES:
++                        target.append(kind(device.vendor_id, device.device_id, device.class_code, **fields))
++                        break
++
++        computer.runtime_probe()
++        computer.oclp_sys_patch_probe()
++        computer.check_rosetta()
++        return computer
++
++
+     @staticmethod
+     def probe():
+         computer = Computer()
+@@ -882,6 +950,18 @@ class Computer:
+         # Real model
+         self.real_model = utilities.get_nvram("oem-product", "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102", decode=True) or self.reported_model
+         self.real_board_id = utilities.get_nvram("oem-board", "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102", decode=True) or self.reported_board_id
++        self.runtime_probe()
++
++        # Firmware Vendor
++        firmware_vendor = utilities.get_firmware_vendor(decode=False)
++        if isinstance(firmware_vendor, bytes):
++            firmware_vendor = str(firmware_vendor.replace(b"\x00", b"").decode("utf-8"))
++        self.firmware_vendor = firmware_vendor
++
++    def runtime_probe(self):
++        """
++        Running machine's OCLP/OpenCore and Secure Boot state (also used with a hardware profile)
++        """
+         self.build_model = utilities.get_nvram("OCLP-Model", "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102", decode=True)
+ 
+         # OCLP version
+@@ -893,12 +973,6 @@ class Computer:
+         self.secure_boot_model = utilities.check_secure_boot_model()
+         self.secure_boot_policy = utilities.check_ap_security_policy()
+ 
+-        # Firmware Vendor
+-        firmware_vendor = utilities.get_firmware_vendor(decode=False)
+-        if isinstance(firmware_vendor, bytes):
+-            firmware_vendor = str(firmware_vendor.replace(b"\x00", b"").decode("utf-8"))
+-        self.firmware_vendor = firmware_vendor
+-
+     def cpu_probe(self):
+         self.cpu = CPU(
+             subprocess.run(["/usr/sbin/sysctl", "machdep.cpu.brand_string"], stdout=subprocess.PIPE).stdout.decode().partition(": ")[2].strip(),
+@@ -986,6 +1060,9 @@ class Computer:
+     def sata_disk_probe(self):
+         # Get all SATA Controllers/Disks from 'system_profiler SPSerialATADataType'
+         # Determine whether SATA SSD is present and Apple-made
++        if not Path("/usr/sbin/system_profiler").exists():
++            # recoveryOS (target patching) ships no system_profiler
++            return
+         sp_sata_data = plistlib.loads(subprocess.run(["/usr/sbin/system_profiler", "SPSerialATADataType", "-xml"], stdout=subprocess.PIPE).stdout.decode().strip().encode())
+         for root in sp_sata_data:
+             for ahci_controller in root["_items"]:
+diff --git a/opencore_legacy_patcher/support/arguments.py b/opencore_legacy_patcher/support/arguments.py
+index 40e2fef017a75cd5f40481cd82acf60191d86cb7..7222ad043c903df314b1e537c9ccfac83ad56de0 100644
+--- a/opencore_legacy_patcher/support/arguments.py
++++ b/opencore_legacy_patcher/support/arguments.py
+@@ -2,7 +2,9 @@
+ arguments.py: CLI argument handling
+ """
+ 
++import os
+ import sys
++import traceback
+ import time
+ import logging
+ import plistlib
+@@ -19,6 +21,7 @@ from ..wx_gui import gui_entry
+ from ..efi_builder import build
+ from ..sys_patch import sys_patch
+ from ..sys_patch.auto_patcher import StartAutomaticPatching
++from ..sys_patch.target import PatchTarget
+ 
+ from ..datasets import (
+     model_array,
+@@ -28,7 +31,8 @@ from ..datasets import (
+ from . import (
+     utilities,
+     defaults,
+-    validation
++    validation,
++    kdk_handler
+ )
+ 
+ 
+@@ -53,6 +57,10 @@ class arguments:
+             self._validation_handler()
+             return
+ 
++        if (self.args.target or self.args.hooks or self.args.kdk_dir or self.args.allow_build_mismatch) and not (self.args.patch_sys_vol or self.args.unpatch_sys_vol):
++            logging.error("--target, --hooks, --kdk_dir and --allow_build_mismatch require --patch_sys_vol")
++            sys.exit(2)
++
+         if self.args.build:
+             self._build_handler()
+             return
+@@ -91,6 +99,12 @@ class arguments:
+         Start root volume patching
+         """
+ 
++        if self.args.target:
++            self._sys_patch_target_handler()
++            return
++
++        self.constants.target_hooks = self.args.hooks
++
+         logging.info("Set System Volume patching")
+         if "Library/InstallerSandboxes/" in str(self.constants.payload_path):
+             logging.info("- Running from Installer Sandbox, blocking OS updaters")
+@@ -103,10 +117,49 @@ class arguments:
+             sys_patch.PatchSysVolume(self.constants.custom_model or self.constants.computer.real_model, self.constants, None).start_patch()
+ 
+ 
++    def _sys_patch_target_handler(self) -> None:
++        """
++        Root patch a non-booted install from another macOS on the same machine (see sys_patch/target.py)
++        Exits 0 on success, 1 if patching failed, 2 if the target could not be set up
++        """
++        logging.info(f"Set System Volume patching of target: {self.args.target}")
++        if os.geteuid() != 0:
++            logging.error("- Target patching must run as root")
++            sys.exit(2)
++
++        if self.args.kdk_dir:
++            logging.info(f"- Looking for Kernel Debug Kits in {self.args.kdk_dir}")
++            kdk_handler.KDK_INSTALL_PATH = self.args.kdk_dir
++        self.constants.target_hooks = self.args.hooks
++
++        target = PatchTarget(self.args.target, mount_name=self.args.target_mount_name)
++        try:
++            target.setup(self.constants, allow_build_mismatch=self.args.allow_build_mismatch)
++        except Exception as e:
++            logging.error(f"- Target setup failed: {e}")
++            target.release()
++            sys.exit(2)
++
++        # Every exit releases the target's read/write System mount (stock code returns early without unmounting)
++        rc = 1
++        try:
++            sys_patch.PatchSysVolume(self.constants.custom_model or self.constants.computer.real_model, self.constants, None).start_patch()
++            rc = 0 if self.constants.root_patcher_succeeded is True else 1
++        except Exception as e:
++            logging.error(f"- Patching failed: {e}\n{traceback.format_exc()}")
++        finally:
++            target.release()
++        sys.exit(rc)
++
++
+     def _sys_unpatch_handler(self) -> None:
+         """
+         Start root volume unpatching
+         """
++        if self.args.target:
++            logging.error("Unpatching a target volume is not supported")
++            sys.exit(2)
++
+         logging.info("Set System Volume unpatching")
+         sys_patch.PatchSysVolume(self.constants.custom_model or self.constants.computer.real_model, self.constants, None).start_unpatch()
+ 
+diff --git a/opencore_legacy_patcher/support/subprocess_wrapper.py b/opencore_legacy_patcher/support/subprocess_wrapper.py
+index c3ea354d3fcc6ab6f689b3b6c696ce1fea6d3b8c..c9cd4fff8252abe5b2e603e6296268b577009588 100644
+--- a/opencore_legacy_patcher/support/subprocess_wrapper.py
++++ b/opencore_legacy_patcher/support/subprocess_wrapper.py
+@@ -3,6 +3,7 @@ subprocess_wrapper.py: Wrapper for subprocess module to better handle errors and
+                        Additionally handles our Privileged Helper Tool
+ """
+ 
++import os
+ import enum
+ import logging
+ import subprocess
+@@ -51,6 +52,10 @@ def run_as_root(*args, **kwargs) -> subprocess.CompletedProcess:
+     if not Path(args[0][0]).exists():
+         raise FileNotFoundError(f"File not found: {args[0][0]}")
+ 
++    # Already root (ex. target patching from recoveryOS): the helper is neither present nor needed
++    if os.geteuid() == 0:
++        return subprocess.run([args[0][0]] + args[0][1:], **kwargs)
++
+     return subprocess.run([OCLP_PRIVILEGED_HELPER] + [args[0][0]] + args[0][1:], **kwargs)
+ 
+ 
+diff --git a/opencore_legacy_patcher/support/utilities.py b/opencore_legacy_patcher/support/utilities.py
+index 56b8c7b818a89708049487835a90b5affe341e74..aa7dd3ed6f979e7edfbc42747326540714fd99c4 100644
+--- a/opencore_legacy_patcher/support/utilities.py
++++ b/opencore_legacy_patcher/support/utilities.py
+@@ -603,6 +603,12 @@ def check_cli_args():
+     parser.add_argument("--unpatch_sys_vol", help="Unpatches root volume, EXPERIMENTAL", action="store_true", required=False)
+     parser.add_argument("--prepare_for_update", help="Prepares host for macOS update, ex. clean /Library/Extensions", action="store_true", required=False)
+     parser.add_argument("--cache_os", help="Caches patcher files (ex. KDKs) for incoming OS in Preflight.plist", action="store_true", required=False)
++    parser.add_argument("--target", "--target_volume", dest="target", action="store", help="With --patch_sys_vol: patch this non-booted install (volume path or disk identifier) instead of the booted system", required=False)
++    parser.add_argument("--hooks", action="store", help="With --patch_sys_vol: run executable *.sh in this directory before the snapshot", required=False)
++    parser.add_argument("--kdk_dir", action="store", help="With --patch_sys_vol: look for Kernel Debug Kits here instead of /Library/Developer/KDKs", required=False)
++    parser.add_argument("--allow_build_mismatch", action="store_true", help="With --patch_sys_vol --target: allow a target whose macOS build differs from the running one (untested)", required=False)
++    parser.add_argument("--hardware_profile", action="store", help="Use the hardware recorded in this JSON file instead of probing this machine (ex. patching a target from a VM)", required=False)
++    parser.add_argument("--target_mount_name", action="store", help="With --patch_sys_vol --target: mount the target System volume at <oclp-target>/NAME instead of its disk identifier (kmutil records the mount path in the kernel collections)", required=False)
+ 
+     # validation args
+     parser.add_argument("--validate", help="Runs Validation Tests for CI", action="store_true", required=False)
+@@ -622,7 +628,11 @@ def check_cli_args():
+         args.validate or
+         args.auto_patch or
+         args.prepare_for_update or
+-        args.cache_os
++        args.cache_os or
++        args.target or       # target-mode options without an action are an error (arguments.py), not a GUI start
++        args.hooks or
++        args.kdk_dir or
++        args.allow_build_mismatch
+     ):
+         return None
+     else:
+diff --git a/opencore_legacy_patcher/sys_patch/kernelcache/kernel_collection/explicit.py b/opencore_legacy_patcher/sys_patch/kernelcache/kernel_collection/explicit.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c6f731b318c427c781dcfe2586c3bfb176051cd3
+--- /dev/null
++++ b/opencore_legacy_patcher/sys_patch/kernelcache/kernel_collection/explicit.py
+@@ -0,0 +1,101 @@
++"""
++explicit.py: Boot and System Kernel Collections for an Intel target, built from an Apple silicon host (ssd-tools derivative)
++
++'kmutil create --update-all' fails on an arm64 host for an x86_64 target (rc 71: "unable to create release extension
++manager" / "bless2_bootobjects_path() failed: 103"). Two explicit creates do work there, and with the target's own
++kmutil and the target mounted at the same path they give byte-identical collections in recoveryOS (2026-10-22, BootKC
++2465b382, SystemKC 57138f02, patchset/tools/arm64-kmutil):
++  kmutil create -n boot -a x86_64 --allow-missing-kdk -R <root> -k <root>/System/Library/Kernels/kernel -V release -B <boot>
++  kmutil create -n sys  <same> -S <system> --elide-identifier <each id in BootKernelExtensions.kc.elides>
++-B/-S are paths inside the volume root, but a -B that also exists on the host (ex. the default
++/System/Library/KernelCollections/BootKernelExtensions.kc) is read from the HOST in the sys step, so the arm64 host's
++BootKC is linked against ("names a dependency on 'com.apple.kpi.libkern', which was not found"). Both collections are
++therefore built in a scratch folder inside the volume root that the host does not have, as in the reference run
++(/kcout-E1), then moved into place. --update-all also copies the Boot collection into the target's Preboot
++(<group>/boot/System/Library/KernelCollections), so that is done here too.
++-R is the mount path exactly as the kernel reports it (system_mount): kmutil then stores kext paths relative to it, as
++--update-all does. The few entries kmutil stores with an absolute path carry that mount path: recoveryOS reports
++/System/Volumes/Data/private/var/tmp/oclp-target/<name> (the reference KCs), a full macOS host /private/var/tmp/...
++(the kernel names the folder that way whichever spelling is mounted on), so collections built from a full macOS host
++differ from the recoveryOS-built ones in those strings only (2026-10-23).
++"""
++
++import logging
++import shutil
++import subprocess
++import tempfile
++
++from pathlib import Path
++
++from ..base.cache import BaseKernelCache
++from ....support import subprocess_wrapper
++
++
++KC_DIR = "/System/Library/KernelCollections"
++BUILD_DIR = "/.oclp-kc-build"      # inside the target volume root; must not exist on the host
++
++
++class ExplicitBootSystemKernelCollections(BaseKernelCache):
++
++    def __init__(self, mount_location: str, target) -> None:
++        self.mount_location = mount_location
++        self.target = target
++
++
++    def _kmutil(self, work: str) -> str:
++        """
++        The target's own kmutil (its build's KMBuildVersion ends up in the collections), ad-hoc signed in a temporary
++        folder: an Apple binary on a non-booted volume is not in this host's trust cache
++        """
++        kmutil = f"{work}/kmutil"
++        shutil.copyfile(f"{self.mount_location}/usr/bin/kmutil", kmutil)
++        Path(kmutil).chmod(0o755)
++        subprocess_wrapper.run_as_root_and_verify(["/usr/bin/codesign", "-s", "-", "-f", kmutil], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        return kmutil
++
++
++    def _create(self, args: list) -> bool:
++        result = subprocess_wrapper.run_as_root(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        if result.returncode != 0:
++            subprocess_wrapper.log(result)
++            return False
++        return True
++
++
++    def rebuild(self) -> bool:
++        root = self.mount_location
++        logging.info("- Rebuilding Boot and System Kernel Collections (explicit creates, Apple silicon host)")
++        elides = Path(f"{root}{KC_DIR}/BootKernelExtensions.kc.elides").read_text().split()
++
++        if Path(BUILD_DIR).exists():
++            raise RuntimeError(f"{BUILD_DIR} exists on this host; kmutil would read it instead of the target's")
++        build = f"{root}{BUILD_DIR}"
++        subprocess_wrapper.run_as_root_and_verify(["/bin/rm", "-rf", build], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        subprocess_wrapper.run_as_root_and_verify(["/bin/mkdir", build], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        try:
++            with tempfile.TemporaryDirectory() as work:
++                kmutil = self._kmutil(work)
++                common = [kmutil, "create", "-a", "x86_64", "--allow-missing-kdk", "-R", root,
++                          "-k", f"{root}/System/Library/Kernels/kernel", "-V", "release",
++                          "-B", f"{BUILD_DIR}/BootKernelExtensions.kc"]
++                if self._create(common[:2] + ["-n", "boot"] + common[2:]) is False:
++                    return False
++                elide_args = [arg for identifier in elides for arg in ("--elide-identifier", identifier)]
++                if self._create(common[:2] + ["-n", "sys"] + common[2:] + ["-S", f"{BUILD_DIR}/SystemKernelExtensions.kc"] + elide_args) is False:
++                    return False
++            for name in ("BootKernelExtensions.kc", "SystemKernelExtensions.kc"):
++                subprocess_wrapper.run_as_root_and_verify(["/bin/mv", "-f", f"{build}/{name}", f"{root}{KC_DIR}/{name}"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++                subprocess_wrapper.run_as_root_and_verify(["/bin/chmod", "755", f"{root}{KC_DIR}/{name}"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)   # as --update-all leaves them
++        finally:
++            subprocess_wrapper.run_as_root(["/bin/rm", "-rf", build], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++
++        preboot_dir, mounted_by_us = self.target.preboot_kernel_collections()
++        try:
++            logging.info(f"- Copying the Boot Kernel Collection to the target Preboot ({preboot_dir})")
++            subprocess_wrapper.run_as_root_and_verify(["/bin/mkdir", "-p", preboot_dir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++            subprocess_wrapper.run_as_root_and_verify(["/bin/cp", f"{root}{KC_DIR}/BootKernelExtensions.kc", f"{preboot_dir}/BootKernelExtensions.kc"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        finally:
++            if mounted_by_us:
++                subprocess_wrapper.run_as_root(["/usr/sbin/diskutil", "unmount", str(Path(preboot_dir).parents[4])], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++
++        return True
+diff --git a/opencore_legacy_patcher/sys_patch/kernelcache/kernel_collection/support.py b/opencore_legacy_patcher/sys_patch/kernelcache/kernel_collection/support.py
+index 44b699401c099c444bc04f73e913596d771346b9..5681a5b231c1e4d2c7799e0ebf7155cc6ddd2f13 100644
+--- a/opencore_legacy_patcher/sys_patch/kernelcache/kernel_collection/support.py
++++ b/opencore_legacy_patcher/sys_patch/kernelcache/kernel_collection/support.py
+@@ -16,7 +16,11 @@ from ....support  import subprocess_wrapper
+ 
+ class KernelCacheSupport:
+ 
+-    def __init__(self, mount_location_data: str, detected_os: int, skip_root_kmutil_requirement: bool) -> None:
++    def __init__(self, mount_location_data: str, detected_os: int, skip_root_kmutil_requirement: bool, mount_location: str = "") -> None:
++        """
++        mount_location: prefix of the System volume holding the OCLP patch record ("" = booted system)
++        """
++        self.mount_location = mount_location
+         self.mount_location_data = mount_location_data
+         self.detected_os = detected_os
+         self.skip_root_kmutil_requirement = skip_root_kmutil_requirement
+@@ -39,7 +43,7 @@ class KernelCacheSupport:
+             return False
+ 
+         try:
+-            aux_cache_path = Path(self.mount_location_data) / Path("/private/var/db/KernelExtensionManagement/AuxKC/CurrentAuxKC/com.apple.kcgen.instructions.plist")
++            aux_cache_path = Path(f"{self.mount_location_data}/private/var/db/KernelExtensionManagement/AuxKC/CurrentAuxKC/com.apple.kcgen.instructions.plist")
+             if aux_cache_path.exists():
+                 aux_cache_data = plistlib.load((aux_cache_path).open("rb"))
+                 for kext in aux_cache_data["kextsToBuild"]:
+@@ -122,7 +126,7 @@ class KernelCacheSupport:
+             return
+ 
+         logging.info("- Cleaning Auxiliary Kernel Collection")
+-        oclp_path = "/System/Library/CoreServices/OpenCore-Legacy-Patcher.plist"
++        oclp_path = f"{self.mount_location}/System/Library/CoreServices/OpenCore-Legacy-Patcher.plist"
+         if Path(oclp_path).exists():
+             oclp_plist_data = plistlib.load(Path(oclp_path).open("rb"))
+             for key in oclp_plist_data:
+@@ -137,10 +141,10 @@ class KernelCacheSupport:
+                         for file in oclp_plist_data[key][install_type][location]:
+                             if not file.endswith(".kext"):
+                                 continue
+-                            if not Path(f"/Library/Extensions/{file}").exists():
++                            if not Path(f"{self.mount_location_data}/Library/Extensions/{file}").exists():
+                                 continue
+                             logging.info(f"  - Removing {file}")
+-                            subprocess_wrapper.run_as_root(["/bin/rm", "-Rf", f"/Library/Extensions/{file}"])
++                            subprocess_wrapper.run_as_root(["/bin/rm", "-Rf", f"{self.mount_location_data}/Library/Extensions/{file}"])
+ 
+         # Handle situations where users migrated from older OSes with a lot of garbage in /L*/E*
+         # ex. Nvidia Web Drivers, NetUSB, dosdude1's patches, etc.
+@@ -148,11 +152,11 @@ class KernelCacheSupport:
+         if self.detected_os < os_data.os_data.ventura:
+             return
+ 
+-        relocation_path = "/Library/Relocated Extensions"
++        relocation_path = f"{self.mount_location_data}/Library/Relocated Extensions"
+         if not Path(relocation_path).exists():
+             subprocess_wrapper.run_as_root(["/bin/mkdir", relocation_path])
+ 
+-        for file in Path("/Library/Extensions").glob("*.kext"):
++        for file in Path(f"{self.mount_location_data}/Library/Extensions").glob("*.kext"):
+             try:
+                 if datetime.fromtimestamp(file.stat().st_mtime) < datetime(2021, 10, 1):
+                     logging.info(f"  - Relocating {file.name} kext to {relocation_path}")
+diff --git a/opencore_legacy_patcher/sys_patch/kernelcache/rebuild.py b/opencore_legacy_patcher/sys_patch/kernelcache/rebuild.py
+index c0c75e21de7017076362b760c2b53d8bee762e2e..52d6da17aba6462257ad0af6f27dbcc9a1c09bf2 100644
+--- a/opencore_legacy_patcher/sys_patch/kernelcache/rebuild.py
++++ b/opencore_legacy_patcher/sys_patch/kernelcache/rebuild.py
+@@ -2,6 +2,8 @@
+ rebuild.py: Manage kernel cache rebuilding regardless of macOS version
+ """
+ 
++import platform
++
+ from .base.cache import BaseKernelCache
+ from ...datasets import os_data
+ 
+@@ -15,12 +17,14 @@ class RebuildKernelCache:
+     - mount_location: Path to the mounted volume
+     - auxiliary_cache: Whether to create auxiliary kernel cache (Big Sur and later)
+     - auxiliary_cache_only: Whether to only create auxiliary kernel cache (Ventura and later)
++    - target: PatchTarget when patching a non-booted volume (ssd-tools derivative), else None
+     """
+-    def __init__(self, os_version: os_data.os_data, mount_location: str, auxiliary_cache: bool, auxiliary_cache_only: bool) -> None:
++    def __init__(self, os_version: os_data.os_data, mount_location: str, auxiliary_cache: bool, auxiliary_cache_only: bool, target=None) -> None:
+         self.os_version = os_version
+         self.mount_location = mount_location
+         self.auxiliary_cache = auxiliary_cache
+         self.auxiliary_cache_only = auxiliary_cache_only
++        self.target = target
+ 
+ 
+     def _rebuild_method(self) -> BaseKernelCache:
+@@ -33,6 +37,13 @@ class RebuildKernelCache:
+                     from .kernel_collection.auxiliary import AuxiliaryKernelCollection
+                     return AuxiliaryKernelCollection(self.mount_location)
+ 
++            if self.target is not None and platform.machine() == "arm64" and self.os_version >= os_data.os_data.ventura:
++                # an Intel target patched from Apple silicon: --update-all does not work there (explicit.py)
++                if self.auxiliary_cache:
++                    raise RuntimeError("Auxiliary kernel collections are not supported when patching from Apple silicon")
++                from .kernel_collection.explicit import ExplicitBootSystemKernelCollections
++                return ExplicitBootSystemKernelCollections(self.mount_location, self.target)
++
+             from .kernel_collection.boot_system import BootSystemKernelCollections
+             return BootSystemKernelCollections(self.mount_location, self.os_version, self.auxiliary_cache)
+ 
+diff --git a/opencore_legacy_patcher/sys_patch/mount/mount.py b/opencore_legacy_patcher/sys_patch/mount/mount.py
+index 6b4b5f8965c374eaf6202bea4cc3a00920f47c66..ee564e24b0b6f9747ac0caee2501b812ec2da7d4 100644
+--- a/opencore_legacy_patcher/sys_patch/mount/mount.py
++++ b/opencore_legacy_patcher/sys_patch/mount/mount.py
+@@ -16,9 +16,13 @@ from ...support  import subprocess_wrapper
+ 
+ class RootVolumeMount:
+ 
+-    def __init__(self, xnu_major: int) -> None:
++    def __init__(self, xnu_major: int, target = None) -> None:
++        """
++        target: PatchTarget (sys_patch/target.py) with its System volume already mounted, or None for the booted system
++        """
+         self.xnu_major = xnu_major
+-        self.root_volume_identifier = self._fetch_root_volume_identifier()
++        self.target = target
++        self.root_volume_identifier = target.system_device if target else self._fetch_root_volume_identifier()
+ 
+         self.mount_path = None
+ 
+@@ -50,6 +54,10 @@ class RootVolumeMount:
+ 
+         Returns the path to the root volume.
+         """
++        # Non-booted target, mounted by PatchTarget.mount_system()
++        if self.target:
++            return self.target.system_mount
++
+         # Root volume same as data volume
+         if self.xnu_major < os_data.os_data.catalina.value:
+             return "/"
+diff --git a/opencore_legacy_patcher/sys_patch/patchsets/detect.py b/opencore_legacy_patcher/sys_patch/patchsets/detect.py
+index 325f9dc81d41ab1b8a76177c654376bec5ea4f3c..5a2580249a2f02f34300bae16220efd023a79d97 100644
+--- a/opencore_legacy_patcher/sys_patch/patchsets/detect.py
++++ b/opencore_legacy_patcher/sys_patch/patchsets/detect.py
+@@ -5,6 +5,7 @@ detect.py: Detects patches for a given system
+ import logging
+ import plistlib
+ import subprocess
++import platform
+ import py_sip_xnu
+ import packaging.version
+ 
+@@ -50,6 +51,8 @@ from .hardware.misc import (
+ 
+ from ... import constants
+ 
++from ..target import system_root
++
+ from ...datasets import sip_data
+ from ...datasets.os_data import os_data
+ from ...support import (
+@@ -180,6 +183,10 @@ class HardwarePatchsetDetection:
+         if self._xnu_major < os_data.big_sur.value:
+             return False
+ 
++        # Target patching: the target's Data volume matters, and recoveryOS has no fdesetup
++        if self._constants.target:
++            return self._constants.target.data_filevault
++
+         # OpenCore Legacy Patcher exposes whether it patched APFS.kext to allow for FileVault
+         nvram = utilities.get_nvram("OCLP-Settings", "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102", decode=True)
+         if nvram:
+@@ -193,7 +200,7 @@ class HardwarePatchsetDetection:
+         """
+         Determine if repatching is not allowed
+         """
+-        oclp_patch_path = Path("/System/Library/CoreServices/OpenCore-Legacy-Patcher.plist")
++        oclp_patch_path = Path(f"{system_root(self._constants)}/System/Library/CoreServices/OpenCore-Legacy-Patcher.plist")
+         try:
+             with oclp_patch_path.open("rb") as patch_file:
+                 oclp_plist = plistlib.load(patch_file)
+@@ -215,10 +222,21 @@ class HardwarePatchsetDetection:
+         return False
+ 
+ 
++    def _host_is_not_target(self) -> bool:
++        """
++        Target patching from an Apple silicon host (ssd-tools derivative): the SIP, SecureBootModel and AMFI state of
++        the running machine says nothing about the Intel target, which gets them from its own OpenCore config at boot,
++        and a non-booted external volume is writable by root whatever the host's SIP is
++        """
++        return bool(self._constants.target) and platform.machine() == "arm64"
++
++
+     def _validation_check_system_integrity_protection_enabled(self, configs: list[str]) -> bool:
+         """
+         Determine if System Integrity Protection is enabled
+         """
++        if self._host_is_not_target():
++            return False
+         return utilities.csr_decode(configs)
+ 
+ 
+@@ -226,6 +244,8 @@ class HardwarePatchsetDetection:
+         """
+         Determine if SecureBootModel is enabled
+         """
++        if self._host_is_not_target():
++            return False
+         return utilities.check_secure_boot_level()
+ 
+ 
+@@ -233,6 +253,8 @@ class HardwarePatchsetDetection:
+         """
+         Determine if AMFI is enabled
+         """
++        if self._host_is_not_target():
++            return False
+         return not amfi_detect.AmfiConfigurationDetection().check_config(self._override_amfi_level(level))
+ 
+ 
+@@ -312,7 +334,7 @@ class HardwarePatchsetDetection:
+         """
+         Check if network patches are already applied
+         """
+-        oclp_patch_path = "/System/Library/CoreServices/OpenCore-Legacy-Patcher.plist"
++        oclp_patch_path = f"{system_root(self._constants)}/System/Library/CoreServices/OpenCore-Legacy-Patcher.plist"
+         if not Path(oclp_patch_path).exists():
+             return False
+         try:
+diff --git a/opencore_legacy_patcher/sys_patch/sys_patch.py b/opencore_legacy_patcher/sys_patch/sys_patch.py
+index 2d427f97ed009acfcac928f54893bd7c35cfd9a7..03fd29aa5214ebb2cf18caaafdf87438614447fa 100644
+--- a/opencore_legacy_patcher/sys_patch/sys_patch.py
++++ b/opencore_legacy_patcher/sys_patch/sys_patch.py
+@@ -76,6 +76,11 @@ from . import (
+     kernelcache
+ )
+ from .auto_patcher import InstallAutomaticPatchingServices
++from .target import (
++    system_root,
++    data_root,
++    run_hooks
++)
+ 
+ 
+ class PatchSysVolume:
+@@ -83,7 +88,7 @@ class PatchSysVolume:
+         self.model = model
+         self.constants: constants.Constants = global_constants
+         self.computer = self.constants.computer
+-        self.root_supports_snapshot = utilities.check_if_root_is_apfs_snapshot()
++        self.root_supports_snapshot = True if self.constants.target else utilities.check_if_root_is_apfs_snapshot()
+         self.constants.root_patcher_succeeded = False # Reset Variable each time we start
+         self.constants.needs_to_open_preferences = False
+         self.patch_set_dictionary = {}
+@@ -103,7 +108,7 @@ class PatchSysVolume:
+         self.requires_kdk_caching      = self.hardware_details[HardwarePatchsetSettings.KERNEL_DEBUG_KIT_REQUIRED] and self.constants.detected_os >= os_data.os_data.ventura
+         self.requires_metallib_caching = self.hardware_details[HardwarePatchsetSettings.METALLIB_SUPPORT_PKG_REQUIRED] and self.constants.detected_os >= os_data.os_data.sequoia
+ 
+-        self.mount_obj = RootVolumeMount(self.constants.detected_os)
++        self.mount_obj = RootVolumeMount(self.constants.detected_os, self.constants.target)
+ 
+ 
+     def _init_pathing(self) -> None:
+@@ -111,7 +116,10 @@ class PatchSysVolume:
+         Initializes the pathing for root volume patching
+         """
+         self.mount_location_data = ""
+-        if self.root_supports_snapshot is True:
++        if self.constants.target:
++            self.mount_location = self.constants.target.system_mount
++            self.mount_location_data = self.constants.target.data_mount
++        elif self.root_supports_snapshot is True:
+             self.mount_location = "/System/Volumes/Update/mnt1"
+         else:
+             self.mount_location = ""
+@@ -194,6 +202,7 @@ class PatchSysVolume:
+         self._delete_nonmetal_defaults()
+ 
+         kernelcache.KernelCacheSupport(
++            mount_location=system_root(self.constants),
+             mount_location_data=self.mount_location_data,
+             detected_os=self.constants.detected_os,
+             skip_root_kmutil_requirement=self.skip_root_kmutil_requirement
+@@ -242,16 +251,27 @@ class PatchSysVolume:
+         Rebuilds the Kernel Cache
+         """
+ 
++        before = self.constants.target.kernel_collections_fingerprint() if self.constants.target else None
++
+         result =  kernelcache.RebuildKernelCache(
+             os_version=self.constants.detected_os,
+             mount_location=self.mount_location,
+             auxiliary_cache=self.needs_kmutil_exemptions,
+-            auxiliary_cache_only=self.skip_root_kmutil_requirement
++            auxiliary_cache_only=self.skip_root_kmutil_requirement,
++            target=self.constants.target
+         ).rebuild()
+ 
+         if result is False:
+             return False
+ 
++        # kmutil exits 0 when it skips the rebuild (ex. "is not a volume root"): on a target, require new collections
++        if before is not None:
++            after = self.constants.target.kernel_collections_fingerprint()
++            unchanged = [name for name in before if before[name] == after[name]]
++            if unchanged:
++                logging.error(f"- kmutil did not rebuild {', '.join(unchanged)} on the target, stopping before the snapshot")
++                return False
++
+         if self.skip_root_kmutil_requirement is False:
+             sys_patch_helpers.SysPatchHelpers(self.constants).install_rsr_repair_binary()
+ 
+@@ -308,10 +328,11 @@ class PatchSysVolume:
+         """
+ 
+         for arg in ["useMetal", "useIOP"]:
+-            result = subprocess.run(["/usr/bin/defaults", "read", "/Library/Preferences/com.apple.CoreDisplay", arg], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.decode("utf-8").strip()
++            core_display = f"{data_root(self.constants)}/Library/Preferences/com.apple.CoreDisplay"
++            result = subprocess.run(["/usr/bin/defaults", "read", core_display, arg], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.decode("utf-8").strip()
+             if result in ["0", "false", "1", "true"]:
+                 logging.info(f"- Removing non-Metal Enforcement Preference: {arg}")
+-                subprocess_wrapper.run_as_root(["/usr/bin/defaults", "delete", "/Library/Preferences/com.apple.CoreDisplay", arg])
++                subprocess_wrapper.run_as_root(["/usr/bin/defaults", "delete", core_display, arg])
+ 
+ 
+     def _delete_nonmetal_defaults(self) -> None:
+@@ -324,7 +345,7 @@ class PatchSysVolume:
+             "Moraea_ColorWidgetDisabled",
+             "Moraea_BacklightHack",
+         ]
+-        system_domain = "/Library/Preferences/.GlobalPreferences.plist"
++        system_domain = f"{data_root(self.constants)}/Library/Preferences/.GlobalPreferences.plist"
+         domains = {
+             system_domain: skylight_defaults + [
+                 "ShowDate",
+@@ -336,6 +357,9 @@ class PatchSysVolume:
+             ],
+             "-globalDomain": skylight_defaults,
+         }
++        if self.constants.target:
++            # '-globalDomain' is the running user's domain, not the target's
++            domains.pop("-globalDomain")
+         for domain, keys in domains.items():
+             for key in keys:
+                 result = subprocess.run(["/usr/bin/defaults", "read", domain, key], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+@@ -378,12 +402,19 @@ class PatchSysVolume:
+         else:
+             self._execute_patchset(HardwarePatchsetDetection(self.constants).patches)
+ 
+-        if self.constants.wxpython_variant is True and self.constants.detected_os >= os_data.os_data.big_sur:
++        if self.constants.target:
++            logging.info("- Skipping Auto Patcher Launch Agent, target patching")
++        elif self.constants.wxpython_variant is True and self.constants.detected_os >= os_data.os_data.big_sur:
+             needs_daemon = False
+             if self.requires_kdk_caching is True or self.requires_metallib_caching is True:
+                 needs_daemon = True
+             InstallAutomaticPatchingServices(self.constants).install_auto_patcher_launch_agent(kdk_caching_needed=needs_daemon)
+ 
++        if run_hooks(self.constants, self.constants.target_hooks) is False:
++            self._unmount_root_vol()
++            logging.error("- Hook failed, no snapshot was created")
++            return
++
+         self._rebuild_root_volume()
+ 
+ 
+@@ -396,6 +427,7 @@ class PatchSysVolume:
+         """
+ 
+         kc_support_obj = kernelcache.KernelCacheSupport(
++            mount_location=system_root(self.constants),
+             mount_location_data=self.mount_location_data,
+             detected_os=self.constants.detected_os,
+             skip_root_kmutil_requirement=self.skip_root_kmutil_requirement
+@@ -529,6 +561,13 @@ class PatchSysVolume:
+ 
+         logging.info("- Running Preflight Checks before patching")
+ 
++        if self.constants.target:
++            executes = [patch for patch in required_patches if PatchType.EXECUTE in required_patches[patch]]
++            if executes:
++                raise Exception(f"Patch sets with commands run on the booted system are not supported for a target: {', '.join(executes)}")
++            if self.skip_root_kmutil_requirement is True and self.constants.detected_os >= os_data.os_data.ventura:
++                raise Exception("Auxiliary-only kernel collection patching is not supported for a target (needs a KDK based rebuild)")
++
+         for patch in required_patches:
+             # Check if all files are present
+             for method_type in [PatchType.OVERWRITE_SYSTEM_VOLUME, PatchType.OVERWRITE_DATA_VOLUME, PatchType.MERGE_SYSTEM_VOLUME, PatchType.MERGE_DATA_VOLUME]:
+@@ -559,6 +598,7 @@ class PatchSysVolume:
+ 
+         # Make sure we clean old kexts in /L*/E* that are not in the patchset
+         kernelcache.KernelCacheSupport(
++            mount_location=system_root(self.constants),
+             mount_location_data=self.mount_location_data,
+             detected_os=self.constants.detected_os,
+             skip_root_kmutil_requirement=self.skip_root_kmutil_requirement
+diff --git a/opencore_legacy_patcher/sys_patch/sys_patch_helpers.py b/opencore_legacy_patcher/sys_patch/sys_patch_helpers.py
+index e4c153e11bd7e5f41c991af83c4c77bc8495a844..e0c309752bf305e768de51ed99c19e8e7c19d544 100644
+--- a/opencore_legacy_patcher/sys_patch/sys_patch_helpers.py
++++ b/opencore_legacy_patcher/sys_patch/sys_patch_helpers.py
+@@ -3,6 +3,7 @@ sys_patch_helpers.py: Additional support functions for sys_patch.py
+ """
+ 
+ import os
++import shlex
+ import logging
+ import plistlib
+ import subprocess
+@@ -15,6 +16,7 @@ from .. import constants
+ 
+ from ..datasets import os_data
+ from ..volume   import generate_copy_arguments
++from .target    import data_root
+ 
+ from ..support import (
+     generate_smbios,
+@@ -142,10 +144,13 @@ class SysPatchHelpers:
+             return
+ 
+         logging.info("Disabling WindowServer Caching")
++        # Quoted: a target's Data mount may contain spaces or quotes (ex. "/Volumes/Bob's SSD - Data").
++        # shlex.quote leaves the stock "/private/var/folders" as is, so the booted-system command is unchanged.
++        folders = shlex.quote(f"{data_root(self.constants)}/private/var/folders")
+         # Invoke via 'bash -c' to resolve pathing
+-        subprocess_wrapper.run_as_root(["/bin/bash", "-c", "/bin/rm -rf /private/var/folders/*/*/*/WindowServer/com.apple.WindowServer"])
++        subprocess_wrapper.run_as_root(["/bin/bash", "-c", f"/bin/rm -rf {folders}/*/*/*/WindowServer/com.apple.WindowServer"])
+         # Disable writing to WindowServer folder
+-        subprocess_wrapper.run_as_root(["/bin/bash", "-c", "/usr/bin/chflags uchg /private/var/folders/*/*/*/WindowServer"])
++        subprocess_wrapper.run_as_root(["/bin/bash", "-c", f"/usr/bin/chflags uchg {folders}/*/*/*/WindowServer"])
+         # Reference:
+         #   To reverse write lock:
+         #   'chflags nouchg /private/var/folders/*/*/*/WindowServer'
+@@ -174,7 +179,14 @@ class SysPatchHelpers:
+             return
+ 
+         logging.info("Installing Kernel Collection syncing utility")
+-        result = subprocess_wrapper.run_as_root([self.constants.rsrrepair_userspace_path, "--install"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        if self.constants.target:
++            # 'RSRRepair --install' copies itself to the booted system's /etc/rc.server, do the same on the target
++            rc_server = f"{data_root(self.constants)}/private/etc/rc.server"
++            result = subprocess_wrapper.run_as_root(["/usr/bin/ditto", self.constants.rsrrepair_userspace_path, rc_server], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++            if result.returncode == 0:
++                result = subprocess_wrapper.run_as_root(["/bin/chmod", "755", rc_server], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        else:
++            result = subprocess_wrapper.run_as_root([self.constants.rsrrepair_userspace_path, "--install"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+         if result.returncode != 0:
+             logging.info("- Failed to install RSRRepair")
+             subprocess_wrapper.log(result)
+diff --git a/opencore_legacy_patcher/sys_patch/target.py b/opencore_legacy_patcher/sys_patch/target.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..339b53ccba34309e31b91ff52ff11f405669f074
+--- /dev/null
++++ b/opencore_legacy_patcher/sys_patch/target.py
+@@ -0,0 +1,370 @@
++"""
++target.py: Root patching a non-booted target volume (ssd-tools derivative)
++
++Stock OCLP patches the booted system. With '--patch_sys_vol --target <volume>'
++the patcher runs from another macOS (ex. a recoveryOS booted from USB) on the
++same machine and patches a macOS install that has never booted:
++- Hardware detection still probes the running machine (it must be the target's hardware)
++- OS version, build and kernel version come from the target's System volume
++- The target's System volume (live, not its snapshot) is mounted read/write at TARGET_MOUNT
++- Every Data volume path is prefixed with the target's Data volume mount point
++- The new snapshot is blessed on the target, the booted volume is never touched
++
++Helpers 'system_root()' and 'data_root()' return "" when no target is set, so
++stock code paths stay byte-identical: f"{data_root(c)}/Library/Extensions" == "/Library/Extensions"
++"""
++
++import os
++import re
++import sys
++import logging
++import plistlib
++import subprocess
++
++from pathlib import Path
++
++from ..support import subprocess_wrapper
++
++
++TARGET_MOUNT = "/private/var/tmp/oclp-target"
++
++
++class PatchTarget:
++
++    def __init__(self, target: str, mount_name: str = None) -> None:
++        """
++        Parameters:
++            target (str): Path inside the target install, a mount point, or a disk identifier
++                          (ex. "/Volumes/Macintosh HD", "disk2s1"). Any volume of the target's
++                          APFS volume group works; the System + Data pair is resolved from it.
++            mount_name (str): Folder name under TARGET_MOUNT for the System volume (default: its disk
++                          identifier). kmutil writes the mount path into the kernel collections, so a fixed
++                          name keeps them independent of how the host numbers its disks.
++        """
++        self.target = target
++        self.mount_name = mount_name
++
++        self.container:      str = None
++        self.system_device:  str = None
++        self.data_device:    str = None
++        self.data_mount:     str = None
++        self.data_filevault: bool = False
++        self.system_mount:   str = None
++
++        self.product_version: str = None
++        self.product_build:   str = None
++        self.xnu_major:       int = None
++        self.xnu_minor:       int = None
++
++        self._mounted_system = False
++
++
++    def _diskutil_info(self, identifier: str) -> dict:
++        result = subprocess.run(["/usr/sbin/diskutil", "info", "-plist", identifier], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
++        if result.returncode != 0:
++            raise RuntimeError(f"diskutil info {identifier} failed: {result.stderr.decode().strip()}")
++        return plistlib.loads(result.stdout)
++
++
++    def _container_volumes(self, container: str) -> list:
++        result = subprocess.run(["/usr/sbin/diskutil", "apfs", "list", "-plist", container], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
++        if result.returncode != 0:
++            raise RuntimeError(f"diskutil apfs list {container} failed: {result.stderr.decode().strip()}")
++        containers = plistlib.loads(result.stdout).get("Containers", [])
++        if len(containers) != 1:
++            raise RuntimeError(f"Expected one APFS container for {container}, found {len(containers)}")
++        return containers[0]["Volumes"]
++
++
++    def resolve(self) -> None:
++        """
++        Find the target's System and Data volumes and refuse unsafe targets
++        """
++        info = self._diskutil_info(self.target)
++        self.container = info.get("APFSContainerReference")
++        if not self.container:
++            raise RuntimeError(f"{self.target} is not on an APFS volume")
++
++        booted = self._diskutil_info("/")
++        if booted.get("APFSContainerReference") == self.container:
++            raise RuntimeError(f"Target {self.target} is in the booted container ({self.container}), use stock patching instead")
++
++        group = info.get("APFSVolumeGroupID")
++        systems, datas = [], []
++        for volume in self._container_volumes(self.container):
++            roles = volume.get("Roles", [])
++            if "System" not in roles and "Data" not in roles:
++                continue
++            if group is not None:
++                volume_group = self._diskutil_info(volume["DeviceIdentifier"]).get("APFSVolumeGroupID")
++                if volume_group != group:
++                    continue
++            (systems if "System" in roles else datas).append(volume)
++
++        if len(systems) != 1 or len(datas) != 1:
++            raise RuntimeError(f"Expected one System and one Data volume for {self.target}, found {len(systems)} and {len(datas)}; pass the target's System volume")
++
++        if datas[0].get("Locked") is True:
++            raise RuntimeError(f"Target Data volume {datas[0]['DeviceIdentifier']} is locked (FileVault), unlock it first")
++
++        self.system_device = systems[0]["DeviceIdentifier"]
++        self.data_device   = datas[0]["DeviceIdentifier"]
++        self.data_filevault = datas[0].get("FileVault") is True
++
++        self.data_mount = self._diskutil_info(self.data_device).get("MountPoint") or None
++        if self.data_mount is None:
++            logging.info(f"- Mounting target Data volume {self.data_device}")
++            subprocess_wrapper.run_as_root_and_verify(["/usr/sbin/diskutil", "mount", self.data_device], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++            self.data_mount = self._diskutil_info(self.data_device).get("MountPoint") or None
++        if self.data_mount is None or self.data_mount == "/":
++            raise RuntimeError(f"Could not mount target Data volume {self.data_device}")
++
++
++    def _mounts(self, device: str) -> list:
++        """
++        (mount point, options) of exactly /dev/<device> as the kernel reports them (f_mntonname, firmlinks resolved)
++        """
++        mounts = []
++        for line in subprocess.run(["/sbin/mount"], stdout=subprocess.PIPE).stdout.decode(errors="replace").splitlines():
++            source, _, rest = line.partition(" on ")
++            if source == f"/dev/{device}":
++                point, _, options = rest.rpartition(" (")
++                mounts.append((point, [o.strip() for o in options.rstrip(")").split(",")]))
++        return mounts
++
++
++    def _mount_points(self, device: str) -> list:
++        return [point for point, _ in self._mounts(device)]
++
++
++    def mount_system(self) -> str:
++        """
++        Mount the target's live System volume read/write (snapshot mounts stay as they are)
++
++        system_mount is the path the kernel reports for the mount: under recoveryOS /private is a firmlink
++        into the RAM Data volume, so /private/var/tmp/... mounts as /System/Volumes/Data/private/var/tmp/...,
++        and kmutil skips a --volume-root that differs from that ("is not a volume root, skipping rebuild").
++        """
++        mount_point = f"{TARGET_MOUNT}/{self.mount_name or self.system_device}"
++        if Path(f"{mount_point}/System/Library/CoreServices/SystemVersion.plist").exists():
++            # Left over from an earlier run. Reuse it only if it really is a read/write mount of this target's
++            # System volume: a plain folder there would be "patched" and blessed in place of the target.
++            mounted = [(p, options) for p, options in self._mounts(self.system_device) if os.path.samefile(p, mount_point)]
++            if not mounted:
++                raise RuntimeError(f"{mount_point} holds a System folder but is not a mount of /dev/{self.system_device}; remove it first")
++            if "read-only" in mounted[0][1]:
++                raise RuntimeError(f"/dev/{self.system_device} is mounted read-only at {mounted[0][0]}; unmount it first")
++            logging.info(f"- Reusing the target System volume mount at {mounted[0][0]}")
++            self.system_mount = mounted[0][0]
++            return self.system_mount
++
++        # DiskArbitration mounts a non-booted System volume's live file system read-only (ex. /Volumes/macOS);
++        # APFS refuses a second mount of it ("Operation already in progress"), so unmount that first.
++        # Snapshot mounts (diskXsYsZ) can stay, as for the booted system.
++        for existing in self._mount_points(self.system_device):
++            logging.info(f"- Target System volume is mounted at {existing}, unmounting it first")
++            result = subprocess_wrapper.run_as_root(["/usr/sbin/diskutil", "unmount", self.system_device], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++            if result.returncode != 0:
++                subprocess_wrapper.log(result)
++                raise RuntimeError(f"Could not unmount the target System volume from {existing}")
++
++        subprocess_wrapper.run_as_root_and_verify(["/bin/mkdir", "-p", mount_point], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        result = subprocess_wrapper.run_as_root(["/sbin/mount", "-o", "nobrowse", "-t", "apfs", f"/dev/{self.system_device}", mount_point], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        if result.returncode != 0:
++            subprocess_wrapper.log(result)
++            raise RuntimeError(f"Failed to mount target System volume {self.system_device} at {mount_point}")
++
++        mounted = self._mount_points(self.system_device)
++        if len(mounted) != 1:
++            raise RuntimeError(f"Target System volume {self.system_device} mounted {len(mounted)} times after mounting: {mounted}")
++        self.system_mount = mounted[0]
++        self._mounted_system = True
++        if self.system_mount != mount_point:
++            logging.info(f"- Target System volume mounted at {self.system_mount}")
++        return self.system_mount
++
++
++    def release(self) -> None:
++        """
++        Unmount the target System volume if it is still mounted at system_mount
++
++        Stock OCLP unmounts only on success and after a failed sanity check or hook. Every other exit (no patch
++        sets needed, can_patch False, PatcherSupportPkg missing, kmutil failure, an exception) left the target's
++        live System volume mounted read/write. Safe to call more than once. The Data volume is left as it is.
++        """
++        if not self.system_device or not self.system_mount:
++            return
++        if self.system_mount not in self._mount_points(self.system_device):
++            return
++        logging.info(f"- Unmounting target System volume at {self.system_mount}")
++        result = subprocess_wrapper.run_as_root(["/sbin/umount", self.system_mount], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        if result.returncode != 0:
++            logging.error(f"- Could not unmount {self.system_mount}")
++            subprocess_wrapper.log(result)
++
++
++    def preboot_kernel_collections(self) -> tuple:
++        """
++        (folder, mounted_by_us) of the target's Preboot copy of the Boot kernel collection:
++        <Preboot>/<volume group>/boot/System/Library/KernelCollections. kmutil --update-all writes it on an Intel
++        host; a host that cannot run --update-all (Apple silicon) has to copy the new BootKC there itself.
++        """
++        group = self._diskutil_info(self.system_device).get("APFSVolumeGroupID")
++        preboot = [v["DeviceIdentifier"] for v in self._container_volumes(self.container) if "Preboot" in v.get("Roles", [])]
++        if not group or len(preboot) != 1:
++            raise RuntimeError(f"Target container {self.container}: volume group {group}, Preboot volumes {preboot}")
++        mount_point = self._diskutil_info(preboot[0]).get("MountPoint") or None
++        mounted_by_us = False
++        if mount_point is None:
++            subprocess_wrapper.run_as_root_and_verify(["/usr/sbin/diskutil", "mount", "-mountOptions", "nobrowse", preboot[0]], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++            mount_point = self._diskutil_info(preboot[0]).get("MountPoint") or None
++            mounted_by_us = True
++        if mount_point is None:
++            raise RuntimeError(f"Could not mount the target Preboot volume {preboot[0]}")
++        return f"{mount_point}/{group}/boot/System/Library/KernelCollections", mounted_by_us
++
++
++    def kernel_collections_fingerprint(self) -> dict:
++        """
++        (size, mtime, inode) of the target's Boot and System kernel collections
++        """
++        result = {}
++        for name in ("BootKernelExtensions.kc", "SystemKernelExtensions.kc"):
++            path = Path(f"{self.system_mount}/System/Library/KernelCollections/{name}")
++            st = path.stat() if path.exists() else None
++            result[name] = (st.st_size, st.st_mtime_ns, st.st_ino) if st else None
++        return result
++
++
++    def read_os_version(self) -> None:
++        """
++        Read the target's macOS version and its kernel's Darwin version
++        """
++        version_plist = Path(f"{self.system_mount}/System/Library/CoreServices/SystemVersion.plist")
++        data = plistlib.load(version_plist.open("rb"))
++        self.product_version = data["ProductVersion"]
++        self.product_build   = data["ProductBuildVersion"]
++
++        kernel = Path(f"{self.system_mount}/System/Library/Kernels/kernel")
++        match = None
++        if kernel.exists():
++            match = re.search(rb"Darwin Kernel Version (\d+)\.(\d+)\.(\d+)", kernel.read_bytes())
++        if match is None:
++            raise RuntimeError(f"Could not read the Darwin version from {kernel}")
++
++        self.xnu_major = int(match.group(1))
++        self.xnu_minor = int(match.group(2))
++
++
++    def apply_to_constants(self, global_constants) -> None:
++        """
++        Make the patcher see the target's OS instead of the running one
++        """
++        logging.info(f"- Target: {self.product_version} ({self.product_build}), Darwin {self.xnu_major}.{self.xnu_minor}")
++        logging.info(f"  - System: {self.system_device} at {self.system_mount}")
++        logging.info(f"  - Data:   {self.data_device} at {self.data_mount}")
++        if global_constants.detected_os_build != self.product_build:
++            logging.info(f"  - Running OS is {global_constants.detected_os_version} ({global_constants.detected_os_build})")
++
++        global_constants.detected_os         = self.xnu_major
++        global_constants.detected_os_minor   = self.xnu_minor
++        global_constants.detected_os_build   = self.product_build
++        global_constants.detected_os_version = self.product_version
++        global_constants.target              = self
++
++
++    def check_supported_os(self) -> None:
++        """
++        Target patching needs a sealed System volume (Big Sur, Darwin 20, or newer). For Catalina, stock OCLP
++        runs '/usr/sbin/kcditto', which updates the running system's Preboot, and makes no snapshot.
++        """
++        if self.xnu_major < 20:
++            raise RuntimeError(f"Target runs macOS {self.product_version} (Darwin {self.xnu_major}); target patching needs Big Sur or newer")
++
++
++    def check_same_build(self, running_build: str, allow_mismatch: bool = False) -> None:
++        """
++        The running OS's kmutil and bless build the target's kernel collections and snapshot. Every hardware run
++        so far used the same build on both sides (2026-10-10 from a booted 25G241 host, 2026-10-19 from recoveryOS
++        25G241), as the 2026-10-10 prototype required. A different build is refused unless explicitly allowed
++        (--allow_build_mismatch): untested, not known to fail.
++        """
++        if running_build == self.product_build:
++            return
++        if allow_mismatch:
++            logging.warning(f"- Running OS build {running_build} differs from the target's {self.product_build} (allowed, untested)")
++            return
++        raise RuntimeError(f"Running OS build {running_build} differs from the target's {self.product_build}; "
++                           "patch from the same build, or pass --allow_build_mismatch")
++
++
++    def setup(self, global_constants, allow_build_mismatch: bool = False) -> None:
++        self.resolve()
++        self.mount_system()
++        self.read_os_version()
++        self.check_supported_os()
++        self.check_same_build(global_constants.detected_os_build, allow_build_mismatch)
++        self.apply_to_constants(global_constants)
++
++
++def system_root(global_constants) -> str:
++    """
++    Prefix for paths on the System volume being inspected ("" = booted system)
++    """
++    target = getattr(global_constants, "target", None)
++    return target.system_mount if target else ""
++
++
++def data_root(global_constants) -> str:
++    """
++    Prefix for paths on the Data volume being patched ("" = booted system)
++    """
++    target = getattr(global_constants, "target", None)
++    return target.data_mount if target else ""
++
++
++def run_hooks(global_constants, hooks_dir: str) -> bool:
++    """
++    Run the hooks in hooks_dir (sorted by name) after the patch sets are installed and
++    before the kernel cache rebuild and snapshot. A hook is either a '*.sh' file or a
++    folder with a 'hook.sh' inside (so it can carry its own payload next to it). Hooks run
++    with /bin/sh, exec bits are not needed. A failing hook stops patching: no snapshot is
++    made, so the target keeps booting its previous snapshot.
++
++    Each hook gets: $1 = System volume mount, $2 = Data volume mount, and in the environment
++    OCLP_TARGET_BUILD, OCLP_TARGET_VERSION and OCLP_PYTHON (this interpreter, for hashing etc.).
++    """
++    if not hooks_dir:
++        return True
++
++    hooks = []
++    for entry in sorted(Path(hooks_dir).iterdir()):
++        if entry.name.startswith("."):
++            continue
++        if entry.is_dir() and (entry / "hook.sh").is_file():
++            hooks.append(entry / "hook.sh")
++        elif entry.is_file() and entry.suffix == ".sh":
++            hooks.append(entry)
++    if not hooks:
++        logging.info(f"- No hooks in {hooks_dir}")
++        return True
++
++    system = system_root(global_constants) or "/System/Volumes/Update/mnt1"
++    data   = data_root(global_constants) or "/"
++    environment = {
++        **os.environ,
++        "OCLP_TARGET_BUILD":   global_constants.detected_os_build,
++        "OCLP_TARGET_VERSION": global_constants.detected_os_version,
++        "OCLP_PYTHON":         sys.executable,
++    }
++    for hook in hooks:
++        name = hook.parent.name if hook.name == "hook.sh" else hook.name
++        logging.info(f"- Running hook {name}")
++        result = subprocess.run(["/bin/sh", str(hook), system, data], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=environment)
++        for line in result.stdout.decode(errors="replace").splitlines():
++            logging.info(f"  {line}")
++        if result.returncode != 0:
++            logging.error(f"- Hook {name} failed ({result.returncode}), stopping before the snapshot")
++            return False
++
++    return True
+diff --git a/opencore_legacy_patcher/sys_patch/utilities/dmg_mount.py b/opencore_legacy_patcher/sys_patch/utilities/dmg_mount.py
+index 8460f02864f585c64aff413abf84a10a245d1e38..0ed7c50e86db24121aed65ca16e97d2ff076bd6a 100644
+--- a/opencore_legacy_patcher/sys_patch/utilities/dmg_mount.py
++++ b/opencore_legacy_patcher/sys_patch/utilities/dmg_mount.py
+@@ -2,6 +2,7 @@
+ dmg_mount.py: PatcherSupportPkg DMG Mounting. Handles Universal-Binaries and DortaniaInternalResources DMGs.
+ """
+ 
++import os
+ import logging
+ import subprocess
+ import applescript
+@@ -169,8 +170,10 @@ class PatcherSupportPkgMount:
+         Returns:
+             bool: True if all resources are mounted, False otherwise
+         """
+-        # If already mounted, skip
+-        if Path(self.constants.payload_local_binaries_root_path).exists():
++        # If already mounted, skip. A target run's payload persists between runs (ssd-target): there the folder
++        # may be a leftover empty mount point, so it must really be a mount.
++        binaries = Path(self.constants.payload_local_binaries_root_path)
++        if binaries.exists() and (not getattr(self.constants, "target", None) or os.path.ismount(binaries)):
+             logging.info("- Local PatcherSupportPkg resources available, continuing...")
+             return True
+ 
+diff --git a/opencore_legacy_patcher/sys_patch/utilities/files.py b/opencore_legacy_patcher/sys_patch/utilities/files.py
+index c962ad48f1779b44d0c657eed9c488c9b4cab882..b03a284920c3c70246a9a8ff26a1f21c799d83e8 100644
+--- a/opencore_legacy_patcher/sys_patch/utilities/files.py
++++ b/opencore_legacy_patcher/sys_patch/utilities/files.py
+@@ -2,6 +2,7 @@
+ utilities.py: Supporting functions for file handling during root volume patching
+ """
+ 
++import os
+ import logging
+ import subprocess
+ 
+@@ -13,6 +14,25 @@ from ...volume  import generate_copy_arguments
+ from ...support import subprocess_wrapper
+ 
+ 
++_RSYNC_USABLE = None
++
++
++def rsync_usable() -> bool:
++    """
++    Whether /usr/bin/rsync runs. recoveryOS ships an rsync whose library is missing,
++    callers merge with ditto there instead (same result: existing files overwritten, nothing deleted).
++    """
++    global _RSYNC_USABLE
++    if _RSYNC_USABLE is None:
++        try:
++            _RSYNC_USABLE = subprocess.run(["/usr/bin/rsync", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0
++        except OSError:
++            _RSYNC_USABLE = False
++        if _RSYNC_USABLE is False:
++            logging.info("- rsync not usable, merging with ditto")
++    return _RSYNC_USABLE
++
++
+ def install_new_file(source_folder: Path, destination_folder: Path, file_name: str, method: PatchType) -> None:
+     """
+     Installs a new file to the destination folder
+@@ -36,8 +56,11 @@ def install_new_file(source_folder: Path, destination_folder: Path, file_name: s
+     if method in [PatchType.MERGE_SYSTEM_VOLUME, PatchType.MERGE_DATA_VOLUME]:
+         # merge with rsync
+         logging.info(f"  - Installing: {file_name}")
+-        subprocess_wrapper.run_as_root(["/usr/bin/rsync", "-r", "-i", "-a", f"{source_folder}/{file_name}", f"{destination_folder}/"], stdout=subprocess.PIPE)
+-        fix_permissions(destination_folder + "/" + file_name)
++        if rsync_usable():
++            subprocess_wrapper.run_as_root(["/usr/bin/rsync", "-r", "-i", "-a", f"{source_folder}/{file_name}", f"{destination_folder}/"], stdout=subprocess.PIPE)
++        else:
++            subprocess_wrapper.run_as_root(["/usr/bin/ditto", f"{source_folder}/{file_name}", f"{destination_folder}/{file_name}"], stdout=subprocess.PIPE)
++        fix_permissions(destination_folder + "/" + file_name, source=f"{source_folder}/{file_name}")
+     elif Path(source_folder + "/" + file_name_str).is_dir():
+         # Applicable for .kext, .app, .plugin, .bundle, all of which are directories
+         if Path(destination_folder + "/" + file_name).exists():
+@@ -75,10 +98,30 @@ def remove_file(destination_folder: Path, file_name: str) -> None:
+             subprocess_wrapper.run_as_root_and_verify(["/bin/rm", f"{destination_folder}/{file_name}"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+ 
+ 
+-def fix_permissions(destination_file: Path) -> None:
++def fix_permissions(destination_file: Path, source: Path = None) -> None:
+     """
+     Fix file permissions for a given file or directory
++
++    With `source` (a merge into a folder that already exists), only the entries that came from `source` are
++    changed, and never a file with more than one link: a recursive chmod of the destination would also reach
++    files that were already there, and on a sealed System many of those are hard links shared with the rest
++    of the OS (one CodeResources inode has thousands of links), so their mode would change everywhere.
+     """
++    if source is not None and Path(source).is_dir():
++        paths = [str(destination_file)]
++        for root, dirs, files in os.walk(source):
++            rel = Path(root).relative_to(source)
++            for name in dirs + files:
++                if Path(root, name).is_symlink():
++                    continue
++                target = Path(destination_file) / rel / name
++                if target.is_file() and not target.is_symlink() and os.lstat(target).st_nlink > 1:
++                    continue
++                paths.append(str(target))
++        for i in range(0, len(paths), 500):
++            subprocess_wrapper.run_as_root_and_verify(["/bin/chmod", "755", *paths[i:i + 500]], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++            subprocess_wrapper.run_as_root_and_verify(["/usr/sbin/chown", "root:wheel", *paths[i:i + 500]], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++        return
+ 
+     chmod_args = ["/bin/chmod",      "-Rf", "755", destination_file]
+     chown_args = ["/usr/sbin/chown", "-Rf", "root:wheel", destination_file]
+diff --git a/opencore_legacy_patcher/sys_patch/utilities/kdk_intel_payload.py b/opencore_legacy_patcher/sys_patch/utilities/kdk_intel_payload.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b07460743c67bf33c4a0da03e30e5e3e4fd40ca2
+--- /dev/null
++++ b/opencore_legacy_patcher/sys_patch/utilities/kdk_intel_payload.py
+@@ -0,0 +1,99 @@
++"""Prepare an Intel-only KDK overlay without modifying the KDK or stock target."""
++import fnmatch
++import os
++import shutil
++import struct
++from pathlib import Path
++
++EXCLUDE = ('*.dSYM', '*_development', '*_kasan')
++X86_64 = 0x01000007
++ARM64 = 0x0100000c
++
++
++def architecture(path):
++    """Return (cpu/subtype tuples, exact x86_64 slice or None). Refuse malformed fat input."""
++    size = path.stat().st_size
++    with path.open('rb') as f:
++        magic = f.read(4)
++        if magic in (b'\xcf\xfa\xed\xfe', b'\xfe\xed\xfa\xcf'):
++            endian = '<' if magic[0] == 0xcf else '>'
++            raw = f.read(8)
++            if len(raw) != 8:
++                raise ValueError('truncated Mach-O: ' + str(path))
++            cpu, sub = struct.unpack(endian+'II', raw)
++            return [(cpu, sub & 0xffffff)], None
++        formats = {b'\xca\xfe\xba\xbe': ('>', False), b'\xbe\xba\xfe\xca': ('<', False),
++                   b'\xca\xfe\xba\xbf': ('>', True), b'\xbf\xba\xfe\xca': ('<', True)}
++        if magic not in formats:
++            return [], None
++        endian, wide = formats[magic]
++        raw = f.read(4)
++        if len(raw) != 4:
++            raise ValueError('truncated fat header')
++        count = struct.unpack(endian+'I', raw)[0]
++        width = 32 if wide else 20
++        if not 1 <= count <= 64 or 8 + count*width > size:
++            raise ValueError('invalid fat architecture count')
++        entries = []
++        for _ in range(count):
++            row = struct.unpack(endian+('IIQQII' if wide else 'IIIII'), f.read(width))
++            cpu, sub, offset, length, align = row[:5]
++            if align > 30 or offset % (1 << align) or offset < 8+count*width or length < 12 or offset+length > size:
++                raise ValueError('invalid fat slice bounds')
++            if any(offset < o+n and o < offset+length for _, _, o, n in entries):
++                raise ValueError('overlapping fat slices')
++            if any(cpu == c and (sub & 0xffffff) == s for c, s, _, _ in entries):
++                raise ValueError('duplicate fat architecture')
++            entries.append((cpu, sub & 0xffffff, offset, length))
++        intel = [(o,n) for c,sub,o,n in entries if c == X86_64 and sub == 3]
++        if any(c == X86_64 for c,_,_,_ in entries) and not intel:
++            raise ValueError('generic x86_64 slice absent')
++        if len(intel) > 1:
++            raise ValueError('ambiguous x86_64 slices')
++        for cpu, sub, offset, length in entries:
++            f.seek(offset); header = f.read(12)
++            if header[:4] != b'\xcf\xfa\xed\xfe' or struct.unpack('<II',header[4:]) != (cpu, sub):
++                # Capability bits in the inner subtype are permitted, but must match the architecture.
++                if header[:4] != b'\xcf\xfa\xed\xfe' or struct.unpack('<I',header[4:8])[0] != cpu or struct.unpack('<I',header[8:12])[0] & 0xffffff != sub:
++                    raise ValueError('fat slice header mismatch')
++        return [(c,s) for c,s,_,_ in entries], intel[0] if intel else None
++
++
++def prepare(source, destination):
++    source, destination = Path(source), Path(destination)
++    if destination.exists():
++        raise ValueError('payload staging destination already exists')
++    excluded, thin = set(), {}
++    for root, dirs, files in os.walk(source, followlinks=False):
++        dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d,p) for p in EXCLUDE)]
++        for name in files:
++            path = Path(root)/name
++            if path.is_symlink() or any(fnmatch.fnmatch(name,p) for p in EXCLUDE):
++                continue
++            bundles = [p for p in path.parents if p != source and p.suffix == '.kext' and source in p.parents]
++            if not bundles:
++                continue
++            arches, selected = architecture(path)
++            if arches and all(c == ARM64 and s == 2 for c,s in arches):
++                excluded.add(bundles[0].relative_to(source))
++            elif selected:
++                thin[path.relative_to(source)] = selected
++    def ignore(folder, names):
++        rel = Path(folder).relative_to(source)
++        return [n for n in names if rel/n in excluded or any(fnmatch.fnmatch(n,p) for p in EXCLUDE)]
++    shutil.copytree(source, destination, symlinks=True, ignore=ignore)
++    for rel, (offset, length) in thin.items():
++        target = destination/rel
++        if not target.exists():
++            continue  # A parent arm64e-only bundle was excluded.
++        target.chmod(target.stat().st_mode | 0o200)
++        with (source/rel).open('rb') as original, target.open('wb') as output:
++            original.seek(offset)
++            remaining = length
++            while remaining:
++                block = original.read(min(1024*1024, remaining))
++                if not block:
++                    raise ValueError('source changed while thinning')
++                output.write(block); remaining -= len(block)
++        shutil.copystat(source/rel, target)
++    return {'excluded_bundles': sorted(map(str, excluded)), 'thinned': sorted(str(p) for p in thin if (destination/p).exists())}
+diff --git a/opencore_legacy_patcher/sys_patch/utilities/kdk_merge.py b/opencore_legacy_patcher/sys_patch/utilities/kdk_merge.py
+index e4fd0d8639fda6429e6665d86b91314429b2cee6..02a7195ff804634ccab79adb623924c7ecbc7a0d 100644
+--- a/opencore_legacy_patcher/sys_patch/utilities/kdk_merge.py
++++ b/opencore_legacy_patcher/sys_patch/utilities/kdk_merge.py
+@@ -1,7 +1,10 @@
+ 
++import os
++import fnmatch
+ import logging
+ import subprocess
+ import plistlib
++import tempfile
+ 
+ from pathlib import Path
+ 
+@@ -10,6 +13,31 @@ from ... import constants
+ from ...datasets import os_data
+ from ...support import subprocess_wrapper, kdk_handler
+ from ...volume import generate_copy_arguments
++from ..target import system_root
++from .files import rsync_usable
++from .kdk_intel_payload import prepare as prepare_intel_payload
++
++
++# KDK content kmutil does not use for a release kernel collection: debug symbols and the development/KASAN
++# variants of kext executables. Leaving them out keeps them out of every sealed snapshot (ssd-target).
++KDK_MERGE_EXCLUDE = ("*.dSYM", "*_development", "*_kasan")
++
++
++def _kdk_excluded_paths(kdk_extensions: Path) -> list:
++    """
++    Relative paths in the KDK's Extensions folder matching KDK_MERGE_EXCLUDE (a matching folder is listed once)
++    """
++    excluded = []
++    for root, dirs, files in os.walk(kdk_extensions):
++        rel = Path(root).relative_to(kdk_extensions)
++        for name in list(dirs):
++            if any(fnmatch.fnmatch(name, pattern) for pattern in KDK_MERGE_EXCLUDE):
++                excluded.append(rel / name)
++                dirs.remove(name)
++        for name in files:
++            if any(fnmatch.fnmatch(name, pattern) for pattern in KDK_MERGE_EXCLUDE):
++                excluded.append(rel / name)
++    return excluded
+ 
+ 
+ class KernelDebugKitMerge:
+@@ -24,7 +52,7 @@ class KernelDebugKitMerge:
+         """
+         Check whether the KDK is already merged with the root volume
+         """
+-        oclp_plist = Path("/System/Library/CoreServices/OpenCore-Legacy-Patcher.plist")
++        oclp_plist = Path(f"{system_root(self.constants)}/System/Library/CoreServices/OpenCore-Legacy-Patcher.plist")
+         if not oclp_plist.exists():
+             return False
+ 
+@@ -78,12 +106,22 @@ class KernelDebugKitMerge:
+         Merge Kernel Debug Kit (KDK) with the root volume
+         """
+         logging.info(f"- Merging KDK with Root Volume: {Path(kdk_path).name}")
+-        subprocess_wrapper.run_as_root(
+-            # Only merge '/System/Library/Extensions'
+-            # 'Kernels' and 'KernelSupport' is wasted space for root patching (we don't care above dev kernels)
+-            ["/usr/bin/rsync", "-r", "-i", "-a", f"{kdk_path}/System/Library/Extensions/", f"{self.mount_location}/System/Library/Extensions"],
+-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+-        )
++        source = Path(kdk_path) / "System/Library/Extensions"
++        destination = Path(self.mount_location) / "System/Library/Extensions"
++        # Only merge '/System/Library/Extensions'
++        # 'Kernels' and 'KernelSupport' is wasted space for root patching (we don't care above dev kernels)
++        if not rsync_usable():
++            raise RuntimeError("KDK merge requires checksum-capable rsync; target unchanged")
++        # Private copies only: never thin installed KDK or mutate omitted stock bundles.
++        with tempfile.TemporaryDirectory(prefix="oclp-kdk-intel-") as scratch:
++            staged = Path(scratch) / "Extensions"
++            report = prepare_intel_payload(source, staged)
++            result = subprocess_wrapper.run_as_root(
++                ["/usr/bin/rsync", "-r", "-i", "-a", "--checksum", f"{staged}/", f"{destination}"],
++                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++            if result.returncode:
++                raise RuntimeError("KDK checksum merge failed")
++            logging.info(f"- Intel KDK overlay: {report}")
+ 
+         if not (Path(self.mount_location) / Path("System/Library/Extensions/System.kext/PlugIns/Libkern.kext/Libkern")).exists():
+             logging.info("- Failed to merge KDK with Root Volume")
+diff --git a/ssd-target/README.md b/ssd-target/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..273eb9f5bfdcf671e80838c26bf6cf3c601ca84a
+--- /dev/null
++++ b/ssd-target/README.md
+@@ -0,0 +1,54 @@
++# ssd-target: root patching a non-booted install
++
++Local derivative of OpenCore Legacy Patcher 3.0.0-rc.3 (branch `ssd-target`, base 238a876f) for ssd-tools.
++Stock OCLP patches the booted system. This branch patches a macOS install that has never booted, from
++another macOS running on the **same machine** (hardware detection still probes the running machine).
++That other macOS can be a recoveryOS on a USB stick (runs 2026-10-19 on) or a booted, OCLP-patched install with
++the target attached, e.g. over USB (the 2026-10-10 prototype on this model: output = image 02-oclp-root-patched).
++Both need root; as root OCLP's privileged helper is bypassed.
++
++```
++sudo <python> ssd-target/run.py --patch_sys_vol --target <volume or diskXsY> [--hooks DIR] [--kdk_dir DIR]
++```
++
++- `--target` (alias `--target_volume`, the prototype's name): any volume of the target's APFS volume group.
++  Refuses the booted container, locked Data volumes, targets older than Big Sur, and a target whose build differs
++  from the running OS (`--allow_build_mismatch` overrides; untested). The target's live System volume is mounted at
++  `/private/var/tmp/oclp-target/<dev>` (a leftover there is reused only if it is a read/write mount of the target),
++  its Data volume where DiskArbitration mounts it. OS version, build and Darwin version come from the target.
++  Every exit unmounts the System volume again; the Data volume stays mounted.
++- `--target`, `--hooks`, `--kdk_dir`, `--allow_build_mismatch` without `--patch_sys_vol`: exit 2.
++- `--hooks DIR`: run `*.sh` files and `<folder>/hook.sh` (sorted) after OCLP's patch sets and before kmutil + bless.
++  Args: System mount, Data mount; env `OCLP_TARGET_BUILD`, `OCLP_TARGET_VERSION`, `OCLP_PYTHON`. A failing hook
++  stops patching before the snapshot. Also works for the booted system.
++- `--kdk_dir DIR`: Kernel Debug Kits are looked up here instead of `/Library/Developer/KDKs`.
++- `--hardware_profile FILE`: use the hardware recorded in FILE (JSON, format 1) instead of probing the running
++  machine, so the target can be patched from a machine without its GPU or Wi-Fi card (ex. a VM).
++  `Computer.from_profile()` classifies the recorded PCI devices with OCLP's own classes (GPU arch, Wi-Fi chipset);
++  OCLP/OpenCore NVRAM, Secure Boot, SIP and AMFI state are still read from the running machine, so the VM must boot
++  with the target's SIP/AMFI settings. Keys: `format`, `model`, `board_id`, `firmware_vendor`, `cpu {name, flags,
++  leafs}`, `pci [{name, vendor_id, device_id, class_code, model?, acpi_path?, pci_path?}]` (hex strings), optional
++  `ambient_light_sensor`, `pcie_webcam`, `t1_chip`, `third_party_sata_ssd`, `bluetooth_chipset`,
++  `internal_keyboard_type`, `trackpad_type`. Unknown keys are ignored.
++- Exit codes in target mode: 0 patched, 1 patching failed, 2 target not usable / not root.
++- `run.py` stubs wxPython, so a plain Python with `requests packaging py_sip_xnu pyobjc-core
++  pyobjc-framework-Cocoa` is enough (ssd-tools: `handoff/oclp-target/runtime`, x86_64 CPython 3.12.14).
++  Running as root skips OCLP's privileged helper.
++
++Not supported for a target: patch sets with EXECUTE commands (T1, non-Metal enforcement), AuxKC-only rebuilds
++(no KDK), unpatching, and the auto-patch LaunchAgents (skipped).
++
++Test (host, no root, nothing executed):
++`python ssd-target/tests/test_target_mode.py <Universal-Binaries.dmg mount> <work dir>` -
++real patch sets for MacBookPro9,2 on 26.7.1 (25G241), every root command recorded and checked; the
++resulting OCLP record is identical to the master image's (9 sets).
++`--hardware-profile FILE` runs OCLP's real detection on `Computer.from_profile(FILE)` and requires the laptop's 9 sets
++in the laptop run's install order.
++`python ssd-target/tests/test_consolidated.py <work dir>` checks the pieces merged from the prototype (CLI alias and
++guard, WindowServer quoting, mount release, leftover-mount rules, Big Sur minimum, same-build rule).
++
++## Intel KDK overlay
++
++The merge stages a private filtered copy of Extensions: omit debug/development/KASAN files and complete bundles whose executable is arm64e-only; retain the stock destination bundle unchanged. Fat kext executables retain the exact generic x86_64 slice (not x86_64h), including its signature bytes. Source KDK files are never modified. The overlay is merged with rsync --checksum; no delete flag, AMD stock bundles and Kernels stay untouched. Missing rsync or malformed/ambiguous fat input refuses. Temporary staging is removed by its owned context.
++
++Tests: ssd-target/tests/test_kdk_intel_payload.py and test_kdk_trim.py. Owner2026-10-26: no dedicated S3 comparison; next normal full dev build supplies build validation. Previous pipeline pin c67a05315c77badd2246f2f9ecb1be93cc56ad26 is retained for one-step revert.
+diff --git a/ssd-target/find_target.py b/ssd-target/find_target.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..4445ab5e0130db5e3a12bdb22634a0190c6e8aa1
+--- /dev/null
++++ b/ssd-target/find_target.py
+@@ -0,0 +1,56 @@
++"""
++find_target.py: print the System volume of the one macOS install on the internal disks
++
++For unattended target patching (ex. from a recoveryOS on USB): looks at every APFS container
++on internal physical disks, skips the booted one, and requires exactly one System volume.
++Anything else (none, several, a locked Data volume) is an error: exit 1, nothing printed.
++
++    python find_target.py [--any-disk]      (--any-disk: also external disks and disk images, for tests)
++"""
++
++import sys
++import plistlib
++import subprocess
++
++
++def diskutil(*args) -> dict:
++    result = subprocess.run(["/usr/sbin/diskutil", *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
++    if result.returncode != 0:
++        raise RuntimeError(f"diskutil {' '.join(args)}: {result.stderr.decode().strip()}")
++    return plistlib.loads(result.stdout)
++
++
++def main() -> int:
++    any_disk = "--any-disk" in sys.argv[1:]
++    booted = diskutil("info", "-plist", "/").get("APFSContainerReference")
++
++    listing = diskutil("list", "-plist") if any_disk else diskutil("list", "-plist", "internal", "physical")
++    containers = set()
++    for disk in listing.get("AllDisksAndPartitions", []):
++        for partition in disk.get("Partitions", []) + ([disk] if disk.get("Content") == "Apple_APFS" else []):
++            if partition.get("Content") not in ("Apple_APFS", "41504653-0000-11AA-AA11-00306543ECAC"):
++                continue
++            container = diskutil("info", "-plist", partition["DeviceIdentifier"]).get("APFSContainerReference")
++            if container and container != booted:
++                containers.add(container)
++
++    systems = []
++    for container in sorted(containers):
++        for apfs in diskutil("apfs", "list", "-plist", container).get("Containers", []):
++            for volume in apfs.get("Volumes", []):
++                if "System" in volume.get("Roles", []):
++                    systems.append((container, volume))
++
++    if len(systems) != 1:
++        found = ", ".join(f"{c}:{v['DeviceIdentifier']} ({v.get('Name')})" for c, v in systems) or "none"
++        print(f"find_target: expected exactly one macOS System volume outside the booted container, found {found}", file=sys.stderr)
++        return 1
++
++    container, volume = systems[0]
++    print(f"find_target: {volume['DeviceIdentifier']} ({volume.get('Name')}) in {container}", file=sys.stderr)
++    print(volume["DeviceIdentifier"])
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/ssd-target/run.py b/ssd-target/run.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..59d194d474b79115e2f5436d92dd7a0bd7ffd2be
+--- /dev/null
++++ b/ssd-target/run.py
+@@ -0,0 +1,42 @@
++"""
++run.py: start the OCLP derivative from source without wxPython (ssd-tools)
++
++recoveryOS has no Python and no GUI toolkit we need for '--patch_sys_vol'. OCLP imports wx at
++module level in the CLI path (application_entry, arguments, auto_patcher), so when wx is not
++installed every wx name becomes an inert dummy class. Only the GUI would ever use them.
++
++    <python> ssd-target/run.py --patch_sys_vol --target <volume> [--hooks DIR] [--kdk_dir DIR]
++
++Runs from the source root (OCLP's CLI mode reads payloads/ relative to the working directory).
++"""
++
++import os
++import sys
++import types
++
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++class _WxStub(types.ModuleType):
++    def __getattr__(self, name):
++        if name.startswith("__"):
++            raise AttributeError(name)
++        stub = type(name, (object,), {"__init__": lambda self, *a, **k: None})
++        setattr(self, name, stub)
++        return stub
++
++
++try:
++    import wx  # noqa: F401
++except ImportError:
++    for module in ("wx", "wx.adv", "wx.html2"):
++        sys.modules[module] = _WxStub(module)
++
++sys.path.insert(0, str(ROOT))
++os.chdir(ROOT)
++
++from opencore_legacy_patcher import main
++
++main()
+diff --git a/ssd-target/tests/test_consolidated.py b/ssd-target/tests/test_consolidated.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..a908f17ca2f1d21b325a2eed2a0d7a75dbfe644c
+--- /dev/null
++++ b/ssd-target/tests/test_consolidated.py
+@@ -0,0 +1,248 @@
++"""
++test_consolidated.py: host checks for the pieces merged from the 2026-10-10 prototype (ssd-target-consolidated)
++
++No root, no disks: diskutil/mount output is faked, every root command is recorded instead of run.
++
++    python ssd-target/tests/test_consolidated.py <work dir>
++
++Checks: --target_volume alias, target options without --patch_sys_vol exit 2, WindowServer quoting (stock command
++unchanged, a Data mount with a quote and spaces works in bash), PatchTarget.release(), leftover-mount reuse rules,
++Big Sur minimum, same-build rule, and that the target handler releases the mount on setup failure and on exceptions.
++"""
++
++import os
++import sys
++import shlex
++import types
++import shutil
++import logging
++import plistlib
++import subprocess
++
++from pathlib import Path
++
++REPO = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(REPO))
++
++
++class _WxStub(types.ModuleType):
++    def __getattr__(self, name):
++        if name.startswith("__"):
++            raise AttributeError(name)
++        stub = type(name, (object,), {"__init__": lambda self, *a, **k: None})
++        setattr(self, name, stub)
++        return stub
++
++try:
++    import wx  # noqa: F401
++except ImportError:
++    for module in ("wx", "wx.adv", "wx.html2"):
++        sys.modules[module] = _WxStub(module)
++
++from opencore_legacy_patcher import constants
++from opencore_legacy_patcher.support import subprocess_wrapper, utilities
++from opencore_legacy_patcher.support import arguments as arguments_module
++from opencore_legacy_patcher.sys_patch import target as target_module
++from opencore_legacy_patcher.sys_patch import sys_patch_helpers
++from opencore_legacy_patcher.sys_patch.target import PatchTarget
++
++ROOT_LOG = []
++MOUNT_TABLE = []          # lines /sbin/mount prints
++_real_run = subprocess.run
++failures = []
++
++
++def check(condition, message):
++    print(("PASS " if condition else "FAIL ") + message)
++    if not condition:
++        failures.append(message)
++
++
++def fake_run_as_root(*args, **kwargs):
++    command = [str(a) for a in args[0]]
++    ROOT_LOG.append(command)
++    if command[0] == "/sbin/umount":
++        MOUNT_TABLE[:] = [line for line in MOUNT_TABLE if f" on {command[1]} (" not in line]
++    return subprocess.CompletedProcess(command, 0, b"", b"")
++
++
++def fake_run(*args, **kwargs):
++    command = args[0] if args else kwargs.get("args")
++    if command == ["/sbin/mount"]:
++        return subprocess.CompletedProcess(command, 0, "\n".join(MOUNT_TABLE).encode(), b"")
++    raise AssertionError(f"unexpected command: {command}")
++
++
++def parse(argv):
++    saved = sys.argv
++    sys.argv = ["oclp"] + argv
++    try:
++        return utilities.check_cli_args()
++    finally:
++        sys.argv = saved
++
++
++def main() -> int:
++    work = Path(sys.argv[1]).resolve()
++    if work.exists():
++        shutil.rmtree(work)
++    work.mkdir(parents=True)
++    logging.basicConfig(level=logging.INFO, format="%(message)s")
++
++    # 1. CLI
++    args = parse(["--patch_sys_vol", "--target_volume", "disk3s4"])
++    check(args is not None and args.target == "disk3s4", "--target_volume is an alias of --target")
++    args = parse(["--patch_sys_vol", "--target", "/Volumes/macOS"])
++    check(args.target == "/Volumes/macOS" and args.allow_build_mismatch is False, "--target still works, --allow_build_mismatch defaults off")
++    check(parse([]) is None, "no arguments still means GUI (check_cli_args returns None)")
++    for argv in (["--target", "disk3s4"], ["--hooks", "/tmp/x"], ["--kdk_dir", "/tmp/k"], ["--allow_build_mismatch"]):
++        saved = sys.argv
++        sys.argv = ["oclp"] + argv
++        try:
++            arguments_module.arguments(constants.Constants())
++            code = None
++        except SystemExit as e:
++            code = e.code
++        finally:
++            sys.argv = saved
++        check(code == 2, f"{' '.join(argv)} without --patch_sys_vol exits 2 (got {code})")
++
++    subprocess_wrapper.run_as_root = fake_run_as_root
++    target_module.subprocess_wrapper.run_as_root = fake_run_as_root
++    sys_patch_helpers.subprocess_wrapper.run_as_root = fake_run_as_root
++
++    # 2. WindowServer quoting
++    c = constants.Constants()
++    c.detected_os = 25
++    ROOT_LOG.clear()
++    sys_patch_helpers.SysPatchHelpers(c).disable_window_server_caching()
++    check(ROOT_LOG == [["/bin/bash", "-c", "/bin/rm -rf /private/var/folders/*/*/*/WindowServer/com.apple.WindowServer"],
++                       ["/bin/bash", "-c", "/usr/bin/chflags uchg /private/var/folders/*/*/*/WindowServer"]],
++          "stock WindowServer commands are byte-identical to upstream")
++    data = work / "Bob's SSD - Data"
++    cache = data / "private/var/folders/ab/cd/C/WindowServer/com.apple.WindowServer"
++    cache.mkdir(parents=True)
++    c.target = types.SimpleNamespace(data_mount=str(data), system_mount=str(work / "sys"))
++    ROOT_LOG.clear()
++    sys_patch_helpers.SysPatchHelpers(c).disable_window_server_caching()
++    rm, chflags = ROOT_LOG
++    _real_run(rm, check=True)
++    check(not cache.exists() and cache.parent.exists(), "rm command removes the cache under a Data mount named with a quote and spaces")
++    syntax = _real_run(["/bin/bash", "-n", "-c", chflags[2]]).returncode
++    check(syntax == 0 and chflags[2] == "/usr/bin/chflags uchg " + shlex.quote(f"{data}/private/var/folders") + "/*/*/*/WindowServer",
++          "chflags command is valid bash with the prefix quoted")
++
++    subprocess.run = fake_run
++    target_module.subprocess.run = fake_run
++    try:
++        # 3. release()
++        t = PatchTarget("disk9s1")
++        t.system_device, t.system_mount = "disk9s1", "/private/var/tmp/oclp-target/disk9s1"
++        MOUNT_TABLE[:] = ["/dev/disk9s1 on /private/var/tmp/oclp-target/disk9s1 (apfs, local, nobrowse)",
++                          "/dev/disk9s1s1 on /Volumes/macOS 1 (apfs, local, read-only)"]
++        ROOT_LOG.clear()
++        t.release()
++        check(ROOT_LOG == [["/sbin/umount", "/private/var/tmp/oclp-target/disk9s1"]], "release() unmounts the target System mount")
++        ROOT_LOG.clear()
++        t.release()
++        check(ROOT_LOG == [], "release() twice: nothing to do the second time (snapshot mount untouched)")
++        PatchTarget("x").release()
++        check(ROOT_LOG == [], "release() before resolve/mount does nothing")
++
++        # 4. leftover mount reuse
++        target_module.TARGET_MOUNT = str(work / "mnt")
++        leftover = work / "mnt/disk9s1"
++        (leftover / "System/Library/CoreServices").mkdir(parents=True)
++        plistlib.dump({"ProductBuildVersion": "25G241"}, (leftover / "System/Library/CoreServices/SystemVersion.plist").open("wb"))
++        for table, expect, message in [
++            ([], "not a mount", "leftover folder that is not a mount is refused"),
++            ([f"/dev/disk9s1 on {leftover} (apfs, local, read-only, nobrowse)"], "read-only", "leftover read-only mount is refused"),
++            ([f"/dev/disk9s2 on {leftover} (apfs, local, nobrowse)"], "not a mount", "leftover mount of another device is refused"),
++        ]:
++            MOUNT_TABLE[:] = table
++            t = PatchTarget("disk9s1")
++            t.system_device = "disk9s1"
++            try:
++                t.mount_system()
++                error = ""
++            except RuntimeError as e:
++                error = str(e)
++            check(expect in error, f"{message} ({error!r})")
++        MOUNT_TABLE[:] = [f"/dev/disk9s1 on {leftover} (apfs, local, nobrowse)"]
++        t = PatchTarget("disk9s1")
++        t.system_device = "disk9s1"
++        ROOT_LOG.clear()
++        check(t.mount_system() == str(leftover) and ROOT_LOG == [], "leftover read/write mount of the target is reused, nothing remounted")
++
++        # 5. Big Sur minimum, 6. same-build rule
++        for xnu, ok in ((19, False), (20, True), (25, True)):
++            t = PatchTarget("x")
++            t.xnu_major, t.product_version = xnu, "test"
++            try:
++                t.check_supported_os()
++                passed = True
++            except RuntimeError:
++                passed = False
++            check(passed == ok, f"Darwin {xnu} target {'accepted' if ok else 'refused'}")
++        t = PatchTarget("x")
++        t.product_build = "25G241"
++        results = []
++        for running, allow in (("25G241", False), ("25G325", False), ("25G325", True)):
++            try:
++                t.check_same_build(running, allow)
++                results.append(True)
++            except RuntimeError:
++                results.append(False)
++        check(results == [True, False, True], f"same build accepted, mismatch refused, --allow_build_mismatch accepts ({results})")
++
++        # 7. handler releases the mount on setup failure and on exceptions
++        saved_euid, saved_setup, saved_release, saved_patcher = os.geteuid, PatchTarget.setup, PatchTarget.release, arguments_module.sys_patch.PatchSysVolume
++        arguments_module.os.geteuid = lambda: 0
++        released = []
++        PatchTarget.release = lambda self: released.append(self.target)
++        try:
++            def setup_fails(self, global_constants, allow_build_mismatch=False):
++                self.system_device, self.system_mount = "disk9s1", str(leftover)
++                raise RuntimeError("mismatch")
++            def setup_ok(self, global_constants, allow_build_mismatch=False):
++                global_constants.target = self
++            class Raises:
++                def __init__(self, *a, **k): pass
++                def start_patch(self): raise Exception("EXECUTE patch sets are not supported")
++            class Succeeds:
++                def __init__(self, model, c, details): self.c = c
++                def start_patch(self): self.c.root_patcher_succeeded = True
++            for setup, patcher, expect, message in [
++                (setup_fails, Succeeds, 2, "setup failure"),
++                (setup_ok, Raises, 1, "exception in patching"),
++                (setup_ok, Succeeds, 0, "success"),
++            ]:
++                PatchTarget.setup = setup
++                arguments_module.sys_patch.PatchSysVolume = patcher
++                released.clear()
++                c = constants.Constants()
++                c.computer = types.SimpleNamespace(real_model="MacBookPro9,2")
++                handler = arguments_module.arguments.__new__(arguments_module.arguments)
++                handler.constants = c
++                handler.args = parse(["--patch_sys_vol", "--target", "disk9s1"])
++                try:
++                    handler._sys_patch_target_handler()
++                    code = None
++                except SystemExit as e:
++                    code = e.code
++                check(code == expect and released == ["disk9s1"], f"handler, {message}: exit {code}, released once ({released})")
++        finally:
++            arguments_module.os.geteuid = saved_euid
++            PatchTarget.setup = saved_setup
++            PatchTarget.release = saved_release
++            arguments_module.sys_patch.PatchSysVolume = saved_patcher
++    finally:
++        subprocess.run = _real_run
++        target_module.subprocess.run = _real_run
++
++    print(f"\n{len(failures)} failure(s)")
++    return 1 if failures else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/ssd-target/tests/test_kdk_intel_payload.py b/ssd-target/tests/test_kdk_intel_payload.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..055ccbc5791577e2e5f3f602ee4ef156ecc5a87d
+--- /dev/null
++++ b/ssd-target/tests/test_kdk_intel_payload.py
+@@ -0,0 +1,56 @@
++import importlib.util
++from pathlib import Path
++import struct
++import tempfile
++import unittest
++import subprocess
++import os
++
++ROOT=Path(__file__).resolve().parents[2]
++spec=importlib.util.spec_from_file_location('payload',ROOT/'opencore_legacy_patcher/sys_patch/utilities/kdk_intel_payload.py')
++m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
++def macho(cpu,sub=3):return b'\xcf\xfa\xed\xfe'+struct.pack('<II',cpu,sub)+b'signed-slice-unchanged'*8
++def fat(a,b):
++ o=4096;p=8192
++ return b'\xca\xfe\xba\xbe'+struct.pack('>I',2)+struct.pack('>IIIII',m.X86_64,3,o,len(a),12)+struct.pack('>IIIII',m.ARM64,2,p,len(b),12)+bytes(o-48)+a+bytes(p-o-len(a))+b
++class Tests(unittest.TestCase):
++ def setUp(self):
++  self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name);self.src=self.root/'src';self.src.mkdir()
++ def put(self,rel,data):
++  p=self.src/rel;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data);return p
++ def test_overlay(self):
++  intel=macho(m.X86_64);arm=macho(m.ARM64,2);original=fat(intel,arm)
++  self.put('Fat.kext/Contents/MacOS/Fat',original);self.put('Arm.kext/Contents/MacOS/Arm',arm);self.put('Arm.kext/Contents/Info.plist',b'new-arm-plist')
++  self.put('Native.kext/Native',intel);self.put('Fat.kext.dSYM/debug',b'debug');self.put('Fat.kext/Fat_kasan',b'variant')
++  out=self.root/'out';report=m.prepare(self.src,out)
++  self.assertEqual((out/'Fat.kext/Contents/MacOS/Fat').read_bytes(),intel)
++  self.assertEqual((self.src/'Fat.kext/Contents/MacOS/Fat').read_bytes(),original)
++  self.assertFalse((out/'Arm.kext').exists());self.assertFalse((out/'Fat.kext.dSYM').exists());self.assertFalse((out/'Fat.kext/Fat_kasan').exists())
++  self.assertEqual((out/'Native.kext/Native').read_bytes(),intel);self.assertEqual(report['excluded_bundles'],['Arm.kext'])
++  target=self.root/'target';target.mkdir();stock=target/'Arm.kext/Contents/Info.plist';stock.parent.mkdir(parents=True);stock.write_bytes(b'stock')
++  kept=target/'Native.kext/Native';kept.parent.mkdir();kept.write_bytes(intel);os.utime(kept,(1,1));inode=kept.stat().st_ino
++  amd=target/'AMD.kext/AMD';amd.parent.mkdir();amd.write_bytes(b'stockamd')
++  subprocess.run(['/usr/bin/rsync','-a','--checksum',str(out)+'/',str(target)],check=True)
++  self.assertEqual(stock.read_bytes(),b'stock');self.assertEqual(amd.read_bytes(),b'stockamd');self.assertEqual(kept.stat().st_ino,inode)
++ def test_bad_fat_refuses_before_staging(self):
++  self.put('Bad.kext/Bad',b'\xca\xfe\xba\xbe'+struct.pack('>I',999));out=self.root/'out'
++  with self.assertRaises(ValueError):m.prepare(self.src,out)
++  self.assertFalse(out.exists())
++ def test_wrong_slice_header(self):
++  p=self.put('Bad.kext/Bad',fat(macho(m.ARM64,2),macho(m.ARM64,2)))
++  with self.assertRaises(ValueError):m.architecture(p)
++ def test_symlink_not_followed(self):
++  original=self.put('Native.kext/Native',macho(m.X86_64));(self.src/'Alias.kext').symlink_to('Native.kext')
++  out=self.root/'out';m.prepare(self.src,out);self.assertTrue((out/'Alias.kext').is_symlink());self.assertEqual(original.read_bytes(),macho(m.X86_64))
++ def test_generic_x86_instead_of_x86h(self):
++  generic=macho(m.X86_64);special=macho(m.X86_64,8)
++  data=bytearray(fat(generic,special));struct.pack_into('>II',data,28,m.X86_64,8)
++  p=self.put('Mixed.kext/Mixed',data)
++  self.assertEqual(m.architecture(p)[1],(4096,len(generic)))
++ def test_no_generic_x86_refuses(self):
++  special=macho(m.X86_64,8);data=bytearray(fat(special,macho(m.ARM64,2)));struct.pack_into('>I',data,12,8)
++  p=self.put('Bad.kext/Bad',data)
++  with self.assertRaises(ValueError):m.architecture(p)
++ def test_existing_stage_refuses(self):
++  with self.assertRaises(ValueError):m.prepare(self.src,self.src)
++if __name__=='__main__':unittest.main()
+diff --git a/ssd-target/tests/test_kdk_trim.py b/ssd-target/tests/test_kdk_trim.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..61abc42f62212803e27b12cb4db0b06cc3649c31
+--- /dev/null
++++ b/ssd-target/tests/test_kdk_trim.py
+@@ -0,0 +1,156 @@
++"""
++test_kdk_trim.py: the KDK merge leaves out debug symbols and development/KASAN variants, and fix_permissions
++on a merge changes only the merged entries (no hard-link spill-over)
++
++No root: root commands run as the current user, chown is recorded instead of run.
++
++    python ssd-target/tests/test_kdk_trim.py <work dir>
++"""
++
++import os
++import sys
++import types
++import shutil
++import logging
++import subprocess
++
++from pathlib import Path
++
++REPO = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(REPO))
++
++
++class _WxStub(types.ModuleType):
++    def __getattr__(self, name):
++        if name.startswith("__"):
++            raise AttributeError(name)
++        stub = type(name, (object,), {"__init__": lambda self, *a, **k: None})
++        setattr(self, name, stub)
++        return stub
++
++try:
++    import wx  # noqa: F401
++except ImportError:
++    for module in ("wx", "wx.adv", "wx.html2"):
++        sys.modules[module] = _WxStub(module)
++
++from opencore_legacy_patcher.support import subprocess_wrapper
++from opencore_legacy_patcher.sys_patch.utilities import files as files_module
++from opencore_legacy_patcher.sys_patch.utilities import kdk_merge
++
++CHOWNED = []
++failures = []
++
++
++def check(condition, message):
++    print(("PASS " if condition else "FAIL ") + message)
++    if not condition:
++        failures.append(message)
++
++
++def run_as_user(*args, **kwargs):
++    command = [str(a) for a in args[0]]
++    if command[0] == "/usr/sbin/chown":
++        CHOWNED.extend(command[2:] if command[1] != "-Rf" else command[3:])
++        return subprocess.CompletedProcess(command, 0, b"", b"")
++    return subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++
++
++def make_kdk(root: Path) -> Path:
++    ext = root / "KDK.kdk/System/Library/Extensions"
++    for rel, data in {
++        "Foo.kext/Contents/Info.plist": "plist",
++        "Foo.kext/Contents/MacOS/Foo": "release",
++        "Foo.kext/Contents/MacOS/Foo_development": "dev",
++        "Foo.kext/Contents/MacOS/Foo_kasan": "kasan",
++        "Flat.kext/Flat_development": "dev",
++        "Flat.kext/Flat": "release",
++        "Foo.kext.dSYM/Contents/Resources/DWARF/Foo": "dwarf",
++        "Foo.kext.dSYM/Contents/Resources/DWARF/Foo_kasan": "dwarf",
++        "Kept_developmentNotes.txt": "not a variant suffix",
++    }.items():
++        path = ext / rel
++        path.parent.mkdir(parents=True, exist_ok=True)
++        path.write_text(data)
++    return root / "KDK.kdk"
++
++
++def merged_names(dest: Path) -> set:
++    return {str(p.relative_to(dest)) for p in dest.rglob("*")}
++
++
++def test_merge(work: Path, rsync: bool) -> None:
++    label = "rsync" if rsync else "ditto"
++    kdk = make_kdk(work / label)
++    mount = work / label / "mount"
++    ext = mount / "System/Library/Extensions"
++    ext.mkdir(parents=True)
++    # Apple's own file that happens to match a pattern must survive a ditto merge.
++    (ext / "Stock.kext/Contents/MacOS").mkdir(parents=True)
++    (ext / "Stock.kext/Contents/MacOS/Stock_kasan").write_text("apple")
++    files_module._RSYNC_USABLE = rsync
++    kdk_merge.rsync_usable = lambda: rsync
++    merger = kdk_merge.KernelDebugKitMerge.__new__(kdk_merge.KernelDebugKitMerge)
++    merger.mount_location = str(mount)
++    try:
++        merger._merge_kdk(str(kdk))
++    except Exception:
++        pass      # the fake KDK has no Libkern; the merge itself has happened
++    if not rsync:
++        check(merged_names(ext) == {"Stock.kext", "Stock.kext/Contents", "Stock.kext/Contents/MacOS", "Stock.kext/Contents/MacOS/Stock_kasan"},
++              "missing rsync refuses without target mutation")
++        return
++    names = merged_names(ext)
++    check({"Foo.kext/Contents/MacOS/Foo", "Flat.kext/Flat", "Foo.kext/Contents/Info.plist", "Kept_developmentNotes.txt"} <= names,
++          f"{label}: release executables, plists and non-suffix names are merged")
++    check(not any(n.endswith((".dSYM", "_development", "_kasan")) or ".dSYM/" in n for n in names - {"Stock.kext/Contents/MacOS/Stock_kasan"}),
++          f"{label}: no dSYM bundle and no _development/_kasan variant is merged")
++    check((ext / "Stock.kext/Contents/MacOS/Stock_kasan").read_text() == "apple", f"{label}: a pre-existing matching file is left alone")
++
++
++def test_fix_permissions(work: Path) -> None:
++    source = work / "perm/src/Thing.framework"
++    dest = work / "perm/dest/Thing.framework"
++    elsewhere = work / "perm/dest/Other.framework/CodeResources"
++    for p in (source / "Versions/A/Thing", source / "Versions/A/Resources/New.plist"):
++        p.parent.mkdir(parents=True, exist_ok=True)
++        p.write_text("payload")
++    (dest / "Versions/A/Resources").mkdir(parents=True)
++    elsewhere.parent.mkdir(parents=True)
++    elsewhere.write_text("shared")
++    os.chmod(elsewhere, 0o644)
++    shared = dest / "Versions/A/Resources/CodeResources"
++    os.link(elsewhere, shared)                        # pre-existing Apple file, hard-linked elsewhere
++    unrelated = dest / "Versions/A/Resources/Stock.plist"
++    unrelated.write_text("apple"); os.chmod(unrelated, 0o644)
++    # The merge copied the payload, including one file that rsync left as the pre-existing shared inode.
++    shutil.copytree(source, dest, dirs_exist_ok=True)
++    (source / "Versions/A/Resources/CodeResources").write_text("shared")
++    files_module.fix_permissions(str(dest), source=str(source))
++    check(oct(os.stat(elsewhere).st_mode & 0o777) == "0o644", "hard-linked file elsewhere keeps mode 644 (no spill-over)")
++    check(oct(os.stat(unrelated).st_mode & 0o777) == "0o644", "pre-existing file not in the payload keeps its mode")
++    check(oct(os.stat(dest / "Versions/A/Thing").st_mode & 0o777) == "0o755", "merged payload file gets 755")
++    check(str(dest / "Versions/A/Resources/New.plist") in CHOWNED and str(elsewhere) not in CHOWNED,
++          "chown limited to merged entries")
++    single = work / "perm/single"; single.write_text("x"); os.chmod(single, 0o600)
++    files_module.fix_permissions(str(single))
++    check(oct(os.stat(single).st_mode & 0o777) == "0o755", "non-merge call keeps the original behaviour")
++
++
++def main() -> int:
++    work = Path(sys.argv[1]).resolve()
++    if work.exists():
++        shutil.rmtree(work)
++    work.mkdir(parents=True)
++    logging.basicConfig(level=logging.WARNING, format="%(message)s")
++    subprocess_wrapper.run_as_root = run_as_user
++    subprocess_wrapper.run_as_root_and_verify = run_as_user
++    test_merge(work, rsync=True)
++    test_merge(work, rsync=False)
++    test_fix_permissions(work)
++    print(f"{len(failures)} failed")
++    return 1 if failures else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/ssd-target/tests/test_target_mode.py b/ssd-target/tests/test_target_mode.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..3985db8253a0c0c1acb629b4bbdd05e682d1d440
+--- /dev/null
++++ b/ssd-target/tests/test_target_mode.py
+@@ -0,0 +1,318 @@
++"""
++test_target_mode.py: host dry run of '--patch_sys_vol --target' (ssd-tools derivative)
++
++Runs the real PatchSysVolume code against a scratch target (fake System + Data roots) with
++every root command recorded instead of executed, then checks that all writes land on the
++target, never on the running system. Needs no root and changes nothing outside <work>.
++
++    python ssd-target/tests/test_target_mode.py <Universal-Binaries mount> <work dir> [--no-rsync]
++
++--no-rsync: behave like recoveryOS, where /usr/bin/rsync cannot run (merges go through ditto).
++--kmutil-noop: kmutil "succeeds" without writing anything (recoveryOS 2026-10-19: "is not a volume root,
++            skipping rebuild", exit 0); the patch must then fail before the snapshot.
++--p6 DIR:   also run the ssd-tools P6 hook (DIR = patches/P6-sysfix) for real on the scratch target, which
++            holds Apple's 25G241 hello metallib and OCLP's Metal wrapper as they are when hooks run
++            (--p6-orig DIR: where default.metallib.orig and Metal.orig are; chown is shimmed, no root).
++--hardware-profile FILE: select the patch sets with OCLP's real detection (HardwarePatchsetDetection) on
++            Computer.from_profile(FILE) instead of this host's hardware, and require the master's 9 sets.
++
++Without --hardware-profile, patch sets are taken from the real hardware classes for a MacBookPro9,2 on
++Tahoe (Intel Ivy Bridge, Modern Audio, Modern Wireless) because the host is not the target hardware.
++"""
++
++import os
++import sys
++import json
++import types
++import shutil
++import logging
++import plistlib
++import subprocess
++
++from pathlib import Path
++
++REPO = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(REPO))
++
++
++class _WxStub(types.ModuleType):
++    """wxPython is only needed for the GUI; any attribute is a dummy class so GUI modules import"""
++    def __getattr__(self, name):
++        if name.startswith("__"):
++            raise AttributeError(name)
++        stub = type(name, (object,), {"__init__": lambda self, *a, **k: None})
++        setattr(self, name, stub)
++        return stub
++
++try:
++    import wx  # noqa: F401
++except ImportError:
++    for module in ("wx", "wx.adv", "wx.html2"):
++        sys.modules[module] = _WxStub(module)
++
++from opencore_legacy_patcher import constants
++from opencore_legacy_patcher.support import subprocess_wrapper, kdk_handler
++from opencore_legacy_patcher.sys_patch import sys_patch
++from opencore_legacy_patcher.sys_patch.target import PatchTarget
++from opencore_legacy_patcher.sys_patch.mount import snapshot
++from opencore_legacy_patcher.sys_patch.utilities import files as patch_files
++from opencore_legacy_patcher.sys_patch.patchsets import HardwarePatchsetSettings, detect
++from opencore_legacy_patcher.detections import device_probe
++from opencore_legacy_patcher.sys_patch.patchsets.hardware.graphics import intel_ivy_bridge
++from opencore_legacy_patcher.sys_patch.patchsets.hardware.misc import modern_audio
++from opencore_legacy_patcher.sys_patch.patchsets.hardware.networking import modern_wireless
++
++# Patch sets in the master image's record (laptop, 2026-10-10)
++MASTER_SETS = {
++    "Metal 3802 Common", "Metal 3802 .metallibs Tahoe", "Tahoe Graphics", "Intel Ivy Bridge",
++    "Big Sur GVA", "Big Sur OpenCL", "Monterey OpenCL", "Modern Audio", "Modern Wireless Common",
++}
++
++# Install order of the laptop's own run (OCLP 3.0.0-rc.3 patch-run.log, 2026-10-10 19:10, target disk3s4)
++LAPTOP_ORDER = [
++    "Metal 3802 Common", "Metal 3802 .metallibs Tahoe", "Big Sur GVA", "Monterey OpenCL", "Big Sur OpenCL",
++    "Tahoe Graphics", "Intel Ivy Bridge", "Modern Wireless Common", "Modern Audio",
++]
++
++ROOT_LOG   = []
++DIRECT_LOG = []
++_real_run  = subprocess.run
++KMUTIL_WRITES = True
++
++
++def fake_run_as_root(*args, **kwargs):
++    command = [str(a) for a in args[0]]
++    ROOT_LOG.append(command)
++    if command[0] == "/usr/bin/kmutil" and KMUTIL_WRITES and "--volume-root" in command:
++        root = command[command.index("--volume-root") + 1]
++        for name in ("BootKernelExtensions.kc", "SystemKernelExtensions.kc"):
++            path = Path(root) / "System/Library/KernelCollections" / name
++            path.unlink()
++            path.write_bytes(b"rebuilt " + name.encode())
++    return subprocess.CompletedProcess(command, 0, b"", b"")
++
++
++def guarded_run(*args, **kwargs):
++    command = args[0] if args else kwargs.get("args")
++    command = [str(a) for a in command] if isinstance(command, (list, tuple)) else [str(command)]
++    DIRECT_LOG.append(command)
++    read_only = (
++        command[:2] == ["/usr/bin/defaults", "read"] or
++        command[:2] == ["/usr/sbin/pkgutil", "--files"] or
++        command[:1] == ["/bin/sh"]      # our hooks
++    )
++    if read_only:
++        return _real_run(*args, **kwargs)
++    return subprocess.CompletedProcess(command, 0, b"", b"")
++
++
++def build_target(work: Path, patches: dict) -> tuple[Path, Path]:
++    system, data = work / "target-system", work / "target-data"
++    for root in (system, data):
++        if root.exists():
++            shutil.rmtree(root)
++    (system / "System/Library/CoreServices").mkdir(parents=True)
++    plistlib.dump({"ProductVersion": "26.7.1", "ProductBuildVersion": "25G241"}, (system / "System/Library/CoreServices/SystemVersion.plist").open("wb"))
++    (system / "System/Library/Kernels").mkdir(parents=True)
++    (system / "System/Library/KernelCollections").mkdir(parents=True)
++    for name in ("BootKernelExtensions.kc", "SystemKernelExtensions.kc"):
++        (system / "System/Library/KernelCollections" / name).write_bytes(b"original " + name.encode())
++    (system / "System/Library/Kernels/kernel").write_bytes(b"\0" * 64 + b"Darwin Kernel Version 25.6.0: Thu Sep 24 2026; root:xnu" + b"\0" * 64)
++    libkern = system / "System/Library/Extensions/System.kext/PlugIns/Libkern.kext/Libkern"
++    libkern.parent.mkdir(parents=True)
++    libkern.write_bytes(b"")
++    for patch in patches.values():
++        for method, directories in patch.items():
++            if not isinstance(directories, dict):
++                continue
++            for directory in directories:
++                if "System Volume" in str(method):
++                    (system / directory.lstrip("/")).mkdir(parents=True, exist_ok=True)
++                elif "Data Volume" in str(method):
++                    (data / directory.lstrip("/")).mkdir(parents=True, exist_ok=True)
++    for directory in ("Library/Extensions", "Library/Preferences", "Library/Application Support", "private/etc"):
++        (data / directory).mkdir(parents=True, exist_ok=True)
++    return system, data
++
++
++def build_kdk(work: Path) -> Path:
++    kdks = work / "KDKs"
++    kdk = kdks / "KDK_26.7.1_25G241.kdk"
++    if kdks.exists():
++        shutil.rmtree(kdks)
++    (kdk / "System/Library/CoreServices").mkdir(parents=True)
++    plistlib.dump({"ProductBuildVersion": "25G241"}, (kdk / "System/Library/CoreServices/SystemVersion.plist").open("wb"))
++    for kext in ["System.kext/PlugIns/Libkern.kext/Libkern", "apfs.kext/Contents/MacOS/apfs",
++                 "IOUSBHostFamily.kext/Contents/MacOS/IOUSBHostFamily", "AMDRadeonX6000.kext/Contents/MacOS/AMDRadeonX6000"]:
++        path = kdk / "System/Library/Extensions" / kext
++        path.parent.mkdir(parents=True, exist_ok=True)
++        path.write_bytes(b"")
++    return kdks
++
++
++def build_hooks(work: Path) -> Path:
++    hooks = work / "hooks"
++    if hooks.exists():
++        shutil.rmtree(hooks)
++    hooks.mkdir()
++    (hooks / "10-record.sh").write_text(f'echo "system=$1 data=$2 build=$OCLP_TARGET_BUILD version=$OCLP_TARGET_VERSION" > "{work}/hook-ran.txt"\necho hook ok\n')
++    (hooks / "20-folder").mkdir()
++    (hooks / "20-folder/hook.sh").write_text(f'[ -f "$(dirname "$0")/payload.txt" ] && "$OCLP_PYTHON" -c "print(1)" > "{work}/hook2-ran.txt"\n')
++    (hooks / "20-folder/payload.txt").write_text("x")
++    (hooks / ".hidden.sh").write_text("exit 1\n")
++    return hooks
++
++
++def main() -> int:
++    universal_binaries, work = Path(sys.argv[1]), Path(sys.argv[2]).resolve()
++    no_rsync = "--no-rsync" in sys.argv[3:]
++    global KMUTIL_WRITES
++    KMUTIL_WRITES = "--kmutil-noop" not in sys.argv[3:]
++    patch_files._RSYNC_USABLE = False if no_rsync else True
++    work.mkdir(parents=True, exist_ok=True)
++    logging.basicConfig(level=logging.INFO, format="%(message)s", handlers=[logging.FileHandler(work / "patcher.log", "w"), logging.StreamHandler(sys.stdout)])
++
++    c = constants.Constants()
++    c.payload_path = work / "payloads"
++    c.payload_path.mkdir(exist_ok=True)
++    c.commit_info = ("ssd-target", "test", "")
++    type(c).payload_local_binaries_root_path = property(lambda self: universal_binaries)
++
++    # The target decides the OS; hardware is a MacBookPro9,2 (patch sets from the real classes)
++    c.detected_os, c.detected_os_minor, c.detected_os_build, c.detected_os_version = 25, 6, "25G241", "26.7.1"
++    patches = {}
++    profile = sys.argv[sys.argv.index("--hardware-profile") + 1] if "--hardware-profile" in sys.argv else None
++    profile_checks = []
++    if profile:
++        # OCLP's own detection, fed the recorded hardware instead of this host's
++        c.computer = device_probe.Computer.from_profile(profile)
++        detection = detect.HardwarePatchsetDetection(c, xnu_major=25, xnu_minor=6, os_build="25G241", os_version="26.7.1")
++        patches = detection.patches
++        found = sorted(key for key in detection.device_properties if not key.startswith(("Settings:", "Validation:")))
++        logging.info(f"- Hardware profile {profile}: {c.computer.real_model}, GPUs {[gpu.arch.value for gpu in c.computer.gpus]}, Wi-Fi {c.computer.wifi.chipset.value if c.computer.wifi else None}")
++        logging.info(f"- Detected hardware: {found}")
++        logging.info(f"- Detected patch sets: {sorted(patches)}")
++        profile_checks.append((list(patches) == LAPTOP_ORDER, f"hardware profile: OCLP detection selects the laptop's 9 sets in its order (got {list(patches)})"))
++        profile_checks.append((c.computer.igpu is not None and c.computer.igpu.arch == device_probe.Intel.Archs.Ivy_Bridge, "hardware profile: IGPU classified as Intel Ivy Bridge"))
++    else:
++        for hardware in (intel_ivy_bridge.IntelIvyBridge, modern_audio.ModernAudio, modern_wireless.ModernWireless):
++            patches.update(hardware(xnu_major=25, xnu_minor=6, os_build="25G241", global_constants=c).patches())
++
++    system, data = build_target(work, patches)
++    kdk_handler.KDK_INSTALL_PATH = str(build_kdk(work))
++    c.target_hooks = str(build_hooks(work))
++    p6 = sys.argv[sys.argv.index("--p6") + 1] if "--p6" in sys.argv else None
++    if p6:
++        originals = Path(sys.argv[sys.argv.index("--p6-orig") + 1])
++        shutil.copytree(p6, Path(c.target_hooks) / "50-P6-sysfix", ignore=shutil.ignore_patterns("test"))
++        lib = system / "System/Library/PrivateFrameworks/SetupAssistantSupportUI.framework/Versions/A/Resources/default.metallib"
++        lib.parent.mkdir(parents=True, exist_ok=True)
++        shutil.copy(originals / "metallib/default.metallib.orig", lib)
++        metal = system / "System/Library/Frameworks/Metal.framework/Versions/A/Metal"
++        metal.parent.mkdir(parents=True, exist_ok=True)
++        shutil.copy(originals / "Metal.orig", metal)
++        (system / "usr/lib").mkdir(parents=True, exist_ok=True)
++        (system / "usr/lib/dyld").write_bytes(b"")
++        shims = work / "shims"
++        shims.mkdir(exist_ok=True)
++        (shims / "chown").write_text("#!/bin/sh\nexit 0\n")
++        (shims / "chown").chmod(0o755)
++        os.environ["P6_TEST_SHIMS"] = str(shims)
++
++    target = PatchTarget("test-target")
++    target.system_device, target.data_device = "disk99s1", "disk99s2"
++    target.system_mount, target.data_mount   = str(system), str(data)
++    target.read_os_version()
++    c.detected_os = c.detected_os_minor = c.detected_os_build = c.detected_os_version = None
++    target.apply_to_constants(c)
++
++    class Detection:
++        def __init__(self, *args, **kwargs):
++            self.patches = json.loads(json.dumps(patches))  # fresh copy, the patcher edits it in place
++            self.can_patch = True
++            self.can_unpatch = True
++            self.device_properties = {}
++
++    sys_patch.HardwarePatchsetDetection = Detection
++    snapshot.platform.machine = lambda: "x86_64"    # the patcher runs on the Intel target machine
++    snapshot.APFSSnapshot._rosetta_status = lambda self: False
++    sys_patch.PatcherSupportPkgMount.mount = lambda self: True
++    subprocess_wrapper.run_as_root = fake_run_as_root
++    subprocess.run = guarded_run
++
++    hardware_details = {
++        HardwarePatchsetSettings.KERNEL_DEBUG_KIT_REQUIRED: True,
++        HardwarePatchsetSettings.METALLIB_SUPPORT_PKG_REQUIRED: False,
++    }
++    patcher = sys_patch.PatchSysVolume("MacBookPro9,2", c, hardware_details)
++    patcher.start_patch()
++    subprocess.run = _real_run
++
++    (work / "root-commands.json").write_text(json.dumps(ROOT_LOG, indent=1))
++    (work / "direct-commands.json").write_text(json.dumps(DIRECT_LOG, indent=1))
++
++    failures = []
++    def check(condition, message):
++        print(("PASS " if condition else "FAIL ") + message)
++        if not condition:
++            failures.append(message)
++
++    for condition, message in profile_checks:
++        check(condition, message)
++    flat = [" ".join(command) for command in ROOT_LOG]
++    if not KMUTIL_WRITES:
++        check(c.root_patcher_succeeded is not True, "kmutil no-op: patcher reports failure")
++        check(not any("--create-snapshot" in line for line in flat), "kmutil no-op: no snapshot blessed")
++        print(f"\n{len(failures)} failure(s); logs in {work}")
++        return 1 if failures else 0
++    check(c.root_patcher_succeeded is True, "patcher reports success")
++    allowed = [str(system), str(data), str(universal_binaries), str(work), kdk_handler.KDK_INSTALL_PATH, str(c.payload_path)]
++    stray = []
++    for command in ROOT_LOG:
++        for argument in command[1:]:
++            if argument.startswith("/") and not any(argument.startswith(root) for root in allowed):
++                stray.append((command[0], argument))
++    check(not stray, f"every root command path is on the target or a source ({len(ROOT_LOG)} commands)" + (f": {stray[:8]}" if stray else ""))
++    flat = [" ".join(command) for command in ROOT_LOG]
++    kdk_ext = f"{kdk_handler.KDK_INSTALL_PATH}/KDK_26.7.1_25G241.kdk/System/Library/Extensions"
++    if no_rsync:
++        check(f"/usr/bin/ditto {kdk_ext} {system}/System/Library/Extensions" in flat, "KDK merged into the target System volume (ditto)")
++        check(not any(command[0] == "/usr/bin/rsync" for command in ROOT_LOG), "no rsync used")
++        merges = [line for line in flat if line.startswith("/usr/bin/ditto ") and ".framework " in line]
++        check(len(merges) == 9 and all(line.split()[1].rsplit("/", 1)[1] == line.split()[2].rsplit("/", 1)[1] for line in merges), f"9 framework merges via ditto into same-named targets ({len(merges)})")
++    else:
++        check(f"/usr/bin/rsync -r -i -a {kdk_ext}/ {system}/System/Library/Extensions" in flat, "KDK merged into the target System volume")
++    check(any(line.startswith(f"/usr/bin/kmutil create --allow-missing-kdk --volume-root {system} --update-all") for line in flat), "kernel collections rebuilt with --volume-root on the target")
++    check(any(line == f"/usr/bin/ditto {c.rsrrepair_userspace_path} {data}/private/etc/rc.server" for line in flat), "RSRRepair installed to the target's /etc/rc.server")
++    check(any(line == f"/usr/sbin/bless --folder {system}/System/Library/CoreServices --bootefi --create-snapshot" for line in flat), "snapshot blessed on the target")
++    check(any(line == f"/sbin/umount {system}" for line in flat), "target System volume unmounted at the end")
++    bless_index = next((i for i, line in enumerate(flat) if "--create-snapshot" in line), -1)
++    kmutil_index = next((i for i, line in enumerate(flat) if line.startswith("/usr/bin/kmutil")), -1)
++    check(0 <= kmutil_index < bless_index, "kmutil runs before the snapshot")
++    hook = (work / "hook-ran.txt").read_text().strip() if (work / "hook-ran.txt").exists() else ""
++    check(hook == f"system={system} data={data} build=25G241 version=26.7.1", f"hook ran with the target roots and build ({hook!r})")
++    check((work / "hook2-ran.txt").exists(), "folder hook ran with its payload and OCLP_PYTHON; hidden entries ignored")
++    if p6:
++        import hashlib
++        def sha8(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:8] if Path(path).exists() else "absent"
++        got = (sha8(lib), sha8(metal), sha8(system / "usr/lib/libhelloblur.dylib"))
++        check(got == ("50149f91", "4baa2b9b", "d471519b"), f"P6 hook applied inside OCLP's run (metallib, Metal, dylib = {got})")
++        log = (work / "patcher.log").read_text()
++        check("Running hook 50-P6-sysfix" in log and "P6: after:" in log, "P6 hook logged its after line")
++        check(log.index("P6: after:") < log.index("Rebuilding Boot and System Kernel Collections"), "P6 ran before the kernel cache rebuild")
++    check(not any("/System/Volumes/Update/mnt1" in line for line in flat), "booted-system mount point never used")
++    check(not any(command[0] == "/usr/bin/killall" for command in ROOT_LOG), "no host daemons killed")
++    record_path = c.payload_path / "OpenCore-Legacy-Patcher.plist"
++    record = plistlib.load(record_path.open("rb")) if record_path.exists() else {}
++    sets = {key for key, value in record.items() if isinstance(value, dict)}
++    check(sets == MASTER_SETS, f"patch record lists the master's 9 sets (got {sorted(sets)})")
++    check(record.get("OS Version") == "25.6 (25G241)", f"record OS Version from the target ({record.get('OS Version')})")
++    check(any(line == f"/bin/cp -R {record_path} {system}/System/Library/CoreServices" or line.endswith(f"{record_path} {system}/System/Library/CoreServices") for line in flat), "patch record copied to the target")
++    unexpected = [command for command in DIRECT_LOG if not (command[:2] == ["/usr/bin/defaults", "read"] or command[:2] == ["/usr/sbin/pkgutil", "--files"] or command[:1] == ["/bin/sh"])]
++    check(not unexpected, f"no unexpected direct (non-root) commands: {unexpected[:5]}")
++    print(f"\n{len(failures)} failure(s); logs in {work}")
++    return 1 if failures else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())

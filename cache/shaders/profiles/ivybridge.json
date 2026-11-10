@@ -1,0 +1,83 @@
+{
+  "applies": {
+    "architecture": "x86_64",
+    "gpu": "Intel Ivy Bridge"
+  },
+  "files": [
+    [
+      "System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+      "fw/Metal.framework/Versions/A/Metal"
+    ],
+    [
+      "System/Library/Frameworks/Metal.framework/Versions/A/MetalOld.dylib",
+      "fw/Metal.framework/Versions/A/MetalOld.dylib"
+    ],
+    [
+      "System/Library/PrivateFrameworks/GPUCompiler.framework/Versions/3802/Libraries/",
+      "fw/GPUCompiler.framework/Versions/3802/Libraries/"
+    ],
+    [
+      "System/Library/PrivateFrameworks/GPUCompiler.framework/Versions/31001/Libraries/",
+      "fw/GPUCompiler.framework/Versions/31001/Libraries/"
+    ],
+    [
+      "System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/3802/MTLCompiler",
+      "fw/MTLCompiler.framework/Versions/3802/MTLCompiler"
+    ],
+    [
+      "System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/3802/Libraries/",
+      "fw/MTLCompiler.framework/Versions/3802/Libraries/"
+    ],
+    [
+      "System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/31001/MTLCompiler",
+      "fw/MTLCompiler.framework/Versions/31001/MTLCompiler"
+    ],
+    [
+      "System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/31001/Libraries/",
+      "fw/MTLCompiler.framework/Versions/31001/Libraries/"
+    ],
+    [
+      "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/",
+      "bundles/AppleIntelHD4000GraphicsMTLDriver.bundle/"
+    ],
+    [
+      "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/libMTLIntelCompilerPlugin.dylib",
+      "dl/libMTLIntelCompilerPlugin.dylib"
+    ],
+    [
+      "System/Library/Extensions/AppleIntelGraphicsShared.bundle/Contents/MacOS/libIGIL-Metal.dylib",
+      "dl/libIGIL-Metal.dylib"
+    ],
+    [
+      "System/Library/Extensions/AppleIntelHD4000GraphicsGLDriver.bundle/Contents/MacOS/iCBE.dylib",
+      "dl/iCBE.dylib"
+    ]
+  ],
+  "resources": "System/Library/Extensions/AppleIntelGraphicsShared.bundle/Contents/Resources",
+  "resource_files": [
+    "runtime.igcHSW64.split",
+    "runtime-reduced.igil64.bc",
+    "runtime.igil64.split",
+    "runtime.igc64.split",
+    "runtime.igil64.bc"
+  ],
+  "metalold_patch": {
+    "offset": 689000,
+    "before": "e875bbffff",
+    "after": "b001909090"
+  },
+  "compiler": "fw/MTLCompiler.framework/Versions/3802/MTLCompiler",
+  "replay": {
+    "abi": "intel-igaccel-config-v1",
+    "device_class": "MTLIGAccelDevice",
+    "metal": "fw/Metal.framework/Versions/A/Metal",
+    "driver": "bundles/AppleIntelHD4000GraphicsMTLDriver.bundle",
+    "step0": 9,
+    "step1": 0,
+    "pci_id": "0x01668086",
+    "registry_id": "0x100000a1f",
+    "vram": 0,
+    "shared_memory": 1610612736,
+    "max_resource": 1610612736
+  }
+}

@@ -1,0 +1,8 @@
+com.apple.iokit.IOAudioFamily
+com.apple.iokit.IOHDAFamily
+com.apple.driver.AppleHDAController
+com.apple.driver.DspFuncLib
+com.apple.driver.AppleHDA
+com.apple.driver.AppleHDAHardwareConfigDriver
+com.apple.driver.AppleMikeyDriver
+com.apple.driver.AppleGFXHDA

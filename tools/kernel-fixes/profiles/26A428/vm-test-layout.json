@@ -1,0 +1,20 @@
+{
+  "_kernel_pmap_store": "0xffffff8001266a80",
+  "_physmap_base": "0xffffff80013bf198",
+  "_vm_pages": "0xffffff8000220f18",
+  "_vm_page_buckets": "0xffffff800021f050",
+  "_pv_head_table": "0xffffff8001266fc8",
+  "_virtual_avail": "0xffffff8001387b98",
+  "_vm_kernel_base_page": "0xffffff8001387a0c",
+  "_pmap_memory_regions": "0xffffff800138aa20",
+  "_pmap_memory_region_count": "0xffffff800138be20",
+  "_pmap_flush_tlbs": "0xffffff80004c1a90",
+  "_panic": "0xffffff8000bdafdc",
+  "_pv_hash_table": "0xffffff8001266c38",
+  "_npvhashmask": "0xffffff8001266c40",
+  "before_bootstrap": "0xffffff8000be8f9a",
+  "after_bootstrap": "0xffffff8000be9124",
+  "before_unmap": "0xffffff80004c0cf6",
+  "after_unmap": "0xffffff80004c0cfb",
+  "failure": "0xffffff80004c9059"
+}

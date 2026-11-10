@@ -1,0 +1,17 @@
+/Applications	0	80	775	4000000	Applications
+/Library	0	0	755	4000000	Library
+/Users	0	80	755	4000000	Users
+/Volumes	0	0	755	100000	Volumes
+/cores	0	0	755	100000	cores
+/opt	0	0	755	100000	opt
+/private	0	0	755	4100000	private
+/usr/local	0	0	755	4000000	usr/local
+/usr/libexec/cups	0	0	755	4000000	usr/libexec/cups
+/usr/share/snmp	0	0	755	4000000	usr/share/snmp
+/System/Library/Assets	0	0	755	2000000	System/Library/Assets
+/System/Library/AssetsV2	0	0	755	2000000	System/Library/AssetsV2
+/System/Library/Caches	0	0	755	4000000	System/Library/Caches
+/System/Library/Speech	0	0	755	4000000	System/Library/Speech
+/System/Library/PreinstalledAssets	0	0	755	2000000	System/Library/PreinstalledAssets
+/System/Library/PreinstalledAssetsV2	0	0	755	2000000	System/Library/PreinstalledAssetsV2
+/System/Library/CoreServices/CoreTypes.bundle/Contents/Library	0	0	755	2000000	System/Library/CoreServices/CoreTypes.bundle/Contents/Library

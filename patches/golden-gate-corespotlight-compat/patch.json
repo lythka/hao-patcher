@@ -1,0 +1,17 @@
+{
+  "revision": 3,
+  "stage": "oclp-hook",
+  "applies": {
+    "models": [
+      "MacBookPro9,2"
+    ],
+    "builds": [
+      "25G332"
+    ]
+  },
+  "inputs": [
+    "corespotlight_compat_shim"
+  ],
+  "status": "experiment",
+  "validated": false
+}

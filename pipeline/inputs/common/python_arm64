@@ -1,0 +1,2 @@
+# arm64 CPython 3.12.14 (python-build-standalone install_only) for OCLP in the builder VM.
+9763f43db2481a6af36af82ec40302aab7a73632f880129d07a6e81aec846277 store/cache/python/cpython-3.12.14+20260924-aarch64-apple-darwin-install_only.tar.gz

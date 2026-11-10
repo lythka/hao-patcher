@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/dortania/OpenCore-Legacy-Patcher",
+  "commit": "fd83bda09bdebc6d128287f5c599b5e0d679b8de",
+  "commit_note": "OCLP integration commit made by tools/oclp-integration from upstream e2107e05d9ce574e9ac3fd8b223e20a2edb7ba53",
+  "original_files": {
+    "opencore_legacy_patcher/volume/properties.py": "69c4c7165a0d485a3b6e12b134e7a395d503486462245bd9967a09679fdd08a3",
+    "opencore_legacy_patcher/volume/copy.py": "2b8757d001de9e7aa397c63d0b06028d47c9dd2ecde9a0eed9878dcdad6b73fb",
+    "opencore_legacy_patcher/sys_patch/utilities/files.py": "89de3a29661b79ca37361d00e0bc2b4d1ee8a8d448763ed4691a1c5205b149cc"
+  },
+  "notes": "Original volume/file-operation function bodies preserved; local imports, checked subprocess errors and explicit fixture owner binding replace the OCLP application framework. Target cleanup is ported from sys_patch.py and kernel_collection/support.py."
+}

@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Reconstruct the OCLP target-volume source used by the image builder."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+
+HERE = Path(__file__).resolve().parent
+UPSTREAM = 'e2107e05d9ce574e9ac3fd8b223e20a2edb7ba53'
+EXPECTED_TREE = '77b788410c4d5d73029d1c3845305eecd8d169eb'
+ORIGINAL = 'fd83bda09bdebc6d128287f5c599b5e0d679b8de'
+URL = 'https://github.com/dortania/OpenCore-Legacy-Patcher.git'
+
+
+def git(root, *args):
+    return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('output', type=Path, help='new artifact directory')
+    p.add_argument('--upstream', default=URL, help='upstream URL or existing local clone')
+    a = p.parse_args()
+    out = a.output.expanduser().absolute()
+    out.mkdir(parents=True, exist_ok=False)
+    source = out / 'source'
+    subprocess.run(['git', 'clone', '--no-checkout', a.upstream, str(source)], check=True)
+    git(source, 'checkout', '--detach', UPSTREAM)
+    subprocess.run(['git', '-C', str(source), 'apply', '--index', str(HERE / 'target.patch')], check=True)
+    tree = git(source, 'write-tree')
+    if tree != EXPECTED_TREE:
+        raise SystemExit(f'OCLP output tree differs: {tree}, expected {EXPECTED_TREE}')
+    git(source, 'commit', '-m', 'Apply versioned Intel target-volume integration',
+        '-m', f'Source tree reproduced from {ORIGINAL}; upstream {UPSTREAM}.')
+    commit = git(source, 'rev-parse', 'HEAD')
+    root = git(HERE, 'rev-parse', '--show-toplevel')
+    manifest = {
+        'unit': 'oclp-integration', 'revision': 1,
+        'source_commit': git(HERE, 'rev-parse', 'HEAD'),
+        'source_dirty': bool(git(root, 'status', '--porcelain', '--', str(HERE))),
+        'upstream': {'repository': URL, 'commit': UPSTREAM},
+        'inputs': {'target.patch': {'sha256': hashlib.sha256((HERE / 'target.patch').read_bytes()).hexdigest()}},
+        'output': {'path': 'source', 'commit': commit, 'tree': tree},
+        'equivalent_original_commit': ORIGINAL,
+        'varying_fields': ['output.commit (commit identity and time)'],
+    }
+    (out / 'build.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    print(f'OCLP_REPO={source}\nOCLP_COMMIT={commit}\nTREE={tree}')
+
+
+if __name__ == '__main__':
+    main()

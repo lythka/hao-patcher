@@ -1,0 +1,630 @@
+#!/usr/bin/env python3
+"""Disposable QEMU boot of a built image on the tested Ivy Bridge topology (Darwin 27 bring-up).
+
+usage: qemu-vm start --image TARGET_IMG --esp ESP_DISK|ESP_DIR [--boot-arg ARG ...] [--csr HEX] [--name NAME] [--ssh-port PORT]
+                     [--memory SIZE] [--out RUN_DIR]
+       qemu-vm stop RUN_DIR
+       qemu-vm faults RUN_DIR
+       qemu-vm launchd-log RUN_DIR
+       qemu-vm retire RUN_DIR --note TEXT
+       qemu-vm logs RUN_DIR [--predicate P] [--out DIR]
+
+start: boots TARGET_IMG through a new qcow2 overlay (the image is never written) with ESP_DISK attached
+       read-only, in a new run folder (default store/tmp/qemu/NAME-YYYYMMDD-HHMMSS); serial console to
+       serial.log there. Earlier runs are never touched.
+stop:  stops the run's QEMU (SIGTERM to qemu.pid) and records stopped.json.
+faults: counts the kernel's "Data/Stack execution not permitted" lines per process in serial.log
+       and where "Early boot complete" appears (the hao native->guest callback measure).
+launchd-log: extracts launchd's own text log (/private/var/log/com.apple.xpc.launchd/launchd.log, written by
+       launchd, not logd) from the run's qcow2 overlay without attaching it: every printable line that starts
+       with a timestamp, sorted and deduplicated, into RUN/launchd-log.txt; prints exits and crashes per job.
+retire: AGENTS rule 10 (images are not file storage). For a stopped run: runs `logs` into the evidence folder,
+       copies its logs and measurements
+       (serial.log, launchd-log.txt, faults, exits, network.pcap, the run's own json) and the image's recipe
+       (its build record) into store/evidence/qemu-RUN, appends an entry with the note to IMAGE-LOG.md, and
+       moves the run folder (overlay, vars, ESP copy) to store/gc/qemu/.
+logs:  for a stopped run: the guest's unified log as a logarchive (boot.logarchive, rebuilt from the Data
+       volume's private/var/db/diagnostics and uuidtext), launchd.log, heartbeat files and crash reports (.ips),
+       into store/evidence/qemu-RUN (or --out). Works on a throwaway APFS clone of the image with the overlay
+       committed into it (store/tmp/qemu-logs/RUN-TIME, deleted afterwards); the run's files are never written.
+       A re-run replaces what `logs` wrote there (boot.logarchive, the extras, logs.json) as a whole; the earlier
+       ones are moved to replaced-YYYYMMDD-HHMMSS/ in that folder, never deleted; other files are kept.
+       --predicate prints `log show --archive ... --predicate P --style compact`.
+"""
+import argparse, datetime, hashlib, json, os, plistlib, re, shutil, signal, struct, subprocess, sys, tempfile, time
+from pathlib import Path
+
+UNIT, REVISION = 'tools/qemu-vm', 9
+TOP = Path(__file__).resolve().parents[2]
+QEMU = '/opt/homebrew/bin/qemu-system-x86_64'
+QEMU_IMG = '/opt/homebrew/bin/qemu-img'
+CODE_FD = '/opt/homebrew/share/qemu/edk2-x86_64-code.fd'
+VARS_FD = '/opt/homebrew/share/qemu/edk2-i386-vars.fd'
+NX = re.compile(r'Data/Stack execution not permitted: (\S+?)\[pid (\d+)\]')
+EARLY = 'Early boot complete'
+NVRAM_GUID = '7C436110-AB2A-4BBB-A880-FE41995C9F82'   # Apple's NVRAM variables (boot-args)
+SKIP = shutil.ignore_patterns('._*', '.fseventsd', '.Spotlight-V100', '.Trashes', '.DS_Store')
+
+
+def command(run, esp, name, ssh_port, memory, sockets):
+    """The QEMU command of the tested topology: Q35/TCG, IvyBridge, 1 socket x 2 cores x 2 threads, OVMF,
+    ESP and system on IDE, xHCI keyboard/tablet, std VGA, vmxnet3 user net with SSH forwarded to localhost."""
+    r = str(run)
+    return [QEMU, '-name', name, '-machine', 'q35', '-accel', 'tcg,thread=multi',
+            '-cpu', 'IvyBridge,vendor=GenuineIntel,+invtsc,vmware-cpuid-freq=on',
+            '-smp', '4,sockets=1,cores=2,threads=2', '-m', memory,
+            '-drive', 'if=pflash,format=raw,readonly=on,file=' + CODE_FD,
+            '-drive', 'if=pflash,format=raw,file=%s/vars.fd' % r,
+            '-drive', esp_drive(esp),
+            '-device', 'ide-hd,bus=ide.0,drive=esp,bootindex=0',
+            '-drive', 'id=system,if=none,format=qcow2,file=%s/guest.qcow2' % r,
+            '-device', 'ide-hd,bus=ide.1,drive=system',
+            '-device', 'qemu-xhci,id=xhci', '-device', 'usb-kbd,bus=xhci.0', '-device', 'usb-tablet,bus=xhci.0',
+            '-vga', 'std',
+            '-nic', 'user,model=vmxnet3,restrict=on,hostfwd=tcp:127.0.0.1:%d-:22,id=sshnet' % ssh_port,
+            '-display', 'none',
+            '-qmp', 'unix:%s/qmp.sock,server=on,wait=off' % sockets,
+            '-gdb', 'unix:%s/gdb.sock,server=on,wait=off' % sockets,
+            '-serial', 'file:%s/serial.log' % r, '-pidfile', '%s/qemu.pid' % r,
+            '-no-reboot', '-daemonize', '-D', '%s/qemu.log' % r,
+            '-object', 'filter-dump,id=netdump,netdev=sshnet,file=%s/network.pcap' % r]
+
+
+def esp_drive(esp):
+    """An ESP disk image is attached with snapshot=on (never written); an ESP folder through QEMU's read-only
+    fat: driver, so a per-run ESP needs no FAT image made on the host."""
+    if Path(esp).is_dir():
+        return 'id=esp,if=none,format=raw,file=fat:%s,snapshot=on' % esp   # IDE needs a writable node
+    return 'id=esp,if=none,format=raw,file=%s,snapshot=on' % esp
+
+
+def add_boot_args(config, args):
+    """Append boot arguments to OpenCore's NVRAM boot-args in config (a config.plist path)."""
+    with open(config, 'rb') as f:
+        c = plistlib.load(f)
+    nv = c['NVRAM']['Add'][NVRAM_GUID]
+    nv['boot-args'] = ' '.join([nv.get('boot-args', '')] + list(args)).strip()
+    with open(config, 'wb') as f:
+        plistlib.dump(c, f)
+    return nv['boot-args']
+
+
+def set_csr(config, value):
+    """Set OpenCore's NVRAM csr-active-config in config (a config.plist path) to value (4 bytes, little endian)."""
+    with open(config, 'rb') as f:
+        c = plistlib.load(f)
+    c['NVRAM']['Add'][NVRAM_GUID]['csr-active-config'] = value.to_bytes(4, 'little')
+    with open(config, 'wb') as f:
+        plistlib.dump(c, f)
+    return '0x%x' % value
+
+
+def esp_tree(disk, dest):
+    """Copy an ESP disk's files into dest through a read-only attach (detached again in every case)."""
+    mnt = Path(tempfile.mkdtemp(prefix='qemu-vm-esp-'))
+    subprocess.run(['hdiutil', 'attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', str(mnt), str(disk)],
+                   check=True, capture_output=True)
+    try:
+        shutil.copytree(mnt, dest, ignore=SKIP)
+    finally:
+        subprocess.run(['hdiutil', 'detach', str(mnt)], check=True, capture_output=True)
+        mnt.rmdir()
+
+
+def new_run(out, name, now):
+    run = Path(out) if out else TOP / 'store' / 'tmp' / 'qemu' / ('%s-%s' % (name, now.astimezone().strftime('%Y%m%d-%H%M%S')))
+    run.parent.mkdir(parents=True, exist_ok=True)
+    run.mkdir()            # a run folder is new: earlier serial logs are evidence and are never replaced
+    return run
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for b in iter(lambda: f.read(1 << 20), b''):
+            h.update(b)
+    return h.hexdigest()
+
+
+def start(a):
+    image, esp = Path(a.image).resolve(), Path(a.esp).resolve()
+    if not image.is_file() or not esp.exists():
+        sys.exit('qemu-vm: no such image or ESP')
+    now = datetime.datetime.now(datetime.timezone.utc)
+    run = new_run(a.out, a.name, now)
+    sockets = Path(tempfile.mkdtemp(prefix='qemu-vm-'))   # unix socket paths must stay short
+    shutil.copyfile(VARS_FD, run / 'vars.fd')
+    subprocess.run([QEMU_IMG, 'create', '-q', '-f', 'qcow2', '-F', 'raw', '-b', str(image), str(run / 'guest.qcow2')],
+                   check=True)
+    boot_args, csr, drive = None, None, esp
+    if a.boot_arg or a.csr is not None:  # a per-run ESP folder: the stored ESP is never changed
+        drive = run / 'esp'
+        if esp.is_dir():
+            shutil.copytree(esp, drive, ignore=SKIP)
+        else:
+            esp_tree(esp, drive)
+        if a.boot_arg:
+            boot_args = add_boot_args(drive / 'EFI' / 'OC' / 'config.plist', a.boot_arg)
+        if a.csr is not None:
+            csr = set_csr(drive / 'EFI' / 'OC' / 'config.plist', a.csr)
+    cmd = command(run, drive, a.name, a.ssh_port, a.memory, sockets)
+    (run / 'command.json').write_text(json.dumps(cmd, indent=2) + '\n')
+    (run / 'started.json').write_text(json.dumps({
+        'unit': UNIT, 'revision': REVISION, 'date': now.isoformat(), 'image': str(image),
+        'esp': str(esp), 'esp_sha256': sha256(esp) if esp.is_file() else None, 'boot_args': boot_args, 'csr': csr, 'sockets': str(sockets), 'ssh': '127.0.0.1:%d' % a.ssh_port,
+        'qemu': subprocess.run([QEMU, '--version'], capture_output=True, text=True).stdout.splitlines()[0]},
+        indent=2) + '\n')
+    subprocess.run(cmd, check=True)
+    print('run', run)
+    print('qemu pid', (run / 'qemu.pid').read_text().strip(), 'ssh 127.0.0.1:%d' % a.ssh_port, 'sockets', sockets)
+
+
+def stop(a):
+    run = Path(a.run)
+    pid = int((run / 'qemu.pid').read_text())
+    os.kill(pid, signal.SIGTERM)
+    for _ in range(100):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    (run / 'stopped.json').write_text(json.dumps({'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                                                  'pid': pid}, indent=2) + '\n')
+    print('stopped', pid)
+
+
+def faults(lines):
+    """Per-process NX fault counts, total, and the 1-based line of the first early-boot-complete marker."""
+    per, early, n = {}, None, 0
+    for n, line in enumerate(lines, 1):
+        m = NX.search(line)
+        if m:
+            per[m.group(1)] = per.get(m.group(1), 0) + 1
+        elif early is None and EARLY in line:
+            early = n
+    return {'total': sum(per.values()), 'per_process': dict(sorted(per.items(), key=lambda kv: -kv[1])),
+            'early_boot_line': early, 'lines': n}
+
+
+LOGLINE = re.compile(rb'20\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d{6} [\x20-\x7e]{8,}')
+EXIT = re.compile(r'\(([^()]*?) \[(\d+)\]\) <Notice>: exited due to ([^,|\s]+)')
+
+
+def log_lines(f, chunk=16 << 20, overlap=4096):
+    """Timestamped printable lines anywhere in a binary file (the qcow2 overlay holds launchd.log's blocks).
+    A match that ends within `overlap` bytes of the end of the data read so far may be cut by the chunk
+    boundary, so it is taken only once more data (or the end of the file) follows."""
+    seen, data = set(), b''
+    while True:
+        block = f.read(chunk)
+        data += block
+        limit = len(data) if not block else len(data) - overlap
+        cut = max(limit, 0)
+        for m in LOGLINE.finditer(data):
+            if m.end() >= limit and block:
+                cut = min(cut, m.start())
+                break
+            seen.add(m.group().decode('ascii'))
+        if not block:
+            break
+        data = data[cut:]
+    return sorted(seen)
+
+
+def exits(lines):
+    """Exit reasons per job, from launchd's 'exited due to' lines: {job: {reason: count}}."""
+    out = {}
+    for line in lines:
+        m = EXIT.search(line)
+        if m:
+            job = re.sub(r'^(system|pid)/', '', m.group(1))
+            reasons = out.setdefault(job, {})
+            reasons[m.group(3)] = reasons.get(m.group(3), 0) + 1
+    return dict(sorted(out.items(), key=lambda kv: -sum(kv[1].values())))
+
+
+def running(run):
+    """True while the run's QEMU (qemu.pid) is alive."""
+    pid = Path(run) / 'qemu.pid'
+    try:
+        os.kill(int(pid.read_text()), 0)
+    except (FileNotFoundError, ProcessLookupError, ValueError):
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def refuse_running(run):
+    if running(run):
+        sys.exit('qemu-vm: %s is still running; stop it first' % Path(run).name)
+
+
+KEEP = ('serial.log', 'started.json', 'command.json', 'stopped.json', 'qemu.log', 'network.pcap')
+
+
+def set_aside(ev, name, now):
+    """Move ev/NAME (an earlier extraction's file or folder) into ev/replaced-YYYYMMDD-HHMMSS/ instead of
+    deleting it; a name already taken there gets a numeric suffix. Returns the new path, or None."""
+    old = Path(ev) / name
+    if not (old.exists() or old.is_symlink()):
+        return None
+    dest = Path(ev) / ('replaced-' + now.astimezone().strftime('%Y%m%d-%H%M%S'))
+    dest.mkdir(exist_ok=True)
+    target, n = dest / name, 1
+    while target.exists() or target.is_symlink():
+        target, n = dest / ('%s.%d' % (name, n)), n + 1
+    os.rename(old, target)
+    return target
+
+
+def recipe(image, runs):
+    """The image's recipe from its build record: target.img lives in store/tmp/BUILD_RUN, the record in
+    store/runs/BUILD_RUN (MANIFEST.txt lines oclp/kdk/set, and the commit on build.log's first line)."""
+    rec = Path(runs) / Path(image).parent.name
+    lines = []
+    m = rec / 'MANIFEST.txt'
+    if m.is_file():
+        lines += [l.strip() for l in m.read_text(errors='replace').splitlines() if l.split(' ', 1)[0] in ('oclp', 'kdk', 'set')]
+    b = rec / 'build.log'
+    if b.is_file():
+        first = b.read_text(errors='replace').splitlines()[:1]
+        c = re.search(r'\(([0-9a-f]{7,})\)', first[0]) if first else None
+        if c:
+            lines.append('commit ' + c.group(1))
+    return rec, lines
+
+
+def retire(run, note, evidence_root, gc_root, log, runs, tmp_root):
+    """Extract a stopped run's evidence, log it, move the run folder to the gc root. Returns (evidence, moved).
+    The guest's own logs (`logs`: unified log, launchd.log, crash reports) come first, into the same folder; if
+    that fails, nothing is moved."""
+    run = Path(run).resolve()
+    refuse_running(run)
+    ev = Path(evidence_root) / ('qemu-' + run.name)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    started = json.loads((run / 'started.json').read_text()) if (run / 'started.json').is_file() else {}
+    image = started.get('image', '')
+    # The overlay's backing image lives in store/tmp, which is pruned: without it the unified log cannot be read,
+    # but serial.log and launchd's own log (read from the overlay's bytes) still can, so keep those.
+    if image and not Path(image).is_file():
+        ev.mkdir(parents=True, exist_ok=True)
+        set_aside(ev, 'logs-skipped.txt', now)
+        (ev / 'logs-skipped.txt').write_text('unified log not extracted: backing image %s was pruned\n' % image)
+        note = (note + '; ' if note else '') + 'unified log lost (backing image pruned)'
+    else:
+        logs(run, ev, tmp_root, evidence_root, now=now)
+
+    def put(name, text):                 # an earlier retire's copy is set aside, never overwritten
+        set_aside(ev, name, now)
+        (ev / name).write_text(text)
+    for name in KEEP:
+        if (run / name).is_file() and not (ev / name).exists():
+            shutil.copy2(run / name, ev / name)
+    lines = []
+    if (run / 'guest.qcow2').is_file():
+        with open(run / 'guest.qcow2', 'rb') as f:
+            lines = log_lines(f)
+        put('launchd-log.txt', ''.join(l + '\n' for l in lines))
+        put('launchd-exits.json', json.dumps(exits(lines), indent=2) + '\n')
+    if (run / 'serial.log').is_file():
+        with open(run / 'serial.log', errors='replace') as f:
+            put('faults.json', json.dumps(faults(f), indent=2) + '\n')
+    rec, rlines = recipe(started.get('image', ''), runs)
+    put('recipe.txt', 'build record %s\n%s\nboot_args %s\nesp %s\n' % (
+        rec, '\n'.join(rlines), started.get('boot_args'), started.get('esp')))
+    gc = Path(gc_root) / 'qemu'
+    gc.mkdir(parents=True, exist_ok=True)
+    moved = gc / run.name
+    run.rename(moved)
+    rel = lambda p: os.path.relpath(p, Path(log).parent) if str(p).startswith(str(Path(log).parent)) else str(p)
+    entry = '\n'.join(['## %s QEMU run %s' % (datetime.date.today().isoformat(), run.name),
+                       '- image: %s' % started.get('image', '?'),
+                       '- recipe: %s' % '; '.join(rlines or ['(no build record)']),
+                       '- boot: esp %s; boot-args %s%s' % (started.get('esp'), started.get('boot_args'),
+                                                         '; csr-active-config %s' % started['csr'] if started.get('csr') else ''),
+                       '- showed: %s' % (note or '(no note)'),
+                       '- evidence: %s' % rel(ev),
+                       '- retired: moved to %s' % rel(moved), '', ''])
+    text = Path(log).read_text() if Path(log).is_file() else ''
+    head, sep, rest = text.partition('\n## ')
+    Path(log).write_text(head.rstrip('\n') + '\n\n' + entry + (('## ' + rest) if sep else ''))
+    return ev, moved
+
+
+LOGARCHIVE = 'boot.logarchive'
+# Data-volume paths copied besides the unified log: (source relative to the Data root, destination in evidence)
+EXTRAS = (('private/var/log/com.apple.xpc.launchd/launchd.log', 'launchd.log'),
+          ('private/var/tmp/heartbeat', 'heartbeat'),
+          ('Library/Logs/DiagnosticReports', 'DiagnosticReports'),
+          ('private/var/db/DiagnosticReports', 'DiagnosticReports-db'))
+
+
+def work_dir(root, run_name, now):
+    """A new throwaway folder for the image clone: store/tmp/qemu-logs/RUN-YYYYMMDD-HHMMSS."""
+    w = Path(root) / ('%s-%s' % (run_name, now.astimezone().strftime('%Y%m%d-%H%M%S')))
+    w.parent.mkdir(parents=True, exist_ok=True)
+    w.mkdir()
+    return w
+
+
+def merge_commands(image, overlay, clone):
+    """Commands that make `clone` what the guest saw at stop: an APFS clone of the image, the overlay copy
+    re-pointed (header only) at the clone, then committed into it. The run's own files are only read."""
+    return [['cp', '-c', str(image), str(clone)],
+            ['cp', '-c', str(overlay[0]), str(overlay[1])],
+            [QEMU_IMG, 'rebase', '-u', '-F', 'raw', '-b', str(clone), '-f', 'qcow2', str(overlay[1])],
+            [QEMU_IMG, 'commit', '-q', '-f', 'qcow2', str(overlay[1])]]
+
+
+def show_command(archive, predicate):
+    return ['/usr/bin/log', 'show', '--archive', str(archive), '--predicate', predicate, '--style', 'compact']
+
+
+def data_root(mounts):
+    """The mounted Data volume among an attach's mount points: the one holding private/var/db/diagnostics."""
+    found = [Path(m) for m in mounts if (Path(m) / 'private' / 'var' / 'db' / 'diagnostics').is_dir()]
+    found.sort(key=lambda m: -len(list((m / 'private' / 'var' / 'db' / 'diagnostics').iterdir())))
+    return found[0] if found else None
+
+
+def timesync(data):
+    """Boot records of a timesync file: [(boot_uuid, numer, denom, boot_wall_ns, [(continuous, wall_ns)...])].
+    Boot record: magic 0xbbb0, size 48, UUID at 8, timebase at 24, wall time at 32; 'Ts' records (size 32)
+    carry the continuous time at 8 and wall time at 16."""
+    import uuid
+    boots, pos = [], 0
+    while pos + 4 <= len(data):
+        magic, size = struct.unpack_from('<HH', data, pos)
+        if magic == 0xbbb0 and size == 48:
+            numer, denom, wall = struct.unpack_from('<IIQ', data, pos + 24)
+            boots.append((str(uuid.UUID(bytes=data[pos + 8:pos + 24])).upper(), numer, denom, wall, []))
+        elif magic == 0x7354 and size == 32 and boots:
+            boots[-1][4].append(struct.unpack_from('<QQ', data, pos + 8))
+        elif size == 0:
+            break
+        pos += size
+    return boots
+
+
+def archive_info(arc, end_wall_ns=None):
+    """Info.plist of a logarchive folder made from a Data volume's diagnostics: `log show` prints nothing
+    without the time references that `log collect` writes. Oldest reference: the first
+    boot in timesync. End reference: anchored on the last boot's last timesync record (continuous, wall) and
+    carried forward to end_wall_ns (default: the newest tracev3 write plus 60 s) in that boot's timebase. The
+    last record itself is not the end: `log show` stops at EndTimeRef, which can be written about 95 s after
+    boot (ending at that record would print only a fraction of the lines)."""
+    import uuid
+    boots = []
+    for f in sorted((Path(arc) / 'timesync').glob('*.timesync')):
+        boots += timesync(f.read_bytes())
+    info = {'OSArchiveVersion': 5, 'ArchiveIdentifier': str(uuid.uuid4()).upper()}
+    if not boots:
+        return info
+    first, last = boots[0], boots[-1]
+    anchor_ct, anchor_wall = last[4][-1] if last[4] else (0, last[3])
+    if end_wall_ns is None:
+        mt = [p.stat().st_mtime_ns for p in Path(arc).rglob('*.tracev3')]
+        end_wall_ns = max(mt + [anchor_wall]) + 60 * 10**9
+    end_wall_ns = max(end_wall_ns, anchor_wall)
+    ticks = anchor_ct + (end_wall_ns - anchor_wall) * last[2] // max(last[1], 1)
+    ref = lambda b, ct, w: {'ContinuousTime': ct, 'UUID': b[0], 'WallTime': w}
+    oldest = {'OldestTimeRef': ref(first, 0, first[3])}
+    info['EndTimeRef'] = ref(last, ticks, end_wall_ns)
+    for k in ('Persist', 'Special', 'Signpost', 'HighVolume', 'Live'):
+        info[k + 'Metadata'] = dict(oldest)
+    return info
+
+
+def copy_tree(src, dest):
+    """Copy what is readable; unreadable entries are listed, not fatal (the Data volume is root-owned)."""
+    errors = []
+    try:
+        shutil.copytree(src, dest, dirs_exist_ok=True, ignore=SKIP, copy_function=shutil.copy2)
+    except shutil.Error as e:
+        errors = [str(x[0]) + ': ' + str(x[2]) for x in e.args[0]]
+    return errors
+
+
+ERRORS, RECORD = 'logs-copy-errors.txt', 'logs.json'
+OWNED = (LOGARCHIVE, ERRORS, RECORD) + tuple(name for _, name in EXTRAS)   # what `logs` writes into evidence
+
+
+def extract(data, out):
+    """Write the logarchive and the extras from a mounted Data root into out (a new folder). Returns
+    {name: files copied}."""
+    out = Path(out)
+    arc = out / LOGARCHIVE
+    arc.mkdir(parents=True)
+    got, errors = {}, []
+    for part in ('diagnostics', 'uuidtext'):
+        src = data / 'private' / 'var' / 'db' / part
+        if src.is_dir():
+            errors += copy_tree(src, arc)
+            got[part] = sum(1 for p in src.rglob('*') if p.is_file())
+    with open(arc / 'Info.plist', 'wb') as f:       # derived from what was copied
+        plistlib.dump(archive_info(arc), f)
+    for rel, name in EXTRAS:
+        src = data / rel
+        if src.is_file():
+            shutil.copy2(src, out / name)
+            got[name] = 1
+        elif src.is_dir() and any(src.iterdir()):
+            errors += copy_tree(src, out / name)
+            got[name] = sum(1 for p in src.rglob('*') if p.is_file())
+    if errors:
+        (out / ERRORS).write_text('\n'.join(errors) + '\n')
+    got['errors'] = len(errors)
+    return got
+
+
+def publish(stage, ev, now):
+    """Move a finished extraction into the evidence folder. Everything `logs` owns is replaced as a whole (a
+    re-run never mixes rotated tracev3 files of two extractions); the earlier copy is set aside in
+    replaced-TIME/, not deleted; other files there are kept."""
+    ev = Path(ev)
+    ev.mkdir(parents=True, exist_ok=True)
+    for name in OWNED:
+        set_aside(ev, name, now)
+        if (Path(stage) / name).exists():
+            os.rename(Path(stage) / name, ev / name)
+
+
+APFS_CONTAINER = 'EF57347C-0000-11AA-AA11-00306543ECAC'
+WHOLE = re.compile(r'^/dev/disk(\d+)$')
+
+
+def attach(image):
+    """Read-only attach of a whole-disk image. Returns this attach's system-entities (dev-entry, content-hint,
+    mount-point): the image's partitions and the APFS container the system synthesizes for it, whose volumes
+    it mounts read-only."""
+    out = subprocess.run(['hdiutil', 'attach', '-readonly', '-nobrowse', '-noautoopen', '-plist', str(image)],
+                         check=True, capture_output=True).stdout
+    return [e for e in plistlib.loads(out).get('system-entities', []) if 'dev-entry' in e]
+
+
+def whole_disk(ents):
+    """The device to detach: the image's own whole disk (no slice suffix), not the synthesized container."""
+    whole = [e for e in ents if WHOLE.match(e['dev-entry'])]
+    whole.sort(key=lambda e: (e.get('content-hint') == APFS_CONTAINER, int(WHOLE.match(e['dev-entry']).group(1))))
+    return whole[0]['dev-entry'] if whole else None
+
+
+def own_mounts(ents, table):
+    """Mount points of this attach only: its entities' own mount points, and mount-table rows whose device is one
+    of its devices or a slice of one of its whole disks (a volume may mount just after hdiutil returns). Other
+    sessions attach images at the same time, so the mount table is never diffed."""
+    devs = {e['dev-entry'] for e in ents}
+    whole = {d for d in devs if WHOLE.match(d)}
+    out = [e['mount-point'] for e in ents if e.get('mount-point')]
+    disk = lambda d: re.sub(r'^(/dev/disk\d+).*', r'\1', d)     # /dev/disk6s5s1 (a snapshot) -> /dev/disk6
+    out += [m for d, m in table if (d in devs or disk(d) in whole) and m not in out]
+    return out
+
+
+def mounted():
+    """The mount table as (device, mount point) rows (from `mount`)."""
+    out = subprocess.run(['/sbin/mount'], capture_output=True, text=True).stdout
+    rows = []
+    for l in out.splitlines():
+        if ' on ' in l:
+            d, rest = l.split(' on ', 1)
+            rows.append((d, rest.rsplit(' (', 1)[0]))
+    return rows
+
+
+def git_commit():
+    r = subprocess.run(['git', '-C', str(TOP), 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True)
+    clean = subprocess.run(['git', '-C', str(TOP), 'status', '--porcelain', '--', UNIT], capture_output=True, text=True)
+    return {'commit': r.stdout.strip() or None, 'clean': clean.returncode == 0 and not clean.stdout.strip()}
+
+
+def logs(run, out, tmp_root, evidence_root, predicate=None, now=None):
+    run = Path(run).resolve()
+    refuse_running(run)
+    started = json.loads((run / 'started.json').read_text())
+    image = Path(started['image'])
+    ev = Path(out) if out else Path(evidence_root) / ('qemu-' + run.name)
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    work = work_dir(tmp_root, run.name, now)
+    clone, ov = work / image.name, work / 'guest.qcow2'
+    ents, disk = [], None
+    try:
+        for c in merge_commands(image, (run / 'guest.qcow2', ov), clone):
+            subprocess.run(c, check=True)
+        ents = attach(clone)
+        disk = whole_disk(ents)
+        data, mounts = None, []
+        for _ in range(15):          # the container's volumes may mount just after hdiutil returns
+            mounts = own_mounts(ents, mounted())
+            data = data_root(mounts)
+            if data:
+                break
+            time.sleep(1)
+        if data is None:
+            raise SystemExit('qemu-vm: no Data volume with private/var/db/diagnostics among this attach\'s mounts '
+                             '%s (devices %s)' % (mounts, [e['dev-entry'] for e in ents]))
+        got = extract(data, work / 'out')
+        (work / 'out' / RECORD).write_text(json.dumps(dict(
+            {'unit': UNIT, 'revision': REVISION, 'date': now.isoformat(), 'run': str(run),
+             'image': str(image), 'overlay': str(run / 'guest.qcow2'), 'data_volume': str(data),
+             'devices': [e['dev-entry'] for e in ents], 'copied': got}, **git_commit()), indent=2) + '\n')
+        publish(work / 'out', ev, now)
+    finally:
+        detached = not ents or (disk is not None and detach(disk))
+        if detached:
+            shutil.rmtree(work, ignore_errors=True)
+        else:
+            print('qemu-vm: %s did not detach; %s kept (detach it, then delete it)' % (
+                disk or [e['dev-entry'] for e in ents], work), file=sys.stderr)
+    print(json.dumps({"evidence": str(ev), "copied": got}, indent=2), flush=True)
+    if not detached:
+        sys.exit('qemu-vm: evidence written, but the image clone is still attached (%s)' % work)
+    if predicate:
+        subprocess.run(show_command(ev / LOGARCHIVE, predicate))
+    return ev, got
+
+
+def detach(dev):
+    """Detach an attached image by its whole disk (its synthesized APFS container goes with it); a busy volume
+    gets a few tries, then -force."""
+    for _ in range(5):
+        if subprocess.run(['hdiutil', 'detach', dev], capture_output=True).returncode == 0:
+            return True
+        time.sleep(2)
+    return subprocess.run(['hdiutil', 'detach', '-force', dev], capture_output=True).returncode == 0
+
+
+def main(argv):
+    ap = argparse.ArgumentParser(prog='qemu-vm', description=__doc__.split('\n')[0])
+    sub = ap.add_subparsers(dest='cmd')
+    s = sub.add_parser('start')
+    s.add_argument('--image', required=True)
+    s.add_argument('--esp', required=True)
+    s.add_argument('--name', default='darwin27')
+    s.add_argument('--ssh-port', type=int, default=22397)
+    s.add_argument('--memory', default='16G')
+    s.add_argument('--out')
+    s.add_argument('--boot-arg', action='append', default=[],
+                   help='append to the ESP boot-args for this run (repeatable); boots a per-run ESP folder')
+    s.add_argument('--csr', type=lambda v: int(v, 0),
+                   help="set the ESP's csr-active-config for this run (e.g. 0x813); boots a per-run ESP folder")
+    sub.add_parser('stop').add_argument('run')
+    sub.add_parser('faults').add_argument('run')
+    sub.add_parser('launchd-log').add_argument('run')
+    r = sub.add_parser('retire')
+    r.add_argument('run')
+    r.add_argument('--note', required=True, help='what this run showed (findings, behaviour)')
+    lg = sub.add_parser('logs')
+    lg.add_argument('run')
+    lg.add_argument('--predicate', help='print `log show --archive ... --predicate P --style compact`')
+    lg.add_argument('--out', help='evidence folder (default store/evidence/qemu-RUN)')
+    a = ap.parse_args(argv)
+    if a.cmd == 'start':
+        start(a)
+    elif a.cmd == 'stop':
+        stop(a)
+    elif a.cmd == 'faults':
+        with open(Path(a.run) / 'serial.log', errors='replace') as f:
+            print(json.dumps(faults(f), indent=2))
+    elif a.cmd == 'launchd-log':
+        run = Path(a.run)
+        with open(run / 'guest.qcow2', 'rb') as f:
+            lines = log_lines(f)
+        (run / 'launchd-log.txt').write_text(''.join(l + '\n' for l in lines))
+        print(json.dumps({'lines': len(lines), 'first': lines[0][:26] if lines else None,
+                          'last': lines[-1][:26] if lines else None, 'exits': exits(lines)}, indent=2))
+    elif a.cmd == 'retire':
+        ev, moved = retire(a.run, a.note, TOP / 'store' / 'evidence', TOP / 'store' / 'gc', TOP / 'IMAGE-LOG.md',
+                           TOP / 'store' / 'runs', TOP / 'store' / 'tmp' / 'qemu-logs')
+        print('evidence', ev)
+        print('moved to', moved)
+    elif a.cmd == 'logs':
+        logs(a.run, a.out, TOP / 'store' / 'tmp' / 'qemu-logs', TOP / 'store' / 'evidence', a.predicate)
+    else:
+        print(__doc__.strip())
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

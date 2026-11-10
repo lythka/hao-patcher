@@ -1,0 +1,396 @@
+{
+  "physical": {
+    "AllDisks": [
+      "disk6"
+    ],
+    "AllDisksAndPartitions": [
+      {
+        "Content": "",
+        "DeviceIdentifier": "disk6",
+        "OSInternal": false,
+        "Size": 171798691840
+      }
+    ],
+    "VolumesFromDisks": [],
+    "WholeDisks": [
+      "disk6"
+    ]
+  },
+  "disk_information": [
+    {
+      "Bootable": false,
+      "BusProtocol": "USB",
+      "CanBeMadeBootable": false,
+      "CanBeMadeBootableRequiresDestroy": false,
+      "Content": "",
+      "DeviceBlockSize": 512,
+      "DeviceIdentifier": "disk6",
+      "DeviceNode": "/dev/disk6",
+      "DeviceTreePath": "IODeviceTree:/arm-io/pcie@30000000/pci106b,1a06@E",
+      "Ejectable": true,
+      "EjectableMediaAutomaticUnderSoftwareControl": false,
+      "EjectableOnly": false,
+      "FreeSpace": 0,
+      "GlobalPermissionsEnabled": false,
+      "IOKitSize": 171798691840,
+      "IORegistryEntryName": "Apple Virtual Disk Media",
+      "Internal": false,
+      "LowLevelFormatSupported": false,
+      "MediaName": "Virtual Disk",
+      "MediaType": "Generic",
+      "MountPoint": "",
+      "OS9DriversInstalled": false,
+      "OSInternalMedia": false,
+      "ParentWholeDisk": "disk6",
+      "PartitionMapPartition": false,
+      "RAIDMaster": false,
+      "RAIDSlice": false,
+      "Removable": false,
+      "RemovableMedia": false,
+      "RemovableMediaOrExternalDevice": true,
+      "SMARTDeviceSpecificKeysMayVaryNotGuaranteed": {},
+      "SMARTStatus": "Not Supported",
+      "Size": 171798691840,
+      "SupportsGlobalPermissionsDisable": false,
+      "SystemImage": false,
+      "TotalSize": 171798691840,
+      "VirtualOrPhysical": "Physical",
+      "VolumeName": "",
+      "VolumeSize": 0,
+      "WholeDisk": true,
+      "Writable": true,
+      "WritableMedia": true,
+      "WritableVolume": false
+    }
+  ],
+  "root": {
+    "APFSContainerFree": 31451148288,
+    "APFSContainerReference": "disk3",
+    "APFSContainerSize": 80006348800,
+    "APFSPhysicalStores": [
+      {
+        "APFSPhysicalStore": "disk0s2"
+      }
+    ],
+    "APFSSnapshot": true,
+    "APFSSnapshotName": "com.apple.os.update-60587424F5399FC05D957DF05B4D2F65543462495C77AEF520F790FBB57CB212",
+    "APFSSnapshotUUID": "339048DF-7E29-4111-B0B1-A6DE57A7F0C3",
+    "APFSVolumeGroupID": "4DBFFE89-4702-43ED-B45D-DEFBA402A152",
+    "Bootable": true,
+    "BooterDeviceIdentifier": "disk3s2",
+    "BusProtocol": "",
+    "CanBeMadeBootable": false,
+    "CanBeMadeBootableRequiresDestroy": false,
+    "CapacityInUse": 12639047680,
+    "Content": "41504653-0000-11AA-AA11-00306543ECAC",
+    "DeviceBlockSize": 4096,
+    "DeviceIdentifier": "disk3s1s1",
+    "DeviceNode": "/dev/disk3s1s1",
+    "DeviceTreePath": "IODeviceTree:/arm-io/pcie@30000000/pci106b,1a00@7/AppleVirtIOStorageDevice",
+    "DiskUUID": "339048DF-7E29-4111-B0B1-A6DE57A7F0C3",
+    "Ejectable": false,
+    "EjectableMediaAutomaticUnderSoftwareControl": false,
+    "EjectableOnly": false,
+    "Encryption": false,
+    "EncryptionThisVolumeProper": false,
+    "FileVault": false,
+    "FilesystemName": "APFS",
+    "FilesystemType": "apfs",
+    "FilesystemUserVisibleName": "APFS",
+    "FreeSpace": 0,
+    "GlobalPermissionsEnabled": true,
+    "IOKitSize": 80006348800,
+    "IORegistryEntryName": "com.apple.os.update-60587424F5399FC05D957DF05B4D2F65543462495C77AEF520F790FBB57CB212",
+    "Internal": true,
+    "Locked": false,
+    "MacOSSystemAPFSEFIDriverVersion": 2811160007000004,
+    "MediaName": "",
+    "MediaType": "",
+    "MountPoint": "/",
+    "OSInternalMedia": false,
+    "ParentWholeDisk": "disk3",
+    "PartitionMapPartition": false,
+    "RAIDMaster": false,
+    "RAIDSlice": false,
+    "RecoveryDeviceIdentifier": "disk3s3",
+    "Removable": false,
+    "RemovableMedia": false,
+    "RemovableMediaOrExternalDevice": false,
+    "SMARTDeviceSpecificKeysMayVaryNotGuaranteed": {},
+    "SMARTStatus": "Not Supported",
+    "Sealed": "Yes",
+    "Size": 80006348800,
+    "SolidState": true,
+    "SupportsGlobalPermissionsDisable": true,
+    "SystemImage": false,
+    "TotalSize": 80006348800,
+    "VolumeAllocationBlockSize": 4096,
+    "VolumeName": "Macintosh HD",
+    "VolumeSize": 0,
+    "VolumeUUID": "339048DF-7E29-4111-B0B1-A6DE57A7F0C3",
+    "WholeDisk": false,
+    "Writable": false,
+    "WritableMedia": false,
+    "WritableVolume": false
+  },
+  "apfs_before": {
+    "Containers": [
+      {
+        "APFSContainerUUID": "0DD97888-E3D7-41FF-BBFB-D12AE7F5B1AF",
+        "CapacityCeiling": 524288000,
+        "CapacityFree": 514015232,
+        "ContainerReference": "disk1",
+        "DesignatedPhysicalStore": "disk0s1",
+        "PhysicalStores": [
+          {
+            "DeviceIdentifier": "disk0s1",
+            "DiskUUID": "62524B8F-34B2-4C3A-B332-941738249923",
+            "Size": 524288000
+          }
+        ],
+        "Volumes": [
+          {
+            "APFSVolumeUUID": "5AD9C6D9-BFFB-49CE-BFF8-2C1E7C94443D",
+            "CapacityInUse": 106496,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk1s1",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "iSCPreboot",
+            "Roles": [
+              "Preboot"
+            ]
+          },
+          {
+            "APFSVolumeUUID": "F72B3D5D-6941-40BE-827D-8D3CEBF78EEE",
+            "CapacityInUse": 20480,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk1s2",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "xART",
+            "Roles": [
+              "xART"
+            ]
+          },
+          {
+            "APFSVolumeUUID": "5AFFEBEB-8835-4423-8C3F-95B012528E26",
+            "CapacityInUse": 5165056,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk1s3",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "Hardware",
+            "Roles": [
+              "Hardware"
+            ]
+          },
+          {
+            "APFSVolumeUUID": "CF17A887-280A-4E34-87CE-25898648115F",
+            "CapacityInUse": 20480,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk1s4",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "Recovery",
+            "Roles": [
+              "Recovery"
+            ]
+          }
+        ]
+      },
+      {
+        "APFSContainerUUID": "4272C4E6-F3DD-4E4A-8038-BFD768C74CF2",
+        "CapacityCeiling": 5368668160,
+        "CapacityFree": 4091277312,
+        "ContainerReference": "disk2",
+        "DesignatedPhysicalStore": "disk0s3",
+        "PhysicalStores": [
+          {
+            "DeviceIdentifier": "disk0s3",
+            "DiskUUID": "DEA0201C-EF0A-4693-95DB-3E8CB4997E79",
+            "Size": 5368668160
+          }
+        ],
+        "Volumes": [
+          {
+            "APFSVolumeUUID": "5430F5F0-8132-4B04-8C68-6FA62D3E8020",
+            "CapacityInUse": 1257619456,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk2s1",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "Recovery",
+            "Roles": [
+              "Recovery"
+            ]
+          },
+          {
+            "APFSVolumeUUID": "28ED77FE-4205-4DE4-9B55-238DE9EF6FD9",
+            "CapacityInUse": 28672,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk2s2",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "Update",
+            "Roles": [
+              "Update"
+            ]
+          }
+        ]
+      },
+      {
+        "APFSContainerUUID": "2E765749-F107-4C70-8820-A89D911CB5A5",
+        "CapacityCeiling": 80006348800,
+        "CapacityFree": 31451164672,
+        "ContainerReference": "disk3",
+        "DesignatedPhysicalStore": "disk0s2",
+        "PhysicalStores": [
+          {
+            "DeviceIdentifier": "disk0s2",
+            "DiskUUID": "120462B5-E892-4D5A-9C57-0DE87F616743",
+            "Size": 80006348800
+          }
+        ],
+        "Volumes": [
+          {
+            "APFSVolumeUUID": "0D3E2C18-B3CB-464E-9178-3D533E46ECDD",
+            "CapacityInUse": 12639047680,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk3s1",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "Macintosh HD",
+            "Roles": [
+              "System"
+            ]
+          },
+          {
+            "APFSVolumeUUID": "FF9897BE-79EF-4F81-9075-96BE94D941C1",
+            "CapacityInUse": 7235141632,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk3s2",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "Preboot",
+            "Roles": [
+              "Preboot"
+            ]
+          },
+          {
+            "APFSVolumeUUID": "9CA25224-9116-46ED-8156-63BED56418D6",
+            "CapacityInUse": 1257541632,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk3s3",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "Recovery",
+            "Roles": [
+              "Recovery"
+            ]
+          },
+          {
+            "APFSVolumeUUID": "B5877073-7C45-41FD-9480-8840EBB5BC97",
+            "CapacityInUse": 2371584,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk3s4",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "Update",
+            "Roles": [
+              "Update"
+            ]
+          },
+          {
+            "APFSVolumeUUID": "4DBFFE89-4702-43ED-B45D-DEFBA402A152",
+            "CapacityInUse": 27299053568,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk3s5",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "Data",
+            "Roles": [
+              "Data"
+            ]
+          },
+          {
+            "APFSVolumeUUID": "E1F485B5-C212-4285-9694-9CD475FEC8D3",
+            "CapacityInUse": 20480,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk3s6",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "VM",
+            "Roles": [
+              "VM"
+            ]
+          }
+        ]
+      },
+      {
+        "APFSContainerUUID": "FED2ECDC-8319-4353-83F7-AAEAFD633C56",
+        "CapacityCeiling": 545259520,
+        "CapacityFree": 22228992,
+        "ContainerReference": "disk5",
+        "DesignatedPhysicalStore": "disk4",
+        "PhysicalStores": [
+          {
+            "DeviceIdentifier": "disk4",
+            "Size": 545259520
+          }
+        ],
+        "Volumes": [
+          {
+            "APFSVolumeUUID": "5619C7BA-DE04-4110-B04E-15DD4710CA2A",
+            "CapacityInUse": 520171520,
+            "CapacityQuota": 0,
+            "CapacityReserve": 0,
+            "CryptoMigrationOn": false,
+            "DeviceIdentifier": "disk5s1",
+            "Encryption": false,
+            "FileVault": false,
+            "Locked": false,
+            "Name": "RevivalC13M302392.UC_SIRI_ASR_ASSISTANT_EN_US_EN_US_MACVM_Cryptex",
+            "Roles": []
+          }
+        ]
+      }
+    ]
+  }
+}

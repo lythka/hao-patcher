@@ -1,0 +1,62 @@
+#!/opt/homebrew/bin/python3.14
+"""Build the IO80211 compat library (input row io80211_compat) into a new, recorded artifact: make STORE_ARTIFACTS."""
+import datetime
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+HERE = Path(__file__).resolve().parent
+PATCH = HERE.parents[1]
+TOP = PATCH.parents[1]
+FRAMEWORK = '/System/Library/PrivateFrameworks/IO80211.framework/Versions/A'
+NAME = 'io80211_compat.dylib'
+
+
+def run(*args):
+    return subprocess.check_output(list(map(str, args)), cwd=TOP, text=True).strip()
+
+
+def build(out):
+    """Compile io80211_compat.c into OUT/io80211_compat.dylib (install name IO80211, re-exporting
+    IO80211OCLP.dylib), ad-hoc signed. Returns its path."""
+    binary = Path(out)/NAME
+    run('xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O2', '-Wall', '-Wextra', '-Werror',
+        '-dynamiclib', '-fvisibility=hidden', '-Wl,-not_for_dyld_shared_cache',
+        '-install_name', f'{FRAMEWORK}/IO80211', '-compatibility_version', '1.0.0', '-current_version', '1.0.0',
+        f'-Wl,-reexport_library,{HERE/"IO80211OCLP.tbd"}', HERE/'io80211_compat.c', '-o', binary)
+    run('codesign', '-f', '-s', '-', binary)
+    return binary
+
+
+def main(root):
+    root = Path(root).resolve()
+    sources = {str(p.relative_to(TOP)): hashlib.sha256(p.read_bytes()).hexdigest()
+               for p in sorted(HERE.iterdir()) if p.is_file()}
+    with tempfile.TemporaryDirectory(prefix='io80211-compat-') as tmp:
+        binary = build(tmp)
+        digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        out = root/f'io80211-compat-26A428-{now:%Y%m%d}-{digest[:12]}'
+        out.mkdir()
+        (out/NAME).write_bytes(binary.read_bytes())
+        (out/NAME).chmod(0o755)
+        (out/'build.json').write_text(json.dumps({
+            'unit': 'patches/golden-gate-userspace/src/io80211',
+            'revision': json.loads((PATCH/'patch.json').read_text())['revision'],
+            'commit': run('git', 'rev-parse', 'HEAD'),
+            'dirty': bool(run('git', 'status', '--porcelain', '--', PATCH)),
+            'date': now.isoformat(), 'inputs': sources,
+            'compiler': run('xcrun', 'clang', '--version'),
+            'sha256': digest,
+        }, indent=2)+'\n')
+        print(out)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print(__doc__)
+        sys.exit(0 if len(sys.argv) == 1 else 2)
+    main(sys.argv[1])

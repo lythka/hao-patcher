@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Build, test and install Darwin 27 Intel Metal fixes from this checkout."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parent
+REPO = ROOT.parents[1]  # repository root: patches/, cache/, tools/
+def run(*args, **kwargs):
+    return subprocess.run([str(arg) for arg in args], check=True, cwd=REPO, **kwargs)
+
+
+def install(args):
+    # Reuse the shipped installation recipes in a private stage; the source
+    # checkout and input artifacts remain immutable.
+    def hook(name, inputs):
+        with tempfile.TemporaryDirectory(prefix='metal-install-') as scratch:
+            stage = Path(scratch) / name
+            shutil.copytree(REPO / 'patches' / name / 'src', stage)
+            (stage / 'inputs').mkdir()
+            for key, value in inputs.items():
+                (stage / 'inputs' / key).symlink_to(value.resolve(), target_is_directory=True)
+            run('sh', stage / 'kc-hook.sh', args.system.resolve(),
+                env={**os.environ, 'OCLP_PYTHON': sys.executable})
+    hook('golden-gate-metal-libraries', {
+        'metallib_repairs_golden_gate': args.libraries,
+        'metal_quad_runtime_golden_gate': args.runtime})
+    if args.framebuffer:
+        hook('golden-gate-metal-framebuffer', {'metal_framebuffer': args.framebuffer})
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='command')
+    p = sub.add_parser('metallibs', help='rewrite the six selected stock 26A428 libraries')
+    p.add_argument('--system', type=Path, required=True)
+    p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--work', type=Path, required=True)
+    p = sub.add_parser('runtime', help='extend the supplied Intel runtime bitcode and iCBE donor')
+    p.add_argument('--input', type=Path, required=True)
+    p.add_argument('--llvm', type=Path, required=True)
+    p.add_argument('--compiler', type=Path, required=True)
+    p.add_argument('--output', type=Path, required=True)
+    p = sub.add_parser('compiler-runtime', help='build compiler/client compatibility dylibs and authored drivers')
+    p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--llvm', type=Path)
+    p = sub.add_parser('framebuffer', help='build the shipped framebuffer adapter and regression fixtures')
+    p.add_argument('--output', type=Path, required=True)
+    p = sub.add_parser('mps-plan', help='report the native MPS initializer edits without changing the cache')
+    p.add_argument('--cache', type=Path, required=True)
+    p = sub.add_parser('mps-apply', help='repair and 4KiB re-sign a new cache family from supplied inputs')
+    p.add_argument('--cache', type=Path, required=True)
+    p.add_argument('--output', type=Path, required=True)
+    p = sub.add_parser('install', help='install artifacts into an offline mounted System in the builder VM')
+    p.add_argument('--system', type=Path, required=True)
+    for name in ('libraries', 'runtime'):
+        p.add_argument('--' + name, type=Path, required=True)
+    p.add_argument('--framebuffer', type=Path)
+    sub.add_parser('test', help='run local CPU/compiler tests; executes no GPU workloads')
+    args = parser.parse_args()
+    if args.command == 'metallibs':
+        run(sys.executable, '-I', REPO / 'cache/metallib/make', args.system.resolve(),
+            args.output.resolve(), '--work', args.work.resolve(), '--paths',
+            REPO / 'cache/metallib/profiles/metallib-repairs-26A428.txt')
+    elif args.command == 'runtime':
+        run(sys.executable, '-I', REPO / 'cache/metallib/make', 'runtime-build',
+            args.input.resolve(), args.output.resolve(), '--llvm', args.llvm.resolve(),
+            '--compiler', args.compiler.resolve())
+    elif args.command == 'compiler-runtime':
+        run(sys.executable, '-I', REPO / 'cache/metallib/make', 'translation-build',
+            args.output.resolve(), *(['--llvm', args.llvm.resolve()] if args.llvm else []))
+    elif args.command == 'framebuffer':
+        run(sys.executable, '-I', REPO / 'patches/golden-gate-metal-framebuffer/build/metal-framebuffer',
+            'build', args.output.resolve())
+    elif args.command == 'mps-plan':
+        sys.path.insert(0, str(REPO / 'patches/golden-gate-userspace/src'))
+        sys.path.insert(0, str(ROOT / 'lib'))  # dyld_cache, mps_matrix_initializer
+        from mps_matrix_initializer import plan_cache_family
+        plan = plan_cache_family(args.cache)
+        print(json.dumps({str(path): [(offset, before.hex(), after.hex(), why)
+                                     for offset, before, after, why in edits]
+                          for path, edits in plan.items()}, indent=2))
+    elif args.command == 'install':
+        install(args)
+    elif args.command == 'mps-apply':
+        sys.path.insert(0, str(ROOT))
+        from mps_apply import apply
+        print(json.dumps(apply(args.cache, args.output), indent=2))
+    elif args.command == 'test':
+        run(sys.executable, '-I', '-m', 'unittest', 'discover', '-s', 'cache/metallib/lib')
+        run(sys.executable, '-I', '-m', 'unittest', 'discover',
+            '-s', 'patches/golden-gate-metal-framebuffer/build/tests', '-p', 'test_lower.py')
+        run(sys.executable, '-I', '-m', 'unittest', 'discover', '-s', 'tools/metal-fixes/tests')
+    else:
+        parser.print_help()
+
+
+if __name__ == '__main__':
+    main()

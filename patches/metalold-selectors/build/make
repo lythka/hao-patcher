@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""patches/metalold-selectors/build/make OUTPUT_PARENT [--survey LEGACY_RUNTIME --protocols TARGET_PROTOCOLS_JSON]
+
+Builds libmetalold-selectors.dylib (x86_64, ad hoc signed) from src/metalold_selectors.m into a new artifact folder
+OUTPUT_PARENT/metalold-selectors-YYYYMMDD-<hash12> with build.json. With --survey, also builds survey/survey.m and
+runs it against the legacy stack of a cache/shaders replay runtime (LEGACY_RUNTIME/runtime.json) before and after
+loading the dylib, writing survey-before.json and survey-after.json next to it. Run with `python3 -I`.
+"""
+import datetime
+import hashlib
+import json
+import os
+import pathlib
+import subprocess
+import sys
+
+HERE = pathlib.Path(__file__).resolve().parent
+UNIT = 'patches/metalold-selectors/build'
+REVISION = 3
+INSTALL_NAME = '/usr/lib/libmetalold-selectors.dylib'
+CFLAGS = ['-arch', 'x86_64', '-mmacosx-version-min=13.0', '-fobjc-arc', '-Wall', '-Wextra', '-Werror']
+
+
+def sha256(path):
+    return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+
+def run(cmd, **kw):
+    return subprocess.run(cmd, check=True, capture_output=True, text=True, **kw)
+
+
+def git(*args):
+    try:
+        return run(['git', '-C', str(HERE), *args]).stdout.strip()
+    except subprocess.CalledProcessError:
+        return ''
+
+
+def build_dylib(out):
+    """compile and sign the shim into OUT; returns the path"""
+    dylib = pathlib.Path(out) / 'libmetalold-selectors.dylib'
+    run(['clang', *CFLAGS, '-Wno-unused-command-line-argument', '-dynamiclib', '-install_name', INSTALL_NAME,
+         '-framework', 'Foundation', '-Wl,-no_warn_inits', '-o', str(dylib), str(HERE / 'src' / 'metalold_selectors.m')])
+    run(['codesign', '-f', '-s', '-', '-i', 'libmetalold-selectors', str(dylib)])
+    return dylib
+
+
+def build_survey(out):
+    survey = pathlib.Path(out) / 'survey'
+    run(['clang', *CFLAGS, '-framework', 'Foundation', '-o', str(survey), str(HERE / 'survey' / 'survey.m')])
+    run(['codesign', '-f', '-s', '-', str(survey)])
+    return survey
+
+
+def run_survey(runtime, survey, protocols, out_json, shim=None):
+    """the replay runtime's env (cache/shaders/lib/harness.py) loads MetalOld and the driver bundle under Rosetta"""
+    sys.path.insert(0, str(HERE.parents[2] / 'cache' / 'shaders' / 'lib'))
+    import harness
+    import tempfile
+    with tempfile.TemporaryDirectory() as cache:      # the harness insists on a MetalOld FS cache folder; nothing compiles here
+        env = harness.env(str(runtime), None, cache, out='', keys=False, extra={'RP_SLEEP': '0'})
+        target = harness.cmd(str(runtime))[1:]
+        cmd = [str(survey), *target, str(protocols), str(out_json)] + ([str(shim)] if shim else [])
+        p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=600)
+    if p.returncode:
+        raise SystemExit(f'survey failed rc={p.returncode}: {p.stderr[-2000:]}')
+    return p.stdout.strip()
+
+
+def main(argv):
+    if len(argv) < 2 or argv[1].startswith('-'):
+        print(__doc__)
+        return 2
+    parent = pathlib.Path(argv[1]).resolve()
+    opts = dict(zip(argv[2::2], argv[3::2]))
+    source = HERE / 'src' / 'metalold_selectors.m'
+    clang = run(['clang', '--version']).stdout.splitlines()[0]
+    sdk = run(['xcrun', '--show-sdk-version']).stdout.strip()
+    inputs = {'src/metalold_selectors.m': sha256(source)}
+    ident = hashlib.sha256((inputs['src/metalold_selectors.m'] + clang + sdk).encode()).hexdigest()[:12]
+    date = datetime.date.today().strftime('%Y%m%d')
+    out = parent / f'metalold-selectors-{date}-{ident}'
+    if out.exists():
+        raise SystemExit(f'{out} exists; a new artifact goes to a new folder')
+    out.mkdir(parents=True)
+    dylib = build_dylib(out)
+    record = {
+        'unit': UNIT, 'revision': REVISION, 'commit': git('rev-parse', 'HEAD'),
+        'dirty': bool(git('status', '--porcelain', '--', str(HERE))), 'date': datetime.date.today().isoformat(),
+        'inputs': inputs, 'toolchain': {'clang': clang, 'sdk': sdk},
+        'outputs': {'libmetalold-selectors.dylib': sha256(dylib)},
+    }
+    if '--survey' in opts:
+        runtime = pathlib.Path(opts['--survey']).resolve()
+        protocols = pathlib.Path(opts['--protocols']).resolve()
+        survey = build_survey(out)
+        record['inputs']['survey/survey.m'] = sha256(HERE / 'survey' / 'survey.m')
+        record['inputs']['target_protocols'] = sha256(protocols)
+        record['survey'] = {
+            'legacy_runtime': str(runtime), 'target_protocols': str(protocols),
+            'before': run_survey(runtime, survey, protocols, out / 'survey-before.json'),
+            'after': run_survey(runtime, survey, protocols, out / 'survey-after.json', dylib),
+        }
+        survey.unlink()
+    (out / 'build.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n')
+    print(out)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

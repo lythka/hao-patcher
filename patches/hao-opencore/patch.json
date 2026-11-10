@@ -1,0 +1,20 @@
+{
+ "revision": 29,
+ "stage": "post",
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
+  ],
+  "builds": [
+   "25G332"
+  ]
+ },
+ "inputs": [
+  "hao_runtime",
+  "kernel_repair_efi",
+  "opencore_debug",
+  "kernel_repair_binding"
+ ],
+ "status": "experiment",
+ "validated": false
+}

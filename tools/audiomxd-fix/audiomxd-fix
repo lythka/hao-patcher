@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""Build/install the Golden Gate native no-console audio repair."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT/'src'))
+from audio_no_console import plan
+from cache_family import apply_edits
+from cache_pages import resign_file
+
+
+def sha(path):
+    h = hashlib.sha256()
+    with path.open('rb') as f:
+        for b in iter(lambda: f.read(8 << 20), b''):
+            h.update(b)
+    return h.hexdigest()
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    sub = p.add_subparsers(dest='action', required=True)
+    q = sub.add_parser('plan')
+    q.add_argument('--cache', type=Path, required=True)
+    b = sub.add_parser('build')
+    b.add_argument('--cache', type=Path, required=True)
+    b.add_argument('--output', type=Path, required=True)
+    i = sub.add_parser('install')
+    i.add_argument('--cache', type=Path, required=True)
+    i.add_argument('--artifact', type=Path, required=True)
+    a = p.parse_args()
+    if a.action == 'install':
+        manifest = json.loads((a.artifact/'build.json').read_text())
+        for row in manifest['files']:
+            if Path(row['name']).name != row['name']:
+                raise ValueError('invalid artifact filename')
+            src, dst = a.artifact/row['name'], a.cache/row['name']
+            if sha(src) != row['sha256']:
+                raise ValueError('artifact hash differs')
+            if sha(dst) not in (row['source_sha256'], row['sha256']):
+                raise ValueError('target cache differs from build input')
+        for row in manifest['files']:
+            src, dst = a.artifact/row['name'], a.cache/row['name']
+            meta = dst.stat()
+            if sha(dst) == row['sha256']:
+                continue
+            os.chflags(dst, 0)
+            shutil.copyfile(src, dst)
+            os.chown(dst, meta.st_uid, meta.st_gid)
+            os.chmod(dst, meta.st_mode & 0o7777)
+            os.chflags(dst, meta.st_flags)
+        return
+    edits = plan(a.cache)
+    serialized = {path.name: [(offset, before.hex(), after.hex(), why)
+                             for offset, before, after, why in changes]
+                  for path, changes in edits.items()}
+    if a.action == 'plan':
+        print(json.dumps(serialized))
+        return
+    if not edits:
+        raise ValueError('source is already repaired; use the original selected cache')
+    a.output.mkdir(mode=0o755, parents=True, exist_ok=False)
+    rows = []
+    for src, changes in edits.items():
+        dst = a.output/src.name
+        shutil.copyfile(src, dst)
+        apply_edits(dst, changes)
+        resign_file(dst, force=True)
+        rows.append(dict(name=src.name, source_sha256=sha(src), sha256=sha(dst)))
+    revision = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'],
+                              capture_output=True, text=True)
+    (a.output/'build.json').write_text(json.dumps(dict(
+        unit='tools/audiomxd-fix', revision=1,
+        commit=revision.stdout.strip() if revision.returncode == 0 else None,
+        files=rows, edits=serialized), indent=2)+'\n')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError) as e:
+        sys.exit(str(e))

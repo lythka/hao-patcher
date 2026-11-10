@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""Rewrite selected libraries into a System-rooted artifact directory."""
+import argparse
+import datetime
+import hashlib
+import importlib
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import types
+
+HERE = Path(__file__).resolve().parent
+
+
+def revision():
+    text = (HERE / 'README.md').read_text()
+    return int(re.search(r'^## Revisions\n+- r(\d+) ', text, re.M)[1])
+
+
+def sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def lowerer(source):
+    # Load only the patching library; the upstream CLI also imports packaging,
+    # download and notarization dependencies, which this producer does not use.
+    for name in ('metal_libraries', 'metal_libraries.metallib', 'metal_libraries.utils'):
+        package = types.ModuleType(name)
+        package.__path__ = [str(source.joinpath(*name.split('.')))]
+        sys.modules[name] = package
+    return importlib.import_module('metal_libraries.metallib.patch').MetallibPatch(
+        tahoe_3802=True, preserve_functions=True)
+
+
+def main():
+    if len(sys.argv)>1 and sys.argv[1] in ('translation-package', 'translation-environment'):
+        sys.path.insert(0, str(HERE/'lib'))
+        from runtime import deployment
+        parser=argparse.ArgumentParser(description='Prepare a portable private Metal translation test bundle')
+        if sys.argv[1]=='translation-package':
+            parser.add_argument('output',type=Path)
+            for key in ('runtime','payload','libraries'):
+                parser.add_argument('--'+key,type=Path,required=True)
+            args=parser.parse_args(sys.argv[2:])
+            report=deployment.bundle(args.output,args.runtime,args.payload,args.libraries)
+            print(json.dumps({'bundle':str(args.output),'cache_identity':report['cache_identity']},indent=2))
+        else:
+            parser.add_argument('package',type=Path)
+            parser.add_argument('--role',choices=('compiler','gpu-client'),required=True)
+            parser.add_argument('--cache',type=Path,required=True)
+            parser.add_argument('--reviewed-mps-dispatch',action='store_true',
+                                help='Assert the reviewed MPS 32x1x1 dispatch; does not enforce it')
+            args=parser.parse_args(sys.argv[2:])
+            env=deployment.environment(args.package,args.role,args.cache,
+                                       reviewed_mps_dispatch=args.reviewed_mps_dispatch,inherited={})
+            print(json.dumps(env,indent=2))
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='mps-sift':
+        commands = dict(build='build.sh', reference='reference.sh', native='native.sh',
+                        inputs='gen.py', compare='compare.py', width8='diagnose_width.py',
+                        logical32='diagnose_logical32.py', compile='compile.py')
+        if len(sys.argv)<3 or sys.argv[2] not in commands:
+            print('usage: cache/metallib/make mps-sift {build|reference|native|inputs|compare|width8|logical32|compile} ...')
+            return
+        script = HERE/'mps-sift'/commands[sys.argv[2]]
+        launcher = ['sh'] if script.suffix=='.sh' else [sys.executable, '-I']
+        sys.exit(subprocess.run(launcher+[str(script)]+sys.argv[3:]).returncode)
+    if len(sys.argv)>1 and sys.argv[1]=='translation-block-check':
+        sys.path.insert(0,str(HERE/'lib/runtime'))
+        import block_gpu
+        parser=argparse.ArgumentParser(description='Generate mip-zero block controls with bound samplers')
+        parser.add_argument('output',type=Path)
+        block_gpu.check(parser.parse_args(sys.argv[2:]).output,revision())
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='translation-block-verify':
+        sys.path.insert(0,str(HERE/'lib/runtime'))
+        import block_gpu
+        parser=argparse.ArgumentParser(description='Verify bound-sampler block controls')
+        for option in ('data','outputs','report'):
+            parser.add_argument('--'+option,type=Path,required=True)
+        args=parser.parse_args(sys.argv[2:])
+        block_gpu.verify(args.data,args.outputs,args.report)
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='translation-native-runtime':
+        sys.path.insert(0,str(HERE/'lib/runtime'))
+        import build
+        parser=argparse.ArgumentParser(description='Prepare a private native compiler for GPU controls')
+        parser.add_argument('output',type=Path)
+        parser.add_argument('--runtime',type=Path,required=True)
+        parser.add_argument('--payload',type=Path,required=True)
+        args=parser.parse_args(sys.argv[2:])
+        build.native_runtime(args.output,args.runtime,args.payload)
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='translation-build':
+        sys.path.insert(0,str(HERE/'lib/runtime'))
+        import build
+        parser=argparse.ArgumentParser(description='Build the opt-in Intel compiler-entry translation prototype')
+        parser.add_argument('output',type=Path)
+        parser.add_argument('--llvm',type=Path,help='Pinned 3802 libLLVM.dylib; enables the optional sampler query extension')
+        args=parser.parse_args(sys.argv[2:])
+        print(json.dumps(build.build(args.output,args.llvm)['outputs'],indent=2))
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='block-read-verify':
+        sys.path.insert(0, str(HERE/'block-reads'))
+        import check
+        parser = argparse.ArgumentParser(description='Compare native block reads with saved Apple GPU output')
+        for option in ('data', 'outputs', 'log', 'report'):
+            parser.add_argument('--'+option, type=Path, required=True)
+        args = parser.parse_args(sys.argv[2:])
+        check.verify(args.data, args.outputs, args.log, args.report)
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='block-read-check':
+        sys.path.insert(0, str(HERE/'block-reads'))
+        import check
+        parser = argparse.ArgumentParser(description='Compare array block reads with Apple GPU controls')
+        parser.add_argument('output', type=Path)
+        args = parser.parse_args(sys.argv[2:])
+        check.check(args.output, revision())
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='quad-verify':
+        sys.path.insert(0, str(HERE/'quad-shuffle'))
+        import check
+        parser = argparse.ArgumentParser(description='Verify native quad permute bit readbacks')
+        parser.add_argument('--data', type=Path, required=True)
+        parser.add_argument('--outputs', type=Path, required=True)
+        parser.add_argument('--log', type=Path, required=True)
+        parser.add_argument('--report', type=Path, required=True)
+        args = parser.parse_args(sys.argv[2:])
+        check.verify_outputs(args.data, args.outputs, args.log, args.report)
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='quad-check':
+        sys.path.insert(0, str(HERE/'quad-shuffle'))
+        import check
+        parser = argparse.ArgumentParser(description='Compare quad permutes with Apple GPU builtins')
+        parser.add_argument('output', type=Path)
+        args = parser.parse_args(sys.argv[2:])
+        check.check(args.output, revision())
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='collective-check':
+        sys.path.insert(0, str(HERE/'collectives'))
+        import check
+        parser = argparse.ArgumentParser(description='Compare collective helpers with Apple GPU builtins')
+        parser.add_argument('output', type=Path)
+        args = parser.parse_args(sys.argv[2:])
+        check.check(args.output, revision())
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='winograd-check':
+        sys.path.insert(0, str(HERE/'winograd'))
+        import check
+        parser = argparse.ArgumentParser(description='Compare Winograd lowering with Apple GPU operations')
+        parser.add_argument('output', type=Path)
+        args = parser.parse_args(sys.argv[2:])
+        report = check.check(args.output, revision())
+        print(json.dumps({k: report[k] for k in ['devices', 'scalar_comparisons', 'intel_gpu_acceptance']}, indent=2))
+        return
+    if len(sys.argv)>1 and sys.argv[1]=='runtime-build':
+        sys.path.insert(0, str(HERE/'lib'))
+        import quad_runtime
+        parser = argparse.ArgumentParser(description='Add missing quad-shuffle helpers to the HD 4000 runtime')
+        parser.add_argument('input', type=Path)
+        parser.add_argument('output', type=Path)
+        parser.add_argument('--llvm', type=Path, required=True)
+        parser.add_argument('--compiler', type=Path,
+                            help='include collective helpers and repair this Intel iCBE active-mask emitter')
+        args = parser.parse_args(sys.argv[2:])
+        print(json.dumps(quad_runtime.build(args.input, args.llvm, args.output, revision(), args.compiler), indent=2))
+        return
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('system', type=Path)
+    parser.add_argument('output', type=Path)
+    parser.add_argument('--work', type=Path, required=True)
+    parser.add_argument('--paths', type=Path, required=True, help='one library per line: RECIPE PATH. RECIPE is steps joined by +: lower (AIR 2.8 -> 2.5), rewrite (Tahoe suite), golden-gate (27.0 suite with direct assembly), half-vector or reads; PATH System-relative')
+    parser.add_argument('--air-lowerer', type=Path, help='preserved MetallibSupportPkg fork, for AIR version lowering first')
+    parser.add_argument('--overlay', type=Path, action='append', default=[],
+                        help='a System-rooted artifact whose copy of a library is the source instead of SYSTEM; the last overlay holding the path wins')
+    args = parser.parse_args()
+    args.work.mkdir(parents=True)
+    args.output.mkdir(parents=True)
+    converter = lowerer(args.air_lowerer.resolve()) if args.air_lowerer else None
+    inputs = [dict(path=str(args.paths), sha256=sha256(args.paths))]
+    outputs = []
+    for number, line in enumerate(args.paths.read_text().splitlines()):
+        if not line or line.startswith('#'):
+            continue
+        recipe, path = line.split(None, 1)
+        steps = recipe.split('+')
+        if not set(steps) <= {'lower', 'rewrite', 'half-vector', 'reads', 'golden-gate'}:
+            raise ValueError('unknown recipe: ' + line)
+        if len([step for step in steps if step != 'lower']) > 1:
+            raise ValueError('one rewrite step per library: ' + line)
+        relative = Path(path.lstrip('/'))
+        if '..' in relative.parts:
+            raise ValueError('library path escapes System: ' + line)
+        source = next((o / relative for o in reversed(args.overlay) if (o / relative).is_file()), args.system / relative)
+        inputs.append(dict(path=str(source), sha256=sha256(source), recipe=recipe))
+        work = args.work / str(number)
+        work.mkdir()
+        if 'lower' in steps:
+            lowered = work / 'lowered.metallib'
+            converter.patch(str(source), str(lowered))
+            source = lowered
+        if set(steps) & {'rewrite', 'half-vector', 'reads', 'golden-gate'}:
+            flags = (['--golden-gate'] if 'golden-gate' in steps else
+                     ['--half-vector-only'] if 'half-vector' in steps else
+                     ['--sampler-reads-only'] if 'reads' in steps else [])
+            subprocess.run([sys.executable, str(HERE / 'lib/build_metallib.py'), str(source), str(work / 'rewrite'), *flags], check=True)
+            source = work / 'rewrite/default.metallib'
+        destination = args.output / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        outputs.append(relative)
+    (args.output / 'SHA256SUMS').write_text(''.join('%s  %s\n' % (sha256(args.output / r), r) for r in outputs))
+    git = lambda *a: subprocess.run(['git', '-C', str(HERE), *a], capture_output=True, text=True).stdout.strip()
+    (args.output / 'build.json').write_text(json.dumps(dict(
+        schema=1, unit='cache/metallib', revision=revision(), commit=git('rev-parse', 'HEAD'),
+        dirty=bool(git('status', '--porcelain', '--', str(HERE))), inputs=inputs,
+        air_lowerer=str(args.air_lowerer.resolve()) if args.air_lowerer else None,
+        date=datetime.datetime.now(datetime.timezone.utc).isoformat()), indent=1, sort_keys=True) + '\n')
+    print(args.output.resolve())
+
+
+if __name__ == '__main__':
+    main()

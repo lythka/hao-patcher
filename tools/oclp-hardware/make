@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""Build/apply the explicit MBP9,2 legacy hardware donor map on a Golden Gate target."""
+import argparse
+import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+import runpy
+import shutil
+import stat
+import subprocess
+
+HERE = Path(__file__).resolve().parent
+REVISION = 1
+
+
+def sha(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for part in iter(lambda: stream.read(1 << 20), b''):
+            digest.update(part)
+    return digest.hexdigest()
+
+
+def inventory(root):
+    result = {}
+    for path in sorted(Path(root).rglob('*')):
+        name = str(path.relative_to(root))
+        mode = stat.S_IMODE(path.lstat().st_mode)
+        if path.is_symlink():
+            result[name] = dict(type='symlink', target=os.readlink(path), mode=mode)
+        elif path.is_file():
+            result[name] = dict(type='file', sha256=sha(path), mode=mode, mtime_ns=path.stat().st_mtime_ns)
+    return result
+
+
+def build(psp_root, psp_archive, rsr_repair, output, profile_path=HERE/'profiles/mbp92.json'):
+    profile = json.loads(Path(profile_path).read_text())
+    archive_sha = sha(psp_archive)
+    if archive_sha != profile['psp_sha256']:
+        raise ValueError('PSP archive differs from the hardware profile input')
+    output = Path(output); output.mkdir(parents=True, exist_ok=False)
+    selected = sorted({entry['support_package_relative_path'] for entry in profile['entries']})
+    for relative in selected:
+        source = Path(psp_root)/relative
+        if not source.exists():
+            raise FileNotFoundError(source)
+        destination = output/'payload'/relative
+        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+        subprocess.run(['ditto', str(source), str(destination)], check=True)
+    subprocess.run(['ditto', str(rsr_repair), str(output/'payload/RSRRepair')], check=True)
+    (output/'install-map.json').write_text(json.dumps(profile, indent=2)+'\n')
+    tools = output/'install-tools'; tools.mkdir(mode=0o755)
+    shutil.copy2(HERE/'make', tools/'apply')
+    shutil.copytree(HERE/'lib', tools/'lib', ignore=shutil.ignore_patterns('__pycache__'))
+    shutil.copy2(HERE/'LICENSE.txt', tools/'LICENSE.txt')
+    git = lambda *args: subprocess.check_output(['git', '-C', str(HERE), *args], text=True).strip()
+    record = dict(unit='tools/oclp-hardware', revision=REVISION, date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                  commit=git('rev-parse', 'HEAD'), dirty=bool(git('status', '--porcelain')),
+                  source_files={str(path.relative_to(HERE)):sha(path) for path in sorted(HERE.rglob('*'))
+                                if path.is_file() and '__pycache__' not in path.parts},
+                  oclp_source_commit=profile['source_commit'], donor_policy=profile['donor_policy'],
+                  psp_custom_signature=(Path(psp_root)/'.signed').exists(),
+                  inputs=dict(psp_archive=dict(path=str(Path(psp_archive).resolve()),sha256=archive_sha),
+                              expanded_psp_root=str(Path(psp_root).resolve()),
+                              rsr_repair=dict(path=str(Path(rsr_repair).resolve()),sha256=sha(rsr_repair))),
+                  files=inventory(output), validation='BUILT ONLY; target boot acceptance remains separate')
+    (output/'build.json').write_text(json.dumps(record, indent=2)+'\n')
+    return output
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='command', required=True)
+    make = sub.add_parser('build')
+    for name in ('psp-root','psp-archive','rsr-repair','out'):
+        make.add_argument('--'+name,type=Path,required=True)
+    apply = sub.add_parser('apply')
+    for name in ('artifact','system-root','data-root'):
+        apply.add_argument('--'+name,type=Path,required=True)
+    apply.add_argument('--owner',default='root:wheel',help='fixture ownership override; image installs use root:wheel')
+    apply.add_argument('--report',type=Path)
+    args = parser.parse_args()
+    if args.command == 'build':
+        print(build(args.psp_root,args.psp_archive,args.rsr_repair,args.out))
+    else:
+        result = runpy.run_path(str(HERE/'lib/installer.py'))['apply'](args.artifact,args.system_root,args.data_root,args.owner)
+        body = json.dumps(result,indent=2)+'\n'
+        if args.report:
+            with args.report.open('x') as stream:
+                stream.write(body)
+        print(body,end='')
+
+
+if __name__ == '__main__':
+    main()

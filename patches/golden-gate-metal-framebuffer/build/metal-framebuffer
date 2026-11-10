@@ -1,0 +1,107 @@
+#!/opt/homebrew/bin/python3.14
+"""Build the offscreen framebuffer-input regression and inspect its pixel results."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
+
+
+def build(output):
+    output = output.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    sys.path.insert(0, str(HERE/'lib'))
+    from lower import lower, build_native, use_executable
+    native_command = build_native(output/'lower')
+    use_executable(output/'lower')
+    commands = [
+        ['xcrun', 'metal', '-std=metal3.0', '-mmacos-version-min=13.0',
+         '-fno-fast-math', '-c', str(HERE/'src/probe.metal'), '-o', str(output/'probe.air')],
+        ['xcrun', 'metallib', str(output/'probe.air'), '-o', str(output/'probe.metallib')],
+        ['xcrun', 'metal', '-std=metal3.0', '-mmacos-version-min=13.0', '-DFB_FUNCTION_CONSTANTS=1',
+         '-fno-fast-math', '-c', str(HERE/'src/probe.metal'), '-o', str(output/'constants.air')],
+        ['xcrun', 'metallib', str(output/'constants.air'), '-o', str(output/'constants.metallib')],
+        ['xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=13.0',
+         '-fobjc-arc', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations',
+         '-framework', 'Foundation', '-framework', 'Metal', str(HERE/'src/probe.m'),
+         '-o', str(output/'probe')],
+        ['codesign', '-s', '-', str(output/'probe')],
+        ['xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=13.0',
+         '-fobjc-arc', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations',
+         '-c', str(HERE/'src/encoder.m'), '-o', str(output/'encoder.o')],
+        ['xcrun', 'clang++', '-std=c++17', '-arch', 'x86_64', '-mmacosx-version-min=13.0',
+         '-fobjc-arc', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations',
+         '-dynamiclib', '-framework', 'Foundation', '-framework', 'Metal',
+         str(output/'encoder.o'), str(HERE/'src/frontend.mm'), str(HERE/'src/lower.cpp'),
+         '-o', str(output/'encoder.dylib')],
+        ['codesign', '-s', '-', str(output/'encoder.dylib')],
+        ['xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=13.0',
+         '-fobjc-arc', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations', '-DFB_SYSTEM=1',
+         '-c', str(HERE/'src/encoder.m'), '-o', str(output/'system.o')],
+        ['xcrun', 'clang++', '-std=c++17', '-arch', 'x86_64', '-mmacosx-version-min=13.0',
+         '-fobjc-arc', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations',
+         '-dynamiclib', '-framework', 'Foundation', '-install_name', '/usr/lib/libmetal-framebuffer.dylib',
+         str(output/'system.o'), str(HERE/'src/frontend.mm'), str(HERE/'src/lower.cpp'),
+         '-o', str(output/'libmetal-framebuffer.dylib')],
+        ['codesign', '-s', '-', str(output/'libmetal-framebuffer.dylib')],
+    ]
+    for command in commands:
+        subprocess.run(command, check=True)
+    commands = [native_command, ['codesign', '-s', '-', str(output/'lower')], *commands]
+    dump_command = ['xcrun', 'metal-objdump', '--disassemble', str(output/'probe.air')]
+    dump = subprocess.check_output(dump_command, text=True)
+    source = dump[dump.index('; ModuleID'):]
+    commands.append(dump_command)
+    for label, multisample in [('single', False), ('ms', True)]:
+        rewritten, bindings = lower(source, multisample=multisample)
+        base = output/('lowered-'+label)
+        base.with_suffix('.ll').write_text(rewritten)
+        base.with_suffix('.bindings.json').write_text(json.dumps(bindings, indent=2)+'\n')
+        for command in [
+            ['xcrun', 'metal', '-c', '-mmacos-version-min=13.0', str(base.with_suffix('.ll')),
+             '-o', str(base.with_suffix('.air'))],
+            ['xcrun', 'metallib', str(base.with_suffix('.air')), '-o', str(base.with_suffix('.metallib'))],
+        ]:
+            subprocess.run(command, check=True); commands.append(command)
+    sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+    git = lambda *a: subprocess.check_output(['git', '-C', str(ROOT), *a], text=True).strip()
+    record = dict(unit='patches/golden-gate-metal-framebuffer/build', revision=4, commit=git('rev-parse', 'HEAD'),
+                  dirty=bool(git('status', '--porcelain', '--', str(HERE))),
+                  date=datetime.now(timezone.utc).isoformat(), commands=commands,
+                  compiler=subprocess.check_output(['xcrun', 'clang', '--version'], text=True),
+                  sdk=subprocess.check_output(['xcrun', '--show-sdk-version'], text=True).strip(),
+                  inputs={str(p.relative_to(ROOT)): sha(p) for p in sorted(HERE.rglob('*'))
+                          if p.is_file() and '__pycache__' not in p.parts},
+                  outputs={p.name: sha(p) for p in output.iterdir() if p.is_file()})
+    (output/'build.json').write_text(json.dumps(record, indent=2)+'\n')
+    print(output)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='command')
+    p = sub.add_parser('build'); p.add_argument('output', type=Path)
+    p = sub.add_parser('lower-air', help='lower specialized fragment color inputs; requires an ordered encoder')
+    p.add_argument('input', type=Path); p.add_argument('output', type=Path)
+    p.add_argument('--multisample', action='store_true')
+    args = parser.parse_args()
+    if args.command == 'build':
+        build(args.output)
+    elif args.command == 'lower-air':
+        sys.path.insert(0, str(HERE/'lib'))
+        from lower import lower
+        rewritten, plan = lower(args.input.read_text(), multisample=args.multisample)
+        with args.output.open('x') as destination:
+            destination.write(rewritten)
+        args.output.with_suffix('.bindings.json').write_text(json.dumps(plan, indent=2)+'\n')
+    else:
+        parser.print_help()
+
+
+if __name__ == '__main__':
+    main()

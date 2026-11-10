@@ -1,0 +1,6 @@
+{
+  "kernel_sha256": "ce09da26bf61813cee503e40872c3b901e2ed3f146ca50ced8a077d344b492e9",
+  "address": "0xffffff8000342b60",
+  "prefix_hex": "554889e54157415641554154534883ec384c8b5718",
+  "evidence": "Fixed locator loads max_offset at +0x18 into r10, tests only 32bit-VA bit57, then rejects end > max at 0xffffff8000342c0c. Unlike xnu-12377.121.6 vm_map_locate_space_fixed, it has no beyond_max branch. Replay its position-independent prologue and max load; allow only the four commpage addresses with the restoration request flag and size4096."
+}

@@ -1,0 +1,48 @@
+# Local inputs, images and build records (see docs/inputs.md).
+store/
+
+# Build outputs. A patch's build/ folder is source; its own build/ output is not.
+build/
+!/patches/*/build/
+/patches/*/build/build/
+
+# Apple software, disk images and other binaries are supplied locally, never committed.
+*.ipsw
+*.dmg
+*.img
+*.iso
+*.pkg
+*.xip
+*.aar
+*.kc
+*.efi
+*.kext/
+*.bundle
+*.cdr
+*.qcow2
+*.fd
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.dylib
+*.o
+*.metallib
+*.metalar
+*.car
+*.aot
+*.logarchive/
+*.trace/
+*.sqlite
+dyld_shared_cache_*
+tools/ssdpush/ssdpush-agent-*
+
+# Python and macOS.
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local editor and agent settings.
+.claude/
+AGENTS.md
+CLAUDE.md

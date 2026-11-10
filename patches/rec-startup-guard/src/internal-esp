@@ -1,0 +1,30 @@
+#!/bin/sh
+# internal-esp [--mount]: print the internal disk's EFI system partition (diskNsM); with --mount, mount it at
+# /private/var/tmp/iesp (or reuse an existing mount) and print "diskNsM MOUNTPOINT WE_MOUNTED(0|1)".
+# Whole disks from `diskutil list internal physical` that are not removable, first partition whose Content is EFI.
+# IESP_DISKS="diskN ..." replaces the disk list (offline tests against disk images only).
+disks=${IESP_DISKS:-}
+if [ -z "$disks" ]; then
+    l=$(diskutil list -plist internal physical)
+    n=$(echo "$l" | plutil -extract WholeDisks raw -o - - 2>/dev/null) || n=0
+    i=0
+    while [ "$i" -lt "$n" ]; do
+        d=$(echo "$l" | plutil -extract "WholeDisks.$i" raw -o - -)
+        [ "$(diskutil info -plist "$d" | plutil -extract Removable raw -o - - 2>/dev/null)" = true ] || disks="$disks $d"
+        i=$((i + 1))
+    done
+fi
+part=""
+for d in $disks; do
+    for s in $(diskutil list "$d" | awk '$NF ~ /^disk[0-9]+s[0-9]+$/ {print $NF}'); do
+        [ "$(diskutil info -plist "$s" | plutil -extract Content raw -o - - 2>/dev/null)" = EFI ] && { part=$s; break 2; }
+    done
+done
+[ -n "$part" ] || { echo "internal-esp: no internal EFI system partition (disks:${disks:- none})" >&2; exit 1; }
+[ "${1:-}" = --mount ] || { echo "$part"; exit 0; }
+mp=$(diskutil info -plist "$part" | plutil -extract MountPoint raw -o - - 2>/dev/null)
+if [ -n "$mp" ]; then echo "$part $mp 0"; exit 0; fi
+m=${IESP_MOUNT:-/private/var/tmp/iesp}
+mkdir -p "$m"
+diskutil mount -mountPoint "$m" "$part" >/dev/null || { echo "internal-esp: cannot mount $part" >&2; exit 1; }
+echo "$part $m 1"

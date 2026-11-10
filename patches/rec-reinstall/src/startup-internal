@@ -1,0 +1,54 @@
+#!/bin/sh
+# startup-internal [diskN]: after ssdinstall wrote a new image on diskN (default: the first internal disk with an EFI
+# partition), make that disk's \EFI\OC\OpenCore.efi the firmware's startup default (ssdinstall --startup runs it).
+#   - The firmware default is NetBoot (efi-boot-device names a network path): nothing is written, the default
+#     stays NetBoot.
+#   - Otherwise the path the Recovery's Startup Disk takes, which bootguard handles:
+#     restart bootguard so it watches the NEW ESP (the image brings its own partition GUIDs), bless the internal
+#     macOS as startup disk (efi-boot-device + Boot0080/BootOrder -> Tahoe's boot.efi), and bootguard turns that into
+#     the ESP's OpenCore.efi within a second. Checked by reading efi-boot-device back. Without bootguard (not
+#     loaded): efi-boot-device is written directly (the kernel derives -data), BootOrder left alone.
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+HERE=$(cd "$(dirname "$0")" && pwd)
+IESP=$HERE/internal-esp; [ -x "$IESP" ] || IESP=/usr/local/ssdtools/internal-esp
+case "$(nvram efi-boot-device 2>/dev/null)" in
+*MessagingIPv4*) echo "firmware default is NetBoot: kept (nothing written)"; exit 0 ;;
+esac
+# the new partitions appear once the agent closed the disk; give diskarbitration a moment
+i=0; r=""
+while [ $i -lt 30 ]; do r=$(IESP_DISKS=${1:-} sh "$IESP" --mount 2>/dev/null) && break; sleep 1; i=$((i + 1)); done
+[ -n "$r" ] || { echo "no internal EFI system partition"; exit 1; }
+set -- $r; esp=$1; mp=$2; mounted=$3
+[ -f "$mp/EFI/OC/OpenCore.efi" ] || { echo "$esp has no \\EFI\\OC\\OpenCore.efi"; exit 1; }
+uuid=$(diskutil info -plist "$esp" | plutil -extract DiskUUID raw -o - -)
+[ "$mounted" = 1 ] && diskutil unmount "$mp" >/dev/null 2>&1
+echo "internal ESP $esp $uuid"
+ok() { bv=$(nvram efi-boot-device 2>/dev/null); case $bv in *"$uuid"*OpenCore.efi*) return 0 ;; esac; return 1; }
+
+if launchctl print system/local.bootguard >/dev/null 2>&1; then
+    launchctl kickstart -k system/local.bootguard && sleep 2
+    # the internal macOS System volume (role System) on the internal disk's APFS container
+    sys=""
+    for v in $(diskutil apfs list | awk '/APFS Volume Disk \(Role\):/ && /System/ {print $(NF-1)}'); do
+        [ "$(diskutil info -plist "$v" | plutil -extract Internal raw -o - - 2>/dev/null)" = true ] && { sys=$v; break; }
+    done
+    if [ -n "$sys" ]; then
+        smp=$(diskutil info -plist "$sys" | plutil -extract MountPoint raw -o - - 2>/dev/null)
+        [ -n "$smp" ] || { diskutil mount -mountOptions ro "$sys" >/dev/null 2>&1 || diskutil mount "$sys" >/dev/null 2>&1;
+                           smp=$(diskutil info -plist "$sys" | plutil -extract MountPoint raw -o - - 2>/dev/null); }
+        if [ -n "$smp" ] && bless --mount "$smp" --setBoot; then
+            i=0; while [ $i -lt 10 ] && ! ok; do sleep 1; i=$((i + 1)); done
+            ok && { echo "firmware default: internal OpenCore (bless $sys + bootguard)"; nvram efi-boot-device; exit 0; }
+            echo "bootguard did not redirect within 10 s; writing efi-boot-device directly"
+        else
+            echo "bless of the internal macOS ($sys at ${smp:-not mounted}) failed; writing efi-boot-device directly"
+        fi
+    else
+        echo "no internal System volume found; writing efi-boot-device directly"
+    fi
+fi
+xml="<array><dict><key>IOMatch</key><dict><key>IOProviderClass</key><string>IOMedia</string><key>IOPropertyMatch</key><dict><key>UUID</key><string>$uuid</string></dict></dict><key>BLLastBSDName</key><string>$esp</string></dict><dict><key>IOEFIDevicePathType</key><string>MediaFilePath</string><key>Path</key><string>\\EFI\\OC\\OpenCore.efi</string></dict></array>"
+nvram efi-boot-device="$xml" || { echo "nvram write failed"; exit 1; }
+sleep 1
+ok && nvram efi-boot-device-data >/dev/null 2>&1 || { echo "efi-boot-device not as written"; exit 1; }
+echo "firmware default: internal OpenCore (efi-boot-device written directly; BootOrder unchanged)"

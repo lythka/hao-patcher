@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Darwin 27 Intel kernel foundation: kernel packaging, kernel-fix recipes and the OpenCore EFI.
+
+usage: make kernel --kernel KERNEL --out NEW_ARTIFACT
+       make sandbox-layout ...    (tools/kernel-fixes: Sandbox operation layout)
+       make iosurface-layout ...  (tools/kernel-fixes: IOSurface property ABI)
+       make commpage-kext ...     (tools/kernel-fixes: IntelCommpage kext)
+       make build-repairs ...     (tools/kernel-fixes: OpenCore repair artifact)
+       make install-kernel ...    (tools/kernel-fixes: install into an offline ESP)
+       make vm-esp ...            (OpenCore EFI with the kernel repairs and extra kexts; vm_esp.py)
+Run a subcommand with --help for its arguments.
+"""
+import argparse
+import datetime
+import hashlib
+import json
+from pathlib import Path
+import re
+import runpy
+import shutil
+import struct
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+REVISION = 40
+ROOT = HERE.parents[1]
+PACKAGE_COMMANDS = {'commpage-kext', 'sandbox-layout', 'iosurface-layout', 'build-repairs', 'install-kernel'}
+SCRIPTS = {'vm-esp': 'vm_esp.py'}
+
+
+def digest(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def kernel_identity(data):
+    """UUID and version string of a thin x86_64 Mach-O kernel."""
+    if struct.unpack_from('<II', data) != (0xfeedfacf, 0x1000007):
+        raise SystemExit('Kernel must be a thin x86_64 Mach-O')
+    pos, uuid = 32, None
+    for _ in range(struct.unpack_from('<I', data, 16)[0]):
+        cmd, size = struct.unpack_from('<II', data, pos)
+        if cmd == 0x1b:  # LC_UUID
+            uuid = data[pos+8:pos+24].hex()
+        pos += size
+    if uuid is None:
+        raise SystemExit('Kernel has no LC_UUID')
+    version = re.search(rb'Darwin Kernel Version [^\0]*', data)
+    return uuid, version.group().decode() if version else None
+
+
+def package_kernel(argv):
+    p = argparse.ArgumentParser(prog='make kernel',
+        description='Package an Intel kernel, unchanged, as the darwin27_kernel input artifact.')
+    p.add_argument('--kernel', type=Path, required=True, help='thin x86_64 kernel from the verified IPSW')
+    p.add_argument('--out', type=Path, required=True, help='new artifact folder')
+    args = p.parse_args(argv)
+    uuid, version = kernel_identity(args.kernel.read_bytes())
+    out = args.out.resolve()
+    out.mkdir(parents=True, exist_ok=False)
+    (out/'payload').mkdir()
+    shutil.copyfile(args.kernel, out/'payload/kernel')
+    git = lambda *a: subprocess.check_output(['git', '-C', str(HERE), *a], text=True)
+    record = dict(unit='tools/kernel-foundation', revision=REVISION, operation='kernel',
+        date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        commit=git('rev-parse', 'HEAD').strip(), dirty=bool(git('status', '--porcelain')),
+        inputs=dict(kernel=str(args.kernel.resolve()), kernel_sha256=digest(args.kernel)),
+        kernel_uuid=uuid, kernel_version=version,
+        files={'payload/kernel': digest(out/'payload/kernel')})
+    (out/'build.json').write_text(json.dumps(record, indent=2)+'\n')
+    print(out)
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
+        print(__doc__.strip())
+        raise SystemExit(0 if len(sys.argv) > 1 else 2)
+    command = sys.argv.pop(1)
+    if command == 'kernel':
+        package_kernel(sys.argv[1:])
+    elif command in PACKAGE_COMMANDS:
+        raise SystemExit(subprocess.run([sys.executable, '-I', str(ROOT/'tools/kernel-fixes/kernel-fixes'),
+                                         command, *sys.argv[1:]]).returncode)
+    elif command in SCRIPTS:
+        sys.argv[0] = f'make {command}'
+        runpy.run_path(str(HERE/SCRIPTS[command]), run_name='__main__')
+    else:
+        raise SystemExit(f'unknown subcommand {command!r}; run make without arguments for usage')
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,6 @@
+com.apple.iokit.IOHIDEventDriver
+com.apple.driver.AppleHIDKeyboard
+com.apple.driver.AppleHIDMouse
+com.apple.driver.IOBluetoothHIDDriver
+com.apple.driver.AppleMultitouchDriver
+com.apple.driver.AppleBluetoothMultitouch

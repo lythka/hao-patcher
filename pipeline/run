@@ -1,0 +1,150 @@
+#!/bin/zsh
+# run TARGET MACOS_BUILD OCLP PATCH_SET: macOS installer -> image in an ssdimg repository, on this Apple silicon Mac.
+#   host: layout + Preboot/Recovery, ESP, guest inputs -> builder VM: the pristine stage (System/Data), the oclp stage OCLP root patch with
+#   the set's oclp-hook patches, the post stage the set's post patches (only when the set has one) -> host: capture, fsck, commit.
+#   Stops at the first failing step. The run's share/patches.txt records which patches went in. The pristine stage result is
+#   cached per build, target and the pristine stage sources (store/cache/pristine), so a patch change costs the oclp and post stages only;
+#   the oclp stage result is cached per pristine key, OCLP commit and the set's oclp-hook patches (store/cache/oclp), so a set
+#   that differs from an earlier one only in post patches (dev from beta) costs the post stage only; the target before
+#   each kc-hook is cached too (store/cache/oclp-prefix), so a change to a later kc-hook reruns only the kc-hooks from it.
+# TARGET = pipeline/targets/TARGET.json, MACOS_BUILD = pipeline/inputs/MACOS_BUILD/ (+ common/), one file per lock row, OCLP = a commit or branch
+# of $OCLP_REPO, PATCH_SET = pipeline/sets/PATCH_SET.txt (one patch name per line; empty = stock OCLP).
+# Env: VM (builder clone), VMBIN (ssdvm), VMCTL (vmctl), REPO (image repository), RUN (record folder), WORK (working folder), PRESERVE=1 (keep WORK), NAME (volume name),
+#      OCLP_REPO, SSDIMG, PRISTINE_CACHE=0 / OCLP_CACHE=0 (run the stage even when cached; OCLP_CACHE=0 also ignores the points)
+set -eu
+TARGET=${1:?target}; BUILD=${2:?macOS build}; OCLP=${3:?OCLP commit}; SET=${4:?patch set}
+P=${0:A:h}; TOP=${P:h}; L=(python3 -I $P/lock.py)
+TJ=$P/targets/$TARGET.json; LOCK=$P/inputs/$BUILD; SETF=$P/sets/$SET.txt; ST=$TOP/store
+VM=${VM:-$ST/vm/builder/vm}
+export VMBIN=${VMBIN:-$ST/vm/bin} VMCTL=${VMCTL:-$P/vm/vmctl}
+STAMP=$(date +%Y%m%d-%H%M%S)
+# RUN keeps the record (logs, patches.txt, MANIFEST.txt, uuids.env). WORK holds target.img and share/ in store/tmp,
+# where only the newest 3 working folders are kept, so an intermediate of a recent run can still be pulled;
+# PRESERVE=1 moves this run's working folder into RUN/work instead.
+NAMEDIR=$TARGET-$BUILD-$SET-$STAMP; RUN=${RUN:-$ST/runs/$NAMEDIR}; WORK=${WORK:-$ST/tmp/$NAMEDIR}; IMG=$WORK/target.img
+# Only run working folders (NAME-YYYYMMDD-HHMMSS) are pruned: store/tmp also holds the builder lock and other
+# folders, some with read-only mounts. Pruning never stops a build: Finder can rewrite .DS_Store into a folder while rm
+# empties it ("Directory not empty"); that folder goes on the next run.
+mkdir -p $ST/tmp; ls -td $ST/tmp/*-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]/ 2>/dev/null | tail -n +3 | while read -r d; do rm -rf "$d" || print -u2 "prune: left $d for the next run"; done
+mkdir -p $WORK
+finish() {
+    for f in $WORK/share/out-pristine $WORK/share/out-oclp $WORK/share/out-post $WORK/share/patches.txt $WORK/share/MANIFEST.txt \
+             $WORK/uuids.env $WORK/stage-pb.err $WORK/stage-pb.tsv; do [[ -e $f ]] && cp -R $f $RUN/; done
+    [[ ${PRESERVE:-0} == 1 ]] && mv $WORK $RUN/work
+    return 0
+}
+trap finish EXIT
+REPO=${REPO:-$ST/images/$TARGET-$BUILD-$SET}; SSDIMG=${SSDIMG:-$TOP/tools/bin/ssdimg}
+mkdir -p $RUN; exec > >(tee $RUN/build.log) 2>&1
+t0=$(date +%s); step() { echo "== $1 ($(( $(date +%s)-t0 )) s)"; }
+echo "run $TARGET $BUILD $OCLP $SET ($(git -C $TOP rev-parse --short HEAD)) -> $RUN"
+guest() {   # guest SCRIPT LOG ENV...: start the script's text in the guest through the agent (never run it from the share),
+            # detached, then wait for its LOG on the host side of the share: the agent's reply to a long command can get
+            # lost. The last line must be "RESULT rc=0".
+    local script=$1 log=$WORK/share/$2 t=$(date +%s); shift 2
+    $VMCTL $VM exec "( $* $(cat $script)
+) >/dev/null 2>&1 </dev/null & echo started" | grep -q started || { echo "run: could not start ${script:t}"; $P/vm/stop.sh $VM; exit 1; }
+    until [[ -f $log ]] && grep -q '^RESULT rc=' $log; do
+        (( $(date +%s) - t > ${GUEST_TIMEOUT:-1800} )) && { echo "run: ${script:t}: no RESULT"; $P/vm/stop.sh $VM; exit 1; }
+        sleep 5
+    done
+    tail -3 $log
+    grep -q '^RESULT rc=0' $log || { echo "run: ${script:t} failed"; $P/vm/stop.sh $VM; exit 1; }
+}
+
+# clones.py start provisions a clone on its first start (installs its own guest agent), then runs vm/start.sh.
+vmstart() { python3 -I $P/vm/clones.py start $VM $WORK/share --usb $IMG || { echo "run: VM did not start"; $P/vm/stop.sh $VM; exit 1; }; }
+# the pristine stage's result (layout, ESP, pristine System/Data/Preboot) depends only on the build's installer rows, the pristine stage tools, the target and
+# these stages, so it is kept in store/cache/pristine under a hash of them; a later run with the same key starts from an APFS
+# clone of it at the oclp stage. PRISTINE_CACHE=0 forces a fresh pristine stage.
+# Keys (lock.py key) hash what the inputs are, not the row files' text: a row counts by its sha256 column (a '-' row by
+# its path inside the store), so moving the store or editing a row's comment keeps the caches. `lock.py key-lines`
+# with the same items prints what a key is made of.
+KEY=(python3 -I $P/lock.py key $ST $LOCK:$P/inputs/common)
+PRISTINE_ROWS=(installer unpack tree lists preboot_map autool hmeta fl fl-noent)   # what the pristine stage reads
+PRISTINE_KEY=$($KEY ${PRISTINE_ROWS/#/row:} json:$TJ file:$P/stages/{layout.sh,esp.sh,pristine.sh,stage-pb.py})
+PC=$ST/cache/pristine/$TARGET-$BUILD-$PRISTINE_KEY
+# the oclp stage's result depends on the pristine stage's, the OCLP commit, the KDK and Python rows, oclp.sh and inputs.sh and
+# the set's oclp-hook patches (their revision, src and input rows), so it is kept in store/cache/oclp under a hash of them
+# (newest 3 kept); a run with the same key starts from an APFS clone of it at the post stage.
+# oclp.sh runs in segments, one builder session each: OCLP (every hook.sh), then each kc-hook alone; the run stops the
+# VM between them and keeps the target before each kc-hook in store/cache/oclp-prefix (newest 6, least recently used
+# go first). That point's key leaves out the kc-hook-only patches from that kc-hook on (lock.py oclp_points), so a run
+# whose first changed patch is a later kc-hook starts from the last cached point and runs only the kc-hooks from there.
+# Every run, whole or resumed, runs each kc-hook in a new session after the same steps, so both make the same trees.
+OCLP_REPO=${OCLP_REPO:-$ST/oclp}; export OCLP_REPO
+OCLP_REV=$(git -C $OCLP_REPO rev-parse $OCLP)
+HOOKS=$(python3 -I $P/patches.py plan $SETF $TJ $BUILD | awk '$1 == "oclp-hook"')
+PREFIX=$ST/cache/oclp-prefix
+POINTS=$(print -r -- "$HOOKS" | python3 -I $P/lock.py oclp-keys $ST $LOCK:$P/inputs/common $TOP/patches "$PREFIX/$TARGET-$BUILD-{key}" \
+    text:"$PRISTINE_KEY $OCLP_REV" row:kdk row:python_arm64 row:python_site file:$P/stages/{oclp.sh,inputs.sh,copy-hooks.py})
+OCLP_KEY=$(awk '$1 == "full" {print $2}' <<< $POINTS)
+point() { awk -v n=$1 '$1 == "before" && $2 == n {print $4}' <<< $POINTS; }   # the cache folder of the point before kc-hook $1
+oclp_save() {   # oclp_save DIR: the quiescent (VM stopped) target, its uuids and the oclp logs so far
+    rm -rf $1.tmp; mkdir -p $1.tmp; cp -c $IMG $1.tmp/target.img; cp $WORK/uuids.env $1.tmp/
+    cp -R $WORK/share/out-oclp $1.tmp/; rm -rf $1; mv $1.tmp $1
+}
+OC=$ST/cache/oclp/$TARGET-$BUILD-$OCLP_KEY
+RESUME=$(awk '$1 == "resume" {print $2}' <<< $POINTS)
+G=/private/var/ssdshare
+DONE=0; KC_HOOK=
+if [[ ${OCLP_CACHE:-1} == 1 && -f $OC/target.img ]]; then
+    step "oclp from cache ${OC:t}"; cp -c $OC/target.img $IMG; cp $OC/uuids.env $WORK/; source $WORK/uuids.env
+    step inputs; $P/stages/inputs.sh $WORK/share $TJ $LOCK $P/inputs/common $OCLP $SETF
+    cp -R $OC/out-oclp $WORK/share/   # the record keeps the oclp log of the run that made the cached result
+    ENV="NAME='$NAME' GRP=$GRP SYSU=$SYSU DATU=$DATU PBU=$PBU RCU=$RCU"; DONE=1
+    if grep -q '^post ' $WORK/share/patches.txt; then step vm; vmstart; fi
+elif [[ ${OCLP_CACHE:-1} == 1 && -n $RESUME ]]; then
+    D=$(point $RESUME); touch $D
+    step "oclp from cache ${D:t} (before kc-hook $RESUME)"; cp -c $D/target.img $IMG; cp $D/uuids.env $WORK/; source $WORK/uuids.env
+    step inputs; $P/stages/inputs.sh $WORK/share $TJ $LOCK $P/inputs/common $OCLP $SETF
+    cp -R $D/out-oclp $WORK/share/   # the logs of the segments before this point, from the run that made it
+    step vm;     vmstart
+    ENV="NAME='$NAME' GRP=$GRP SYSU=$SYSU DATU=$DATU PBU=$PBU RCU=$RCU"; KC_HOOK=$RESUME
+elif [[ ${PRISTINE_CACHE:-1} == 1 && -f $PC/target.img ]]; then
+    step "pristine from cache ${PC:t}"; cp -c $PC/target.img $IMG; cp $PC/uuids.env $WORK/; source $WORK/uuids.env
+    step inputs; $P/stages/inputs.sh $WORK/share $TJ $LOCK $P/inputs/common $OCLP $SETF
+    step vm;     vmstart
+    ENV="NAME='$NAME' GRP=$GRP SYSU=$SYSU DATU=$DATU PBU=$PBU RCU=$RCU"
+else
+    step layout; $P/stages/layout.sh $IMG $WORK $($L path $LOCK unpack) $($L path $LOCK tree) $($L path $LOCK preboot_map)
+    source $WORK/uuids.env
+    step esp;    $P/stages/esp.sh $IMG $WORK $($L path $TJ esp)
+    step inputs; $P/stages/inputs.sh $WORK/share $TJ $LOCK $P/inputs/common $OCLP $SETF
+    step vm;     vmstart
+    ENV="NAME='$NAME' GRP=$GRP SYSU=$SYSU DATU=$DATU PBU=$PBU RCU=$RCU"
+    step pristine;     guest $P/stages/pristine.sh out-pristine/pristine.log "$ENV S=$G/pristine OUT=$G/out-pristine;"
+    step "pristine save ${PC:t}"   # the VM is stopped so the image is quiescent, then started again for the oclp stage
+    $P/vm/stop.sh $VM; mkdir -p $PC.tmp; cp -c $IMG $PC.tmp/target.img; cp $WORK/uuids.env $PC.tmp/
+    rm -rf $PC; mv $PC.tmp $PC
+    step vm;     vmstart
+fi
+if [[ $DONE == 0 ]]; then
+    while :; do   # one segment per guest run; a segment that leaves a kc-hook names it on a "NEXT kc-hook NAME" line
+        log=out-oclp/oclp${KC_HOOK:+-$KC_HOOK}.log
+        step "oclp${KC_HOOK:+ kc-hook $KC_HOOK}"; guest $P/stages/oclp.sh $log "$ENV S=$G KC_HOOK=$KC_HOOK; set -- $SYSU;"
+        KC_HOOK=$(awk '$1 == "NEXT" && $2 == "kc-hook" {n = $3} END {print n}' $WORK/share/$log)
+        [[ -n $KC_HOOK ]] || break
+        D=$(point $KC_HOOK)
+        step "oclp save ${D:t} (before kc-hook $KC_HOOK)"   # quiescent image, as for the pristine save
+        $P/vm/stop.sh $VM; oclp_save ${D:?no cache point before kc-hook $KC_HOOK}
+        ls -td $PREFIX/*/ | tail -n +7 | while read -r d; do rm -rf "$d"; done
+        step vm;     vmstart
+    done
+    step "oclp save ${OC:t}"
+    $P/vm/stop.sh $VM; oclp_save $OC
+    ls -td $ST/cache/oclp/*/ | tail -n +4 | while read -r d; do rm -rf "$d"; done
+    if grep -q '^post ' $WORK/share/patches.txt; then step vm; vmstart; fi
+fi
+if grep -q '^post ' $WORK/share/patches.txt; then
+step post;     guest $P/stages/post.sh out-post/post.log "$ENV S=$G;"
+fi
+step stop;   $P/vm/stop.sh $VM
+step capture
+[[ -f $REPO/image.json ]] || $SSDIMG init $REPO
+# ssdimg's own status, not tail's, so a failed capture stops the run
+$SSDIMG -C $REPO capture --force $IMG | tail -1; (( pipestatus[1] == 0 )) || exit 1
+$SSDIMG -C $REPO fsck | tail -1; (( pipestatus[1] == 0 )) || exit 1
+$SSDIMG -C $REPO commit -m "pipeline/run $TARGET $BUILD $OCLP $SET ($(git -C $TOP rev-parse --short HEAD)): ${RUN:t}" \
+    | tr '\r' '\n' | grep -v '^storing' | tail -2; (( pipestatus[1] == 0 )) || exit 1
+step done

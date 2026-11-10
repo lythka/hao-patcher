@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "origin": {
+    "build": "25G332",
+    "installer_sha256": "e7d52c10b58b199ea0060e14ad5c74417514d3a2b19cb9ca39422bc53103196b",
+    "declaration": "pipeline/inputs/25G332/installer; extraction tree from pipeline/stages/unpack.sh; installer hash declared here, selected donor file bytes hashed during extraction"
+  },
+  "system_roots": [
+    "System/DriverKit",
+    "System/Library/Accounts/DataclassOwners/FreeformDataclassOwner.bundle",
+    "System/Library/Accounts/DataclassOwners/PassbookDataclassOwnerPlugin.bundle",
+    "System/Library/Accounts/Notification/AOSKitNotificationPlugin.bundle",
+    "System/Library/Audio/Plug-Ins/RemoteInput/AudioAppleSiriRemoteInput.bundle",
+    "System/Library/CoreServices/PlatformSupport.plist",
+    "System/Library/CoreServices/UAUPlugins/NetAuthAccountUpdater.bundle",
+    "System/Library/CoreServices/UAUPlugins/PCSAccountUpdater.bundle",
+    "System/Library/CoreServices/UAUPlugins/UAULoginItemsAndTALUpdater.bundle",
+    "System/Library/CoreServices/UAUPlugins/UserAccountUpdater8021XPlugin.bundle",
+    "System/Library/CoreServices/WiFiMigratorPlugin.bundle",
+    "System/Library/CoreServices/boot.efi",
+    "System/Library/DriverExtensions",
+    "System/Library/Filesystems/NetFSPlugins/ftp.bundle",
+    "System/Library/Frameworks/Metal.framework",
+    "System/Library/Frameworks/OpenCL.framework",
+    "System/Library/HIDPlugins",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.plist",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.ram.plist",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.spb.plist",
+    "System/Library/OpenDirectory/Modules/ActiveDirectory.bundle",
+    "System/Library/OpenDirectory/Modules/NetLogon.bundle",
+    "System/Library/OpenDirectory/Modules/proxy.bundle",
+    "System/Library/PrivateFrameworks/AppleGVA.framework",
+    "System/Library/PrivateFrameworks/AppleGVACore.framework",
+    "System/Library/PrivateFrameworks/DiskImages2.framework/Versions/A/XPCServices/diskimagescontroller.xpc",
+    "System/Library/PrivateFrameworks/GPUCompiler.framework",
+    "System/Library/PrivateFrameworks/IO80211.framework",
+    "System/Library/PrivateFrameworks/MTLCompiler.framework",
+    "System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/CursorAsset",
+    "System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/CursorAsset_base",
+    "System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer",
+    "System/Library/PrivateFrameworks/WiFiPeerToPeer.framework",
+    "System/Library/Spotlight/RichText.mdimporter",
+    "System/Library/SystemConfiguration/CaptiveNetworkSupport.bundle",
+    "System/Library/SystemConfiguration/EAPOLController.bundle",
+    "System/Library/UserEventPlugins/EAPOLMonitor.plugin",
+    "System/Library/UserEventPlugins/com.apple.cts.plugin",
+    "System/Library/UserEventPlugins/com.apple.nsurlsessiond.plugin",
+    "System/Library/UserEventPlugins/com.apple.opendirectory.matching.plugin",
+    "System/Library/UserEventPlugins/com.apple.rapport.events.plugin",
+    "System/Library/UserEventPlugins/com.apple.rcdevent.matching.plugin",
+    "System/Library/UserNotifications/Bundles/com.apple.universalcontrol.notifications.displays-preferences.bundle",
+    "System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.autohotspot.bundle",
+    "System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.diagnostics.bundle",
+    "System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.join.bundle",
+    "System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.recommend.bundle",
+    "usr/libexec/airportd",
+    "usr/libexec/diskimagesiod",
+    "usr/standalone"
+  ],
+  "build_tools": [
+    "usr/bin/kmutil"
+  ],
+  "required_image_roles": [
+    "system",
+    "build-tools",
+    "driverkit-cache",
+    "preboot",
+    "extensions"
+  ],
+  "preboot_exclude": [
+    "cryptex1/current/os.dmg",
+    "cryptex1/current/os.clone.dmg",
+    "cryptex1/current/app.dmg",
+    "System/Library/CoreServices/SystemVersion.plist",
+    "boot/System/Library/CoreServices/SystemVersion.plist",
+    "cryptex1/current/SystemVersion.plist"
+  ],
+  "extensions_roots": [
+    "System/Library/Extensions"
+  ],
+  "excluded_names": [
+    ".DS_Store"
+  ],
+  "exclusion_reason": "Observed host Finder metadata absent from Apple sys.tsv; not an installer donor",
+  "required_driverkit_families": [
+    "dyld_shared_cache_x86_64"
+  ],
+  "optional_driverkit_families": [
+    "dyld_shared_cache_x86_64h"
+  ],
+  "driverkit_owner_uid": 0,
+  "driverkit_source_images": {
+    "dyld_shared_cache_x86_64": "unpack/out/cryptex-system-arm64e.img",
+    "dyld_shared_cache_x86_64h": "unpack/out/cryptex-system-x86_64.img"
+  },
+  "replacement_policy": "replace-maximal-declared-roots",
+  "legacy_framework_base_roots": [
+    "System/Library/Frameworks/Metal.framework",
+    "System/Library/Frameworks/OpenCL.framework",
+    "System/Library/PrivateFrameworks/MTLCompiler.framework",
+    "System/Library/PrivateFrameworks/GPUCompiler.framework",
+    "System/Library/PrivateFrameworks/AppleGVA.framework",
+    "System/Library/PrivateFrameworks/AppleGVACore.framework",
+    "System/Library/PrivateFrameworks/IO80211.framework",
+    "System/Library/PrivateFrameworks/WiFiPeerToPeer.framework"
+  ],
+  "framework_base_reason": "Replace whole Golden roots with the established Tahoe base before PSP overlays, as legacy oclp_paths preserved complete patched roots."
+}

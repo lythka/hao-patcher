@@ -1,0 +1,291 @@
+#!/usr/bin/env python3
+"""golden-run RECIPE --repo EXPERIMENTAL_IMAGE_REPOSITORY: GG-first assembly in an isolated VZ builder."""
+import argparse
+from contextlib import contextmanager
+import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+import runpy
+import shlex
+import shutil
+import signal
+import subprocess
+import sys
+import time
+import uuid
+
+TOP = Path(__file__).resolve().parent.parent
+GUEST = '/private/var/ssdshare'
+
+
+def q(value):
+    return shlex.quote(str(value))
+
+
+def write(path, data):
+    Path(path).write_text(json.dumps(data, indent=2)+'\n')
+
+
+def digest(path):
+    h = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for block in iter(lambda: stream.read(1 << 20), b''):
+            h.update(block)
+    return h.hexdigest()
+
+
+@contextmanager
+def builder_lock(path, owner):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.mkdir()  # The builder lock shared with pipeline/run; never steal a held lock.
+    try:
+        (path/'owner').write_text(owner+'\n')
+        yield
+    finally:
+        (path/'owner').unlink()
+        path.rmdir()
+
+
+def create_workspace_image(path, size_bytes):
+    with Path(path).open('xb') as stream:
+        stream.truncate(size_bytes)
+    Path(path).chmod(0o644)
+
+
+def guest_config(recipe, share, local):
+    rows = []
+    for number, line in enumerate((share/'patches.txt').read_text().splitlines(), 1):
+        stage, name, *inputs = line.split()
+        rows.append((stage, name, '%02d-%s' % (number, name)))
+    hooks = [(name, folder) for stage, name, folder in rows if stage == 'oclp-hook']
+    selected = {name:folder for name, folder in hooks}
+    kernel = local+'/hooks/'+selected['darwin27-kernel']
+    userspace = local+'/hooks/'+selected['golden-gate-userspace']
+    kdk, = (share/'kdk').iterdir()
+    return dict(image=local+'/target.img', work=local+'/work',size_bytes=recipe['size_bytes'],name=recipe['name'],
+                python=local+'/py/bin/python3.12',layout_helper=local+'/source/golden-layout.py',
+                pristine_script=local+'/source/golden-pristine.sh',payload=GUEST+'/hooks/'+selected['golden-gate-userspace']+'/inputs/golden_gate_userspace',
+                kernel=kernel+'/inputs/darwin27_kernel',kdk=GUEST+'/kdk/'+kdk.name,
+                kdk_preparer=local+'/source/kdk_intel_payload.py',fl=local+'/source/fl',
+                donor_tool=local+'/source/tahoe-donors/make',
+                donors={role:GUEST+'/assembly-inputs/'+role for role in ('native','extensions','boot','driverkit','recovery')},
+                esp=local+'/source/esp',hardware=dict(tool=local+'/source/hardware/apply',artifact=GUEST+'/assembly-inputs/hardware'),
+                kernel_hook=kernel+'/kc-hook.sh',
+                userspace=dict(install=userspace+'/install.py',shim=userspace+'/inputs/display_state_shim',io80211=userspace+'/inputs/io80211_compat'),
+                hooks=[dict(name=name,hook=local+'/hooks/'+folder+'/hook.sh' if (share/'hooks'/folder/'hook.sh').is_file() else None,
+                            kc_hook=local+'/hooks/'+folder+'/kc-hook.sh' if (share/'hooks'/folder/'kc-hook.sh').is_file() else None)
+                       for name,folder in hooks if name not in ('darwin27-kernel','golden-gate-userspace')],
+                posts=[dict(name=name,script=local+'/post/'+folder+'/apply.sh',folder=local+'/post/'+folder)
+                       for stage,name,folder in rows if stage=='post'],
+                environment=dict(PYTHONPATH=local+'/site',PYTHONDONTWRITEBYTECODE='1',TMPDIR=local+'/tmp',S=GUEST,OCLP=GUEST+'/oclp'))
+
+
+def job_script(local, share=GUEST, owner='root:wheel', workspace=None):
+    """Execute source locally, retain logs even on failure, and publish completion last."""
+    workspace_script=''
+    if workspace:
+        helper=(TOP/'pipeline/stages/golden-workspace.py').read_text()
+        marker='GOLDEN_WORKSPACE_'+uuid.uuid4().hex
+        workspace_script=('"$G/py/bin/python3.12" -I - --size-bytes '+str(workspace['size_bytes'])+
+                          ' --mount '+q(workspace['mount'])+' --name '+q(workspace['name'])+
+                          ' --record "$G/out-golden/workspace.json" --source-sha256 '+hashlib.sha256(helper.encode()).hexdigest()+
+                          " <<'"+marker+"'\n"+helper+'\n'+marker+'\n')
+    return '''set -u
+set -o pipefail
+umask 022
+G=%s
+W=%s
+install -d -m 755 "$G/out-golden"
+exec >"$G/out-golden/golden.log" 2>&1
+rc=0
+prepare_workspace() {
+%s
+}
+prepare_workspace || rc=$?
+if [ "$rc" = 0 ]; then
+    install -d -m 755 "$W/source" "$W/hooks" "$W/post" "$W/py" "$W/site" "$W/tmp"
+fi
+export TMPDIR="$W/tmp"
+echo "Maintenance storage before assembly:"
+df -k "$W"
+bootstrap() {
+    (cd "$G/assembly-source" && tar -cf - .) | (cd "$W/source" && tar -xf -) || return $?
+    (cd "$G/py" && tar -cf - .) | (cd "$W/py" && tar -xf -) || return $?
+    (cd "$G/site" && tar -cf - .) | (cd "$W/site" && tar -xf -) || return $?
+    "$W/py/bin/python3.12" -I "$W/source/copy-hooks.py" "$G/hooks" "$W/hooks" --owner %s || return $?
+    (cd "$G/post" && tar -cf - .) | (cd "$W/post" && tar -xf -) || return $?
+    chown -R %s "$W/source" "$W/py" "$W/site" "$W/post" || return $?
+}
+[ "$rc" != 0 ] || bootstrap || rc=$?
+echo "Maintenance storage after local source/hook copies:"
+df -k "$W"
+if [ "$rc" = 0 ]; then
+    PYTHONPATH="$W/site" "$W/py/bin/python3.12" -I "$W/source/golden-image.py" "$G/guest-config.json"
+    rc=$?
+fi
+# Never infer completion from nested pristine/hook RESULT lines.
+if [ -d "$W/work" ]; then
+    mkdir -p "$G/out-golden/guest"
+    (cd "$W/work" && tar -cf - .) | (cd "$G/out-golden/guest" && tar -xf -) || { export_rc=$?; [ "$rc" != 0 ] || rc=$export_rc; }
+fi
+if [ "$rc" = 0 ]; then
+    (cd "$W" && tar -cf - target.img) | (cd "$G/out-golden" && tar -xf -) || rc=$?
+fi
+sync
+printf 'RESULT rc=%%s\\n' "$rc"
+printf '%%s\\n' "$rc" > "$G/out-golden/result.new"
+mv "$G/out-golden/result.new" "$G/out-golden/result"
+''' % (q(share),q(local),workspace_script or ':',q(owner),q(owner))
+
+
+def wait_job(output, timeout, poll=5):
+    deadline = time.monotonic()+timeout
+    offset = 0
+    while True:
+        log = output/'golden.log'
+        if log.exists():
+            with log.open() as stream:
+                stream.seek(offset); text=stream.read();offset=stream.tell()
+            if text:
+                print(text,end='',flush=True)
+        result = output/'result'
+        if result.exists():
+            return int(result.read_text().strip())
+        if time.monotonic() >= deadline:
+            raise TimeoutError('Golden guest has no final completion; logs: '+str(output))
+        time.sleep(poll)
+
+
+def assembled(output):
+    record = json.loads((output/'guest/build.json').read_text())
+    if record['status'] != 'assembled' or record['attached_device'] is not None:
+        raise RuntimeError('guest image is not successfully assembled and detached')
+    return record
+
+
+def run(recipe_path, repository, work=None, record=None, base=None, timeout=14400):
+    recipe_path = Path(recipe_path).resolve(); recipe=json.loads(recipe_path.read_text())
+    if recipe['schema'] != 1:
+        raise ValueError('unsupported Golden assembly recipe')
+    pipeline=TOP/'pipeline';store=(TOP/'store').resolve()
+    stamp=datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:6]
+    job='golden-'+recipe['golden_build']+'-'+stamp
+    work=Path(work).resolve() if work else store/'tmp'/job
+    record=Path(record).resolve() if record else store/'runs'/job
+    repository=Path(repository).resolve();share=work/'share'
+    workspace=dict(size_bytes=recipe.get('workspace_size_bytes',160*1024**3),
+                   mount='/Volumes/builder-work-'+stamp,name='builder-work-'+stamp)
+    local=workspace['mount']+'/job'
+    workspace_image=work/'workspace.img'
+    work.mkdir(parents=True,exist_ok=False);record.mkdir(parents=True,exist_ok=False)
+    env=dict(os.environ,VMBIN=os.environ.get('VMBIN',str(store/'vm/bin')),VMCTL=str(pipeline/'vm/vmctl'))
+    state=dict(unit='pipeline',operation='golden-first',recipe=recipe,recipe_sha256=digest(recipe_path),
+               workspace=str(TOP),work=str(work),repository=str(repository),guest_local=local,
+               guest_workspace=dict(workspace,image=str(workspace_image)),
+               commit=subprocess.check_output(['git','-C',str(TOP),'rev-parse','HEAD'],text=True).strip(),
+               dirty=bool(subprocess.check_output(['git','-C',str(TOP),'status','--porcelain'],text=True)),
+               status='staging',validation='BUILD ONLY; QEMU/native/fresh-install acceptance remains separate')
+    shutil.copy2(recipe_path,record/'assembly.json')
+    write(record/'build.json',state)
+    vm=None;started=False
+    def command(args, **kwargs):
+        print('+ '+shlex.join(map(str,args)),flush=True)
+        return subprocess.run(list(map(str,args)),env=env,check=True,**kwargs)
+    def stop():
+        nonlocal started
+        if started:
+            command(['zsh',pipeline/'vm/stop.sh',vm]);started=False
+    lock=store/'tmp/builder.lock'
+    with builder_lock(lock,job+' pid='+str(os.getpid())):
+        try:
+            lockrows=runpy.run_path(str(pipeline/'lock.py'))
+            build_lock=pipeline/'inputs'/recipe['donor_build'];common=pipeline/'inputs/common'
+            command(['zsh',pipeline/'stages/inputs.sh',share,pipeline/'targets'/(recipe['target']+'.json'),
+                     build_lock,common,recipe['oclp'],pipeline/'sets'/(recipe['patch_set']+'.txt'),'golden-first'])
+            used_rows=set(recipe['inputs'].values()) | {'kdk','python_arm64','python_site','fl'}
+            for line in (share/'patches.txt').read_text().splitlines():
+                used_rows.update(line.split()[2:])
+            manifest=(share/'MANIFEST.txt').read_text()
+            psp_line=next(line for line in manifest.splitlines() if 'PatcherSupportPkg ' in line)
+            used_rows.add('psp_'+psp_line.split('PatcherSupportPkg ',1)[1].split()[0])
+            input_records={}
+            for row in sorted(used_rows):
+                row_lock=build_lock if (build_lock/row).is_file() else common
+                value=lockrows['rows'](str(row_lock))[row]
+                input_records[row]=dict(sha256=value[0],path=value[1],row=(row_lock/row).read_text())
+            write(record/'inputs.json',input_records)
+            sources={}
+            extras=share/'assembly-inputs';extras.mkdir(mode=0o755)
+            for role,row in recipe['inputs'].items():
+                source=Path(lockrows['path'](str(build_lock if (build_lock/row).exists() else common),row))
+                command(['ditto',source,extras/role]);sources[role]=dict(row=row,path=str(source))
+                if (source/'build.json').exists():shutil.copy2(source/'build.json',record/(role+'-input.json'))
+            source=share/'assembly-source';source.mkdir(mode=0o755)
+            for name in ('golden-image.py','golden-layout.py','golden-pristine.sh','golden-workspace.py'):
+                shutil.copy2(pipeline/'stages'/name,source/name)
+            shutil.copy2(pipeline/'stages/copy-hooks.py',source/'copy-hooks.py')
+            shutil.copy2(share/'oclp/opencore_legacy_patcher/sys_patch/utilities/kdk_intel_payload.py',source/'kdk_intel_payload.py')
+            shutil.copy2(share/'pristine/fl',source/'fl')
+            shutil.copytree(TOP/'tools/tahoe-donors',source/'tahoe-donors',ignore=shutil.ignore_patterns('__pycache__'))
+            shutil.copytree(extras/'hardware/install-tools',source/'hardware')
+            (source/'esp').mkdir(mode=0o755)
+            esp=lockrows['path'](str(pipeline/'targets'/(recipe['target']+'.json')),'esp')
+            command(['tar','-xf',esp,'-C',source/'esp'])
+            config=guest_config(recipe,share,local);write(share/'guest-config.json',config)
+            shutil.copy2(share/'guest-config.json',record/'guest-config.json')
+            for name in ('patches.txt','MANIFEST.txt','profile.json'):
+                shutil.copy2(share/name,record/name)
+            state.update(inputs=sources,source_files={str(p.relative_to(source)):digest(p) for p in source.rglob('*') if p.is_file() and not p.is_symlink()},status='starting')
+            clone=command([sys.executable,'-I',pipeline/'vm/clones.py','clone',job,'--base',base or store/'vm/base'],capture_output=True,text=True)
+            vm=Path(json.loads(clone.stdout)['vm']);state['vm']=str(vm);write(record/'build.json',state)
+            create_workspace_image(workspace_image,workspace['size_bytes'])
+            started=True
+            command([sys.executable,'-I',pipeline/'vm/clones.py','start',vm,share,'--usb',workspace_image])
+            script=job_script(local,workspace=workspace)
+            (record/'guest-job.sh').write_text(script)
+            submission='(\n'+script+'\n) >/dev/null 2>&1 </dev/null & echo started'
+            reply=command([pipeline/'vm/vmctl',vm,'exec',submission],capture_output=True,text=True)
+            if reply.stdout.strip()!='started':raise RuntimeError('guest start reply uncertain; do not resubmit automatically')
+            state['status']='assembling';write(record/'build.json',state)
+            output=share/'out-golden';rc=wait_job(output,timeout)
+            if rc:raise RuntimeError('Golden guest failed with status '+str(rc)+'; inspect '+str(output))
+            assembled(output);stop()
+            state['status']='capturing';write(record/'build.json',state)
+            ssdimg=Path(os.environ.get('SSDIMG',str(TOP/'tools/bin/ssdimg')))
+            if not (repository/'image.json').exists():command([ssdimg,'init',repository])
+            command([ssdimg,'-C',repository,'capture','--force',output/'target.img'])
+            command([ssdimg,'-C',repository,'fsck'])
+            command([ssdimg,'-C',repository,'commit','-m','Golden Gate '+recipe['golden_build']+' first; explicit Tahoe '+recipe['donor_build']+' donors; '+job])
+            state['status']='committed'
+        except BaseException as error:
+            state.update(status='failed',error=str(error))
+            raise
+        finally:
+            try:stop()
+            except Exception as error:state['stop_error']=str(error)
+            output=share/'out-golden'
+            if output.exists():
+                record_output=record/'guest-output';record_output.mkdir(exist_ok=True)
+                for item in output.iterdir():
+                    if item.name=='target.img':continue
+                    if item.is_dir():shutil.copytree(item,record_output/item.name,dirs_exist_ok=True,symlinks=True)
+                    else:shutil.copy2(item,record_output/item.name)
+            write(record/'build.json',state)
+    print('Golden image committed: '+str(repository),flush=True)
+    print('Record: '+str(record),flush=True)
+    return state
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('recipe',type=Path);parser.add_argument('--repo',type=Path,required=True)
+    parser.add_argument('--work',type=Path);parser.add_argument('--record',type=Path);parser.add_argument('--base',type=Path)
+    parser.add_argument('--timeout',type=int,default=14400)
+    args=parser.parse_args()
+    signal.signal(signal.SIGTERM,lambda *_:(_ for _ in ()).throw(KeyboardInterrupt('terminated')))
+    run(args.recipe,args.repo,args.work,args.record,args.base,args.timeout)
+
+
+if __name__=='__main__':main()

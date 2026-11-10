@@ -1,0 +1,14 @@
+# Golden Gate first, explicit Tahoe donors, no development services or warm caches.
+# The assembly recipe selects this set; order is significant.
+darwin27-kernel
+golden-gate-userspace
+darwin27-sandbox-disk-space
+hao-runtime
+golden-gate-metal-libraries
+golden-gate-hello
+golden-gate-windowserver-filter
+golden-gate-corespotlight-compat
+golden-gate-metal-framebuffer
+golden-gate-code-identity
+hao-opencore
+metalold-selectors

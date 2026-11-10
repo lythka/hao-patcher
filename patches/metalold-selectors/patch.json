@@ -1,0 +1,17 @@
+{
+ "revision": 2,
+ "stage": "oclp-hook",
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
+  ],
+  "builds": [
+   "25G332"
+  ]
+ },
+ "inputs": [
+  "metalold_selectors"
+ ],
+ "status": "product",
+ "validated": false
+}

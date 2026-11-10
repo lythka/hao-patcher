@@ -1,0 +1,2 @@
+# Mounted read-only; the combined cryptex is written to the target Preboot volume.
+golden_gate_userspace

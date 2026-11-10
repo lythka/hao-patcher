@@ -1,0 +1,14 @@
+--- !tapi-tbd
+tbd-version:     4
+targets:         [ x86_64-macos ]
+install-name:    '/System/Library/PrivateFrameworks/IOAccelerator.framework/Versions/A/IOAccelerator'
+exports:
+  - targets:         [ x86_64-macos ]
+    symbols:         [ _IOAccelDeviceCreateWithAPIProperty, _IOAccelDeviceGetConfig64, _IOAccelDeviceGetGlobalTraceObjectID,
+                       _IOAccelDeviceGetMaxResourceSize, _IOAccelDeviceGetNextGlobalTraceID, _IOAccelDeviceGetPeerInfo,
+                       _IOAccelDeviceGetSharedMemorySize, _IOAccelDeviceGetSurfaceInfo, _IOAccelDeviceTraceEvent,
+                       _IOAccelDeviceTraceObjectLabel, _IOAccelInitCommPage, _IOAccelSharedCreate, _IOAccelSharedCreateDeviceShmem,
+                       _IOAccelSharedAllocateFenceMemory, _IOAccelSharedSetupDirtyRing, _IOAccelSharedGetAllocatedSize,
+                       _IOAccelDeviceGetConnect, _IOAccelSharedGetConnect, _IOAccelResourceCreate, _IOAccelCommandQueueCreateWithQoS,
+                       _IOAccelMemoryInfoRegisterAPICollectionBlock ]
+...

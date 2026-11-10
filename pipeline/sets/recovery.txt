@@ -1,0 +1,12 @@
+# Offline recovery and image installation; no test SSH keys or benchmark tools.
+rec-display-ethernet
+rec-audio
+rec-bluetooth-input
+rec-wifi
+rec-wifi-autojoin
+rec-brightness-keys
+rec-language-list
+rec-progress-phase
+rec-startup-guard
+rec-power
+rec-reinstall

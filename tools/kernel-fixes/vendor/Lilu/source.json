@@ -1,0 +1,12 @@
+{
+  "origin": "https://github.com/acidanthera/Lilu.git",
+  "commit": "0249c3a918c68a43891350f35fded615b1575776",
+  "scope": "minimal source/header include closure for the recorded x86_64 IntelCommpage compile; no binary libraries",
+  "files": {
+    "Lilu/Headers/kern_mach.hpp": "2a7ded60a06ff4dee6f26832102c7b5e91a7fd5aea46538ce00758ba16c66e20",
+    "Lilu/Headers/kern_config.hpp": "e984014182ba3170d7906d8775d09fd522d87de89dcf01bc7d34fc53e0e23f00",
+    "Lilu/Headers/kern_util.hpp": "fba7159efed51076004d65b98972fb032a20ac056aece74b5e0cab13e37cf39d",
+    "Lilu/Headers/kern_compat.hpp": "87e70a3912ae13187b48307829aa42455d7fbb8ab00c9bdac46706998e0b81b7",
+    "LICENSE.txt": "74c3ca48189b796b0d262866e67de8efba77a71516667ce68dc3a8f13c2a3c57"
+  }
+}
