@@ -10,7 +10,7 @@ record each file's SHA256 in an input row.
 |---|---|---|
 | Golden Gate IPSW | macOS **27.0 (26A428)**, [UniversalMac_27.0_26A428_Restore.ipsw](https://updates.cdn-apple.com/2026FallFCS/afcfc88e-bbe6-44bf-a5da-07c56eebc06c/UniversalMac_27.0_26A428_Restore.ipsw) | `2a5d3c695d501022b7fad9adaffcf2627bcb867d993fb5662dcd41bac99a2836` |
 | Tahoe installer | macOS **26.7.2 (25G332)**, [InstallAssistant.pkg](https://swcdn.apple.com/content/downloads/38/31/142-50020-A_7SHECS0ACF/ncy3h2j7nwse4aoz0rjot59fp0z9s4yf3o/InstallAssistant.pkg) (catalog product `142-50020`) | `e7d52c10b58b199ea0060e14ad5c74417514d3a2b19cb9ca39422bc53103196b` |
-| Tahoe Kernel Debug Kit | **26.7.2 build 25G330**, `Kernel_Debug_Kit_26.7.2_build_25G330.dmg` from [Apple Developer downloads](https://developer.apple.com/download/all/?q=Kernel%20Debug%20Kit) (Apple Account required) | `621eb51de4e5b48f1e5db0708297f8b9491a4cd171a4d55c4506f525fce86ab1` |
+| Tahoe Kernel Debug Kit | **26.7.2 build 25G330**, [Kernel_Debug_Kit_26.7.2_build_25G330.dmg](https://github.com/dortania/KdkSupportPkg/releases/download/25G330/Kernel_Debug_Kit_26.7.2_build_25G330.dmg) from Dortania's [KdkSupportPkg](https://github.com/dortania/KdkSupportPkg) mirror, or from [Apple Developer downloads](https://developer.apple.com/download/all/?q=Kernel%20Debug%20Kit) (Apple Account required) | `621eb51de4e5b48f1e5db0708297f8b9491a4cd171a4d55c4506f525fce86ab1` |
 | OCLP support files | [PatcherSupportPkg **2.0.5** Universal-Binaries.dmg](https://github.com/dortania/PatcherSupportPkg/releases/download/2.0.5/Universal-Binaries.dmg), matching [OCLP **3.0.0-rc.5**](https://github.com/dortania/OpenCore-Legacy-Patcher/releases/tag/3.0.0-rc.5) | `1c290781bc726759ff37a110ffcb7182a6c6fd3d8ebce112d134d482c8de52a3` |
 | OpenCore | [OpenCore **1.0.5** DEBUG](https://github.com/acidanthera/OpenCorePkg/releases/tag/1.0.5), `OpenCore-1.0.5-DEBUG.zip` | `db0720000455502b34ad5a0fc53114f7cd6d388bc6af7636e8a530276a6bf0a1` |
 
@@ -18,9 +18,8 @@ Check each download with `shasum -a 256 FILE`. Use these exact versions: other
 builds can have the same file names but different contents. The builder extracts
 the IPSW; it is never restored onto the Intel Mac.
 
-The image deliberately pairs the 25G330 Kernel Debug Kit with the 25G332 installer,
-because no 25G332 KDK was available. Do not assume other KDK versions are
-interchangeable. No Golden Gate KDK is needed.
+The image is tested with the 25G330 Kernel Debug Kit and the 25G332 installer. Do
+not assume other KDK versions are interchangeable. No Golden Gate KDK is needed.
 
 ## Prepared inputs
 
