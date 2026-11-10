@@ -6,8 +6,7 @@
       "MacBookPro9,2"
     ],
     "builds": [
-      "25G332"
-    ]
+      "25G332", "25G342"]
   },
   "inputs": [
     "darwin27_kernel",

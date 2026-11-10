@@ -180,10 +180,15 @@ def package(args):
         for family in recipe.get('required_driverkit_families',[]):
             if family not in names:
                 raise ValueError('required DriverKit family missing: '+family)
+        attrs = metadata(args.metadata, os.devnull) if getattr(args,'metadata',None) else {}
+        if attrs: inputs.append(args.metadata)
         for name,p in sorted(names.items()):
-            if 'driverkit_owner_uid' in recipe and p.lstat().st_uid != recipe['driverkit_owner_uid']:
+            if attrs and name not in attrs:
+                raise ValueError('DriverKit metadata has no row for '+name)
+            uid = attrs[name]['uid'] if attrs else p.lstat().st_uid
+            if 'driverkit_owner_uid' in recipe and uid != recipe['driverkit_owner_uid']:
                 raise ValueError('DriverKit source owner differs; mount source read-only with owners on: '+str(p))
-            add(p, 'driverkit-cache', Path(name))
+            add(p, 'driverkit-cache', Path(name), attrs.get(name))
         inputs.extend(getattr(args,'source_image',None) or [])
     elif args.command in ('boot', 'recovery'):
         inputs.append(args.map)
@@ -324,6 +329,7 @@ def main():
             p.add_argument('--links',type=Path,required=True)
         if name == 'driverkit':
             p.add_argument('--source',type=Path,action='append',required=True,help='repeat for generic and Haswell cache source directories')
+            p.add_argument('--metadata',type=Path,help='owners, modes, flags and times of the cache files (sys.tsv format), when the copies do not carry them')
             p.add_argument('--source-image',type=Path,action='append',help='retained source image identity recorded in build.json')
         if name in ('boot','recovery'):
             p.add_argument('--unpack',type=Path,required=True)

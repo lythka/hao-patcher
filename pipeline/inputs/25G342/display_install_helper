@@ -1,0 +1,2 @@
+# Display-state installation helper, taken from this checkout.
+- patches/golden-gate-windowserver-filter/src/install_dss.py

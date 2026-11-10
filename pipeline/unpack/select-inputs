@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""select-inputs PKG OUT --recipe RECIPE --ref-map MAP: extract only what the donor pathway reads.
+
+Reads the InstallAssistant.pkg in place (inplace.py) and writes, under the new OUT:
+  payload.aa              Apple Archive subset: the recipe's roots and the map's tree sources
+  tree/                   that subset extracted (no owners or flags; the lists carry them)
+  fixup.yaa, lists/sys.tsv  Apple's final System metadata (mklist.py's sys.tsv rules)
+  zip/AssetData/...       links.txt, firmlinks_payload, BuildManifest, the boot/Restore files the map uses
+  out/BaseSystem-x86_64.dmg  rebuilt from its full-replacement patch, checked against its chunklist
+  out/driverkit-{arm64e,x86_64}/  the DriverKit dyld caches from the rebuilt cryptexes (images deleted)
+  preboot-recovery-map.tsv  MAP rebased to this build (same destinations, sources by path or role)
+  select-manifest.json    every output's SHA-256 and every step
+The layout matches pipeline/unpack's output, so tools/tahoe-donors runs on it unchanged."""
+import argparse, datetime, glob, hashlib, json, os, re, shutil, struct, subprocess, sys, tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import inplace  # noqa: E402
+PY = [sys.executable, '-I']
+PV2 = 'AssetData/payloadv2/'
+
+
+def sha(p):
+    h = hashlib.sha256()
+    with open(p, 'rb') as f:
+        for b in iter(lambda: f.read(8 << 20), b''):
+            h.update(b)
+    return h.hexdigest()
+
+
+def run(steps, name, cmd, **kw):
+    print('==', name, file=sys.stderr, flush=True)
+    r = subprocess.run(cmd, **kw)
+    steps.append(dict(step=name, cmd=[str(c) for c in cmd], rc=r.returncode))
+    if r.returncode:
+        raise SystemExit('step %s failed (rc %d)' % (name, r.returncode))
+    return r
+
+
+def entries(path):
+    """YAA1 or AA01 entries (same field encoding): yields (fields, blobs)."""
+    sys.path.insert(0, HERE)
+    import yaa
+    with open(path, 'rb') as f:
+        while True:
+            h = f.read(6)
+            if len(h) < 6:
+                return
+            if h[:4] not in (b'YAA1', b'AA01'):
+                raise SystemExit('bad archive header %r' % h[:4])
+            f.seek(-6, 1)
+            data = bytearray(f.read(struct.unpack('<H', h[4:])[0]))
+            data[:4] = b'YAA1'
+            import io
+            one = io.BytesIO(bytes(data))
+            fields, blobs = next(yaa.entries(_Chain(one, f)))
+            yield fields, blobs
+
+
+class _Chain:
+    """Header bytes from `head`, then blob bytes from `rest` (so yaa.entries reads one entry)."""
+    def __init__(self, head, rest):
+        self.head, self.rest = head, rest
+
+    def read(self, n):
+        b = self.head.read(n)
+        return b + self.rest.read(n - len(b)) if len(b) < n else b
+
+    def seek(self, n, whence):
+        self.rest.seek(n, whence)
+
+
+def pat(f):
+    p = f.get('PAT', b'')
+    return (p.decode('utf-8', 'surrogateescape') if isinstance(p, bytes) else p) or '.'
+
+
+def mtimes(path):
+    m = {}
+    for f, _ in entries(path):
+        t = f.get('MTM')
+        if isinstance(t, bytes) and len(t) == 12:
+            m[pat(f)] = struct.unpack('<qI', t)
+        elif isinstance(t, bytes) and len(t) == 8:
+            m[pat(f)] = (struct.unpack('<q', t)[0], 0)
+    return m
+
+
+def write_sys_tsv(out):
+    """mklist.py's sys.tsv rules: rows from fixup.yaa, mtimes from the payload subset or firmlinks_payload."""
+    import yaa
+    mt = mtimes(os.path.join(out, 'payload.aa')); mt_fl = mtimes(os.path.join(out, 'zip', PV2, 'firmlinks_payload'))
+    os.makedirs(os.path.join(out, 'lists'), exist_ok=True); n = 0
+    with open(os.path.join(out, 'fixup.yaa'), 'rb') as fh, \
+            open(os.path.join(out, 'lists/sys.tsv'), 'w', encoding='utf-8', errors='surrogateescape') as o:
+        for f, d in yaa.entries(fh):
+            p = pat(f)
+            if '\t' in p or '\n' in p:
+                raise SystemExit('path with tab/newline: %r' % p)
+            t = chr(f['TYP']) if isinstance(f.get('TYP'), int) else '?'
+            if 'UID' not in f and 'HLC' in f:
+                o.write('%s\tH\t0\t0\t0\t0\t-\t-\t-\n' % p); n += 1; continue
+            xs = '-'
+            if d.get('XAT'):
+                xs = ','.join('%s=%s' % (k, v.hex()) for k, v in yaa.xattrs(d['XAT']).items())
+            m = mt.get(p) or mt_fl.get(p)
+            o.write('%s\t%s\t%d\t%d\t%o\t%x\t%s\t%s\t%s\n' % (p, t, f['UID'], f['GID'], f['MOD'] & 0o7777, f.get('FLG', 0),
+                                                         m[0] if m else '-', m[1] if m else '-', xs)); n += 1
+    return n
+
+
+def rebase_map(ref_map, out, members):
+    """Same destination rows; each source taken at the same path in this build, or by role when its name carries
+    a product number (NNN-NNNNN-NNN.<suffix>) that changed between builds."""
+    rows, need = [], set()
+    by_suffix = {}
+    for m in members:
+        mm = re.match(r'(.*/)\d{3}-\d{5}-\d{3}(\..+)$', m)
+        if mm:
+            by_suffix.setdefault(mm.group(1) + mm.group(2), []).append(m)
+    for line in open(ref_map):
+        vol, rel, size, digest, kind, srcs = line.rstrip('\n').split('\t')
+        if kind != 'matched':
+            rows.append([vol, rel, size, digest, kind, srcs]); continue
+        src = srcs.split(';')[0]
+        if src.startswith('zip/'):
+            m = src[4:]
+            if m not in members:
+                mm = re.match(r'(.*/)\d{3}-\d{5}-\d{3}(\..+)$', m)
+                cands = by_suffix.get(mm.group(1) + mm.group(2), []) if mm else []
+                if len(cands) != 1:
+                    rows.append([vol, rel, size, digest, 'no-source', srcs]); continue
+                m = cands[0]
+            need.add(m); src = 'zip/' + m
+        rows.append([vol, rel, None, None, kind, src])
+    return rows, need
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('pkg'); ap.add_argument('out')
+    ap.add_argument('--recipe', required=True); ap.add_argument('--ref-map', required=True)
+    a = ap.parse_args()
+    out = os.path.abspath(a.out); os.makedirs(out, exist_ok=False)
+    steps = []; t0 = datetime.datetime.now(datetime.timezone.utc)
+    recipe = json.load(open(a.recipe))
+    name, z = inplace.open_zip(a.pkg); members = set(z.namelist())
+
+    ref_rows = [l.rstrip('\n').split('\t') for l in open(a.ref_map)]
+    tree_srcs = sorted({r[5].split(';')[0][5:] for r in ref_rows if r[4] == 'matched' and r[5].startswith('tree/')})
+    include = sorted(set(recipe['system_roots'] + recipe['build_tools'] + recipe['extensions_roots'] + tree_srcs +
+                         ['System/Library/CoreServices/SystemVersion.plist']))
+    with open(os.path.join(out, 'include-paths.txt'), 'w') as f:
+        f.write(''.join(p + '\n' for p in include))
+
+    run(steps, 'payload-subset', PY + [os.path.join(HERE, 'inplace.py'), 'payload', a.pkg,
+                                       os.path.join(out, 'include-paths.txt'), os.path.join(out, 'payload.aa')])
+    run(steps, 'aa-extract', ['/usr/bin/aa', 'extract', '-exclude-field', 'uid,gid,flg', '-i',
+                              os.path.join(out, 'payload.aa'), '-d', os.path.join(out, 'tree')])
+    run(steps, 'chmod-tree', ['/bin/chmod', '-R', 'u+rwX', os.path.join(out, 'tree')])
+
+    zdir = os.path.join(out, 'zip')
+    def take(member):
+        dst = os.path.join(zdir, member); os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with z.open(member) as s, open(dst, 'xb') as o:
+            shutil.copyfileobj(s, o, 16 << 20)
+        return dst
+    for m in (PV2 + 'links.txt', PV2 + 'firmlinks_payload', 'AssetData/boot/BuildManifest.plist',
+              'AssetData/Restore/BaseSystem.chunklist'):
+        take(m)
+    with z.open(PV2 + 'fixup.manifest') as s, open(os.path.join(out, 'fixup.yaa'), 'xb') as o:
+        o.write(inplace.pbzx_bytes(s))
+    steps.append(dict(step='metadata-members'))
+
+    inc = tuple(p.rstrip('/') for p in include)
+    def inside(p): return any(p == r or p.startswith(r + '/') for r in inc)
+    links, master = [], None
+    for l in open(os.path.join(zdir, PV2, 'links.txt')):
+        l = l.rstrip('\n')
+        if l.startswith('='):
+            master = l[1:]
+        elif l.startswith('+') and inside(master) and inside(l[1:]):
+            links += ['=' + master, l]
+    with open(os.path.join(out, 'links-selected.txt'), 'w') as f:
+        f.write('\n'.join(links) + '\n')
+    run(steps, 'hard-links', PY + [os.path.join(HERE, 'links.py'), os.path.join(out, 'tree'),
+                                   os.path.join(out, 'links-selected.txt')])
+    rows = write_sys_tsv(out); steps.append(dict(step='sys.tsv', rows=rows))
+
+    rows, need = rebase_map(a.ref_map, out, members)
+    for m in sorted(need):
+        if not os.path.exists(os.path.join(zdir, m)):
+            take(m)
+
+    o = os.path.join(out, 'out'); os.makedirs(o)
+    work = tempfile.mkdtemp(prefix='select-', dir=out)
+    patch = os.path.join(work, 'x86_64BaseSystem.dmg')
+    with z.open(PV2 + 'basesystem_patches/x86_64BaseSystem.dmg') as s, open(patch, 'xb') as f:
+        shutil.copyfileobj(s, f, 16 << 20)
+    run(steps, 'bx50-basesystem', PY + [os.path.join(HERE, 'bx50full.py'), patch, os.path.join(o, 'BaseSystem-x86_64.dmg')])
+    os.remove(patch)
+    run(steps, 'chunklist-basesystem', PY + [os.path.join(HERE, 'chunklist.py'),
+                                             os.path.join(zdir, 'AssetData/Restore/BaseSystem.chunklist'),
+                                             os.path.join(o, 'BaseSystem-x86_64.dmg')])
+
+    ripatch = os.path.join(work, 'ripatch')
+    run(steps, 'build-ripatch', ['/usr/bin/cc', '-O2', '-Wall', '-o', ripatch, os.path.join(HERE, 'ripatch.c')])
+    for arch in ('arm64e', 'x86_64'):
+        p = os.path.join(work, 'patch-' + arch); img = os.path.join(work, 'cryptex-%s.img' % arch)
+        with z.open(PV2 + 'image_patches/cryptex-system-' + arch) as s, open(p, 'xb') as f:
+            shutil.copyfileobj(s, f, 16 << 20)
+        run(steps, 'ripatch-' + arch, [ripatch, '-', img, p], stderr=subprocess.DEVNULL); os.remove(p)
+        mnt = os.path.join(work, 'mnt-' + arch); os.makedirs(mnt)
+        att = subprocess.run(['/usr/bin/hdiutil', 'attach', '-readonly', '-nobrowse', '-noverify', '-mountpoint', mnt,
+                              '-imagekey', 'diskimage-class=CRawDiskImage', img], capture_output=True, text=True)
+        if att.returncode:
+            raise SystemExit('attach %s: %s' % (img, att.stderr))
+        dev = att.stdout.split()[0]
+        try:
+            dst = os.path.join(o, 'driverkit-' + arch); os.makedirs(dst)
+            for f in sorted(glob.glob(os.path.join(mnt, 'System/DriverKit/System/Library/dyld/dyld_shared_cache_*'))):
+                shutil.copy2(f, dst)
+            shutil.copy2(os.path.join(mnt, 'System/Library/CoreServices/SystemVersion.plist'), os.path.join(dst, 'cryptex-SystemVersion.plist'))
+        finally:
+            subprocess.run(['/usr/bin/hdiutil', 'detach', dev], capture_output=True)
+        os.remove(img); os.rmdir(mnt)
+        steps.append(dict(step='driverkit-' + arch, files=sorted(os.listdir(dst))))
+    shutil.rmtree(work)
+
+    with open(os.path.join(out, 'preboot-recovery-map.tsv'), 'w') as f:
+        for vol, rel, size, digest, kind, src in rows:
+            if kind == 'matched':
+                p = os.path.join(out, 'tree', src[5:]) if src.startswith('tree/') else os.path.join(out, src)
+                if not os.path.isfile(p):
+                    kind = 'no-source'
+                else:
+                    size, digest = str(os.path.getsize(p)), sha(p)
+            f.write('\t'.join([vol, rel, size or '-', digest or '-', kind, src]) + '\n')
+
+    outputs = {}
+    for root, _, files in os.walk(out):
+        if os.path.relpath(root, out).split(os.sep)[0] == 'tree':
+            continue
+        for fn in files:
+            p = os.path.join(root, fn); outputs[os.path.relpath(p, out)] = sha(p)
+    json.dump(dict(tool='pipeline/unpack/select-inputs', date=t0.isoformat(), pkg=os.path.abspath(a.pkg),
+                   pkg_sha256=sha(a.pkg), asset_zip=name, recipe=os.path.abspath(a.recipe), recipe_sha256=sha(a.recipe),
+                   ref_map=os.path.abspath(a.ref_map), ref_map_sha256=sha(a.ref_map), include=include,
+                   steps=steps, outputs=outputs), open(os.path.join(out, 'select-manifest.json'), 'w'), indent=1)
+    print('done:', out, file=sys.stderr)
+
+
+if __name__ == '__main__':
+    main()

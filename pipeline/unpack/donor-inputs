@@ -1,0 +1,337 @@
+#!/usr/bin/env python3
+"""donor-inputs INSTALLER OUT --requirements REQ [--kdk KDK.dmg]: find and extract the Intel files the
+Golden Gate merge needs, from any macOS installer, and report what is missing.
+
+Nothing here names a macOS build. REQ lists what the merge needs (paths, DriverKit cache families, the
+BaseSystem, a Preboot/Recovery layout); the build and version are read from the installer itself.
+INSTALLER is an InstallAssistant.pkg, read in place (inplace.py): no SharedSupport.dmg copy, no full unpack.
+
+OUT (new) receives:
+  report.json / report.txt   every requirement: found or MISSING, required or optional, where it came from
+  recipe.json                REQ plus the detected origin, for tools/tahoe-donors
+  payload.aa, tree/          the System payload entries under REQ's paths, and those extracted
+  fixup.yaa, lists/sys.tsv   Apple's final owners, modes, flags and times for the System
+  zip/AssetData/...          links.txt, firmlinks_payload, BuildManifest and the boot/Restore files the layout uses
+  out/BaseSystem-<arch>.dmg  rebuilt from its patch and checked against its chunklist
+  out/driverkit/             DriverKit dyld cache families found in the system cryptexes (images not kept)
+  preboot-recovery-map.tsv   the layout resolved for this build (tools/tahoe-donors boot/recovery input)
+Exit status: 0 everything required was found; 1 something required is missing (see report.txt); 2 usage/error."""
+import argparse, datetime, fnmatch, glob, hashlib, json, os, plistlib, re, shutil, struct, subprocess, sys, tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import inplace  # noqa: E402
+import yaa  # noqa: E402
+PY = [sys.executable, '-I']
+PV2 = 'AssetData/payloadv2/'
+GROUP = 'GROUP'  # placeholder volume-group folder in the resolved map; tools/tahoe-donors drops it
+
+
+def sha(p):
+    h = hashlib.sha256()
+    with open(p, 'rb') as f:
+        for b in iter(lambda: f.read(8 << 20), b''):
+            h.update(b)
+    return h.hexdigest()
+
+
+class Steps(list):
+    def run(self, name, cmd, **kw):
+        print('==', name, file=sys.stderr, flush=True)
+        r = subprocess.run([str(c) for c in cmd], **kw)
+        self.append(dict(step=name, cmd=[str(c) for c in cmd], rc=r.returncode))
+        if r.returncode:
+            raise SystemExit('step %s failed (rc %d)' % (name, r.returncode))
+        return r
+
+
+class _Chain:
+    def __init__(self, head, rest): self.head, self.rest = head, rest
+    def read(self, n):
+        b = self.head.read(n)
+        return b + self.rest.read(n - len(b)) if len(b) < n else b
+    def seek(self, n, whence): self.rest.seek(n, whence)
+
+
+def entries(path):
+    """YAA1 or AA01 entries (aa convert writes AA01; the field encoding is the same)."""
+    import io
+    with open(path, 'rb') as f:
+        while True:
+            h = f.read(6)
+            if len(h) < 6:
+                return
+            if h[:4] not in (b'YAA1', b'AA01'):
+                raise SystemExit('bad archive header %r in %s' % (h[:4], path))
+            f.seek(-6, 1); head = bytearray(f.read(struct.unpack('<H', h[4:])[0])); head[:4] = b'YAA1'
+            yield next(yaa.entries(_Chain(io.BytesIO(bytes(head)), f)))
+
+
+def pat(f):
+    p = f.get('PAT', b'')
+    return (p.decode('utf-8', 'surrogateescape') if isinstance(p, bytes) else p) or '.'
+
+
+def mtimes(path):
+    m = {}
+    for f, _ in entries(path):
+        t = f.get('MTM')
+        if isinstance(t, bytes) and len(t) == 12:
+            m[pat(f)] = struct.unpack('<qI', t)
+        elif isinstance(t, bytes) and len(t) == 8:
+            m[pat(f)] = (struct.unpack('<q', t)[0], 0)
+    return m
+
+
+def write_sys_tsv(out):
+    """pipeline/unpack/pristine-tools/mklist.py's sys.tsv rules over the selected payload."""
+    mt = mtimes(os.path.join(out, 'payload.aa')); mt_fl = mtimes(os.path.join(out, 'zip', PV2, 'firmlinks_payload'))
+    os.makedirs(os.path.join(out, 'lists')); n = 0
+    with open(os.path.join(out, 'fixup.yaa'), 'rb') as fh, \
+            open(os.path.join(out, 'lists/sys.tsv'), 'w', encoding='utf-8', errors='surrogateescape') as o:
+        for f, d in yaa.entries(fh):
+            p = pat(f)
+            if '\t' in p or '\n' in p:
+                raise SystemExit('path with tab/newline: %r' % p)
+            t = chr(f['TYP']) if isinstance(f.get('TYP'), int) else '?'
+            if 'UID' not in f and 'HLC' in f:
+                o.write('%s\tH\t0\t0\t0\t0\t-\t-\t-\n' % p); n += 1; continue
+            xs = ','.join('%s=%s' % (k, v.hex()) for k, v in yaa.xattrs(d['XAT']).items()) if d.get('XAT') else '-'
+            m = mt.get(p) or mt_fl.get(p)
+            o.write('%s\t%s\t%d\t%d\t%o\t%x\t%s\t%s\t%s\n' % (p, t, f['UID'], f['GID'], f['MOD'] & 0o7777, f.get('FLG', 0),
+                                                         m[0] if m else '-', m[1] if m else '-', xs)); n += 1
+    return n
+
+
+def layout_rules(path):
+    rules = []
+    for line in open(path):
+        if line.startswith('#') or not line.strip():
+            continue
+        vol, dst, src = line.rstrip('\n').split('\t')
+        rules.append((vol, dst, src))
+    return rules
+
+
+def kdk_identity(dmg):
+    """Version and build named in a Kernel Debug Kit's installer package."""
+    mnt = tempfile.mkdtemp(prefix='kdk-')
+    att = subprocess.run(['/usr/bin/hdiutil', 'attach', '-readonly', '-nobrowse', '-noverify', '-mountpoint', mnt, dmg],
+                         capture_output=True, text=True)
+    if att.returncode:
+        return dict(error=att.stderr.strip())
+    tmp = tempfile.mkdtemp(prefix='kdk-dist-')
+    try:
+        pkgs = glob.glob(os.path.join(mnt, '*.pkg'))
+        if pkgs:
+            subprocess.run(['/usr/bin/xar', '-x', '-f', pkgs[0], 'Distribution'], cwd=tmp, capture_output=True)
+        dist = open(os.path.join(tmp, 'Distribution'), errors='replace').read() if os.path.exists(os.path.join(tmp, 'Distribution')) else ''
+        m = re.search(r'com\.apple\.pkg\.KDK\.(\w+)', dist)
+        return dict(build=m.group(1), package=os.path.basename(pkgs[0])) if m else dict(error='no build in the KDK package')
+    finally:
+        subprocess.run(['/usr/bin/hdiutil', 'detach', mnt], capture_output=True); os.rmdir(mnt); shutil.rmtree(tmp)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('installer'); ap.add_argument('out')
+    ap.add_argument('--requirements', required=True); ap.add_argument('--kdk')
+    a = ap.parse_args()
+    out = os.path.abspath(a.out); os.makedirs(out, exist_ok=False)
+    req = json.load(open(a.requirements)); req_dir = os.path.dirname(os.path.abspath(a.requirements))
+    steps, report = Steps(), []
+    def note(kind, item, found, required=True, detail=''):
+        report.append(dict(kind=kind, item=item, status='found' if found else 'MISSING', required=required, detail=detail))
+
+    t0 = datetime.datetime.now(datetime.timezone.utc)
+    zname, z = inplace.open_zip(a.installer); members = set(z.namelist())
+    rules = layout_rules(os.path.join(req_dir, req['boot_layout']))
+    optional = set(req.get('optional_roots', []))
+    roots = req['system_roots'] + req['build_tools'] + req['extensions_roots']
+    tree_srcs = [s[5:] for _, _, s in rules if s.startswith('tree/')]
+    include = set(roots + tree_srcs + ['System/Library/CoreServices/SystemVersion.plist'])
+    # A hard-link alias has no data of its own in the payload: also take the master file of every alias needed.
+    def under(p, paths): return any(p == r or p.startswith(r.rstrip('/') + '/') for r in paths)
+    master = None
+    with z.open(PV2 + 'links.txt') as s:
+        for l in s.read().decode('utf-8', 'surrogateescape').splitlines():
+            if l.startswith('='):
+                master = l[1:]
+            elif l.startswith('+') and under(l[1:], include) and not under(master, include):
+                include.add(master)
+    include = sorted(include)
+    with open(os.path.join(out, 'include-paths.txt'), 'w') as f:
+        f.write(''.join(p + '\n' for p in include))
+
+    # System payload: only entries under the needed paths
+    steps.run('payload-subset', PY + [os.path.join(HERE, 'inplace.py'), 'payload', a.installer,
+                                      os.path.join(out, 'include-paths.txt'), os.path.join(out, 'payload.aa')])
+    steps.run('aa-extract', ['/usr/bin/aa', 'extract', '-exclude-field', 'uid,gid,flg', '-i',
+                             os.path.join(out, 'payload.aa'), '-d', os.path.join(out, 'tree')])
+    steps.run('chmod-tree', ['/bin/chmod', '-R', 'u+rwX', os.path.join(out, 'tree')])
+    tree = os.path.join(out, 'tree')
+    sv = os.path.join(tree, 'System/Library/CoreServices/SystemVersion.plist')
+    origin = plistlib.load(open(sv, 'rb')) if os.path.exists(sv) else {}
+    build, version = origin.get('ProductBuildVersion', 'unknown'), origin.get('ProductVersion', 'unknown')
+    for r in req['system_roots']:
+        note('system path', r, os.path.lexists(os.path.join(tree, r)), r not in optional)
+    for r in req['build_tools']:
+        note('build tool', r, os.path.isfile(os.path.join(tree, r)))
+    for r in req['extensions_roots']:
+        note('extension tree', r, os.path.isdir(os.path.join(tree, r)))
+
+    zdir = os.path.join(out, 'zip')
+    def take(member):
+        dst = os.path.join(zdir, member); os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if not os.path.exists(dst):
+            with z.open(member) as s, open(dst, 'xb') as o:
+                shutil.copyfileobj(s, o, 16 << 20)
+        return dst
+    for m in (PV2 + 'links.txt', PV2 + 'firmlinks_payload', PV2 + 'fixup.manifest', 'AssetData/boot/BuildManifest.plist'):
+        note('update asset member', m, m in members)
+        if m in members and not m.endswith('fixup.manifest'):
+            take(m)
+    if PV2 + 'fixup.manifest' not in members:
+        raise SystemExit('the installer has no System metadata (fixup.manifest); cannot continue')
+    with z.open(PV2 + 'fixup.manifest') as s, open(os.path.join(out, 'fixup.yaa'), 'xb') as o:
+        o.write(inplace.pbzx_bytes(s))
+
+    inc = tuple(p.rstrip('/') for p in include)
+    def inside(p): return any(p == r or p.startswith(r + '/') for r in inc)
+    links, master = [], None
+    for l in open(os.path.join(zdir, PV2, 'links.txt')):
+        l = l.rstrip('\n')
+        if l.startswith('='):
+            master = l[1:]
+        elif l.startswith('+') and inside(master) and inside(l[1:]):
+            links += ['=' + master, l]
+    with open(os.path.join(out, 'links-selected.txt'), 'w') as f:
+        f.write('\n'.join(links) + '\n')
+    steps.run('hard-links', PY + [os.path.join(HERE, 'links.py'), tree, os.path.join(out, 'links-selected.txt')])
+    steps.append(dict(step='sys.tsv', rows=write_sys_tsv(out)))
+
+    o = os.path.join(out, 'out'); os.makedirs(o)
+    work = tempfile.mkdtemp(prefix='work-', dir=out)
+    try:
+        arch = req.get('basesystem_arch', 'x86_64')
+        bpatch = PV2 + 'basesystem_patches/%sBaseSystem.dmg' % arch
+        chunk = 'AssetData/Restore/BaseSystem.chunklist'
+        have = bpatch in members
+        note('BaseSystem', '%s BaseSystem' % arch, have, req.get('basesystem_required', False),
+             'full-replacement patch ' + bpatch if have else 'no %s BaseSystem patch in this installer' % arch)
+        if have:
+            p = os.path.join(work, 'basesystem.patch')
+            with z.open(bpatch) as s, open(p, 'xb') as f:
+                shutil.copyfileobj(s, f, 16 << 20)
+            dmg = os.path.join(o, 'BaseSystem-%s.dmg' % arch)
+            steps.run('bx50-basesystem', PY + [os.path.join(HERE, 'bx50full.py'), p, dmg]); os.remove(p)
+            if chunk in members:
+                steps.run('chunklist-basesystem', PY + [os.path.join(HERE, 'chunklist.py'), take(chunk), dmg])
+
+        dk = req['driverkit']; found = {}; dk_meta = []
+        ripatch = os.path.join(work, 'ripatch')
+        steps.run('build-ripatch', ['/usr/bin/cc', '-O2', '-Wall', '-o', ripatch, os.path.join(HERE, 'ripatch.c')])
+        dst = os.path.join(o, 'driverkit'); os.makedirs(dst)
+        for member in sorted(m for m in members if re.fullmatch(re.escape(PV2) + r'image_patches/cryptex-system-[^/]+', m)):
+            label = member.rsplit('/', 1)[1]
+            p = os.path.join(work, label + '.patch'); img = os.path.join(work, label + '.img'); mnt = os.path.join(work, 'mnt')
+            with z.open(member) as s, open(p, 'xb') as f:
+                shutil.copyfileobj(s, f, 16 << 20)
+            steps.run('ripatch-' + label, [ripatch, '-', img, p], stderr=subprocess.DEVNULL); os.remove(p)
+            os.makedirs(mnt)
+            att = subprocess.run(['/usr/bin/hdiutil', 'attach', '-readonly', '-nobrowse', '-noverify', '-owners', 'on',
+                                  '-mountpoint', mnt, '-imagekey', 'diskimage-class=CRawDiskImage', img],
+                                 capture_output=True, text=True)
+            if att.returncode:
+                raise SystemExit('attach %s: %s' % (img, att.stderr))
+            try:
+                for f in sorted(glob.glob(os.path.join(mnt, dk['path'], 'dyld_shared_cache_*'))):
+                    fam = re.sub(r'\.(atlas|symbols|\d+)$', '', os.path.basename(f))
+                    if fam not in dk['required_families'] + dk.get('optional_families', []) or os.path.basename(f) in found:
+                        continue
+                    shutil.copyfile(f, os.path.join(dst, os.path.basename(f))); shutil.copymode(f, os.path.join(dst, os.path.basename(f)))
+                    st = os.lstat(f)  # the copy cannot carry root ownership or flags: record the source's
+                    dk_meta.append('%s\tF\t%d\t%d\t%o\t%x\t%d\t%d\t-\n' % (os.path.basename(f), st.st_uid, st.st_gid,
+                                   st.st_mode & 0o7777, st.st_flags, st.st_mtime_ns // 10**9, st.st_mtime_ns % 10**9))
+                    found[os.path.basename(f)] = label
+            finally:
+                subprocess.run(['/usr/bin/hdiutil', 'detach', mnt], capture_output=True)
+            os.remove(img); os.rmdir(mnt)
+        open(os.path.join(dst, 'metadata.tsv'), 'w').write(''.join(dk_meta))
+        owners = sorted({int(l.split('\t')[2]) for l in dk_meta})
+        if 'owner_uid' in dk:
+            note('DriverKit cache owner', 'uid %d' % dk['owner_uid'], owners == [dk['owner_uid']], True,
+                 'source owners %s (the cryptex must be mounted with owners on)' % owners)
+        for fam in dk['required_families'] + dk.get('optional_families', []):
+            src = sorted({v for k, v in found.items() if k == fam or k.startswith(fam + '.')})
+            note('DriverKit cache', fam, bool(src), fam in dk['required_families'],
+                 'from ' + ', '.join(src) if src else 'in no system cryptex of this installer')
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    # Preboot/Recovery layout resolved for this build
+    resolved, rules_resolved = [], 0
+    excluded = set(req.get('preboot_exclude', []))
+    for vol, dest, src in rules:
+        if vol == 'preboot' and dest in excluded:
+            continue  # the merge builds these itself (REQ preboot_exclude)
+        required = vol in req.get('layout_required_volumes', ['preboot'])
+        if src.startswith('zip/'):
+            hits = sorted(m for m in members if fnmatch.fnmatchcase(m, src[4:]))
+            pairs = [(dest + os.path.basename(m) if dest.endswith('/') else dest, 'zip/' + m) for m in hits]
+            for _, s in pairs:
+                take(s[4:])
+        elif src.startswith('tree/'):
+            pairs = [(dest, src)] if os.path.isfile(os.path.join(tree, src[5:])) else []
+        else:
+            pairs = [(dest, src)] if os.path.isfile(os.path.join(out, src)) else []
+        if not pairs:
+            note('boot layout', '%s: %s <- %s' % (vol, dest, src), False, required)
+        rules_resolved += bool(pairs)
+        for d, s in pairs:
+            p = os.path.join(tree, s[5:]) if s.startswith('tree/') else os.path.join(out, s)
+            resolved.append((vol, '%s/%s' % (GROUP, d[2:] if d.startswith('./') else d), os.path.getsize(p), sha(p), s))
+    steps.append(dict(step='boot-layout', rules=len(rules), resolved=rules_resolved, files=len(resolved)))
+    with open(os.path.join(out, 'preboot-recovery-map.tsv'), 'w') as f:
+        for vol, rel, size, digest, src in resolved:
+            f.write('%s\t%s\t%d\t%s\tmatched\t%s\n' % (vol, rel, size, digest, src))
+
+    kdk = None
+    if a.kdk:
+        kdk = kdk_identity(a.kdk); kdk['sha256'] = sha(a.kdk)
+        ok = kdk.get('build') == build
+        note('Kernel Debug Kit', 'KDK for %s' % build, ok, True,
+             'KDK %s' % kdk.get('build') if 'build' in kdk else kdk.get('error', ''))
+
+    recipe = dict(req, origin=dict(build=build, version=version, installer_sha256=sha(a.installer),
+                                   declaration='detected from the installer by pipeline/unpack/donor-inputs'))
+    if 'owner_uid' in req['driverkit']:
+        recipe['driverkit_owner_uid'] = req['driverkit']['owner_uid']
+    recipe['required_driverkit_families'] = req['driverkit']['required_families']
+    recipe['optional_driverkit_families'] = req['driverkit'].get('optional_families', [])
+    json.dump(recipe, open(os.path.join(out, 'recipe.json'), 'w'), indent=2)
+
+    missing = [r for r in report if r['status'] == 'MISSING' and r['required']]
+    optional_missing = [r for r in report if r['status'] == 'MISSING' and not r['required']]
+    outputs = {}
+    for root, _, files in os.walk(out):
+        if os.path.relpath(root, out).split(os.sep)[0] != 'tree':
+            for fn in files:
+                p = os.path.join(root, fn); outputs[os.path.relpath(p, out)] = sha(p)
+    json.dump(dict(tool='pipeline/unpack/donor-inputs', date=t0.isoformat(), installer=os.path.abspath(a.installer),
+                   asset_zip=zname, build=build, version=version, kdk=kdk, requirements=os.path.abspath(a.requirements),
+                   requirements_sha256=sha(a.requirements), steps=steps, report=report, outputs=outputs),
+              open(os.path.join(out, 'report.json'), 'w'), indent=1)
+    lines = ['Installer: macOS %s (%s)' % (version, build)]
+    if kdk:
+        lines.append('KDK: %s' % (kdk.get('build') or kdk.get('error')))
+    lines.append('Found %d, missing %d required, %d optional.' % (sum(r['status'] == 'found' for r in report), len(missing), len(optional_missing)))
+    for r in missing + optional_missing:
+        lines.append('MISSING (%s) %s: %s %s' % ('required' if r['required'] else 'optional', r['kind'], r['item'], r['detail']))
+    open(os.path.join(out, 'report.txt'), 'w').write('\n'.join(lines) + '\n')
+    print('\n'.join(lines))
+    sys.exit(1 if missing else 0)
+
+
+if __name__ == '__main__':
+    main()
