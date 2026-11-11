@@ -53,9 +53,12 @@ def rows(manifest, original_root, installed_prefix='/'):
     return result
 
 
-def header(entries):
+def header(entries, dynamic_observers=()):
+    """C map; DYNAMIC_OBSERVERS are the absolute observer paths allowed to substitute running guests."""
     if not entries:
         raise ValueError('empty identity map')
+    if any(not str(path).startswith('/') for path in dynamic_observers):
+        raise ValueError('dynamic observer path must be absolute')
     lines = ['static const struct identity identities[] = {']
     seen = set()
     for path, executable, arch, digest in entries:
@@ -64,4 +67,7 @@ def header(entries):
         seen.add(path)
         values = ', '.join(json.dumps(x) for x in (path, executable, arch))
         lines.append('    {' + values + ', {' + ','.join(f'0x{x:02x}' for x in digest) + '}},')
-    return '\n'.join(lines + ['};', ''])
+    lines.append('};')
+    lines.append('static const char *const dynamic_observers[] = {'
+                 + ''.join(json.dumps(str(path)) + ', ' for path in dynamic_observers) + 'NULL};')
+    return '\n'.join(lines + [''])

@@ -9,7 +9,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | darwin27-kernel | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Use the measured 26B131 Intel kernel with the 25G342 Tahoe donor kexts. Boot validation pending. |
 | darwin27-sandbox-disk-space | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-10 Initial public release. |
 | dev-access | r3 | post | dev |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
-| golden-gate-code-identity | r6 | oclp-hook | experiment | x |  |  | **needs** | r6 2026-11-11 Generate the identity map from the 26B131 System and matching hao payload. Boot validation pendi |
+| golden-gate-code-identity | r7 | oclp-hook | experiment | x |  |  | **needs** | r7 2026-11-11 Load the shim in Tahoe's airportd and validate running mapped clients (audit-token identity) aga |
 | golden-gate-corespotlight-compat | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
 | golden-gate-hello | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-11 The hello library row is a System-rooted folder with `SOURCES`; the hook refuses a System librar |
 | golden-gate-metal-framebuffer | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-10 Initial public release. |

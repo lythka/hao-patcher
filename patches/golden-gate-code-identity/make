@@ -1,5 +1,5 @@
 #!/opt/homebrew/bin/python3.14
-"""make PAYLOAD ORIGINAL_SYSTEM ARTIFACTS: build observers and their fixed identity map."""
+"""make PAYLOAD ORIGINAL_SYSTEM ARTIFACTS --native-donors DIR: build observers and their fixed identity map."""
 import argparse
 import datetime
 import hashlib
@@ -13,9 +13,14 @@ import tempfile
 HERE = Path(__file__).resolve().parent
 TOP = HERE.parents[1]
 DYLIB = '/usr/lib/gg-code-identity.dylib'
+# (path, source root, dynamic): 'original' is the pristine System, 'donors' the Tahoe native donor root the image
+# installs over it. Dynamic observers also validate running guests (audit tokens) of mapped executables.
 OBSERVERS = (
-    'System/Library/PrivateFrameworks/TCC.framework/Support/tccd',
-    'System/Library/PrivateFrameworks/BackgroundTaskManagement.framework/Versions/A/Resources/backgroundtaskmanagementd',
+    ('System/Library/PrivateFrameworks/TCC.framework/Support/tccd', 'original', False),
+    ('System/Library/PrivateFrameworks/BackgroundTaskManagement.framework/Versions/A/Resources/backgroundtaskmanagementd',
+     'original', False),
+    # Tahoe's x86_64 airportd: CoreWiFi's CWFIsCodesignedByApple gates Wi-Fi joins on the client's audit token.
+    ('usr/libexec/airportd', 'donors', True),
 )
 
 def module(name, path):
@@ -34,22 +39,27 @@ def run(*args):
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
-def main(payload, original, artifacts, live_text_runtime=None):
-    payload, original, artifacts = map(lambda p: Path(p).resolve(), (payload, original, artifacts))
+def main(payload, original, artifacts, native_donors, live_text_runtime=None):
+    payload, original, artifacts, native_donors = map(lambda p: Path(p).resolve(),
+                                                      (payload, original, artifacts, native_donors))
+    roots = {'original': original, 'donors': native_donors}
     manifest_path = payload/'embed/manifest.json'
     manifest = json.loads(manifest_path.read_text())
     live_text_record = None
     if live_text_runtime:
         adapter = module('identity_live_text', HERE/'src/live_text.py')
         manifest, live_text_record = adapter.transform(manifest, payload, original, live_text_runtime)
-    entries = mapping.rows(manifest, original)
+    # A native observer replaces the payload's translated program at its path (airportd), so it is mapped as itself.
+    observed = {'/'+relative for relative, _, _ in OBSERVERS}
+    entries = [row for row in mapping.rows(manifest, original) if row[1] not in observed]
+    translated = len({row[1] for row in entries})
     sources = [HERE/'make', HERE/'patch.json', *sorted((HERE/'src').glob('*')), macho_path]
     source_hashes = {str(p.relative_to(TOP)): sha(p) for p in sources if p.is_file()}
     with tempfile.TemporaryDirectory(prefix='gg-identity-') as tmp:
         tmp = Path(tmp)
         replacements = []
-        for relative in OBSERVERS:
-            source = original/relative
+        for relative, root, _ in OBSERVERS:
+            source = roots[root]/relative
             data = source.read_bytes()
             slices = macho.slices(data)
             x86 = [(arch, body) for arch, body in slices.items() if arch[0] == 0x1000007]
@@ -71,7 +81,8 @@ def main(payload, original, artifacts, live_text_runtime=None):
             digest = sha(target)
             entries.append(('/'+relative, '/'+relative, mapping.architecture(data), bytes.fromhex(digest)))
             replacements.append({'path': relative, 'source_sha256': sha(source), 'sha256': digest})
-        (tmp/'identity_map.h').write_text(mapping.header(entries))
+        dynamic = ['/'+relative for relative, _, flag in OBSERVERS if flag]
+        (tmp/'identity_map.h').write_text(mapping.header(entries, dynamic))
         binary = tmp/'gg-code-identity.dylib'
         run('xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O2', '-Wall', '-Wextra',
             '-Werror', '-Wno-deprecated-declarations', '-dynamiclib', '-Wl,-not_for_dyld_shared_cache', '-I', tmp,
@@ -91,10 +102,11 @@ def main(payload, original, artifacts, live_text_runtime=None):
             'dirty': bool(run('git', '-C', TOP, 'status', '--porcelain')),
             'date': now.isoformat(), 'inputs': source_hashes,
             'payload': str(payload), 'payload_manifest_sha256': sha(manifest_path),
+            'native_donors': str(native_donors), 'dynamic_observers': dynamic,
             'live_text': live_text_record,
-            'identity_paths': len(entries), 'executables': len(manifest['files']) + len(OBSERVERS),
+            'identity_paths': len(entries), 'executables': translated + len(OBSERVERS),
             'sha256': digest, 'replacements': replacements,
-            'validation': 'local prototype; target TCC and Login Items acceptance pending',
+            'validation': 'local prototype; target TCC, Login Items and Wi-Fi join acceptance pending',
         }, indent=2)+'\n')
         print(out)
 
@@ -103,6 +115,8 @@ if __name__ == '__main__':
     parser.add_argument('payload')
     parser.add_argument('original')
     parser.add_argument('artifacts')
+    parser.add_argument('--native-donors', required=True,
+                        help='Tahoe native donor system root the image installs (row tahoe_native_donors, payload/system)')
     parser.add_argument('--live-text-runtime', help='runtime artifact installed by golden-gate-live-text')
     args = parser.parse_args()
-    main(args.payload, args.original, args.artifacts, args.live_text_runtime)
+    main(args.payload, args.original, args.artifacts, args.native_donors, args.live_text_runtime)
