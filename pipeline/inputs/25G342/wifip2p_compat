@@ -1,2 +1,2 @@
-# WiFiPeerToPeer compatibility dylib made and checked against 26A428's clients by patches/golden-gate-userspace/src/wifip2p/make (r43).
-74dbd002165ad35b2c87db207a63a31b6c01dd710b362022040d6f94bbdb627d store/artifacts/wifip2p-compat-26A428-20261111-74dbd002165a/wifip2p_compat.dylib
+# WiFiPeerToPeer compatibility dylib made and checked against 26A428's clients by patches/golden-gate-userspace/src/wifip2p/make (r46; coverage- and method-checked).
+73c170321022de15ae7ec11e8b70566dc61e96d93f12677eea1e82f8fbe904f5 store/artifacts/wifip2p-compat-26A428-20261111-73c170321022/wifip2p_compat.dylib

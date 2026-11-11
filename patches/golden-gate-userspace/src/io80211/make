@@ -3,7 +3,8 @@
 27.x build: make STORE_ARTIFACTS --system SYSTEM_ROOT --cache X86_64_DYLD_CACHE --oclp OCLP_IO80211_DIR.
 SYSTEM_ROOT is the build's System volume (its SystemVersion.plist names the build and its programs are the on-disk
 clients), X86_64_DYLD_CACHE its RosettaOS dyld_shared_cache_x86_64, OCLP_IO80211_DIR the folder holding OCLP's IO80211
-and IO80211Old.dylib. Any import nothing answers (coverage.py) stops the build with MISSING/unsupported."""
+and IO80211Old.dylib. Any import nothing answers (coverage.py) stops the build with MISSING/unsupported. coverage.py
+also runs the method pass (methods.py); 27.x's x86_64 IO80211 defines no Objective-C classes, so it records 0."""
 import argparse
 import datetime
 import hashlib
