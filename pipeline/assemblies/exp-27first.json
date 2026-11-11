@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "target": "mbp92",
+  "golden_build": "26A428",
+  "donor_build": "25G342",
+  "oclp": "fd83bda09",
+  "patch_set": "dev-bs-test",
+  "name": "macOS",
+  "size_bytes": 85899345920,
+  "inputs": {
+    "native": "tahoe_native_donors_27first",
+    "extensions": "tahoe_extensions_donors",
+    "boot": "tahoe_boot_donors",
+    "driverkit": "tahoe_driverkit_donors",
+    "recovery": "tahoe_recovery_donors",
+    "hardware": "oclp_hardware"
+  },
+  "workspace_size_bytes": 171798691840
+}

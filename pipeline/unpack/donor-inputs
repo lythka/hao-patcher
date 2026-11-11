@@ -136,6 +136,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('installer'); ap.add_argument('out')
     ap.add_argument('--requirements', required=True); ap.add_argument('--kdk')
+    ap.add_argument('--target-system', help='the target OS System tree (read-only): keep its own x86_64 subsystems and '
+                                            'take a donor root only where the target cannot supply it')
+    ap.add_argument('--target-cache-images', help='file listing the target x86_64 shared cache image paths (one per line); '
+                                                  'a root with no binaries on disk counts as supplied only if the cache has code under it')
     a = ap.parse_args()
     out = os.path.abspath(a.out); os.makedirs(out, exist_ok=False)
     req = json.load(open(a.requirements)); req_dir = os.path.dirname(os.path.abspath(a.requirements))
@@ -321,6 +325,53 @@ def main():
         note('Kernel Debug Kit', 'KDK for %s' % build, ok, True,
              'KDK %s' % kdk.get('build') if 'build' in kdk else kdk.get('error', ''))
 
+    choices = []
+    if a.target_system:
+        keep = set(req.get('keep_donor_roots', []))
+        cache_images = [l.strip() for l in open(a.target_cache_images) if l.strip()] if a.target_cache_images else None
+        def tahoe_machos_under(r):
+            base = os.path.join(tree, r)
+            if not os.path.isdir(base):
+                return [r] if os.path.isfile(base) else []
+            return [os.path.relpath(os.path.join(d, f), tree) for d, _, fs in os.walk(base) for f in fs]
+        def x86(path):
+            try:
+                with open(path, 'rb') as f:
+                    h = f.read(4096)
+            except OSError:
+                return None
+            if len(h) < 8:
+                return None
+            m = struct.unpack('>I', h[:4])[0]
+            if m in (0xcafebabe, 0xcafebabf):
+                n = struct.unpack('>I', h[4:8])[0]
+                return n < 20 and any(struct.unpack('>I', h[8 + 20 * i:12 + 20 * i])[0] == 0x01000007 for i in range(n))
+            if struct.unpack('<I', h[:4])[0] in (0xfeedfacf, 0xfeedface):
+                return struct.unpack('<I', h[4:8])[0] == 0x01000007
+            return None  # not Mach-O
+        donor_roots = []
+        for r in req['system_roots']:
+            t = os.path.join(a.target_system, r)
+            if r in keep:
+                donor_roots.append(r); choices.append((r, 'donor', 'pinned (keep_donor_roots)')); continue
+            if not os.path.lexists(t):
+                donor_roots.append(r); choices.append((r, 'donor', 'target lacks it')); continue
+            files = [t] if not os.path.isdir(t) else [os.path.join(d, f) for d, _, fs in os.walk(t) for f in fs]
+            kinds = [x86(f) for f in files if not os.path.islink(f)]
+            machos = [k for k in kinds if k is not None]
+            without = sum(1 for k in machos if not k)
+            if without:
+                donor_roots.append(r); choices.append((r, 'donor', 'target has %d of %d binaries without x86_64' % (without, len(machos))))
+            elif machos:
+                choices.append((r, 'target', 'target supplies x86_64 code on disk'))
+            elif cache_images is not None and any(i.lstrip('/').startswith(r.rstrip('/') + '/') for i in cache_images):
+                choices.append((r, 'target', 'target supplies x86_64 code in its shared cache'))
+            elif cache_images is not None and any(x86(os.path.join(tree, rel)) for rel in tahoe_machos_under(r)):
+                donor_roots.append(r); choices.append((r, 'donor', 'target has no x86_64 code on disk or in its cache'))
+            else:
+                choices.append((r, 'target', 'target supplies it (no binaries)'))
+        req = dict(req, system_roots=donor_roots,
+                   legacy_framework_base_roots=[r for r in req['legacy_framework_base_roots'] if r in donor_roots])
     recipe = dict(req, origin=dict(build=build, version=version, installer_sha256=sha(a.installer),
                                    declaration='detected from the installer by pipeline/unpack/donor-inputs'))
     if 'owner_uid' in req['driverkit']:
@@ -338,9 +389,14 @@ def main():
                 p = os.path.join(root, fn); outputs[os.path.relpath(p, out)] = sha(p)
     json.dump(dict(tool='pipeline/unpack/donor-inputs', date=t0.isoformat(), installer=os.path.abspath(a.installer),
                    asset_zip=zname, build=build, version=version, kdk=kdk, requirements=os.path.abspath(a.requirements),
-                   requirements_sha256=sha(a.requirements), steps=steps, report=report, outputs=outputs),
+                   requirements_sha256=sha(a.requirements), steps=steps, report=report, outputs=outputs,
+                   root_choices=[dict(root=r, source=src, reason=why) for r, src, why in choices]),
               open(os.path.join(out, 'report.json'), 'w'), indent=1)
     lines = ['Installer: macOS %s (%s)' % (version, build)]
+    if choices:
+        lines.append('Target-first: %d roots from the target, %d from the donor.' % (
+            sum(c[1] == 'target' for c in choices), sum(c[1] == 'donor' for c in choices)))
+        lines += ['  %-6s %s (%s)' % ('27.0' if src == 'target' else 'Tahoe', r, why) for r, src, why in choices]
     if kdk:
         lines.append('KDK: %s' % (kdk.get('build') or kdk.get('error')))
     lines.append('Found %d, missing %d required, %d optional.' % (sum(r['status'] == 'found' for r in report), len(missing), len(optional_missing)))

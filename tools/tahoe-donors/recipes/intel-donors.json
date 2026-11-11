@@ -107,5 +107,10 @@
   "layout_required_volumes": [
     "preboot",
     "recovery"
+  ],
+  "keep_donor_roots": [
+    "System/DriverKit",
+    "System/Library/CoreServices/boot.efi",
+    "System/Library/CoreServices/PlatformSupport.plist"
   ]
 }
