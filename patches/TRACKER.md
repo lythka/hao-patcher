@@ -9,7 +9,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | darwin27-kernel | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
 | darwin27-sandbox-disk-space | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
 | dev-access | r3 | post | dev |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
-| golden-gate-code-identity | r6 | oclp-hook | experiment | x |  |  | **needs** | r6 2026-11-11 Generate the identity map from the 26B131 System and matching hao payload. Boot validation pendi |
+| golden-gate-code-identity | r7 | oclp-hook | experiment | x |  |  | **needs** | r7 2026-11-11 Load the shim in Tahoe's airportd and validate running mapped clients (audit-token identity) aga |
 | golden-gate-corespotlight-compat | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
 | golden-gate-hello | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
 | golden-gate-metal-framebuffer | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |

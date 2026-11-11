@@ -48,7 +48,14 @@ class MapTests(unittest.TestCase):
         with self.assertRaises(ValueError): mapping.header([])
         entry = ('/a', '/a', 'arm64e', bytes(32))
         with self.assertRaises(ValueError): mapping.header([entry, entry])
+        with self.assertRaises(ValueError): mapping.header([entry], ['relative/observer'])
         with self.assertRaises(ValueError): mapping.architecture(b'not macho')
+
+    def test_dynamic_observers_terminated(self):
+        entry = ('/a', '/a', 'arm64e', bytes(32))
+        self.assertIn('dynamic_observers[] = {NULL};', mapping.header([entry]))
+        self.assertIn('dynamic_observers[] = {"/usr/libexec/airportd", NULL};',
+                      mapping.header([entry], ['/usr/libexec/airportd']))
 
 class SignatureTests(unittest.TestCase):
     @classmethod
@@ -113,5 +120,81 @@ class SignatureTests(unittest.TestCase):
     def test_missing_file_is_not_success(self):
         self.path.unlink()
         self.assertNotEqual(self.verdict('mapped').returncode, 0)
+
+APPLE_DONOR = Path('/usr/bin/true')
+
+class DynamicTests(unittest.TestCase):
+    """A running guest named by audit token, as airportd's CWFIsCodesignedByApple checks Wi-Fi clients.
+
+    The guest is a fat file of an ad hoc native test program and the host's Apple-signed arm64e /usr/bin/true
+    slice, the shape hao-runtime gives translated programs. Only the generated test programs run (x86_64)."""
+    @classmethod
+    def setUpClass(cls):
+        if not APPLE_DONOR.is_file() or 'arm64e' not in subprocess.run(
+                ['lipo', '-archs', str(APPLE_DONOR)], capture_output=True, text=True).stdout.split():
+            raise unittest.SkipTest('needs an Apple-signed arm64e slice at /usr/bin/true')
+        cls.tmp = tempfile.TemporaryDirectory(prefix='gg-identity-dynamic-')
+        cls.root = root = Path(cls.tmp.name).resolve()
+        flags = ['clang', '-arch', 'x86_64', '-O2', '-Wall', '-Wextra', '-Werror',
+                 '-Wno-deprecated-declarations', '-framework', 'CoreFoundation', '-framework', 'Security']
+        def sign(path):
+            subprocess.run(['codesign', '-f', '-s', '-', str(path)], check=True, capture_output=True)
+        arm = root/'apple-arm64e'
+        subprocess.run(['lipo', str(APPLE_DONOR), '-thin', 'arm64e', '-output', str(arm)], check=True)
+        for variant in ('a', 'b'):
+            native = root/f'guest-{variant}-x86_64'
+            subprocess.run(['clang', '-arch', 'x86_64', '-O2', f'-DVARIANT="{variant}"',
+                            str(HERE/'tests/guest.c'), '-o', str(native)], check=True)
+            sign(native)
+            subprocess.run(['lipo', '-create', str(native), str(arm), '-output', str(root/f'guest-{variant}')],
+                           check=True)
+        cls.guest = root/'guest'
+        cls.original = (root/'guest-a').read_bytes()
+        cls.guest.write_bytes(cls.original); cls.guest.chmod(0o755)
+        cls.lib = root/'identity.dylib'
+        (root/'identity_map.h').write_text(mapping.header(
+            [(str(cls.guest), str(cls.guest), 'arm64e', hashlib.sha256(cls.original).digest())],
+            [str(root/'observer')]))
+        subprocess.run(flags + ['-dynamiclib', '-Wl,-not_for_dyld_shared_cache', '-I', str(root),
+            '-install_name', str(cls.lib), str(HERE/'src/identity.c'), '-o', str(cls.lib)], check=True)
+        sign(cls.lib)
+        for name, extra in [('plain', []), ('observer', ['-Wl,-needed_library,'+str(cls.lib)])]:
+            subprocess.run(flags + [str(HERE/'tests/dynamic_probe.c'), *extra, '-o', str(root/name)], check=True)
+            sign(root/name)
+        # The same observer binary at a path the map does not name.
+        shutil.copy2(root/'observer', root/'unnamed-observer')
+
+    @classmethod
+    def tearDownClass(cls): cls.tmp.cleanup()
+
+    def tearDown(self):
+        self.guest.write_bytes(self.original); self.guest.chmod(0o755)
+
+    def verdict(self, probe, guest=None, requirement='anchor apple'):
+        result = subprocess.run([str(self.root/probe), str(guest or self.guest), requirement],
+                                capture_output=True, text=True, timeout=60)
+        return result.stdout.strip()
+
+    def test_observer_accepts_running_mapped_guest(self):
+        self.assertEqual(self.verdict('plain'), '-67050')
+        self.assertEqual(self.verdict('observer'), '0')
+
+    def test_requirement_unchanged(self):
+        self.assertEqual(self.verdict('observer', requirement='anchor apple and identifier "com.apple.true"'), '0')
+        self.assertEqual(self.verdict('observer', requirement='anchor apple and identifier "com.example.other"'),
+                         '-67050')
+
+    def test_only_named_observers_substitute(self):
+        self.assertEqual(self.verdict('unnamed-observer'), '-67050')
+
+    def test_unlisted_copy_keeps_normal_identity(self):
+        copy = self.root/'unlisted'
+        shutil.copy2(self.guest, copy)
+        self.assertEqual(self.verdict('observer', copy), '-67050')
+
+    def test_other_native_code_beside_original_slice_rejected(self):
+        # A validly signed but different native program with the same Apple slice at the mapped path.
+        self.guest.write_bytes((self.root/'guest-b').read_bytes())
+        self.assertEqual(self.verdict('observer'), '-67050')
 
 if __name__ == '__main__': unittest.main()
