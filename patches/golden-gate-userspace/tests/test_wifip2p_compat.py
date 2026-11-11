@@ -1,7 +1,8 @@
 """Host tests for the WiFiPeerToPeer compat library (src/wifip2p): it exports exactly the 36 Wi-Fi Aware classes and
 their metaclasses, links only libobjc and libSystem and re-exports WiFiPeerToPeerOCLP.dylib; under Rosetta a category on
-one of its classes loads (the APTransport case that aborted coreaudiod). The coverage check names the library it
-checks. With WIFIP2P_OCLP_DIR set to OCLP's WiFiPeerToPeer folder (PatcherSupportPkg 13.7.2-25, holding WiFiPeerToPeer
+one of its classes loads (the APTransport case that aborted coreaudiod), and the stand-ins answer the methods 27.x's
+WiFiAgent and airportd send them. The coverage check names the library it checks; the method check (io80211/methods.py)
+parses ipsw's ObjC text and fails only on stand-in gaps an on-disk client names. With WIFIP2P_OCLP_DIR set to OCLP's WiFiPeerToPeer folder (PatcherSupportPkg 13.7.2-25, holding WiFiPeerToPeer
 and WiFiPeerToPeerOld.dylib), the wrapper can be renamed in place and keeps its exports, and the compat library
 exports no name the wrapper already has.
 Run: python3.14 -I -m unittest discover -s patches/golden-gate-userspace/tests -p 'test_wifip2p*'"""
@@ -26,7 +27,11 @@ spec = importlib.util.spec_from_file_location('wifip2p_coverage', SRC/'io80211/c
 coverage = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(coverage)
 FRAMEWORK = '/System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A'
-CLASSES = re.findall(r'^WIFI_AWARE_CLASS\((\w+)\)$', (SRC/'wifip2p/wifip2p_compat.m').read_text(), re.M)
+SOURCE = (SRC/'wifip2p/wifip2p_compat.m').read_text()
+CLASSES = re.findall(r'^WIFI_AWARE_CLASS\((\w+)\)$', SOURCE, re.M) + re.findall(r'^STAND_IN @interface (\w+) ', SOURCE, re.M)
+spec = importlib.util.spec_from_file_location('wifip2p_methods', SRC/'io80211/methods.py')
+methods = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(methods)
 
 
 def sh(*args, **kw):
@@ -86,6 +91,40 @@ class Library(unittest.TestCase):
         out = sh(probe, env={**os.environ, 'DYLD_LIBRARY_PATH': str(folder)})
         self.assertEqual(out.strip(), '42')
 
+    @unittest.skipUnless(platform.machine() == 'arm64', 'runs the x86_64 library under Rosetta')
+    def test_stand_ins_answer_27_methods(self):
+        folder = self.tmp/'methods'
+        folder.mkdir()
+        (self.tmp/'empty2.c').write_text('int wifip2p_compat_test_stand_in;\n')
+        sh('xcrun', 'clang', '-arch', 'x86_64', '-dynamiclib', '-install_name', f'{FRAMEWORK}/WiFiPeerToPeerOCLP.dylib',
+           self.tmp/'empty2.c', '-o', folder/'WiFiPeerToPeerOCLP.dylib')
+        sh('codesign', '-f', '-s', '-', folder/'WiFiPeerToPeerOCLP.dylib')
+        shutil.copy(self.lib, folder/'WiFiPeerToPeer')
+        # What 27.x's WiFiAgent does in -[CWWiFiAgent init] outside the system context, then at teardown.
+        (self.tmp/'agent.m').write_text(
+            '#import <objc/NSObject.h>\n#import <stdio.h>\n'
+            '@interface WiFiP2PKeychainAgent : NSObject - (void)activate; - (void)invalidate; @end\n'
+            '@interface WiFiAwareStateMonitor : NSObject - (void)beginMonitoring; - (void)endMonitoring;'
+            ' - (void)setStateUpdatedHandler:(id)h; - (void)setRealtimeModeUpdatedHandler:(id)h; @end\n'
+            'int main(void) { WiFiP2PKeychainAgent *a = [WiFiP2PKeychainAgent new]; [a activate]; [a invalidate];'
+            ' WiFiAwareStateMonitor *m = [WiFiAwareStateMonitor new]; [m setStateUpdatedHandler:^{}];'
+            ' [m setRealtimeModeUpdatedHandler:^{}]; [m beginMonitoring]; [m endMonitoring];'
+            ' printf("%d\\n", (int)[a respondsToSelector:@selector(activate)]); return 0; }\n')
+        probe = self.tmp/'agent'
+        sh('xcrun', 'clang', '-arch', 'x86_64', '-fobjc-arc', self.tmp/'agent.m', folder/'WiFiPeerToPeer', '-lobjc',
+           '-o', probe)
+        sh('codesign', '-f', '-s', '-', probe)
+        self.assertEqual(sh(probe, env={**os.environ, 'DYLD_LIBRARY_PATH': str(folder)}).strip(), '1')
+
+    @unittest.skipUnless(shutil.which('ipsw'), 'needs ipsw')
+    def test_method_check_reads_the_stand_ins(self):
+        classes = methods.parse_classes(sh('ipsw', 'macho', 'info', self.lib, '--objc', '--no-color'))
+        self.assertEqual({name for name in classes if classes[name]['defined']}, set(CLASSES))
+        self.assertEqual(classes['WiFiP2PKeychainAgent']['methods'], {'-activate', '-invalidate'})
+        self.assertEqual(classes['WiFiAwareStateMonitor']['methods'],
+                         {'-beginMonitoring', '-endMonitoring', '-setStateUpdatedHandler:',
+                          '-setRealtimeModeUpdatedHandler:'})
+
     @unittest.skipUnless(os.environ.get('WIFIP2P_OCLP_DIR'),
                          "set WIFIP2P_OCLP_DIR to a folder with OCLP's WiFiPeerToPeer and WiFiPeerToPeerOld.dylib")
     def test_wrapper_renames_and_nothing_is_shadowed(self):
@@ -111,6 +150,76 @@ class Coverage(unittest.TestCase):
 
     def test_install_name(self):
         self.assertEqual(coverage.install_name('WiFiPeerToPeer'), f'{FRAMEWORK}/WiFiPeerToPeer\0'.encode())
+
+
+class Methods(unittest.TestCase):
+    """io80211/methods.py on ipsw-style text."""
+    BUILD = methods.parse_classes('''
+@interface WiFiP2PKeychainAgent : NSObject {
+}
+/* instance methods */
+-[WiFiP2PKeychainAgent init];
+-[WiFiP2PKeychainAgent activate];
+-[WiFiP2PKeychainAgent invalidate];
+-[WiFiP2PKeychainAgent exportedObject];
+@end
+@interface WiFiP2PUIAgent : NSObject <NSObject> {
+}
+-[WiFiP2PUIAgent activate];
+@end
+@interface WiFiChannel : NSObject
++[WiFiChannel supportsSecureCoding];
+-[WiFiChannel is6GHz];
+-[WiFiChannel channelNumber];
+@end
+''')
+    WRAPPER = methods.parse_classes('''
+@interface WiFiChannel (Stub)
+
+/* instance methods */
+-[WiFiChannel  is6GHz];
+
+@end
+''')
+
+    def providers(self, compat_methods=()):
+        compat = {'WiFiP2PKeychainAgent': {'super': 'NSObject', 'defined': True, 'methods': set(compat_methods)}}
+        return [('compat', {'WiFiP2PKeychainAgent'}, compat), ('OCLP WiFiPeerToPeer', set(), self.WRAPPER),
+                ('OCLP WiFiPeerToPeerOld.dylib', {'WiFiP2PUIAgent', 'WiFiChannel'}, {})]
+
+    def test_parse(self):
+        self.assertTrue(self.BUILD['WiFiP2PKeychainAgent']['defined'])
+        self.assertEqual(self.BUILD['WiFiP2PKeychainAgent']['super'], 'NSObject')
+        self.assertEqual(self.BUILD['WiFiChannel']['methods'], {'+supportsSecureCoding', '-is6GHz', '-channelNumber'})
+        self.assertFalse(self.WRAPPER['WiFiChannel']['defined'])
+        self.assertEqual(self.WRAPPER['WiFiChannel']['methods'], {'-is6GHz'})
+        self.assertEqual(methods.parse_selrefs('@class refs\n0x1 => 0x2: Foo\n@selectors refs\n'
+                                               '0x10 => 0x20: activate\n0x11 => 0x21: initWithFoo:bar:\n'),
+                         {'activate', 'initWithFoo:bar:'})
+
+    def test_stand_in_gap_named_on_disk_fails(self):
+        clients = {'System/Library/CoreServices/WiFiAgent.app/Contents/MacOS/WiFiAgent [arm64e]':
+                   ({'WiFiP2PKeychainAgent'}, {'new', 'init', 'activate', 'invalidate'})}
+        report = methods.assess(self.BUILD, self.providers(), {'-init'}, clients)
+        self.assertEqual(sorted(report['WiFiP2PKeychainAgent']['gaps']), ['-activate', '-invalidate'])
+        errors, reported, _ = methods.classify(report, 'WiFiPeerToPeer')
+        self.assertEqual(len(errors), 2)
+        self.assertIn('-[WiFiP2PKeychainAgent activate] from compat', errors[0])
+        self.assertEqual(reported, [])
+        report = methods.assess(self.BUILD, self.providers(('-activate', '-invalidate')), {'-init'}, clients)
+        self.assertEqual(methods.classify(report, 'WiFiPeerToPeer'), ([], [], []))
+
+    def test_cache_only_gap_and_unreadable_oclp_are_reported(self):
+        clients = {methods.CACHE: ({'WiFiP2PKeychainAgent', 'WiFiChannel', 'WiFiP2PUIAgent'},
+                                   {'activate', 'is6GHz', 'channelNumber'})}
+        errors, reported, unverified = methods.classify(
+            methods.assess(self.BUILD, self.providers(), set(), clients), 'WiFiPeerToPeer')
+        self.assertEqual(errors, [])
+        self.assertEqual(reported, ['-[WiFiP2PKeychainAgent activate] from compat (named by shared cache)'])
+        # Old's own WiFiChannel list is unreadable; the wrapper's (Stub) category answers is6GHz.
+        self.assertEqual(unverified, [
+            'OCLP WiFiPeerToPeerOld.dylib WiFiChannel: own methods unreadable offline; clients name -channelNumber',
+            'OCLP WiFiPeerToPeerOld.dylib WiFiP2PUIAgent: own methods unreadable offline; clients name -activate'])
 
 
 if __name__ == '__main__':

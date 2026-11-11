@@ -80,6 +80,23 @@ python3.14 -I patches/golden-gate-userspace/src/wifip2p/make ARTIFACTS \
 `make` runs the same coverage check as IO80211 (`src/io80211/coverage.py`, given the library name). It skips the
 build's own `usr/libexec/wifip2pd`, which OCLP overwrites with its x86_64 program, and records that it did so.
 
+A class that exists but lacks a method still fails at run time: 27.x's WiFiAgent sends `-activate` to a new
+`WiFiP2PKeychainAgent` in every user session, before it opens its `com.apple.wifi.WiFiAgent` listener, so with the
+empty r43 stand-in the exception stopped it and Setup's own Wi-Fi join timed out. The stand-ins now answer what
+27.x's on-disk programs name on them, as no-ops: `WiFiP2PKeychainAgent` `-activate`/`-invalidate` (WiFiAgent) and
+`WiFiAwareStateMonitor` `-beginMonitoring`/`-endMonitoring`/`-setStateUpdatedHandler:`/`-setRealtimeModeUpdatedHandler:`
+(27.x's airportd, which this image replaces with Tahoe's; Tahoe's binds none of the stand-ins).
+
+The method pass (`src/io80211/methods.py`, run by `coverage.py` for both libraries) lists, for every class of the
+build's own library a client binds, the selectors the build's class implements, a binding client names in its
+selector references, and neither the provided class (exporting library plus categories, superclasses included) nor
+NSObject answers. Selector references are untyped, so these are candidates. A gap on a stand-in named by an on-disk
+program stops `make` (`MISSING method`). The rest is recorded in `build.json` under `coverage.methods`: stand-in gaps
+named only by the x86_64 cache (its importers bind through shared GOTs, so their selectors are pooled; on 26B131 these
+are the Wi-Fi Aware pairing, datapath and bootstrapping classes), gaps on OCLP's wrapper classes, and `unverified`
+OCLP classes: WiFiPeerToPeerOld.dylib is cut from a 13.7.2 shared cache and its method lists name selectors relative
+to that cache, so they cannot be read offline. 27.x's x86_64 IO80211 defines no classes, so its pass records none.
+
 It requires the explicit DriverKit donor and never takes DriverKit from an earlier installed image. It installs OS libraries only; it does not generate
 Swift metadata, shader warm-up caches, icon indexes or account state.
 
@@ -97,8 +114,12 @@ NEEDS VALIDATION: host tests cover the current recipe, and a Golden Gate-first i
 loading of HID and serial DriverKit extensions with the added DriverKit cache, and a full application pass, are open.
 The WiFiPeerToPeer library (r43) was swapped live onto a running 26B131 image on the laptop: AirPlayXPCHelper then
 started without the libobjc abort. An image built with r43, and coreaudiod starting on it, are not yet tested.
+r46 (stand-in methods) is host-tested only: an x86_64 probe sends WiFiAgent's `-activate`/`-invalidate` under
+Rosetta. Not yet shown on an image: WiFiAgent logging "XPCListener started." in a user session, its
+`com.apple.wifi.WiFiAgent` endpoint `active = 1`, and Setup's own join reaching the password sheet.
 
 ## Revisions
+- r46 2026-11-11 WiFiPeerToPeer compat: the `WiFiP2PKeychainAgent` stand-in answers `-activate`/`-invalidate` (27.x's WiFiAgent threw on them in every user session before opening its listener, so Setup's own Wi-Fi join timed out after 80 s), and `WiFiAwareStateMonitor` answers 27.x airportd's monitoring calls; all no-ops. New method-level pass (`src/io80211/methods.py`) in both libraries' coverage check: fails on a stand-in method an on-disk 27.x client names, records the rest. New 26B131 `wifip2p_compat` artifact; 26A428 row unchanged (still r43).
 - r45 2026-11-11 `src/kc-hook.sh` is the real entry point (the runner no longer calls `install.py` itself); it takes the DriverKit donor and donor tool from `TAHOE_DRIVERKIT_ARTIFACT`/`TAHOE_DONOR_TOOL`. Removed the unused Tahoe-first mode (`--prepared-system`, the System/Data base-tree replacement and its keep list, the DriverKit fallbacks). README: 26B131, no `*_fix_source` rows, which frameworks come from 27.x. Same files installed (`golden-gate-userspace.json` drops the empty keep-list fields); boot validation pending.
 - r44 2026-11-11 IO80211 compat also exports `Apple80211StartMonitoringEvent`: OCLP's wrapper forwards it through `dlsym(RTLD_NEXT)` and calls the result unchecked; in 27.x's translated processes that lookup is NULL (sharingd SIGSEGV loop on the 26B131 laptop, also on the earlier image). The compat function looks it up in IO80211Old.dylib by handle and keeps the wrapper's return value (0). Same library for 26A428 and 26B131 (coverage-checked on both).
 - r43 2026-11-11 WiFiPeerToPeer compat: defines the 36 Wi-Fi Aware classes OCLP's 13.7.2 wrapper lacks (26A428 and 26B131 bind the same set), which made coreaudiod, AirPlayXPCHelper, ControlCenter and sharingd abort in libobjc; new row `wifip2p_compat`. The IO80211 coverage check takes the library name and skips clients OCLP overwrites.

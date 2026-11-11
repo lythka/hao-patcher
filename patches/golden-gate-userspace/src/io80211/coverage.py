@@ -9,11 +9,18 @@ links IO80211 (each architecture's imports). Each symbol resolves to the first l
 wrapper, then IO80211Old. A symbol nothing exports, or one the build's IO80211 exports as code that resolves to data
 (the wrapper's CFString-pointer exports), is an error.
 
-Host tools: ipsw (dyld patches, dyld extract), xcrun dyld_info, otool, nm."""
+Then the method pass (methods.py) checks the Objective-C methods clients name on the classes the replacement provides;
+its errors join this check's.
+
+Host tools: ipsw (dyld patches, dyld extract, dyld macho, macho info), xcrun dyld_info, otool, nm."""
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import methods  # noqa: E402
 
 LEAF = 'IO80211'
 
@@ -128,7 +135,9 @@ def check(cache, root, oclp, compat, leaf=LEAF, reexported=('IO80211Old.dylib',)
     providers = [('compat', exports(compat)), (f'OCLP {leaf}', exports(Path(oclp)/leaf))] + [
         (f'OCLP {name}', exports(Path(oclp)/name)) for name in reexported]
     resolved, errors = assess(imports, kinds, providers, leaf)
+    method_record = methods.check(cache, root, oclp, compat, leaf, reexported, disk)
     return dict(**{f'{leaf.lower()}_uuid': uuid}, cache_symbols=len(in_cache), disk_clients=sorted(
                     {c for uses in disk.values() for c, _, _ in uses}),
                 replaced_by_oclp=sorted(replaced),
-                symbols={s: resolved.get(s, 'ERROR') for s in sorted(imports)}, errors=errors)
+                symbols={s: resolved.get(s, 'ERROR') for s in sorted(imports)}, methods=method_record,
+                errors=errors + method_record['errors'])

@@ -14,7 +14,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-hello | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
 | golden-gate-metal-framebuffer | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
 | golden-gate-metal-libraries | r15 | oclp-hook | experiment | x |  |  | **needs** | r15 2026-11-11 README: runs in set order after golden-gate-userspace (which no longer replaces System); docume |
-| golden-gate-userspace | r45 | oclp-hook | experiment | x |  |  | **needs** | r45 2026-11-11 `src/kc-hook.sh` is the real entry point (the runner no longer calls `install.py` itself); it t |
+| golden-gate-userspace | r46 | oclp-hook | experiment | x |  |  | **needs** | r46 2026-11-11 WiFiPeerToPeer compat: the `WiFiP2PKeychainAgent` stand-in answers `-activate`/`-invalidate` (2 |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
 | hao-opencore | r32 | post | experiment | x |  |  | **needs** | r32 2026-11-11 No longer copies OpenCore.efi and OpenRuntime.efi from `opencore_debug`: the base EFI build alr |
 | hao-runtime | r58 | oclp-hook | experiment | x |  |  | **needs** | r58 2026-11-11 Select the 26B131 payload with regenerated interface units and AOT; async provider and URLReque |

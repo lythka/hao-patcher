@@ -4,7 +4,8 @@ one 27.x build: make STORE_ARTIFACTS --system SYSTEM_ROOT --cache X86_64_DYLD_CA
 SYSTEM_ROOT is the build's System volume (its SystemVersion.plist names the build and its programs are the on-disk
 clients), X86_64_DYLD_CACHE its RosettaOS dyld_shared_cache_x86_64, OCLP_WIFIP2P_DIR the folder holding OCLP's
 WiFiPeerToPeer and WiFiPeerToPeerOld.dylib. Any import nothing answers (../io80211/coverage.py) stops the build with
-MISSING/unsupported."""
+MISSING/unsupported, and any method an on-disk client names on a stand-in class that the stand-in lacks
+(../io80211/methods.py) with MISSING method."""
 import argparse
 import datetime
 import hashlib
@@ -52,7 +53,8 @@ def main(root, system, cache, oclp):
     macos_build = plistlib.loads((Path(system)/'System/Library/CoreServices/SystemVersion.plist').read_bytes())['ProductBuildVersion']
     sources = {str(p.relative_to(TOP)): hashlib.sha256(p.read_bytes()).hexdigest()
                for p in sorted(HERE.iterdir()) if p.is_file()}
-    sources[str(COVERAGE.relative_to(TOP))] = hashlib.sha256(COVERAGE.read_bytes()).hexdigest()
+    for helper in (COVERAGE, COVERAGE.parent/'methods.py'):
+        sources[str(helper.relative_to(TOP))] = hashlib.sha256(helper.read_bytes()).hexdigest()
     with tempfile.TemporaryDirectory(prefix='wifip2p-compat-') as tmp:
         binary = build(tmp)
         record = coverage.check(cache, system, oclp, binary, LEAF, REEXPORTED, REPLACED)
