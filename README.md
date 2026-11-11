@@ -18,25 +18,27 @@ ARM-only programs on the Intel CPU.
 Experimental. MacBookPro9,2 is the only supported model.
 
 The table below is from the 26B131 (macOS 27.2.1) development image built from this
-pipeline on 2026-11-11 and tested on the laptop: Setup Assistant, a new account, the
-desktop and the apps listed. [The 26B131 repair review](docs/repair-review-26B131.md)
-records earlier evidence.
+pipeline on 2026-11-11 (image 4d1c48c) and tested on the laptop: Setup Assistant, a new
+account, the desktop and the apps listed. Fixes tested on the laptop by replacing files
+on the running system, but not yet in a built image, are marked *live-tested*.
+[The 26B131 repair review](docs/repair-review-26B131.md) records earlier evidence.
 
 | Area | State |
 |---|---|
-| Startup | Boots to Setup Assistant in about 80 s. Setup and account creation work. After creating the account, Setup's automatic login hangs; restart and log in (fix in progress). |
-| Desktop | Menu bar, Dock, Finder, Liquid Glass and the lock screen draw correctly. The first boot is slow while shaders and icons are built. |
+| Startup | The screen comes on about 65 s after the kernel starts. Setup, account creation and Setup's automatic login after creating the account work. |
+| Desktop | Menu bar, Dock, Finder, Liquid Glass, the lock screen and the login window draw correctly. The first login of a new account is slow for about 10 minutes while macOS sets up the account's app containers (fix in progress). |
 | Graphics | Accelerated HD 4000 desktop. Video decoding uses the HD 4000's hardware decoder: YouTube plays 1080p H.264 with no dropped frames. Newer Metal features are incomplete. |
-| Wi-Fi | Networks are listed and can be joined. Setup's own join dialog is fixed on `main` (`golden-gate-userspace` r46) but not yet tested in an image; joining a remembered network automatically still crashes the Wi-Fi daemon (fix in progress). |
+| Wi-Fi | Networks are listed and can be joined, including from Setup's own join dialog. Joining remembered networks automatically, also at startup, works with Tahoe's CoreWiFi (on `main`, *live-tested*); with macOS 27's own CoreWiFi it never happens. |
 | Hardware | Speakers, brightness, keyboard, trackpad and Bluetooth work; AirPlay displays are discovered. |
 | Safari | Works, including YouTube. |
 | Control Center | Opens; Wi-Fi, Bluetooth, AirDrop, Now Playing, Display and Sound work. |
-| Maps | Map tiles, search, place cards and current location work. Pin shadows are missing (VectorKit shaders, fix in progress). |
-| Photos | Import, thumbnails and full-size view work. Live Text does not: OCLP blocks the analysis service on this GPU. |
+| Maps | Map tiles, search, place cards and current location work. Pin shadows are missing in this image; the VectorKit shader repair is on `main` and not yet checked. |
+| Photos | Import, thumbnails and full-size view work. Live Text: the analysis service now starts and runs text recognition (branch, *live-tested*), but has not yet returned a result. |
 | Calendar, Terminal, System Settings | Work. |
-| Notification Center, widgets | Notification Center restarts in a loop and some widgets crash; fixed in hao-runtime, not yet in an image. |
-| Spotlight | Crashes on 26B131 because of broken references in Apple's Intel shared cache; repair in progress. |
-| Other apps | Varies by app; Weather does not work yet. |
+| Notification Center, widgets | Work: no crash loop. |
+| Spotlight | Opens and searches without crashing, but lists web results instead of local apps: its ranking data never downloads (fix planned). |
+| Background services | A crash loop of `rapportd` and one in Control Center under a newer hao build are fixed in hao-runtime 790720d (*live-tested*; next image). |
+| Other apps | Varies by app. Weather's crash is fixed in hao-runtime and hao-research's interface units; not yet tested. |
 | Sleep and updates | Not yet tested on 26B131. |
 
 ## Requirements
@@ -77,31 +79,17 @@ refuses a set that breaks that order.
 
 ## What's new
 
-- **Clear layer order** (2026-11-11): the build runs every recipe once, in set-file
-  order, after a fixed list of base layers, and duplicate steps are gone.
-  [Building an image](docs/building.md) lists the order.
-- **Wi-Fi:** the Wi-Fi daemon accepts macOS 27 programs, so networks can be joined.
-  WiFiAgent now starts in user sessions (`golden-gate-userspace` r46), which Setup's own
-  join dialog needs. A new build check catches methods that macOS 27 programs call but
-  the OCLP Wi-Fi libraries lack.
-- **Audio and sharing:** audio, AirPlay, Control Center and `sharingd` no longer crash at
-  boot (`golden-gate-userspace` r43–r44).
+- **Wi-Fi:** Setup's join dialog works, and remembered networks join automatically
+  (Tahoe's CoreWiFi; live-tested, next image).
+- **Login:** Setup's automatic login after creating an account works.
+- **Spotlight:** no longer crashes.
+- **Background services:** `rapportd` and Control Center crash loops fixed (hao-runtime
+  790720d; live-tested, next image).
+- **Faster first boot:** preloaded shader, icon and font caches.
+- **Build:** recipes run once, in set-file order ([layer order](docs/building.md#layer-order)).
 
-On `main`, built into a test image but not yet confirmed on the laptop:
-- **Code identity for every program** (`golden-gate-userspace` r48,
-  `golden-gate-native-identities`): one check inside Security.framework lets macOS see
-  verified hao and re-signed programs as the Apple programs they are. It replaces the
-  per-daemon `golden-gate-code-identity` list.
-- **Spotlight:** the build repairs Swift type references that are broken in Apple's own
-  Intel shared cache, then checks every reference (`golden-gate-userspace` r47).
-- **Safari's helpers:** programs in the App and OS cryptexes get hao stubs, so they run
-  under their own identity (`golden-gate-userspace` r49, hao-runtime 7415a0b).
-- **Faster first boot:** preloaded shader, icon and font caches
-  (`golden-gate-user-seed`, `-shader-caches`, `-icon-caches`, `-font-registry`).
-- **Maps and VFX shaders:** VectorKit, AlloyCommon and VFX join the Metal library repairs
-  (`golden-gate-metal-libraries` r16).
-
-Still in progress: Tahoe's CoreWiFi for the Wi-Fi daemon, and Live Text.
+In progress: Live Text, a fast first login for new accounts, Spotlight's local results,
+Maps shadows (repair on `main`, not yet checked).
 
 ## Fixes
 
