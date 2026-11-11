@@ -87,6 +87,13 @@ def set_order(share):
     return rows
 
 
+def dev_build(names, patches=TOP/'patches'):
+    """A dev build is one whose set includes a recipe with status "dev" (dev-access): recipes then add dev-only
+    diagnostics (IMAGE_DEV_BUILD=1), so a release set never carries them."""
+    return any(json.loads((patches/n/'patch.json').read_text()).get('status') == 'dev'
+               for n in names if (patches/n/'patch.json').is_file())
+
+
 def guest_config(recipe, share, local):
     rows = set_order(share)
     hooks = [(name, folder) for stage, name, folder in rows if stage == 'oclp-hook']
@@ -106,7 +113,8 @@ def guest_config(recipe, share, local):
                 hooks=[dict(name=name,kc_hook=local+'/hooks/'+folder+'/kc-hook.sh') for name,folder in hooks],
                 posts=[dict(name=name,script=local+'/post/'+folder+'/apply.sh',folder=local+'/post/'+folder)
                        for stage,name,folder in rows if stage=='post'],
-                environment=dict(PYTHONPATH=local+'/site',PYTHONDONTWRITEBYTECODE='1',TMPDIR=local+'/tmp',S=GUEST,OCLP=GUEST+'/oclp'))
+                environment=dict(PYTHONPATH=local+'/site',PYTHONDONTWRITEBYTECODE='1',TMPDIR=local+'/tmp',S=GUEST,OCLP=GUEST+'/oclp',
+                                 IMAGE_DEV_BUILD='1' if dev_build([name for _,name,_ in rows]) else '0'))
 
 
 def job_script(local, share=GUEST, owner='root:wheel', workspace=None):

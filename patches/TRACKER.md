@@ -22,7 +22,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-user-seed | r5 | post | experiment | caches | x |  |  |  | ok | r5 2026-11-11 Optional (group caches) with needs_any caches: skipped when no cache patch runs, since the copie |
 | golden-gate-userspace | r52 | oclp-hook | experiment |  | x | x |  |  | ok | r52 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
-| hao-opencore | r34 | post | experiment |  | x | x |  |  | ok | r34 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d; HaoExec  |
+| hao-opencore | r35 | post | experiment |  | x | x |  |  | ok | r35 2026-11-11 `hao_nx_stats=1` and `hao_bridge_stats=1` only in dev builds (`IMAGE_DEV_BUILD=1`); `hao_crash= |
 | hao-runtime | r60 | oclp-hook | experiment |  | x | x |  |  | ok | r60 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
 | metalold-selectors | r3 | oclp-hook | product |  | x | x |  |  | ok | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
 | rec-audio | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |

@@ -1,4 +1,4 @@
-# golden-gate-26B131: macOS 27.2.1 (26B131) image = dev-bs-test without dev-access (no root SSH).
+# golden-gate-26B131: macOS 27.2.1 (26B131) image = dev-bs-test without dev-access (no root SSH, no dev diagnostics).
 # Selected by pipeline/assemblies/mbp92-26B131.json. Same rules and base layers as golden-gate.txt: run order is exactly
 # this file's order, darwin27-kernel then golden-gate-userspace first, every post after every oclp-hook.
 # Keep it equal to dev-bs-test.txt minus its dev-only entries (pipeline/tests/test_golden_run.py checks this).

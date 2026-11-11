@@ -84,6 +84,17 @@ class GoldenRun(unittest.TestCase):
         for bad in ('caches',[''],[1]):
             with self.assertRaises(ValueError):RUN['skipped_groups']({'skip_optional':bad})
 
+    def test_dev_build_follows_dev_status_recipes(self):
+        base=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace'),('post','hao-opencore')]
+        for rows,value in ((base,'0'),(base+[('post','dev-access')],'1')):
+            with self.subTest(dev=value),tempfile.TemporaryDirectory() as folder:
+                config=RUN['guest_config'](dict(size_bytes=80,name='GG'),self.share(folder,rows),'/guest/job')
+                self.assertEqual(value,config['environment']['IMAGE_DEV_BUILD'])
+        sets=TOP/'pipeline/sets'
+        names=lambda n:[l.split('#',1)[0].strip() for l in (sets/(n+'.txt')).read_text().splitlines() if l.split('#',1)[0].strip()]
+        self.assertTrue(RUN['dev_build'](names('dev-bs-test')))
+        self.assertFalse(RUN['dev_build'](names('golden-gate-26B131')))
+
     def test_set_order_must_be_run_order(self):
         base=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace')]
         cases=[([('oclp-hook','golden-gate-userspace'),('oclp-hook','darwin27-kernel')],(),'must start with darwin27-kernel then golden-gate-userspace'),
