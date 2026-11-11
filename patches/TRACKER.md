@@ -22,10 +22,10 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-native-identities | r1 | oclp-hook | experiment |  | x | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
 | golden-gate-shader-caches | r10 | post | experiment | caches | x |  |  |  | ok | r10 2026-11-11 Row `shader_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (84 |
 | golden-gate-user-seed | r5 | post | experiment | caches | x |  |  |  | ok | r5 2026-11-11 Optional (group caches) with needs_any caches: skipped when no cache patch runs, since the copie |
-| golden-gate-userspace | r52 | oclp-hook | experiment |  | x | x |  |  | ok | r52 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
+| golden-gate-userspace | r53 | oclp-hook | experiment |  | x | x |  |  | ok | r53 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 5651d79 (native-c |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
-| hao-opencore | r35 | post | experiment |  | x | x |  |  | ok | r35 2026-11-11 `hao_nx_stats=1` and `hao_bridge_stats=1` only in dev builds (`IMAGE_DEV_BUILD=1`); `hao_crash= |
-| hao-runtime | r60 | oclp-hook | experiment |  | x | x |  |  | ok | r60 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
+| hao-opencore | r36 | post | experiment |  | x | x |  |  | ok | r36 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 5651d79 (native-c |
+| hao-runtime | r61 | oclp-hook | experiment |  | x | x |  |  | ok | r61 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 5651d79 (native-c |
 | metal-compiler-compat | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Restored from darwin27-live-text-fixes v0.2.0 into tools/live-text; row metal_compiler_compat fo |
 | metalold-selectors | r3 | oclp-hook | product |  | x | x |  |  | ok | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
 | rec-audio | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
