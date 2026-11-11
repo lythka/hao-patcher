@@ -278,7 +278,25 @@ def main():
         required = vol in req.get('layout_required_volumes', ['preboot'])
         if src.startswith('zip/'):
             hits = sorted(m for m in members if fnmatch.fnmatchcase(m, src[4:]))
-            pairs = [(dest + os.path.basename(m) if dest.endswith('/') else dest, 'zip/' + m) for m in hits]
+            if dest.endswith('/'):
+                pairs = [(dest + os.path.basename(m), 'zip/' + m) for m in hits]
+            elif len(hits) > 1 and len({hashlib.sha256(z.read(m)).hexdigest() for m in hits}) > 1:
+                note('boot layout', '%s: %s <- %s' % (vol, dest, src), False, required,
+                     'ambiguous: %d different files match' % len(hits))
+                continue
+            else:
+                pairs = [(dest, 'zip/' + hits[0])] if hits else []
+            for _, s in pairs:
+                take(s[4:])
+        elif src.startswith('manifest:'):
+            role, pattern = src[len('manifest:'):].rsplit(':', 1)
+            bm = plistlib.load(open(take('AssetData/boot/BuildManifest.plist'), 'rb'))
+            paths = sorted({i['Manifest'][role]['Info']['Path'] for i in bm['BuildIdentities']
+                            if role in i['Manifest'] and fnmatch.fnmatchcase(i['Manifest'][role]['Info'].get('Path', ''), pattern)})
+            if len(paths) > 1:
+                note('boot layout', '%s: %s <- %s' % (vol, dest, src), False, required, 'ambiguous: ' + ', '.join(paths))
+                continue
+            pairs = [(dest, 'zip/AssetData/boot/' + paths[0])] if paths and 'AssetData/boot/' + paths[0] in members else []
             for _, s in pairs:
                 take(s[4:])
         elif src.startswith('tree/'):
