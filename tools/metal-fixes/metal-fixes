@@ -37,10 +37,12 @@ def install(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command')
-    p = sub.add_parser('metallibs', help='rewrite the six selected stock 26A428 libraries')
-    p.add_argument('--system', type=Path, required=True)
-    p.add_argument('--output', type=Path, required=True)
-    p.add_argument('--work', type=Path, required=True)
+    for name, text in (('metallibs', "rewrite Golden Gate's six selected stock libraries"),
+                       ('hello', "rewrite Golden Gate's first-boot hello shaders")):
+        p = sub.add_parser(name, help=text)
+        p.add_argument('--system', type=Path, required=True)
+        p.add_argument('--output', type=Path, required=True)
+        p.add_argument('--work', type=Path, required=True)
     p = sub.add_parser('runtime', help='extend the supplied Intel runtime bitcode and iCBE donor')
     p.add_argument('--input', type=Path, required=True)
     p.add_argument('--llvm', type=Path, required=True)
@@ -63,10 +65,11 @@ def main():
     p.add_argument('--framebuffer', type=Path)
     sub.add_parser('test', help='run local CPU/compiler tests; executes no GPU workloads')
     args = parser.parse_args()
-    if args.command == 'metallibs':
+    if args.command in ('metallibs', 'hello'):
+        profile = 'metallib-repairs-golden-gate.txt' if args.command == 'metallibs' else 'hello-golden-gate.txt'
         run(sys.executable, '-I', REPO / 'cache/metallib/make', args.system.resolve(),
             args.output.resolve(), '--work', args.work.resolve(), '--paths',
-            REPO / 'cache/metallib/profiles/metallib-repairs-26A428.txt')
+            REPO / 'cache/metallib/profiles' / profile)
     elif args.command == 'runtime':
         run(sys.executable, '-I', REPO / 'cache/metallib/make', 'runtime-build',
             args.input.resolve(), args.output.resolve(), '--llvm', args.llvm.resolve(),

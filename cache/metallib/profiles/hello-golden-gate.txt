@@ -1,0 +1,2 @@
+# Golden Gate's first-boot hello shaders (patches/golden-gate-hello), the whole compatibility suite.
+rewrite System/Library/PrivateFrameworks/SetupAssistantSupportUI.framework/Versions/A/Resources/default.metallib
