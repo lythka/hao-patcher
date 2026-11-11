@@ -1,3 +1,3 @@
 # hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit).
-# Boot check only: no interface units, no async provider; not for the laptop or app acceptance.
-- store/artifacts/hao-runtime-nounits-26B131-20261111-128fcc0818fb/payload
+# Regenerated interface units (1,895); no async provider yet (needs a booted 26B131 image).
+- store/artifacts/hao-runtime-26B131-20261111-128fcc0818fb/payload
