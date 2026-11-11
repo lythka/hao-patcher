@@ -13,6 +13,8 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-font-registry | r1 | post | experiment |  |  |  | **needs** | r1 2026-11-11 Setup and per-user font registries harvested from 26B131 (bf10de4). Root cause: a54ec244 removed |
 | golden-gate-hello | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
 | golden-gate-icon-caches | r1 | post | experiment |  |  |  | **needs** | r1 2026-11-11 IconServices store and indexes harvested from 26B131 (bf10de4), with the 27 index checks. Root c |
+| golden-gate-live-text-service | r2 | post | experiment |  |  |  | **needs** | r2 2026-11-11 Checks the runtime in System (/usr/lib/hao-live-text/LiveText.dylib) on the read-only System ins |
+| golden-gate-live-text-shared | r2 | oclp-hook | experiment |  |  |  | **needs** | r2 2026-11-11 Runtime in System (/usr/lib/hao-live-text, umbrella LiveText.dylib: the load command must fit li |
 | golden-gate-metal-framebuffer | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
 | golden-gate-metal-libraries | r16 | oclp-hook | experiment | x |  |  | **needs** | r16 2026-11-11 26B131 artifact adds VectorKit, AlloyCommon and VFX (cache/metallib r54), superseding OCLP's 26 |
 | golden-gate-native-identities | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
@@ -22,6 +24,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
 | hao-opencore | r33 | post | experiment | x |  |  | **needs** | r33 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 7415a0b; HaoExec  |
 | hao-runtime | r59 | oclp-hook | experiment | x |  |  | **needs** | r59 2026-11-11 26B131 payload rebuilt with hao-runtime 7415a0b from a root that includes the App and OS crypte |
+| metal-compiler-compat | r2 | oclp-hook | experiment |  |  |  | **needs** | r2 2026-11-11 Restored from darwin27-live-text-fixes v0.2.0 into tools/live-text; row metal_compiler_compat fo |
 | metalold-selectors | r3 | oclp-hook | product | x |  |  | **needs** | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
 | rec-audio | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-bluetooth-input | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
