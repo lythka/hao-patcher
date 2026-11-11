@@ -17,6 +17,7 @@ python3.14 -I pipeline/golden-run pipeline/assemblies/mbp92-golden-first.json \
 | `size_bytes` | Target raw-image capacity |
 | `workspace_size_bytes` | Separate sparse maintenance-workspace capacity |
 | `oclp` | Selected OCLP integration revision |
+| `skip_optional` | Optional, e.g. `["caches"]`: optional recipe groups to leave out ([optional cache recipes](../../docs/building.md#optional-cache-recipes)) |
 
 The runner creates its own builder clone and takes the builder lock. The guest
 verifies that the attached workspace is the intended external USB device before

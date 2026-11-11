@@ -1,5 +1,5 @@
 """Behaviour of pipeline/patches.py (sets, applies, stages). python3 -m unittest discover -s pipeline/tests"""
-import json, subprocess, sys, tempfile, unittest
+import contextlib, hashlib, io, json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 TOP = Path(__file__).resolve().parents[2]
@@ -43,6 +43,83 @@ class Plan(unittest.TestCase):
                 self.plan(n + '\n')
         with self.assertRaises(OSError):
             self.plan('missing\n')
+
+
+class Optional(unittest.TestCase):
+    """Optional patches: skipped when a row or its path is missing or the group is skipped, never on a hash mismatch;
+    needs_any skips a consumer when no provider of its group runs."""
+    def setUp(self):
+        self.d = Path(tempfile.mkdtemp()); self.lock = self.d / 'lock'; self.lock.mkdir()
+        self.target = self.d / 'm.json'; self.target.write_text(json.dumps({'model': 'MacBookPro9,2'}))
+        self.patch('base', stage='post', inputs=['base_row'])
+        self.patch('seed', stage='post', optional='caches', needs_any='caches')
+        self.patch('icons', stage='post', optional='caches', inputs=['icons_row'])
+        self.patch('fonts', stage='post', optional='caches', inputs=['fonts_row'])
+        self.artifact('icons_row'); self.artifact('fonts_row')
+
+    def patch(self, name, **p):
+        (self.d / name).mkdir(); (self.d / name / 'patch.json').write_text(json.dumps({'revision': 1, 'applies': 'any', **p}))
+
+    def artifact(self, row, body=b'payload', sha=None):
+        f = self.d / ('store-' + row); f.write_bytes(body)
+        (self.lock / row).write_text('# fixture\n%s %s\n' % (sha or hashlib.sha256(body).hexdigest(), f))
+
+    def plan(self, skip=()):
+        s = self.d / 'set.txt'; s.write_text('base\nseed\nicons\nfonts\n'); record = {}
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            out = patches.plan(s, self.target, '25G342', root=self.d, locks=[str(self.lock)], skip=skip, record=record)
+        return [n for _, n, _ in out], record, err.getvalue()
+
+    def test_present_rows_run(self):
+        names, record, _ = self.plan()
+        self.assertEqual(names, ['base', 'seed', 'icons', 'fonts'])
+        self.assertEqual(record, {'ran': {'seed': 'caches', 'icons': 'caches', 'fonts': 'caches'}, 'skipped': {}})
+
+    def test_absent_row_or_path_skips_only_that_patch(self):
+        (self.lock / 'icons_row').unlink(); (self.d / 'store-fonts_row').unlink()
+        names, record, err = self.plan()
+        self.assertEqual(names, ['base'])   # seed: no provider left
+        self.assertIn('optional icons skipped: no row icons_row in', err)
+        self.assertIn('optional fonts skipped: row fonts_row: %s is not there' % (self.d / 'store-fonts_row'), err)
+        self.assertEqual(record['skipped']['seed']['reason'], 'no provider of optional group caches runs')
+        self.assertEqual(record['ran'], {})
+
+    def test_one_provider_keeps_the_consumer(self):
+        (self.lock / 'icons_row').unlink()
+        self.assertEqual(self.plan()[0], ['base', 'seed', 'fonts'])
+
+    def test_hash_mismatch_stops(self):
+        self.artifact('icons_row', sha='0' * 64)
+        with self.assertRaisesRegex(ValueError, 'icons_row: .* is not 0{64} \\(a corrupted input stops'):
+            self.plan()
+
+    def test_forced_skip_even_when_present(self):
+        names, record, err = self.plan(skip=['caches'])
+        self.assertEqual(names, ['base'])
+        self.assertEqual({n: v['reason'] for n, v in record['skipped'].items()},
+                         {n: 'group caches skipped (--skip-optional)' for n in ('seed', 'icons', 'fonts')})
+
+    def test_required_patch_is_never_skipped_here(self):
+        # base_row has no row: plan keeps base; staging (inputs.sh) stops on it as before
+        self.assertIn('base', self.plan()[0])
+
+    def test_cli_without_harvest_rows(self):
+        # the repository's dev-bs-test set with no rows at all: the cache group is skipped, the rest planned as before
+        rec = self.d / 'optional.json'; empty = self.d / 'empty'; empty.mkdir()
+        cmd = [sys.executable, '-I', str(TOP / 'pipeline/patches.py'), 'plan', str(TOP / 'pipeline/sets/dev-bs-test.txt'),
+               str(TOP / 'pipeline/targets/mbp92.json'), '25G342']
+        full = subprocess.run(cmd + ['--locks', str(empty), '--skip-optional', 'none'], capture_output=True, text=True)
+        r = subprocess.run(cmd + ['--locks', str(empty), '--record', str(rec)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(rec.read_text())
+        self.assertEqual(got['ran'], {})
+        self.assertIn('golden-gate-user-seed', got['skipped'])
+        self.assertTrue(got['skipped']['golden-gate-icon-caches']['reason'].startswith('no row icon_caches_golden_gate in '))
+        self.assertIn('optional golden-gate-shader-caches skipped: no row shader_caches_golden_gate', r.stderr)
+        names = [l.split()[1] for l in r.stdout.splitlines()]
+        self.assertEqual(names, [l.split()[1] for l in full.stdout.splitlines() if l.split()[1] not in got['skipped']])
+        self.assertIn('dev-access', names)
+        self.assertIn('no patch of optional group none', full.stderr)
 
 
 class Repo(unittest.TestCase):
@@ -114,6 +191,14 @@ class Format(unittest.TestCase):
         for want in ('nostatus: status', 'mismatch: patch.json validated=True', 'devship: status dev, but set recovery',
                      'oldrev: newest Revisions line is r1', 'nojson: no patch.json'):
             self.assertIn(want, got)
+
+    def test_optional_keys(self):
+        self.patch('opt', optional='caches'); self.patch('cons', optional='caches', needs_any='caches')
+        self.patch('badgroup', optional=True); self.patch('loose', needs_any='caches')
+        got = '\n'.join(self.check())
+        self.assertNotIn('opt:', got); self.assertNotIn('cons:', got)
+        self.assertIn('badgroup: optional must be a group name', got)
+        self.assertIn('loose: needs_any without optional', got)
 
     def test_repo_patches_follow_the_format(self):
         self.assertEqual(patches.check(), [])

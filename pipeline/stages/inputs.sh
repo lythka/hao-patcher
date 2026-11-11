@@ -6,6 +6,7 @@
 #   SHARE/kdk     the build's KDK, expanded (System/Library/Extensions + SystemVersion.plist), cached in $CACHE
 #   SHARE/py SHARE/site   arm64 CPython + the site-packages OCLP imports
 #   SHARE/patches.txt   the set's image patches that apply to this target and build (pipeline/patches.py plan)
+#   SHARE/optional.json the set's optional patches that ran or were skipped, with the reason
 #   SHARE/hooks/NN-<name>  the set's oclp-hook patches (patches/<name>/src, OCLP runs its hook.sh SYS DATA) and
 #   SHARE/post/NN-<name>   post patches (patches/<name>), NN = set order; each with inputs/<row> for its lock rows and,
 #                          when the patch has make.sh, build/ from `sh make.sh build` on the host (as pipeline/recovery)
@@ -52,10 +53,14 @@ PY=$CACHE/python/arm64
 [[ -x $PY/python/bin/python3.12 ]] || { rm -rf $PY; mkdir -p $PY; tar -xzf $(common python_arm64) -C $PY; }
 ditto $PY/python $SHARE/py; ditto $(common python_site) $SHARE/site
 
-python3 -I $TOP/pipeline/patches.py plan $SET $TARGET ${LOCK:t:r} > $SHARE/plan.txt
-awk '$1 != "recovery"' $SHARE/plan.txt > $SHARE/patches.txt; rm $SHARE/plan.txt   # recovery patches: pipeline/recovery
 # A patch input: the Golden Gate build's row (GOLDEN_LOCK, golden-first only), else the donor build's, else common's.
+# Optional patches whose rows are not there, or whose group is in SKIP_OPTIONAL (space-separated), are left out of the
+# plan; SHARE/optional.json says which ran and which were skipped, and why.
 GOLDEN_LOCK=${GOLDEN_LOCK:-}
+skip=(); for g in ${=SKIP_OPTIONAL:-}; do skip+=(--skip-optional $g); done
+python3 -I $TOP/pipeline/patches.py plan $SET $TARGET ${LOCK:t:r} --locks ${GOLDEN_LOCK:+$GOLDEN_LOCK:}$LOCK:$COMMON \
+    $skip --record $SHARE/optional.json > $SHARE/plan.txt
+awk '$1 != "recovery"' $SHARE/plan.txt > $SHARE/patches.txt; rm $SHARE/plan.txt   # recovery patches: pipeline/recovery
 row() { if [[ -n $GOLDEN_LOCK && -f $GOLDEN_LOCK/$1 ]]; then $L path $GOLDEN_LOCK $1; elif [[ -f $LOCK/$1 ]]; then in $1; else common $1; fi; }
 i=0
 while read -r stage name ins; do

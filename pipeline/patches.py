@@ -1,8 +1,11 @@
 #!/usr/bin/python3 -I
 """patches.py: which patches of a set apply to a build, and at which stage.
 
-  patches.py plan SET TARGET BUILD   one line per patch that applies, in set order: STAGE NAME [INPUT ...]
-                                     (SET = pipeline/sets/SET.txt, TARGET = pipeline/targets/MODEL.json)
+  patches.py plan SET TARGET BUILD [--locks DIR:DIR...] [--skip-optional GROUP]... [--record FILE]
+                                     one line per patch that applies, in set order: STAGE NAME [INPUT ...]
+                                     (SET = pipeline/sets/SET.txt, TARGET = pipeline/targets/MODEL.json). Rows of
+                                     optional patches are looked up in --locks (default pipeline/inputs/BUILD then
+                                     pipeline/inputs/common); --record writes which optional patches ran or were skipped
   patches.py revisions NAME ...      NAME rN per patch, for the build record (MANIFEST.txt)
   patches.py tracker [OUT]           the patch tracker (patches/TRACKER.md): every patch, revision, sets, validation
 
@@ -18,6 +21,12 @@ VALIDATION. The README has "## Verify", "## Validation" and, last, "## Revisions
 pipeline/run takes the oclp-hook and post patches, pipeline/recovery the recovery ones. A key left out of applies
 matches every value. A patch that does not apply is skipped with a note on stderr; a missing or unknown stage or applies
 key, or a missing revision, stops.
+
+Optional patches ("optional": GROUP in patch.json) need inputs most builders do not have (e.g. caches harvested from a
+running laptop). plan skips one, with a note on stderr, when one of its rows is not in the locks or its path is not
+there, or when its GROUP is passed to --skip-optional. A row that is there but fails its sha256 stops: a corrupted
+input is never skipped. "needs_any": GROUP skips a patch unless a patch of GROUP without needs_any runs (a consumer
+with nothing to consume). Rows of patches that are not optional are not looked at here; staging stops on a missing one.
 """
 import json, os, re, sys
 
@@ -59,9 +68,35 @@ def revision(name, root=os.path.join(TOP, 'patches')):
     return r
 
 
-def plan(setfile, target, build, root=os.path.join(TOP, 'patches')):
+def default_locks(build):
+    return [os.path.join(TOP, 'pipeline', 'inputs', build), os.path.join(TOP, 'pipeline', 'inputs', 'common')]
+
+
+def missing_row(row, locks):
+    """Why ROW cannot be used (None: it can): no row file in LOCKS, or its path is not there. A row whose file is there
+    but is not its sha256 raises: an optional patch is skipped for a missing input, never for a corrupted one."""
+    import runpy   # lock.py is not importable under python -I (no script folder on sys.path)
+    lock = runpy.run_path(os.path.join(TOP, 'pipeline', 'lock.py'))
+    for d in locks:
+        if os.path.isfile(os.path.join(d, row)):
+            sha, p = lock['rows'](d)[row]
+            if not os.path.exists(p):
+                return 'row %s: %s is not there' % (row, p)
+            if sha != '-' and (not os.path.isfile(p) or lock['sha256'](p) != sha):
+                raise ValueError('row %s: %s is not %s (a corrupted input stops, it is not skipped)' % (row, p, sha))
+            return None
+    return 'no row %s in %s' % (row, ', '.join(os.path.relpath(d, TOP) if d.startswith(TOP) else d for d in locks))
+
+
+def plan(setfile, target, build, root=os.path.join(TOP, 'patches'), locks=None, skip=(), record=None):
+    """[(stage, name, inputs)] in set order. LOCKS (row folders, searched in order) and SKIP (optional groups to leave
+    out) decide which optional patches run; with LOCKS None their rows are not looked at. RECORD, a dict, receives
+    {"ran": {name: group}, "skipped": {name: {"group", "reason"}}} for the optional patches that apply."""
     model = json.load(open(target))['model']
-    out = []
+    out, optional = [], {}
+    if record is None:
+        record = {}
+    record.update(ran={}, skipped={})
     for name in names(setfile):
         p = json.load(open(os.path.join(directory(name, root), 'patch.json')))
         revision(name, root)
@@ -71,10 +106,32 @@ def plan(setfile, target, build, root=os.path.join(TOP, 'patches')):
             ok = applies(p.get('applies'), model, build)
         except ValueError as e:
             raise ValueError('%s: %s' % (name, e))
-        if ok:
-            out.append((p['stage'], name, list(p.get('inputs', []))))
-        else:
+        if not ok:
             print('patches: %s does not apply to %s %s; skipped' % (name, model, build), file=sys.stderr)
+            continue
+        group = p.get('optional')
+        if group:
+            reason = 'group %s skipped (--skip-optional)' % group if group in skip else None
+            for row in p.get('inputs', []) if locks is not None and not reason else []:
+                reason = missing_row(row, locks)
+                if reason:
+                    break
+            if reason:
+                record['skipped'][name] = dict(group=group, reason=reason)
+                print('patches: optional %s skipped: %s' % (name, reason), file=sys.stderr)
+                continue
+            optional[name] = (group, p.get('needs_any'))
+        out.append((p['stage'], name, list(p.get('inputs', []))))
+    for name, (group, needs) in optional.items():
+        if needs and not any(g == needs and not nn and n not in record['skipped'] for n, (g, nn) in optional.items()):
+            reason = 'no provider of optional group %s runs' % needs
+            record['skipped'][name] = dict(group=group, reason=reason)
+            print('patches: optional %s skipped: %s' % (name, reason), file=sys.stderr)
+    out = [o for o in out if o[1] not in record['skipped']]
+    record['ran'] = {n: g for n, (g, _) in optional.items() if n not in record['skipped']}
+    for g in skip:
+        if g not in {g for g, _ in optional.values()} | {v['group'] for v in record['skipped'].values()}:
+            print('patches: no patch of optional group %s in %s' % (g, os.path.basename(str(setfile))), file=sys.stderr)
     return out
 
 
@@ -89,8 +146,9 @@ def tracker(root=os.path.join(TOP, 'patches')):
             'Generated by `python3 -I pipeline/patches.py tracker` from each patch.json and README; the pipeline tests',
             'fail when it is stale. Validation: **needs** = patch.json "validated": false (the README says NEEDS',
             'VALIDATION), ok = a boot test proved the current revision.', '',
-            '| Patch | Rev | Stage | Status | ' + ' | '.join(TRACKED_SETS) + ' | Validation | Newest revision |',
-            '|---|---|---|---|' + '---|' * len(TRACKED_SETS) + '---|---|']
+            'Optional: the patch\'s optional group (skipped when its inputs are missing or the group is skipped).', '',
+            '| Patch | Rev | Stage | Status | Optional | ' + ' | '.join(TRACKED_SETS) + ' | Validation | Newest revision |',
+            '|---|---|---|---|---|' + '---|' * len(TRACKED_SETS) + '---|---|']
     for name in patch_names(root):
         pj = os.path.join(directory(name, root), 'patch.json')
         if not os.path.isfile(pj):
@@ -99,8 +157,8 @@ def tracker(root=os.path.join(TOP, 'patches')):
         text = open(os.path.join(directory(name, root), 'README.md')).read()
         newest = text.split('\n## Revisions\n', 1)[1] if '\n## Revisions\n' in text else ''
         newest = next((l[2:] for l in newest.splitlines() if l.startswith('- r')), '').replace('|', '/')
-        rows.append('| %s | r%s | %s | %s | %s | %s | %s |' % (name, p.get('revision', '?'), p.get('stage', '?'),
-                    p.get('status', '?'), ' | '.join('x' if name in sets[s] else '' for s in TRACKED_SETS),
+        rows.append('| %s | r%s | %s | %s | %s | %s | %s | %s |' % (name, p.get('revision', '?'), p.get('stage', '?'),
+                    p.get('status', '?'), p.get('optional', ''), ' | '.join('x' if name in sets[s] else '' for s in TRACKED_SETS),
                     'ok' if p.get('validated') else '**needs**', newest[:110]))
     return '\n'.join(rows) + '\n'
 
@@ -126,7 +184,12 @@ def check(root=os.path.join(TOP, 'patches'), sets_dir=os.path.join(TOP, 'pipelin
             bad.append('%s: status %r is not one of %s' % (name, p.get('status'), ', '.join(STATUSES)))
         if not isinstance(p.get('validated'), bool):
             bad.append('%s: validated must be true or false' % name)
-        unknown = set(p) - {'revision', 'stage', 'applies', 'inputs', 'status', 'validated'}
+        for key in ('optional', 'needs_any'):
+            if key in p and not (isinstance(p[key], str) and re.fullmatch(r'[a-z0-9][a-z0-9-]*', p[key])):
+                bad.append('%s: %s must be a group name (lower-case letters, digits, -)' % (name, key))
+        if 'needs_any' in p and 'optional' not in p:
+            bad.append('%s: needs_any without optional (a patch that can be skipped must be optional)' % name)
+        unknown = set(p) - {'revision', 'stage', 'applies', 'inputs', 'status', 'validated', 'optional', 'needs_any'}
         if unknown:
             bad.append('%s: unknown patch.json keys %s' % (name, ', '.join(sorted(unknown))))
         text = open(os.path.join(d, 'README.md')).read() if os.path.isfile(os.path.join(d, 'README.md')) else ''
@@ -166,10 +229,28 @@ if __name__ == '__main__':
         except (ValueError, OSError) as e:
             sys.exit('patches: %s' % e)
         sys.exit(0)
-    if sys.argv[1:2] != ['plan'] or len(sys.argv) != 5:
+    args, locks, skip, out, rest = [], None, [], None, iter(sys.argv[2:])
+    for a in rest:
+        if a not in ('--locks', '--skip-optional', '--record'):
+            args.append(a)
+            continue
+        value = next(rest, None)
+        if value is None:
+            sys.exit(__doc__)
+        if a == '--locks':
+            locks = [d for d in value.split(':') if d]
+        elif a == '--skip-optional':
+            skip.append(value)
+        else:
+            out = value
+    if sys.argv[1:2] != ['plan'] or len(args) != 3 or any(a.startswith('--') for a in args):
         sys.exit(__doc__)
     try:
-        for stage, name, inputs in plan(*sys.argv[2:]):
+        record = {}
+        for stage, name, inputs in plan(*args, locks=locks if locks is not None else default_locks(args[2]),
+                                        skip=skip, record=record):
             print(' '.join([stage, name] + inputs))
+        if out:
+            open(out, 'w').write(json.dumps(dict(record, skip_optional=skip), indent=1, sort_keys=True) + '\n')
     except (ValueError, OSError, KeyError) as e:
         sys.exit('patches.py: %s' % e)

@@ -66,6 +66,12 @@ class GoldenRun(unittest.TestCase):
             self.assertEqual('/guest/job/tmp',config['environment']['TMPDIR'])
             self.assertEqual('golden-pristine.sh',Path(config['pristine_script']).name)
 
+    def test_skipped_optional_groups_merge_assembly_and_flag(self):
+        self.assertEqual(RUN['skipped_groups']({}),[])
+        self.assertEqual(RUN['skipped_groups']({'skip_optional':['caches']},['caches','other']),['caches','other'])
+        for bad in ('caches',[''],[1]):
+            with self.assertRaises(ValueError):RUN['skipped_groups']({'skip_optional':bad})
+
     def test_set_order_must_be_run_order(self):
         base=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace')]
         cases=[([('oclp-hook','golden-gate-userspace'),('oclp-hook','darwin27-kernel')],(),'must start with darwin27-kernel then golden-gate-userspace'),

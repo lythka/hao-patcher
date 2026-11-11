@@ -40,8 +40,10 @@ against bf10de4 (4:21, 476); then `make compare` on a new harvest.
 ## Validation
 Laptop 2026-11-11, image 4d1c48c (26B131): MTLCompilerService was not among the busiest processes during first boot (bf10de4 without the seed: 4:21 CPU at 9 min). Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
 Earlier: r8 is built and chain-tested on the host only; no image with it has booted.
+r9 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r8's, so the result above stands.
 
 ## Revisions
-- r8 2026-11-11 Restored for 26B131 with a pack harvested from 26B131 itself (cache/seeds), ancestors and owners from the harvest instead of src/folders.tsv. Root cause: a54ec244 removed the patch, and the 26A428 pack cannot serve 26B131 (every function hash changed) (this commit).
+- r9 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch instead of stopping. apply.sh unchanged.
+- r8 2026-11-11 Restored for 26B131 with a pack harvested from 26B131 itself (cache/seeds), ancestors and owners from the harvest instead of src/folders.tsv. Root cause: a54ec244 removed the patch, and the 26A428 pack cannot serve 26B131 (every function hash changed).
 - r7 2026-11-09 Preserve r6 and add 166 native records observed in Setup/app consumer trees (26A428).
 - r1-r6 2026-11-04 to 11-09 26A428 packs: Tahoe pack regenerated against 27.0 libraries plus native supplements.

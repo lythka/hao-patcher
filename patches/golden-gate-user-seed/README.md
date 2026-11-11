@@ -37,9 +37,11 @@ the new uid before its desktop started.
 Laptop 2026-11-11, image 4d1c48c (26B131): seed.zsh saw the new account 2.3 s after creation and placed the icon index, font registry and 17 Metal trees before its first login. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
 Earlier: r4 is built only on the host fixture; no image with it has booted. On 26A428 images r2/r3's runtime
 placed trees (owner sessions 2026-11-06), not re-checked on 26B131.
+r5 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r4's, so the result above stands.
 
 ## Revisions
-- r4 2026-11-11 Restored for 26B131 without payloads of its own: runtime and build gate only; fonts moved to golden-gate-font-registry, efilogin deferral dropped. Root cause: a54ec244 removed every seed, so each new account compiles and renders everything at first login (bf10de4: benchtest iconservicesagent 2:13 CPU) (this commit).
+- r5 2026-11-11 Optional (group caches) with needs_any caches: skipped when no cache patch runs, since the copier would have nothing to place. apply.sh unchanged.
+- r4 2026-11-11 Restored for 26B131 without payloads of its own: runtime and build gate only; fonts moved to golden-gate-font-registry, efilogin deferral dropped. Root cause: a54ec244 removed every seed, so each new account compiles and renders everything at first login (bf10de4: benchtest iconservicesagent 2:13 CPU).
 - r3 2026-11-09 Port Tahoe's scoped Setup Preboot deferral together with the seed7 re-enable marker.
 - r2 2026-11-06 Ship 27.0 font registries (Setup account and per-user seed).
 - r1 2026-11-05 From user-seed r7 without the wallpaper payload and the efilogin flag.

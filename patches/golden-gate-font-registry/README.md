@@ -26,6 +26,8 @@ registry placed" for the new account; fontd's scan count at Setup and first logi
 Laptop 2026-11-11, image 4d1c48c (26B131): the user seed placed fontd's registry in the new account before its first login; text renders in Setup and apps. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
 Earlier: built and chain-tested on the host only; no image with it has booted. OPEN (carried from
 mac-image): that fontd adopts a seeded registry without a full rescan.
+r2 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r1's, so the result above stands.
 
 ## Revisions
-- r1 2026-11-11 Setup and per-user font registries harvested from 26B131 (bf10de4). Root cause: a54ec244 removed the 26A428 registries with golden-gate-user-seed, so Setup's and each new account's fontd built its registry from scratch (this commit).
+- r2 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch instead of stopping. apply.sh unchanged.
+- r1 2026-11-11 Setup and per-user font registries harvested from 26B131 (bf10de4). Root cause: a54ec244 removed the 26A428 registries with golden-gate-user-seed, so Setup's and each new account's fontd built its registry from scratch.
