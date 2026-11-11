@@ -16,7 +16,7 @@ Prints a new artifact directory containing the signed `corespotlight_compat.dyli
 
 ## Install
 
-Supply a writable, offline Golden Gate 26A428 System volume containing Apple's `corespotlightd` and
+Supply a writable, offline Golden Gate (26A428 or 26B131) System volume containing Apple's `corespotlightd` and
 `managedcorespotlightd`, then run as root:
 
 ```sh

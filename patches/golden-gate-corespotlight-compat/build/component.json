@@ -6,11 +6,12 @@
       "MacBookPro9,2"
     ],
     "target_builds": [
-      "26A428"
+      "26A428",
+      "26B131"
     ]
   },
   "build_recipe": "python3 patch build --output /absolute/path/to/artifacts",
-  "compatibility": "26A428 native x86_64 CoreSpotlight/corespotlightd and managedcorespotlightd; MacBookPro9,2. Constructor adds the getter only when absent.",
+  "compatibility": "26A428 and 26B131 native x86_64 CoreSpotlight/corespotlightd and managedcorespotlightd; MacBookPro9,2. Constructor adds the getter only when absent.",
   "dependencies": [],
   "exports": [],
   "name": "golden-gate-corespotlight-compat",
