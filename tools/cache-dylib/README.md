@@ -2,7 +2,8 @@
 
 Turns one image of an x86_64 dyld shared cache back into a standalone dylib that dyld can load from disk. On this
 Mac it supplies Tahoe libraries that exist only inside a Tahoe cache, such as CoreWiFi for
-[golden-gate-corewifi](../../patches/golden-gate-corewifi/README.md). The output is an Apple binary: it goes under
+[tools/tahoe-donors](../tahoe-donors/README.md)'s `cache_images`. Apple's extractor (`dsc_extractor`) and
+`ipsw dyld extract` write debugger files dyld refuses (no fixups; see tahoe-donors). The output is an Apple binary: it goes under
 `store/` with an input row and is never committed.
 
 ## How it works
@@ -59,7 +60,7 @@ python3.14 -I tools/cache-dylib/check.py OUT.dylib report.json
 ```
 
 The report lists every library the dylib binds and the symbols it binds there, so a caller can check them against
-another OS build. golden-gate-corewifi's `make` checks them against 27.x.
+another OS build. golden-gate-userspace's `src/corewifi/make` checks them against 27.x.
 
 ## Limits
 
@@ -79,6 +80,7 @@ CACHE_DYLIB_TAHOE_CACHE=store/inputs/25G342/os-cryptex-x86_64h python3.14 -I -B 
 ```
 
 ## Revisions
+- r2 2026-11-11 Used by tools/tahoe-donors (`native --cache`) instead of a recipe of its own; no code change.
 - r1 2026-11-11 First version: extracts Tahoe 25G342's CoreWiFi from the x86_64h cache. Verified by check.py: no
   Haswell-only instruction; 720 GOT slots used by code, all bound; 3453 Swift relative pointers resolved. Under Rosetta on 27.2 its classes
   register and secure coding round-trips.

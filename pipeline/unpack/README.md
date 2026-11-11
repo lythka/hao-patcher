@@ -75,7 +75,9 @@ again. None of Apple's code is included here.
 reads the package in place and extracts only required donor roots. Native target
 roots are removed from the payload selection before extraction. The generic
 x86_64 DriverKit cache is required; the Haswell-only cache is not selected for
-MacBookPro9,2. Cryptex reconstruction stops once the requested cache families exist.
+MacBookPro9,2. The requirement's `os_cache` families (Tahoe's x86_64h OS cache) are copied to
+`out/os-cache/`, the source of the recipe's `cache_images` (CoreWiFi, which Tahoe ships only in its cache) that
+`tools/tahoe-donors native --cache` cuts out. Cryptex reconstruction stops once the requested cache families exist.
 
 Measured with Tahoe 25G342 and Golden Gate 26B131: 8 roots stay native and 42
 come from Tahoe. The payload archive shrank from 1,942,322,740 to 1,476,002,843

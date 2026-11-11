@@ -13,7 +13,8 @@ import stat
 import subprocess
 
 UNIT = Path(__file__).resolve().parent
-REVISION = 10
+REVISION = 11
+CACHE_DYLIB = UNIT.parent/'cache-dylib'
 
 
 def sha(path):
@@ -134,6 +135,52 @@ def describe(source, destination, role, path, overrides=None):
     return row
 
 
+def extract_cache_image(cache, family, image, destination):
+    """Cut IMAGE (an install name) out of the donor's CACHE/FAMILY into DESTINATION with tools/cache-dylib, keeping
+    its install name, sign it ad hoc and verify it with cache-dylib's check.py. Apple's own extractor
+    (dsc_extractor, dyld_shared_cache_util -extract) and `ipsw dyld extract` write files for debuggers: no rebase,
+    bind or (Apple's) export information, cache segment order, so dyld refuses them (README). Returns
+    (extraction record, verification record)."""
+    import sys
+    sys.path.insert(0, str(CACHE_DYLIB))
+    import cache_dylib, check  # noqa: E401 (imported here: the guest copy of this tool never extracts)
+    record = cache_dylib.extract(cache, family.removeprefix('dyld_shared_cache_'), image, destination)
+    subprocess.run(['codesign', '-f', '-s', '-', str(destination)], check=True, capture_output=True)
+    verified = check.check(str(destination), record)
+    if verified['errors']:
+        raise ValueError('extracted cache image fails verification: '+image+'\n'+'\n'.join(verified['errors']))
+    return record, verified
+
+
+def add_cache_images(recipe, cache, payload, rows, inputs, output):
+    """Recipe cache_images: libraries the donor ships only inside its shared cache (CoreWiFi), made into files at
+    their own paths in the system role. The extraction records (binds per dependency, Objective-C repairs) go to
+    OUTPUT/cache-images.json."""
+    records = {}
+    for item in recipe.get('cache_images', []):
+        if cache is None:
+            raise ValueError('the recipe takes images from the donor shared cache: give --cache')
+        path, family = relative(item['path']), item['family']
+        main = Path(cache)/family
+        if not main.is_file():
+            raise ValueError('donor shared cache family missing: '+str(main))
+        if main not in inputs:
+            inputs.append(main)
+        target = payload/'system'/path
+        target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+        record, verified = extract_cache_image(cache, family, '/'+path.as_posix(), target)
+        meta = item['metadata']
+        rows.append(dict(role='system', path=path.as_posix(), kind='file', size=target.stat().st_size,
+                         sha256=sha(target), uid=meta['uid'], gid=meta['gid'], mode=meta['mode'],
+                         flags=meta['flags'], mtime_ns=main.stat().st_mtime_ns, xattrs={},
+                         metadata_source='recipe cache_images', source=f'{main}:/{path.as_posix()}',
+                         extraction='cache-images.json'))
+        records[path.as_posix()] = dict(cache=str(Path(cache).resolve()), family=family, main_sha256=sha(main),
+                                        extraction=record, verification=verified)
+    if records:
+        write(output/'cache-images.json', records)
+
+
 def package(args):
     recipe = json.loads(args.recipe.read_text())
     args.output.mkdir(mode=0o755, parents=True, exist_ok=False)
@@ -155,6 +202,7 @@ def package(args):
         for name in recipe['build_tools']:
             p = args.tree/relative(name)
             add(p, 'build-tools', relative(name), attrs[name])
+        add_cache_images(recipe, getattr(args, 'cache', None), payload, rows, inputs, args.output)
     elif args.command == 'extensions':
         attrs = metadata(args.metadata,args.links); inputs.extend([args.metadata,args.links])
         for root in recipe['extensions_roots']:
@@ -238,7 +286,8 @@ def package(args):
                   commit=subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip(),
                   dirty=bool(subprocess.check_output(['git','-C',str(root),'status','--porcelain'],text=True)),
                   inputs=[dict(path=str(p.resolve()), sha256=sha(p)) for p in inputs],
-                  source_inputs=[dict(path=str(p), sha256=sha(p)) for p in [Path(__file__)]],
+                  source_inputs=[dict(path=str(p), sha256=sha(p)) for p in [Path(__file__)] + (
+                      sorted(CACHE_DYLIB.glob('*.py')) if args.command == 'native' and recipe.get('cache_images') else [])],
                   origin=recipe['origin'], totals=totals,
                   manifest_sha256=sha(args.output/'manifest.json'),
                   scope='Donor role only. No Tahoe install, original kernel/KCs, KDK/OCLP content or complete image is produced.')
@@ -327,6 +376,8 @@ def main():
         if name in ('native','extensions'):
             p.add_argument('--metadata',type=Path,required=True)
             p.add_argument('--links',type=Path,required=True)
+        if name == 'native':
+            p.add_argument('--cache',type=Path,help='folder with the donor OS shared cache family the recipe\'s cache_images come from (donor-inputs out/os-cache)')
         if name == 'driverkit':
             p.add_argument('--source',type=Path,action='append',required=True,help='repeat for generic and Haswell cache source directories')
             p.add_argument('--metadata',type=Path,help='owners, modes, flags and times of the cache files (sys.tsv format), when the copies do not carry them')

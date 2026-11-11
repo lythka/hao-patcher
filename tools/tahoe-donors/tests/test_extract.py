@@ -43,6 +43,50 @@ class Donors(unittest.TestCase):
         self.assertIn('driverkit-cache',manifest['required_image_roles'])
         self.assertEqual(json.loads((self.root/'out/build.json').read_text())['manifest_sha256'],tool.sha(self.root/'out/manifest.json'))
 
+    def cache_recipe(self):
+        p=self.tree/'System/Donor';p.mkdir(parents=True);(p/'file').write_bytes(b'donor');(p/'link').symlink_to('file')
+        p=self.tree/'usr/bin';p.mkdir(parents=True);(p/'kmutil').write_bytes(b'linker')
+        d=json.loads(self.recipe.read_text())
+        d['cache_images']=[dict(path='System/Library/PrivateFrameworks/X.framework/Versions/A/X',family='dyld_shared_cache_x86_64h',
+                                metadata=dict(uid=0,gid=0,mode='755',flags='80000'))]
+        self.recipe.write_text(json.dumps(d))
+        cache=self.root/'os-cache';cache.mkdir();(cache/'dyld_shared_cache_x86_64h').write_bytes(b'cache')
+        return cache
+
+    def test_cache_images_are_cut_out_into_the_system_role(self):
+        cache=self.cache_recipe();calls=[]
+        def extract(source,family,image,destination):
+            calls.append((source,family,image));Path(destination).write_bytes(b'extracted')
+            return {'binds':{'/usr/lib/libobjc.A.dylib':['_objc_msgSend']}},{'errors':[]}
+        with mock.patch.object(tool,'extract_cache_image',side_effect=extract):
+            manifest=tool.package(self.args('native',cache=cache))
+        self.assertEqual(calls,[(cache,'dyld_shared_cache_x86_64h','/System/Library/PrivateFrameworks/X.framework/Versions/A/X')])
+        row={r['path']:r for r in manifest['entries']}['System/Library/PrivateFrameworks/X.framework/Versions/A/X']
+        self.assertEqual((row['role'],row['kind'],row['uid'],row['mode'],row['flags']),('system','file',0,'755','80000'))
+        self.assertEqual(row['sha256'],tool.sha(self.root/'out/payload/system'/row['path']))
+        self.assertEqual(row['mtime_ns'],(cache/'dyld_shared_cache_x86_64h').stat().st_mtime_ns)
+        records=json.loads((self.root/'out/cache-images.json').read_text())
+        self.assertEqual(records[row['path']]['main_sha256'],tool.sha(cache/'dyld_shared_cache_x86_64h'))
+        self.assertIn(str((cache/'dyld_shared_cache_x86_64h').resolve()),[i['path'] for i in json.loads((self.root/'out/build.json').read_text())['inputs']])
+
+    def test_cache_images_need_the_cache(self):
+        self.cache_recipe()
+        with self.assertRaisesRegex(ValueError,'give --cache'):
+            tool.package(self.args('native'))
+
+    def test_failed_cache_image_verification_stops(self):
+        cache=self.cache_recipe()
+        fake=mock.Mock(extract=lambda *a:{'stats':{}}); checker=mock.Mock(check=lambda *a:{'errors':['GOT slot 0x1 used by code is neither bound nor rebased']})
+        with mock.patch.dict('sys.modules',{'cache_dylib':fake,'check':checker}),mock.patch.object(tool.subprocess,'run'):
+            with self.assertRaisesRegex(ValueError,'fails verification'):
+                tool.package(self.args('native',cache=cache))
+
+    def test_intel_recipe_cuts_tahoe_corewifi_from_the_os_cache(self):
+        recipe=json.loads((UNIT/'recipes/intel-donors.json').read_text())
+        self.assertEqual([i['path'] for i in recipe['cache_images']],['System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFi'])
+        self.assertEqual({i['family'] for i in recipe['cache_images']},set(recipe['os_cache']['families']))
+        self.assertFalse(any(i['path'].startswith(r) for i in recipe['cache_images'] for r in recipe['system_roots']))
+
     def test_missing_driverkit_is_explicit_failure(self):
         source=self.root/'cache';source.mkdir()
         with self.assertRaisesRegex(ValueError,'no x86_64 family'):

@@ -99,6 +99,25 @@
     "optional_families": [],
     "owner_uid": 0
   },
+  "os_cache": {
+    "path": "System/Library/dyld",
+    "families": [
+      "dyld_shared_cache_x86_64h"
+    ]
+  },
+  "cache_images": [
+    {
+      "path": "System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFi",
+      "family": "dyld_shared_cache_x86_64h",
+      "metadata": {
+        "uid": 0,
+        "gid": 0,
+        "mode": "755",
+        "flags": "80000"
+      }
+    }
+  ],
+  "cache_images_reason": "Tahoe's airportd (usr/libexec/airportd) hosts CoreWiFi's XPC server and auto-join, and 27.x's CoreWiFi changed its callout reply blocks and renumbered its request types, so the image goes back to Tahoe's CoreWiFi. Tahoe ships it only inside its OS cryptex shared cache (x86_64h only; the code uses no instruction Ivy Bridge lacks), so tools/tahoe-donors cuts it out as a file at its own path with its own install name; golden-gate-userspace installs the CoreWiFi compat library in front of it.",
   "basesystem_arch": "x86_64",
   "basesystem_required": true,
   "boot_layout": "intel-boot-layout.tsv",

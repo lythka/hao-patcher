@@ -14,6 +14,7 @@ OUT (new) receives:
   zip/AssetData/...          links.txt, firmlinks_payload, BuildManifest and the boot/Restore files the layout uses
   out/BaseSystem-<arch>.dmg  rebuilt from its patch and checked against its chunklist
   out/driverkit/             DriverKit dyld cache families found in the system cryptexes (images not kept)
+  out/os-cache/              REQ os_cache: the OS cryptex's shared cache families (tools/tahoe-donors native --cache)
   preboot-recovery-map.tsv   the layout resolved for this build (tools/tahoe-donors boot/recovery input)
 Exit status: 0 everything required was found; 1 something required is missing (see report.txt); 2 usage/error."""
 import argparse, datetime, fnmatch, glob, hashlib, json, os, plistlib, re, shutil, struct, subprocess, sys, tempfile
@@ -245,6 +246,11 @@ def main():
         ripatch = os.path.join(work, 'ripatch')
         steps.run('build-ripatch', ['/usr/bin/cc', '-O2', '-Wall', '-o', ripatch, os.path.join(HERE, 'ripatch.c')])
         dst = os.path.join(o, 'driverkit'); os.makedirs(dst)
+        # REQ os_cache: the OS cryptex's own shared cache families (tools/tahoe-donors native cuts REQ cache_images,
+        # libraries Tahoe ships only in its cache, out of them). Images are not kept.
+        osc = req.get('os_cache'); os_found = {}; os_dst = os.path.join(o, 'os-cache')
+        if osc:
+            os.makedirs(os_dst)
         for member in sorted(m for m in members if re.fullmatch(re.escape(PV2) + r'image_patches/cryptex-system-[^/]+', m)):
             label = member.rsplit('/', 1)[1]
             p = os.path.join(work, label + '.patch'); img = os.path.join(work, label + '.img'); mnt = os.path.join(work, 'mnt')
@@ -267,17 +273,30 @@ def main():
                     dk_meta.append('%s\tF\t%d\t%d\t%o\t%x\t%d\t%d\t-\n' % (os.path.basename(f), st.st_uid, st.st_gid,
                                    st.st_mode & 0o7777, st.st_flags, st.st_mtime_ns // 10**9, st.st_mtime_ns % 10**9))
                     found[os.path.basename(f)] = label
+                for f in sorted(glob.glob(os.path.join(mnt, osc['path'], 'dyld_shared_cache_*'))) if osc else ():
+                    fam = re.sub(r'\.(atlas|symbols|map|\d+)$', '', os.path.basename(f))
+                    if fam not in osc['families'] or fam in os_found and os_found[fam] != label:
+                        continue  # each family wholly from one cryptex: its main file pins its subcaches by UUID
+                    shutil.copyfile(f, os.path.join(os_dst, os.path.basename(f)))
+                    os_found[fam] = label
+                if osc and os_found and not os.path.exists(os.path.join(os_dst, 'SystemVersion.plist')):
+                    sv_c = os.path.join(mnt, 'System/Library/CoreServices/SystemVersion.plist')
+                    if os.path.isfile(sv_c):
+                        shutil.copyfile(sv_c, os.path.join(os_dst, 'SystemVersion.plist'))
             finally:
                 subprocess.run(['/usr/bin/hdiutil', 'detach', mnt], capture_output=True)
             os.remove(img); os.rmdir(mnt)
             wanted = dk['required_families'] + dk.get('optional_families', [])
-            if all(family in found for family in wanted):
+            if all(family in found for family in wanted) and all(f in os_found for f in (osc or {}).get('families', [])):
                 break  # Do not reconstruct another cryptex once every requested family is present.
         open(os.path.join(dst, 'metadata.tsv'), 'w').write(''.join(dk_meta))
         owners = sorted({int(l.split('\t')[2]) for l in dk_meta})
         if 'owner_uid' in dk:
             note('DriverKit cache owner', 'uid %d' % dk['owner_uid'], owners == [dk['owner_uid']], True,
                  'source owners %s (the cryptex must be mounted with owners on)' % owners)
+        for fam in (osc or {}).get('families', []):
+            note('OS shared cache', fam, fam in os_found, bool(req.get('cache_images')),
+                 'from ' + os_found[fam] if fam in os_found else 'in no system cryptex of this installer')
         for fam in dk['required_families'] + dk.get('optional_families', []):
             src = sorted({v for k, v in found.items() if k == fam or k.startswith(fam + '.')})
             note('DriverKit cache', fam, bool(src), fam in dk['required_families'],
