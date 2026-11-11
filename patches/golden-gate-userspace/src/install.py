@@ -2,7 +2,8 @@
 
 The base layers (pipeline/stages/golden-image.py) already copied Golden Gate's System/Data and installed the Tahoe
 donors and OCLP's hardware overlay; nothing here replaces or keeps System trees. This installs the combined OS cryptex
-(Golden Gate SystemOS + RosettaOS x86_64 cache + Tahoe's x86_64 DriverKit cache, with the cache repairs), the OCLP
+(Golden Gate SystemOS + RosettaOS x86_64 cache + Tahoe's x86_64 DriverKit cache, with the cache repairs and the code
+identity carrier), the OCLP
 compat libraries, the display-state shim and its re-signed clients, and disables jobs that cannot run on this Mac."""
 import argparse
 from contextlib import contextmanager, ExitStack
@@ -26,6 +27,7 @@ from legacy_trackpad import plan_cache_family, apply_edits
 from endpoint_security import plan_cache_family as endpoint_plan
 from core_routine import plan_cache_family as routine_plan
 import swift_refs
+from codeid_carrier import plan_cache_family as codeid_plan
 def matrix_plan(cache):
     package = Path(__file__).resolve().parent / 'build/metal-fixes'
     result = subprocess.check_output([sys.executable, '-I', str(package/'metal-fixes'),
@@ -383,7 +385,8 @@ def seal_image(image):
     return next((line for line in out.splitlines() if 'root hash' in line.lower()), out.strip()[-200:])
 
 
-def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driverkit_artifact, donor_tool):
+def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driverkit_artifact, donor_tool,
+                    codeid_carrier):
     current = preboot/group/'cryptex1/current'
     work = current/'.golden-gate-os.dmg'
     # Resizing either source container hangs in APFSContainerGetMinimalSize.
@@ -447,6 +450,12 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
             path.name: [reason for _, _, _, reason in changes]
             for path, changes in swift.items()}
         for path, changes in swift.items():
+            trackpad_plan.setdefault(path, []).extend(changes)
+        # Code identity carrier: hao_codeid_decide after Security's two validity bodies (src/codeid_carrier.py,
+        # row codeid_carrier), so every native and hao process answers listed code's requirement checks from its
+        # Apple-signed reference (/usr/lib/hao/stub-identities, native-identities).
+        carrier, counts['code_identity_carrier'] = codeid_plan(mount/'System/Library/dyld', codeid_carrier)
+        for path, changes in carrier.items():
             trackpad_plan.setdefault(path, []).extend(changes)
         resigned = []
         for cache in sorted((mount/'System/Library/dyld').glob('dyld_shared_cache_x86_64*')):
@@ -514,7 +523,8 @@ def main():
         display_installer.resign_clients(system, source, workspace, RESIGN_WITH_27_ENTITLEMENTS,
                                         resign_with_entitlements)
         counts = install_cryptex(payload, preboot, group, golden_os, rosetta, workspace,
-                                 driverkit_artifact=args.driverkit_artifact, donor_tool=args.donor_tool)
+                                 driverkit_artifact=args.driverkit_artifact, donor_tool=args.donor_tool,
+                                 codeid_carrier=Path(__file__).resolve().parent/'inputs/codeid_carrier')
         version = system/'System/Library/CoreServices/SystemVersion.plist'
         for rel in ('System/Library/CoreServices/SystemVersion.plist',
                     'boot/System/Library/CoreServices/SystemVersion.plist',

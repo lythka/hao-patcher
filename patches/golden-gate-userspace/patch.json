@@ -1,5 +1,5 @@
 {
-  "revision": 47,
+  "revision": 48,
   "stage": "oclp-hook",
   "applies": {
     "models": [
@@ -17,6 +17,7 @@
     "display_state_shim",
     "io80211_compat",
     "wifip2p_compat",
-    "display_install_helper"
+    "display_install_helper",
+    "codeid_carrier"
   ]
 }

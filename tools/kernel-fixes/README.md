@@ -75,7 +75,6 @@ Other subcommands (each takes `--help`):
 | `repair-binding profile`, `repair-binding bind` | rebind the repairs to a freshly linked collection (below) |
 | `early-kexts SYSTEM ESP ROOTS_FILE` | inject Tahoe display and network kexts missing from the collections ([`patches/hao-opencore`](../../patches/hao-opencore)) |
 | `sandbox-rule SYSTEM_SB OUTPUT_SB` | add the disk-space Sandbox rule ([`patches/darwin27-sandbox-disk-space`](../../patches/darwin27-sandbox-disk-space)) |
-| `code-identity PAYLOAD SYSTEM OUT` | build the native code-identity map ([`patches/golden-gate-code-identity`](../../patches/golden-gate-code-identity)) |
 
 ## Per-image collection binding
 

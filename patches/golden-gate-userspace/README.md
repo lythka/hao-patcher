@@ -16,6 +16,8 @@ System tree.
   ([tools/display-fixes](../../tools/display-fixes)).
 - `io80211_compat`: the IO80211 compatibility library, built and checked for one build by `src/io80211/make`.
 - `wifip2p_compat`: the WiFiPeerToPeer compatibility library, built and checked for one build by `src/wifip2p/make`.
+- `codeid_carrier`: the code identity carrier's objects (`carrier.o` and hao-runtime's `libhao_codeid.a`), made by
+  `src/codeid/make` (common row: the objects are build-independent; each cache is checked when it is edited).
 - The native cache repairs' source is not an input row: `make.sh` copies `tools/metal-fixes` and
   `tools/audiomxd-fix` from this checkout into the staged recipe (`build/`).
 - From the runner, not a row of this patch: `golden-image.py` sets `TAHOE_DRIVERKIT_ARTIFACT` (the assembly's
@@ -26,9 +28,9 @@ System tree.
 collections; the runner calls it like every other recipe. It:
 - builds the combined OS cryptex from Golden Gate's native libraries and RosettaOS's x86_64 shared cache, adds
   Tahoe's generic Intel DriverKit cache, applies the native cache repairs (including the Swift conformance repair
-  below), re-signs the cache with 4 KiB code pages (`src/cache_pages.py`; the x86_64 kernel registers only 4 KiB
-  page signatures), checks every Swift metadata reference of the x86_64 cache (`src/swift_refs.py`, stops on any
-  bad one) and seals the image so 27.0's launchd can graft it;
+  below) and the code identity carrier (below), re-signs the cache with 4 KiB code pages (`src/cache_pages.py`;
+  the x86_64 kernel registers only 4 KiB page signatures), checks every Swift metadata reference of the x86_64
+  cache (`src/swift_refs.py`, stops on any bad one) and seals the image so 27.0's launchd can graft it;
 - links Rosetta's cache directory to the combined cache (`src/cryptex-cache-alias.sh`), because native dyld still
   looks there;
 - gives Tahoe programs that serve 27.0 clients (WindowServer) the 27.0 program's Info.plist and entitlements;
@@ -117,6 +119,56 @@ are the Wi-Fi Aware pairing, datapath and bootstrapping classes), gaps on OCLP's
 OCLP classes: WiFiPeerToPeerOld.dylib is cut from a 13.7.2 shared cache and its method lists name selectors relative
 to that cache, so they cannot be read offline. 27.x's x86_64 IO80211 defines no classes, so its pass records none.
 
+### Code identity
+macOS 27 programs run through hao's stubs, which are signed ad hoc, and several native Apple programs are re-signed ad
+hoc by later recipes; every check of a code requirement (`anchor apple`, `identifier ... and anchor apple`) then
+fails against them. Daemons that trust a peer by its Apple signature refuse it: tccd and backgroundtaskmanagementd
+(Find My's Bluetooth prompt, Login Items), airportd (no Wi-Fi join), authd (Setup's automatic login after creating
+the account). hao-runtime's `libhao_codeid` decides such a failure once for every process: when the code is listed in
+`/usr/lib/hao/stub-identities` (hao writes it) or `/usr/lib/hao/native-identities`
+([golden-gate-native-identities](../golden-gate-native-identities/README.md)), the caller's own requirement is
+evaluated against the listed Apple-signed reference and that verdict returned; anything else is unchanged
+(hao-runtime `include/hao/codeid.h`, `docs/security-model.md`).
+
+`src/codeid_carrier.py` carries that decision in the image's x86_64 shared cache, inside Security.framework, so every
+native process and every hao process (hao calls native Security through its bridge) gets it, whichever API path
+reaches the check:
+
+- It links `carrier.o` (`src/codeid/carrier.c`) and the members of `libhao_codeid.a` into the zero-filled free tail
+  of the main subcache's `__TEXT` mapping (code, constants) and `__DATA` mapping (about 1 KiB of writable data), after
+  the last image. Calls resolve to Security's own symbols, to Security's symbol stubs (which jump through the
+  subcache's bound GOT, so they follow dyld binding and root patching like Security's own calls), else to the regular
+  export of a system library in the same subcache; data references become `leaq` of the symbol. Anything that would
+  need a rebase (an absolute pointer), a common symbol, or an unresolved or ambiguous symbol stops the build.
+- `SecCodeCheckValidityWithErrors` and `SecStaticCodeCheckValidityWithErrors` begin with a jump to the carrier's
+  hook, which runs the original (its 6-byte prologue `push rbp; mov rbp, rsp; push r15`, relocated, then a jump back
+  into Apple's body) and returns `hao_codeid_decide(code, requirement, status, errors)`.
+- `SecCodeCheckValidity` and `SecStaticCodeCheckValidity` must be the cache's forwarders into those bodies
+  (`xor ecx, ecx` and a jump), so they, `SecTaskValidateForRequirement` and libxpc's dlsym'd checks
+  (`xpc_connection_set_peer_code_signing_requirement`) all reach the hook. authd's
+  `SecCodeCopyGuestWithAttributes` + `SecCodeCheckValidity(code, 0, "anchor apple")` and CoreWiFi's audit-token check
+  are this path.
+- Every site is found by shape and checked: one Security image, the hooked prologues, no branch into them, the
+  forwarders, zero-filled and unreferenced free space (not named by the cache header; no rebase in the data tail).
+  A cache that does not match stops the build (`MISSING/unsupported`). The edited main cache file is re-signed with
+  the other repairs. On 26B131 the carrier takes 0xd3b bytes of `__TEXT` (of 0x2000 free) and 0x420 of `__DATA`
+  (of 0x2ec0); 26A428's cache plans the same way.
+
+What is not covered: checks that do not evaluate a requirement through these two bodies, such as cdhash comparisons
+through `csops` (kernel CS flags, a pinned cdhash, trust caches), lightweight code requirements and Swift
+`XPCPeerRequirement` if they are evaluated outside Security, and `SecCodeCopySigningInformation`, which still
+describes the stub or the re-signed program. Unwinding through a carrier frame (only inside `hao_codeid_decide`) finds
+no unwind information; no C++ exception crosses it.
+
+```sh
+python3.14 -I patches/golden-gate-userspace/src/codeid/make ARTIFACTS --hao-runtime HAO_RUNTIME_CHECKOUT \
+  --cache ROSETTA_OS/System/Library/dyld
+```
+
+`make` builds `libhao_codeid.a` with hao-runtime's own Makefile from a committed tree, compiles `carrier.c`, plans the
+edit of the given cache read-only and writes `codeid-carrier-DATE-HASH12/` with `build.json` (hao-runtime commit and
+source hashes, object hashes, planned layout). Point row `codeid_carrier` at it.
+
 It requires the explicit DriverKit donor and never takes DriverKit from an earlier installed image. It installs OS libraries only; it does not generate
 Swift metadata, shader warm-up caches, icon indexes or account state.
 
@@ -125,12 +177,29 @@ Swift metadata, shader warm-up caches, icon indexes or account state.
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests
 # optional: WIFIP2P_OCLP_DIR / IO80211_OCLP_DIR = OCLP's 13.7.2-25 framework folders
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/build/tests
+# code identity carrier: HAO_RUNTIME = hao-runtime checkout (runs it); CODEID_CACHE = an image cache folder (plans it)
+HAO_RUNTIME=... CODEID_CACHE=.../System/Library/dyld python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests -k codeid
 ```
 The fixtures cover the DriverKit requirement, the absence of any System-tree replacement, special modes, native cache repair plans (the Swift conformance repair and verifier on an authored two-architecture cache)
 and adapter ordering. A built image must still pass filesystem, boot, native-service and application checks.
 
+The carrier tests link it against this Mac's own x86_64 cache (Rosetta's) into memory beside the mapped cache and
+call the hooks in an x86_64 process, so the relocated prologues run Apple's real Security bodies: an ad hoc re-signed
+copy of `/usr/bin/true` listed with its original passes `anchor apple` and `identifier "com.apple.true" and anchor
+apple`, and a running fat guest (ad hoc x86_64 beside Apple's arm64e `true`) passes by audit token; a requirement the
+original does not meet, unlisted code, a modified and re-signed copy and an unlisted guest keep -67050; Apple's own
+program is unchanged. Objects with an absolute pointer, a common symbol or an unknown symbol are refused. The entry
+jumps themselves are checked statically against the image cache (PlanTests).
+
+On a built image the main cache file holds `hao-codeid-carrier` at the start of its `__TEXT` tail, and
+`golden-gate-userspace.json` names the hook addresses (`code_identity_carrier`). Then: Setup Assistant's account
+creation logs in automatically (authd accepts loginwindow's `FUSAutologinDataKey`); `networksetup
+-setairportnetwork` joins; `codesign --verify -R='anchor apple'` passes for a hao-run Apple program and fails for an
+unlisted ad hoc one.
+
 ## Validation
-NEEDS VALIDATION: host tests cover the current recipe, and a Golden Gate-first image assembled with it reached SSH;
+NEEDS VALIDATION: host tests cover the current recipe (r48's carrier runs against this Mac's x86_64 cache; no image
+with it has been built or booted), and a Golden Gate-first image assembled with it reached SSH;
 loading of HID and serial DriverKit extensions with the added DriverKit cache, and a full application pass, are open.
 The WiFiPeerToPeer library (r43) was swapped live onto a running 26B131 image on the laptop: AirPlayXPCHelper then
 started without the libobjc abort. An image built with r43, and coreaudiod starting on it, are not yet tested.
@@ -138,9 +207,10 @@ r46 (stand-in methods) is host-tested only: an x86_64 probe sends WiFiAgent's `-
 Rosetta. Not yet shown on an image: WiFiAgent logging "XPCListener started." in a user session, its
 `com.apple.wifi.WiFiAgent` endpoint `active = 1`, and Setup's own join reaching the password sheet.
 The Swift conformance repair (r47) is checked on host copies of the 26B131 cache only (verifier 47 -> 0 bad
-references); an image built with it, and Siri AI.app launching from Cmd-Space, are not yet tested. Neither r46 nor r47 has been validated on an image.
+references); an image built with it, and Siri AI.app launching from Cmd-Space, are not yet tested. None of r46, r47 and r48 (code identity carrier) has been validated on an image.
 
 ## Revisions
+- r48 2026-11-11 Code identity carrier: hao-runtime's `hao_codeid_decide` (row `codeid_carrier`, hao-runtime 53d26c3 sources) linked into the free tails of the main x86_64 subcache and called after `SecCodeCheckValidityWithErrors` and `SecStaticCodeCheckValidityWithErrors` (their forwarders and SecTaskValidateForRequirement included), for every native and hao process; replaces golden-gate-code-identity's per-daemon interposer. Host-run against this Mac's x86_64 cache; planned on 26A428 and 26B131; boot validation pending.
 - r47 2026-11-11 Repair the x86_64 cache's broken Swift conformance type references (47 in 26B131, 21 in 26A428; Apple's own RosettaOS cache) from the arm64e cache's records, and refuse a combined cryptex whose x86_64 cache still has a bad Swift metadata reference (`src/swift_refs.py`). Fixes the SIGBUS of Siri AI.app (Cmd-Space) in `swift_getTypeByMangledName`. Host: plan, apply, 4 KiB re-sign and verify on a copy of 26B131's cache (47 -> 0); image and boot validation pending.
 - r46 2026-11-11 WiFiPeerToPeer compat: the `WiFiP2PKeychainAgent` stand-in answers `-activate`/`-invalidate` (27.x's WiFiAgent threw on them in every user session before opening its listener, so Setup's own Wi-Fi join timed out after 80 s), and `WiFiAwareStateMonitor` answers 27.x airportd's monitoring calls; all no-ops. New method-level pass (`src/io80211/methods.py`) in both libraries' coverage check: fails on a stand-in method an on-disk 27.x client names, records the rest. New `wifip2p_compat` artifacts for 26B131 and 26A428 (same library, checked against each build).
 - r45 2026-11-11 `src/kc-hook.sh` is the real entry point (the runner no longer calls `install.py` itself); it takes the DriverKit donor and donor tool from `TAHOE_DRIVERKIT_ARTIFACT`/`TAHOE_DONOR_TOOL`. Removed the unused Tahoe-first mode (`--prepared-system`, the System/Data base-tree replacement and its keep list, the DriverKit fallbacks). README: 26B131, no `*_fix_source` rows, which frameworks come from 27.x. Same files installed (`golden-gate-userspace.json` drops the empty keep-list fields); boot validation pending.

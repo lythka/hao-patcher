@@ -200,10 +200,11 @@ class Image:
     def recipes(self):
         """Every oclp-hook recipe of the set, in set order, each through its own src/kc-hook.sh SYSTEM.
         golden-run guarantees darwin27-kernel then golden-gate-userspace come first; the environment
-        carries the runner-only facts those two need (volume UUIDs, donor DriverKit artifact and tool)."""
+        carries the runner-only facts those two need (volume UUIDs, donor DriverKit artifact and tool) and the native
+        donor artifact golden-gate-native-identities reads Apple originals from."""
         c = self.config
         environment = dict(self.environment, TAHOE_DRIVERKIT_ARTIFACT=str(c['donors']['driverkit']),
-                           TAHOE_DONOR_TOOL=str(c['donor_tool']))
+                           TAHOE_DONOR_TOOL=str(c['donor_tool']), TAHOE_NATIVE_ARTIFACT=str(c['donors']['native']))
         for hook in c['hooks']:
             if not hook.get('kc_hook'):
                 raise ValueError('set entry has no src/kc-hook.sh: '+hook['name'])

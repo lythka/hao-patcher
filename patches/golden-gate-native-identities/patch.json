@@ -1,14 +1,17 @@
 {
-  "revision": 7,
+  "revision": 1,
   "stage": "oclp-hook",
   "applies": {
+    "models": [
+      "MacBookPro9,2"
+    ],
     "builds": [
       "25G332",
       "25G342"
     ]
   },
   "inputs": [
-    "code_identity"
+    "golden_gate_userspace"
   ],
   "status": "experiment",
   "validated": false

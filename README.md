@@ -80,7 +80,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 
 | Fix | Recipe | Source |
 |---|---|---|
-| Intel kernel, boot and platform repairs | `darwin27-kernel`, `hao-opencore`, `golden-gate-code-identity`, `darwin27-sandbox-disk-space` | [tools/kernel-fixes](tools/kernel-fixes), [tools/kernel-foundation](tools/kernel-foundation) |
+| Intel kernel, boot and platform repairs | `darwin27-kernel`, `hao-opencore`, `darwin27-sandbox-disk-space` | [tools/kernel-fixes](tools/kernel-fixes), [tools/kernel-foundation](tools/kernel-foundation) |
 | Metal libraries and framebuffer | `golden-gate-metal-libraries`, `golden-gate-metal-framebuffer` | [tools/metal-fixes](tools/metal-fixes), [cache/metallib](cache/metallib) |
 | First-boot hello and Welcome animation | `golden-gate-hello` | [patches/golden-gate-hello](patches/golden-gate-hello), [cache/metallib](cache/metallib) |
 | Legacy Metal selectors | `metalold-selectors` | [patches/metalold-selectors/build](patches/metalold-selectors/build) |
@@ -88,6 +88,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 | Display and WindowServer adapters | `golden-gate-windowserver-filter` | [tools/display-fixes](tools/display-fixes), [tools/display-state-shim](tools/display-state-shim) |
 | Userspace, Wi-Fi and pre-login audio adapters | `golden-gate-userspace` | [patches/golden-gate-userspace](patches/golden-gate-userspace), [tools/audiomxd-fix](tools/audiomxd-fix) |
 | ARM-only programs | `hao-runtime`, `hao-opencore` | [hao-runtime](https://github.com/lythka/hao-runtime) payload |
+| Apple code identity of hao and re-signed programs | `golden-gate-userspace` (carrier in Security), `golden-gate-native-identities` | [patches/golden-gate-userspace/src/codeid](patches/golden-gate-userspace/src/codeid), hao-runtime `libhao_codeid` |
 
 [patches/README.md](patches/README.md) describes the recipe format, and
 [patches/TRACKER.md](patches/TRACKER.md) lists every recipe with its stage and
