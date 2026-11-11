@@ -49,12 +49,16 @@ native `MPSMatrixMultiplication` fallback, yet family 25 then selects the code p
 that needs it. Messages to the missing object are dropped, so the matrix
 multiplication silently does nothing.
 
-`lib/mps_matrix_initializer.py` matches an exact 86-byte context at `__TEXT+0x2ee43`
-of MPSNDArray (UUID `530AFC24-8A84-3B7A-9601-9608EA68391C`) and changes
+`lib/mps_matrix_initializer.py` finds an 86-byte context in MPSNDArray with its six
+RIP-relative fields masked, requires exactly one original or repaired match, and
+checks that its selector reference resolves to
+`initWithDevice:transposeLeft:transposeRight:resultRows:resultColumns:interiorColumns:alpha:beta:`
+and its class reference to `MPSMatrixMultiplication`. It then changes
 `add eax,-26; cmp eax,-9; ja skip` to `add eax,-25; cmp eax,-8; ja skip`. Only
-family 25 changes behaviour. Any other build, relocated code, duplicate or mixed
-state is refused; an already repaired cache needs no edits. `lib/dyld_cache.py`
-resolves the image through the cache's mappings.
+family 25 changes behaviour. Anything else stops with `MISSING/unsupported`; an
+already repaired cache needs no edits. `lib/dyld_cache.py` resolves the image
+through the cache's mappings and slide info. The context is at `__TEXT+0x2ee43` in
+27.0 (26A428) and `__TEXT+0x2ee13` in 27.2.1 (26B131).
 
 ## Install
 
@@ -86,7 +90,7 @@ environment.
 
 ## Limitations
 
-The MPS initializer repair matches only the binaries named above; the library installers refuse a System library
+The MPS initializer repair is located by code shape (26A428 and 26B131); the library installers refuse a System library
 other than the one an artifact's `SOURCES` names. Rebuilt artifacts
 reproduce the selected runtime and framebuffer bytes, but acceptance on hardware
 is per patch; see each patch's Validation section.
@@ -95,4 +99,5 @@ Licensing: see [NOTICE.md](NOTICE.md).
 
 ## Revisions
 
+- r2 2026-11-11 MPS initializer repair located by masked context and resolved ObjC names instead of UUID and offset (26A428 and 26B131).
 - r1 2026-11-11 `metallibs` uses the Golden Gate profile for any 27.x System; `hello` added.

@@ -77,7 +77,7 @@ def main():
     revision = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'],
                               capture_output=True, text=True)
     (a.output/'build.json').write_text(json.dumps(dict(
-        unit='tools/audiomxd-fix', revision=1,
+        unit='tools/audiomxd-fix', revision=2,
         commit=revision.stdout.strip() if revision.returncode == 0 else None,
         files=rows, edits=serialized), indent=2)+'\n')
 

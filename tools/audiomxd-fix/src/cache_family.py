@@ -4,7 +4,7 @@ from pathlib import Path
 
 def plan_cache_family(directory, image, checker):
     """Return file-offset edits, resolving the image through the cache tables."""
-    files = []
+    files, slides = [], []
     for path in sorted(Path(directory).glob('dyld_shared_cache_x86_64*')):
         if path.is_symlink() or path.suffix in ('.map', '.atlas', '.symbols'):
             continue
@@ -15,6 +15,13 @@ def plan_cache_family(directory, image, checker):
             offset, count = struct.unpack_from('<II', head, 16)
             stream.seek(offset)
             mappings = [struct.unpack('<QQQII', stream.read(32)) for _ in range(count)]
+            # dyld_cache_header.mappingWithSlideOffset/Count: per-mapping slide info
+            offset, count = struct.unpack_from('<II', head, 0x138)
+            stream.seek(offset)
+            for _ in range(count):
+                base, length, _, info, info_size = struct.unpack('<QQQQQ', stream.read(56)[:40])
+                if info_size:
+                    slides.append((base, length, path, info))
         files.append((path, mappings))
 
     def locate(address, size):
@@ -35,6 +42,24 @@ def plan_cache_family(directory, image, checker):
             raise ValueError('audio no-console: truncated cache')
         return data
 
+    def pointer(address):
+        """Unslid target of a pointer stored at address (slide info v2 encoding)."""
+        raw = struct.unpack('<Q', read(address, 8))[0]
+        rows = [(path, info) for base, length, path, info in slides
+                if base <= address and address + 8 <= base + length]
+        if len(rows) != 1:
+            return raw
+        path, info = rows[0]
+        with path.open('rb') as stream:
+            stream.seek(info)
+            version, = struct.unpack('<I', stream.read(4))
+            if version != 2:
+                raise ValueError(f'audio no-console: unsupported slide info v{version}')
+            stream.seek(info + 24)
+            delta_mask, value_add = struct.unpack('<QQ', stream.read(16))
+        value = raw & ~delta_mask & 0xffffffffffffffff
+        return value + value_add if value else 0
+
     main = Path(directory)/'dyld_shared_cache_x86_64'
     addresses = []
     with main.open('rb') as stream:
@@ -50,7 +75,7 @@ def plan_cache_family(directory, image, checker):
     if len(addresses) != 1:
         raise ValueError('expected one cached image: ' + image.decode())
     plan = {}
-    for address, original, replacement, reason in checker(read, addresses[0]):
+    for address, original, replacement, reason in checker(read, addresses[0], pointer):
         path, offset = locate(address, len(original))
         plan.setdefault(path, []).append((offset, original, replacement, reason))
     return plan

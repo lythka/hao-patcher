@@ -1,6 +1,6 @@
 # audiomxd-fix
 
-Stops the audio retry loop that Golden Gate (26A428) runs on Intel while no user
+Stops the audio retry loop that Golden Gate runs on Intel while no user
 is logged in. Before login, AudioAccessoryServices reports a false server death
 to `audiomxd`, which retries its request and keeps asking `configd` for the
 console user, so both services stay busy. The fix removes that one false
@@ -8,21 +8,23 @@ notification; real XPC-death handling and the original no-user error are kept.
 
 ## How it works
 
-In AudioAccessoryServices (UUID `34D52126-6651-3DDE-BB42-6B17B8C547E1`),
-`-[BTAudioRoutingRequest _ensureXPCStarted]` compares the console uid with zero.
-Its zero branch calls `_handleServerDied` at `__TEXT+0x2456b`. The fix replaces
-that six-byte indirect call with a six-byte NOP.
+In AudioAccessoryServices, `-[BTAudioRoutingRequest _ensureXPCStarted]` compares
+the console uid with zero. Its zero branch sends `_handleServerDied`. The fix
+replaces that six-byte indirect call with a six-byte NOP.
 
-Before planning a write, the tool checks the image UUID, the conditional branch,
-the receiver setup and the original bytes. Unknown code is refused, and an
-already repaired cache plans no edits. The file offset is resolved through the
-supplied cache's mappings (for the 26A428 cache it is
-`dyld_shared_cache_x86_64.03+0x2192c56b`), not assumed.
+The tool finds the call by its shape, not by offset: in `__TEXT,__text` it looks
+for `movq SELREF(%rip),%rsi; movq %reg,%rdi; callq *GOT(%rip)` (or the repaired
+NOP), resolves each selector reference through the cache's slide info, and keeps
+the one `_handleServerDied` send that a `cmpl $0,disp8(%rbp); je` branch reaches.
+It must find exactly one; otherwise it stops with `MISSING/unsupported` and the
+image UUID. An already repaired cache plans no edits. On 27.0 (26A428) the site
+is `dyld_shared_cache_x86_64.03+0x2192c56b`; on 27.2.1 (26B131) it is
+`dyld_shared_cache_x86_64.01+0x2217f56b`.
 
 ## Usage
 
-Requires Python 3.9 or later and the original 26A428 x86_64 dyld cache family
-from the 27.0 RosettaOS. Run from this folder:
+Requires Python 3.9 or later and the original x86_64 dyld cache family from the
+Golden Gate RosettaOS. Run from this folder:
 
 ```sh
 python3 -I audiomxd-fix plan --cache CACHE_DIRECTORY
@@ -53,8 +55,13 @@ logging out and back in.
 
 ## Limitations
 
-The repair matches only the 26A428 AudioAccessoryServices image. It has not yet
-been confirmed on a freshly built image.
+The planner finds the site in 26A428 and 26B131; a later build is accepted only
+if the same code shape and selector are present. Not yet confirmed on a freshly
+built 26B131 image.
 
 The cache mapping resolver and the 4 KiB signature writer are adapted from
 `patches/golden-gate-userspace/src`. Licensing: see [NOTICE.md](NOTICE.md).
+
+## Revisions
+
+- r2 2026-11-11 Locate the no-console call by code shape and selector instead of UUID and offset (26A428 and 26B131).

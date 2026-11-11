@@ -45,7 +45,7 @@ def apply(source, output):
         inputs.append(dict(path=str(original), sha256=digest(original)))
         outputs[original.name] = digest(target)
         actions.append(dict(file=original.name, edits=len(changes), resigned_4k=resigned))
-    record = dict(unit='tools/metal-fixes/mps-apply', revision=1,
+    record = dict(unit='tools/metal-fixes/mps-apply', revision=2,
                   date=datetime.now(timezone.utc).isoformat(),
                   commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                   dirty=bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT)),
