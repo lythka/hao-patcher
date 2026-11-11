@@ -34,7 +34,8 @@ independent implementation. Where dsce leaves a cache address behind, this tool 
   - A class list that the cache builder turned into a relative list of lists (the class's own list plus other
     images' categories, preattached) points at the class's own list again.
   - Class method caches are bound to `__objc_empty_cache`, without preoptimized caches.
-  - The image info no longer says the image was optimized by dyld.
+  - The image info no longer says the image was optimized by dyld, nor that dyld attached its categories (with that
+    bit left set libobjc skips the image's categories when it loads at launch; a dlopen still attaches them).
 - **Linkedit.** New rebase and bind opcodes (`LC_DYLD_INFO_ONLY`; binds to weakly linked libraries are weak
   imports), an export trie rebuilt from the cache's trie, the original function starts and data-in-code, a symbol
   table of the exports, and a new UUID. `MH_DYLIB_IN_CACHE` is cleared. The result is unsigned; sign it ad hoc.
@@ -43,6 +44,7 @@ independent implementation. Where dsce leaves a cache address behind, this tool 
 - No instruction needs a CPU newer than Ivy Bridge: AVX2, BMI1/2, FMA, MOVBE, LZCNT or TZCNT. A cache built for
   x86_64h may use them, and Ivy Bridge would fault on most of them and silently run LZCNT/TZCNT as BSR/BSF.
 - Every RIP-relative operand in the disassembly lands inside the dylib.
+- The Objective-C image info claims no dyld optimization (bits 0, 3, 7).
 - Every operand that lands in `__CACHE_GOT` uses a slot the dylib binds or rebases (`dyld_info -fixups`).
 - A target outside the dylib fails if it lies in the source cache's uniqued GOT region. Other such targets are listed
   as decoding artifacts: data inside `__text` decoded as instructions, with absurd displacements.
@@ -80,6 +82,7 @@ CACHE_DYLIB_TAHOE_CACHE=store/inputs/25G342/os-cryptex-x86_64h python3.14 -I -B 
 ```
 
 ## Revisions
+- r3 2026-11-11 Also clear objc_image_info bit 0 (dyld categories optimized), and check.py refuses it: with it set, Tahoe CoreWiFi's categories (e.g. -[NSString redactedForWiFi]) were not attached when airportd loaded it at launch, and airportd threw an unrecognized selector at start-up on the laptop.
 - r2 2026-11-11 Used by tools/tahoe-donors (`native --cache`) instead of a recipe of its own; no code change.
 - r1 2026-11-11 First version: extracts Tahoe 25G342's CoreWiFi from the x86_64h cache. Verified by check.py: no
   Haswell-only instruction; 720 GOT slots used by code, all bound; 3453 Swift relative pointers resolved. Under Rosetta on 27.2 its classes

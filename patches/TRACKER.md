@@ -18,7 +18,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-native-identities | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
 | golden-gate-shader-caches | r8 | post | experiment |  |  |  | **needs** | r8 2026-11-11 Restored for 26B131 with a pack harvested from 26B131 itself (cache/seeds), ancestors and owners |
 | golden-gate-user-seed | r4 | post | experiment |  |  |  | **needs** | r4 2026-11-11 Restored for 26B131 without payloads of its own: runtime and build gate only; fonts moved to gol |
-| golden-gate-userspace | r50 | oclp-hook | experiment | x |  |  | **needs** | r50 2026-11-11 CoreWiFi: Tahoe 25G342's CoreWiFi (a native donor, cut from Tahoe's cache by tools/tahoe-donors |
+| golden-gate-userspace | r51 | oclp-hook | experiment | x |  |  | **needs** | r51 2026-11-11 The live test of r50 crashed airportd at start-up: `-[NSString redactedForWiFi]` (a Tahoe CoreW |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
 | hao-opencore | r33 | post | experiment | x |  |  | **needs** | r33 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 7415a0b; HaoExec  |
 | hao-runtime | r59 | oclp-hook | experiment | x |  |  | **needs** | r59 2026-11-11 26B131 payload rebuilt with hao-runtime 7415a0b from a root that includes the App and OS crypte |

@@ -34,8 +34,10 @@ VM_PROT_READ, VM_PROT_WRITE, VM_PROT_EXECUTE = 1, 2, 4
 METHOD_LIST_RELATIVE = 0x80000000
 METHOD_LIST_DIRECT_SELECTORS = 0x40000000
 METHOD_LIST_FIXED_UP = 0x3
-# objc_image_info flags cleared: optimized by dyld (3), optimized by the dyld closure (7)
-IMAGE_INFO_CLEAR = (1 << 3) | (1 << 7)
+# objc_image_info flags cleared: dyld categories optimized (0), optimized by dyld (3), optimized by the dyld closure (7).
+# With bit 0 left set, libobjc skips the image's categories when it is loaded at launch (they count as attached by the
+# cache builder), so e.g. Tahoe CoreWiFi's -[NSString redactedForWiFi] was missing in airportd; a dlopen attached them.
+IMAGE_INFO_CLEAR = (1 << 0) | (1 << 3) | (1 << 7)
 # protocol_t flags the cache builder sets on canonical copies: fixed up (30, 31), canonical (29)
 PROTOCOL_CLEAR = 0xE0000000
 STRING_SECTIONS = ('__objc_methname', '__objc_classname', '__objc_methtype', '__cstring')

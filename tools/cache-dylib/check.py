@@ -8,11 +8,13 @@ dylib's segments, and
 every one landing in the private GOT segment (__CACHE_GOT) on a slot the dylib binds or rebases (dyld_info -fixups).
 A target outside every segment is an error when it lies in the source cache's uniqued GOT region (a GOT slot the
 extraction missed); elsewhere it is a decoding artifact of data inside __text (absurd displacements such as
-0x3fffffff) and is listed, not failed. Prints a JSON record; exit status 1 on errors.
+0x3fffffff) and is listed, not failed. The Objective-C image info must not claim dyld optimization (categories
+attached, optimized by dyld or its closure). Prints a JSON record; exit status 1 on errors.
 """
 import json
 from pathlib import Path
 import re
+import struct
 import subprocess
 import sys
 
@@ -188,7 +190,13 @@ def check(path, report):
     errors = [f'GOT slot {t:#x} used by code is neither bound nor rebased' for t in sorted(unbound)]
     errors += [f'code uses a uniqued GOT slot outside the dylib: {line}' for line in missed]
     errors += [f'instruction Ivy Bridge lacks: {line}' for line in haswell]
-    swift_count, swift_errors = swift(Image(path), fixed)
+    image = Image(path)
+    if '__objc_imageinfo' in image.sects:
+        flags, = struct.unpack('<I', image.read(image.sects['__objc_imageinfo'][0] + 4, 4))
+        if flags & 0x89:
+            # bit 0 (categories attached by dyld): libobjc then skips the image's categories when it loads at launch
+            errors.append(f'objc_image_info flags {flags:#x} still claim dyld optimization (bits 0, 3, 7)')
+    swift_count, swift_errors = swift(image, fixed)
     return dict(rip_operands=total, got_slots_used=len(used), fixups=len(fixed), swift_relative_pointers=swift_count,
                 decoding_artifacts=artifacts, errors=errors + swift_errors)
 

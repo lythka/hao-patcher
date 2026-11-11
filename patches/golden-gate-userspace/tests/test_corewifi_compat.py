@@ -307,6 +307,21 @@ class Artifact(unittest.TestCase):
         self.assertEqual(lines[2], 'coex=0/45 scan=45/0')
         self.assertEqual(lines[3], 'responds=2')
 
+    def test_categories_attach_when_linked_at_launch(self):
+        # airportd links CoreWiFi, so libobjc attaches its categories at launch, not at dlopen: with the image info
+        # still claiming dyld-attached categories it skipped them and airportd threw on -[NSString redactedForWiFi].
+        (self.tmp/'launch.m').write_text(
+            '#import <Foundation/Foundation.h>\nextern NSString *const CWFEventLinkQualityAssessmentKey;\n'
+            'int main(void) { printf("%d %d %s\\n", (int)[@"abc" respondsToSelector:NSSelectorFromString(@"redactedForWiFi")],'
+            ' (int)[NSSet instancesRespondToSelector:NSSelectorFromString(@"_prettyDescription")],'
+            ' CWFEventLinkQualityAssessmentKey.UTF8String); return 0; }\n')
+        sh('xcrun', 'clang', '-arch', 'x86_64', '-fobjc-arc', '-framework', 'Foundation', self.tmp/'launch.m',
+           self.folder/'CoreWiFi', '-o', self.tmp/'launch')
+        sh('codesign', '-f', '-s', '-', self.tmp/'launch')
+        out = run_probe(self.tmp/'launch', self.folder)
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr[-3000:])
+        self.assertEqual(out.stdout.strip(), '1 1 LinkQualityAssessment')
+
     def test_swift_type_lookup(self):
         (self.tmp/'probe.swift').write_text(SWIFT)
         sh('xcrun', 'swiftc', '-target', 'x86_64-apple-macos14', self.tmp/'probe.swift', '-o', self.tmp/'swiftprobe')
