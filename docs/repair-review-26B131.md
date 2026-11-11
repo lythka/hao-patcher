@@ -16,7 +16,7 @@ by themselves prove that a repaired path is exercised on the laptop.
 | MPSMatrix | The legacy GPU family needs the fallback initializer; the current cache matches the recipe. | Keep pending graphics acceptance. |
 | Audio | The no-console branch still reaches the server-died path. | Keep; a pre-login comparison could establish whether current system behavior makes it redundant. |
 | Metal libraries/runtime/framebuffer | The legacy HD 4000 compiler and driver still serve newer framework clients. | Keep. Investigate pruning selector coverage used only by debug/replay paths. |
-| Code identity | Translated programs gain a native executable slice while TCC/BTM need their original identity. | Keep; boot success alone cannot establish correct attribution. |
+| Code identity | Translated programs gain a native executable slice, and re-signed native programs lose Apple's signature, while TCC, BTM, airportd and authd check `anchor apple`. | Replaced (2026-11-11) by one carrier in Security.framework (golden-gate-userspace r46) with hao's stub-identities and golden-gate-native-identities; boot success alone cannot establish correct attribution. |
 | Hello shaders | Only needed when retaining the Hello animation on the legacy GPU. | Optional feature. Blur-cache and Continue-button warmup are separate performance candidates. |
 | hybridsearchd suppression | Historical non-Apple-silicon exit loop; current target behavior has not been compared. | Open removal candidate, requiring a bounded target run. |
 

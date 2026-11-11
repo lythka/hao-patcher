@@ -7,7 +7,7 @@
 #
 # oclp-hook entries (src/kc-hook.sh, System writable, before the snapshot):
 darwin27-kernel                   # Boot/System kernel collections around the 27 x86_64 kernel and the Intel kexts. First: everything after edits on top of them
-golden-gate-userspace             # combined OS cryptex (x86_64 dyld cache, Tahoe DriverKit, cache repairs), IO80211/WiFiPeerToPeer compat, display shim. Second, same reason
+golden-gate-userspace             # combined OS cryptex (x86_64 dyld cache, Tahoe DriverKit, cache repairs, code identity carrier in Security), IO80211/WiFiPeerToPeer compat, display shim. Second, same reason
 darwin27-sandbox-disk-space       # 26A428's system.sb lacks the vfs.disk-space rule (27.2 has it): one Sandbox report per statfs without it
 hao-runtime                       # hao, plus an x86_64 launch slice in every arm64-only 27 program so it runs on Intel
 golden-gate-metal-libraries       # the build's own RenderBox/Tungsten/MPS/MetalFX/CoreRE metallibs repaired for the HD 4000 compiler; deliberately supersedes OCLP's Tahoe RenderBox/Tungsten copies
@@ -16,6 +16,6 @@ golden-gate-windowserver-filter   # two WindowServer rendering paths (Siri bubbl
 golden-gate-corespotlight-compat  # the CoreSpotlight getter 27's corespotlightd/managedcorespotlightd call on every query
 metalold-selectors                # Metal selectors OCLP's MetalOld does not answer, via a weak dylib in the HD 4000 Metal driver; before metal-framebuffer (same binary)
 golden-gate-metal-framebuffer     # framebuffer reads for RenderBox symbols (Wi-Fi, Control Center), a second weak dylib in the same driver
-golden-gate-code-identity         # tccd/backgroundtaskmanagementd see the Apple identity of hao-translated programs; after hao-runtime, whose payload its map is built from
+golden-gate-native-identities     # Apple originals of the native programs the image re-signed ad hoc + /usr/lib/hao/native-identities, for golden-gate-userspace's code identity carrier. Last oclp-hook: after every recipe that re-signs
 # post entries (apply.sh, after the snapshot, System read-only):
 hao-opencore                      # OpenCore: kernel repairs bound to this image's BootKC, IntelCommpage, HaoExec, early display/Ethernet kexts, boot-args

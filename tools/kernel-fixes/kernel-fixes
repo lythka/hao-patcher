@@ -20,7 +20,6 @@ SCRIPTS = {'repair-binding': REPO/'patches/hao-opencore/src/repair_binding.py',
            'commpage-kext': UNIT/'commpage_build.py',
            'iosurface-layout': UNIT/'iosurface_layout.py',
            'sandbox-layout': UNIT/'sandbox_layout.py',
-           'code-identity': REPO/'patches/golden-gate-code-identity/make',
            'early-kexts': REPO/'patches/hao-opencore/src/early_kexts.py',
            'sandbox-rule': REPO/'patches/darwin27-sandbox-disk-space/src/disk_space_rule.py'}
 

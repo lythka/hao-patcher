@@ -1,3 +1,4 @@
-# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit).
-# Regenerated interface units (1,895); no async provider yet (needs a booted 26B131 image).
-- store/artifacts/hao-runtime-26B131-20261111-128fcc0818fb/payload
+# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 7415a0b).
+# Built from a root that includes the App and OS cryptexes (their 26 programs are embedded by golden-gate-userspace).
+# Regenerated interface units (1,895); stub-identities; no async provider yet (needs a booted 26B131 image).
+- store/artifacts/hao-runtime-26B131-20261111-7415a0b0252f/payload

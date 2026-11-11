@@ -1,2 +1,3 @@
 # Mounted read-only; the combined cryptex is written to the target Preboot volume.
 golden_gate_userspace
+hao_runtime  # read only: the stubs embedded into the App and OS cryptexes

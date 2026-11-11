@@ -1,0 +1,4 @@
+# Code identity carrier objects made by patches/golden-gate-userspace/src/codeid/make: carrier.o and libhao_codeid.a from
+# hao-runtime 33a0a04 (code-identity sources identical to 53d26c3); build.json pins every hash. Planned against the 26A428
+# and 26B131 x86_64 caches.
+- store/artifacts/codeid-carrier-20261111-002baf5f2e03

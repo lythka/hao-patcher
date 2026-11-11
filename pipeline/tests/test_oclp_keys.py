@@ -130,7 +130,7 @@ class OclpKeys(unittest.TestCase):
                                                   'golden-gate-metal-libraries', 'golden-gate-hello',
                                                   'golden-gate-windowserver-filter', 'golden-gate-corespotlight-compat',
                                                   'metalold-selectors', 'golden-gate-metal-framebuffer',
-                                                  'golden-gate-code-identity'])
+                                                  'golden-gate-native-identities'])
         self.assertEqual(points[4][1], ['darwin27-kernel', 'golden-gate-userspace', 'darwin27-sandbox-disk-space'])
         # No recipe has a hook.sh any more, so the state before hao-runtime holds exactly the kc-hooks before it.
         self.assertEqual([l.split()[1] for l in points[4][2]],

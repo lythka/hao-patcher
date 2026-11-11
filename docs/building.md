@@ -58,8 +58,12 @@ keeps 27's Metal, OpenCL, AppleGVA(Core), GPUCompiler, MTLCompiler, IO80211 and
 WiFiPeerToPeer. The 26A428 one installs Tahoe's.
 
 In layer 7, `darwin27-kernel` links the Boot and System KCs (the record keeps the BootKC);
-`golden-gate-userspace` builds the OS cryptex and installs the Wi-Fi compat libraries and the
-display shim. Each set entry has a comment saying what it adds and why.
+`golden-gate-userspace` builds the OS cryptex (with the code identity carrier in the x86_64 cache's
+Security.framework) and installs the Wi-Fi compat libraries and the display shim;
+`golden-gate-native-identities` runs last, after every recipe that re-signs a program ad hoc, and
+lists those programs with their Apple originals for the carrier. Recipes get `TAHOE_DRIVERKIT_ARTIFACT`,
+`TAHOE_DONOR_TOOL` and `TAHOE_NATIVE_ARTIFACT` from the runner. Each set entry has a comment saying
+what it adds and why.
 
 `golden-run` refuses a set unless:
 - the first two entries are `darwin27-kernel`, then `golden-gate-userspace` (later recipes

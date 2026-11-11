@@ -80,22 +80,28 @@ refuses a set that breaks that order.
 - **Clear layer order** (2026-11-11): the build runs every recipe once, in set-file
   order, after a fixed list of base layers, and duplicate steps are gone.
   [Building an image](docs/building.md) lists the order.
-- **Wi-Fi:** the Wi-Fi daemon accepts macOS 27 programs (`golden-gate-code-identity` r7),
-  so networks can be joined. WiFiAgent now starts in user sessions (`golden-gate-userspace`
-  r46), which Setup's own join dialog needs. A new build check catches methods that
-  macOS 27 programs call but the OCLP Wi-Fi libraries lack.
+- **Wi-Fi:** the Wi-Fi daemon accepts macOS 27 programs, so networks can be joined.
+  WiFiAgent now starts in user sessions (`golden-gate-userspace` r46), which Setup's own
+  join dialog needs. A new build check catches methods that macOS 27 programs call but
+  the OCLP Wi-Fi libraries lack.
 - **Audio and sharing:** audio, AirPlay, Control Center and `sharingd` no longer crash at
   boot (`golden-gate-userspace` r43–r44).
 
-In progress, not yet on `main`:
-- one code-identity check built into Security.framework for every program, replacing
-  the per-daemon `golden-gate-code-identity` list;
-- repair of Apple's broken Swift references in the Intel shared cache (Spotlight);
-- hao stubs for Safari's helpers in the App and OS cryptexes;
-- preloaded shader, icon and font caches;
-- Tahoe's CoreWiFi for the Wi-Fi daemon;
-- VectorKit and VFX shader repairs;
-- Live Text.
+On `main`, built into a test image but not yet confirmed on the laptop:
+- **Code identity for every program** (`golden-gate-userspace` r48,
+  `golden-gate-native-identities`): one check inside Security.framework lets macOS see
+  verified hao and re-signed programs as the Apple programs they are. It replaces the
+  per-daemon `golden-gate-code-identity` list.
+- **Spotlight:** the build repairs Swift type references that are broken in Apple's own
+  Intel shared cache, then checks every reference (`golden-gate-userspace` r47).
+- **Safari's helpers:** programs in the App and OS cryptexes get hao stubs, so they run
+  under their own identity (`golden-gate-userspace` r49, hao-runtime 7415a0b).
+- **Faster first boot:** preloaded shader, icon and font caches
+  (`golden-gate-user-seed`, `-shader-caches`, `-icon-caches`, `-font-registry`).
+- **Maps and VFX shaders:** VectorKit, AlloyCommon and VFX join the Metal library repairs
+  (`golden-gate-metal-libraries` r16).
+
+Still in progress: Tahoe's CoreWiFi for the Wi-Fi daemon, and Live Text.
 
 ## Fixes
 
@@ -104,7 +110,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 
 | Fix | Recipe | Source |
 |---|---|---|
-| Intel kernel, boot and platform repairs | `darwin27-kernel`, `hao-opencore`, `golden-gate-code-identity`, `darwin27-sandbox-disk-space` | [tools/kernel-fixes](tools/kernel-fixes), [tools/kernel-foundation](tools/kernel-foundation) |
+| Intel kernel, boot and platform repairs | `darwin27-kernel`, `hao-opencore`, `darwin27-sandbox-disk-space` | [tools/kernel-fixes](tools/kernel-fixes), [tools/kernel-foundation](tools/kernel-foundation) |
 | Metal libraries and framebuffer | `golden-gate-metal-libraries`, `golden-gate-metal-framebuffer` | [tools/metal-fixes](tools/metal-fixes), [cache/metallib](cache/metallib) |
 | First-boot hello and Welcome animation | `golden-gate-hello` | [patches/golden-gate-hello](patches/golden-gate-hello), [cache/metallib](cache/metallib) |
 | Legacy Metal selectors | `metalold-selectors` | [patches/metalold-selectors/build](patches/metalold-selectors/build) |
@@ -112,6 +118,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 | Display and WindowServer adapters | `golden-gate-windowserver-filter` | [tools/display-fixes](tools/display-fixes), [tools/display-state-shim](tools/display-state-shim) |
 | Userspace, Wi-Fi and pre-login audio adapters | `golden-gate-userspace` | [patches/golden-gate-userspace](patches/golden-gate-userspace), [tools/audiomxd-fix](tools/audiomxd-fix) |
 | ARM-only programs | `hao-runtime`, `hao-opencore` | [hao-runtime](https://github.com/lythka/hao-runtime) payload |
+| Apple code identity of hao and re-signed programs | `golden-gate-userspace` (carrier in Security), `golden-gate-native-identities` | [patches/golden-gate-userspace/src/codeid](patches/golden-gate-userspace/src/codeid), hao-runtime `libhao_codeid` |
 
 [patches/README.md](patches/README.md) describes the recipe format, and
 [patches/TRACKER.md](patches/TRACKER.md) lists every recipe with its stage and

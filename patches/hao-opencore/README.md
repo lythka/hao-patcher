@@ -94,6 +94,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r33 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 7415a0b; HaoExec comes from it (rebuilt by that commit). No recipe change; boot validation pending.
 - r32 2026-11-11 No longer copies OpenCore.efi and OpenRuntime.efi from `opencore_debug`: the base EFI build already installs every OpenCore binary from that same archive. Input row `opencore_debug` dropped from this patch (the runner still reads it for the base EFI). Same ESP bytes expected; build validation pending.
 - r31 2026-11-11 Use the Sandbox operation adapter that prunes isolated unsupported roots from removed operations. The previous adapter refused apsd and left Setup Assistant waiting on its activation-record request. Full boot validation pending.
 - r30 2026-11-11 Bind 26B131 kernel repairs and IntelCommpage to the freshly linked collection, and stamp HaoExec for that kernel. Boot validation pending.

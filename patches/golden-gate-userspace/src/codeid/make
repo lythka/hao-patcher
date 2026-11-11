@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Make the code identity carrier artifact (row codeid_carrier) from a hao-runtime checkout.
+
+  make ARTIFACTS --hao-runtime CHECKOUT [--cache DIR]
+
+Builds hao-runtime's build/libhao_codeid.a (its own Makefile, a committed and clean tree), compiles carrier.c against
+its include/, and writes ARTIFACTS/codeid-carrier-DATE-SHA12/{carrier.o, libhao_codeid.a, build.json}. With --cache
+(a folder holding an image's dyld_shared_cache_x86_64*, e.g. the build's RosettaOS System/Library/dyld) it also plans
+the cache edit, read-only, and records the summary, so an artifact that does not fit the cache is never made.
+"""
+import argparse
+import datetime
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+import codeid_carrier as carrier
+
+RUNTIME_SOURCES = ['Makefile', 'src/code_identity.c', 'src/idlist.c', 'include/hao/codeid.h', 'include/hao/idlist.h']
+
+
+def git(checkout, *args):
+    return subprocess.run(['git', '-C', str(checkout), *args], check=True, capture_output=True, text=True).stdout
+
+
+def sha256(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('artifacts', type=Path)
+    parser.add_argument('--hao-runtime', type=Path, required=True)
+    parser.add_argument('--cache', type=Path)
+    args = parser.parse_args()
+    runtime = args.hao_runtime.resolve()
+    if git(runtime, 'status', '--porcelain', '--', *RUNTIME_SOURCES).strip():
+        raise SystemExit(f'{runtime}: uncommitted changes in {", ".join(RUNTIME_SOURCES)}')
+    commit = git(runtime, 'rev-parse', 'HEAD').strip()
+    subprocess.run(['make', '-C', str(runtime), 'build/libhao_codeid.a'], check=True)
+    with tempfile.TemporaryDirectory(prefix='codeid-carrier-') as tmp:
+        tmp = Path(tmp)
+        subprocess.run(['clang', '-arch', 'x86_64', '-O2', '-Wall', '-Wextra', '-Werror', '-fno-common',
+                        '-ffile-prefix-map=' + str(HERE) + '=.', '-I', str(runtime/'include'),
+                        '-c', str(HERE/'carrier.c'), '-o', str(tmp/'carrier.o')], check=True)
+        shutil.copyfile(runtime/'build/libhao_codeid.a', tmp/'libhao_codeid.a')
+        objects = [carrier.Object('carrier.o', (tmp/'carrier.o').read_bytes())]
+        objects += [carrier.Object(name, body) for name, body in carrier.read_archive((tmp/'libhao_codeid.a').read_bytes())]
+        record = dict(
+            hao_runtime=dict(commit=commit, libhao_codeid_a=sha256(tmp/'libhao_codeid.a'),
+                             sources={name: sha256(runtime/name) for name in RUNTIME_SOURCES}),
+            carrier_c=sha256(HERE/'carrier.c'), carrier_o=sha256(tmp/'carrier.o'),
+            linker=sha256(HERE.parent/'codeid_carrier.py'),
+            members=[obj.name for obj in objects],
+            date=datetime.datetime.now(datetime.timezone.utc).isoformat())
+        if args.cache:
+            _, summary = carrier.plan_cache_family(args.cache, objects=objects)
+            record['planned'] = dict(cache=str(args.cache), summary=summary)
+            print('planned:', json.dumps(summary), flush=True)
+        key = hashlib.sha256((record['carrier_o'] + record['hao_runtime']['libhao_codeid_a']).encode()).hexdigest()
+        out = args.artifacts/f'codeid-carrier-{datetime.date.today():%Y%m%d}-{key[:12]}'
+        out.mkdir(parents=True, exist_ok=False)
+        for name in ('carrier.o', 'libhao_codeid.a'):
+            shutil.copyfile(tmp/name, out/name)
+        (out/'build.json').write_text(json.dumps(record, indent=2) + '\n')
+    print(out)
+
+
+if __name__ == '__main__':
+    main()

@@ -2,8 +2,10 @@
 
 The base layers (pipeline/stages/golden-image.py) already copied Golden Gate's System/Data and installed the Tahoe
 donors and OCLP's hardware overlay; nothing here replaces or keeps System trees. This installs the combined OS cryptex
-(Golden Gate SystemOS + RosettaOS x86_64 cache + Tahoe's x86_64 DriverKit cache, with the cache repairs), the OCLP
-compat libraries, the display-state shim and its re-signed clients, and disables jobs that cannot run on this Mac."""
+(Golden Gate SystemOS + RosettaOS x86_64 cache + Tahoe's x86_64 DriverKit cache, with the cache repairs and the code
+identity carrier) and the App cryptex, each with the hao stubs of its arm64-only programs (src/cryptex_stubs.py),
+the OCLP compat libraries, the display-state shim and its re-signed clients, and disables jobs that cannot run on this
+Mac."""
 import argparse
 from contextlib import contextmanager, ExitStack
 import importlib.machinery
@@ -25,6 +27,9 @@ from cache_pages import resign_file
 from legacy_trackpad import plan_cache_family, apply_edits
 from endpoint_security import plan_cache_family as endpoint_plan
 from core_routine import plan_cache_family as routine_plan
+import swift_refs
+from codeid_carrier import plan_cache_family as codeid_plan
+import cryptex_stubs
 def matrix_plan(cache):
     package = Path(__file__).resolve().parent / 'build/metal-fixes'
     result = subprocess.check_output([sys.executable, '-I', str(package/'metal-fixes'),
@@ -382,16 +387,13 @@ def seal_image(image):
     return next((line for line in out.splitlines() if 'root hash' in line.lower()), out.strip()[-200:])
 
 
-def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driverkit_artifact, donor_tool):
-    current = preboot/group/'cryptex1/current'
-    work = current/'.golden-gate-os.dmg'
-    # Resizing either source container hangs in APFSContainerGetMinimalSize.
-    # Format a new raw image at its final size instead; never resize a live APFS container.
-    size = logical_size(golden_os)+logical_size(rosetta)+(2 << 30)
+def new_image(work, size, like):
+    """A new raw image WORK of SIZE bytes (rounded up to 1 MiB) with one APFS volume named and owned like the mounted
+    volume LIKE. Resizing a source container hangs in APFSContainerGetMinimalSize: never resize a live one."""
     with work.open('xb') as stream:
         stream.truncate((size+(1 << 20)-1)//(1 << 20)*(1 << 20))
-    metadata = golden_os.stat()
-    volume_name = disk_info(golden_os)['VolumeName']
+    metadata = like.stat()
+    volume_name = disk_info(like)['VolumeName']
     attached = plistlib.loads(run('hdiutil', 'attach', '-nomount', '-plist',
                                   '-imagekey', 'diskimage-class=CRawDiskImage', work, output=True))
     whole = attached['system-entities'][0]['dev-entry']
@@ -400,9 +402,23 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
             '-i', '-U', metadata.st_uid, '-G', metadata.st_gid, '-v', volume_name, whole)
     finally:
         run('hdiutil', 'detach', whole)
+
+
+CRYPTEX_KEEP = {'.fseventsd', '.Spotlight-V100', '.Trashes'}
+
+
+def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driverkit_artifact, donor_tool,
+                    codeid_carrier, hao):
+    current = preboot/group/'cryptex1/current'
+    work = current/'.golden-gate-os.dmg'
+    # Format a new raw image at its final size.
+    new_image(work, logical_size(golden_os)+logical_size(rosetta)+(2 << 30), golden_os)
+    metadata = golden_os.stat()
     counts = dict(added_subtrees=0, universal_files=0)
     with image_mount(work, workspace/'combined-os', writable=True) as mount:
-        replace_tree(golden_os, mount, {'.fseventsd', '.Spotlight-V100', '.Trashes'})
+        replace_tree(golden_os, mount, CRYPTEX_KEEP)
+        # hao stubs of the arm64-only programs in SystemOS (Safari's and WebKit's XPC services), before sealing.
+        counts['hao_stubs'] = cryptex_stubs.embed(hao, 'OS', mount)
         merge_rosetta(rosetta, mount, counts)
         # 27.x ships DriverKit only for arm64e: add the explicitly extracted Tahoe x86_64 DriverKit cache family.
         driverkit = 'System/DriverKit/System/Library/dyld'
@@ -439,6 +455,20 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
             for path, changes in audio.items()}
         for path, changes in audio.items():
             trackpad_plan.setdefault(path, []).extend(changes)
+        # Apple's x86_64 cache leaves some Swift conformance type references unadjusted (they point at unrelated
+        # bytes; a name lookup that scans them faults). The arm64e cache beside it names the intended types.
+        swift = swift_refs.plan_cache_family(mount/'System/Library/dyld')
+        counts['swift_conformance_types'] = {
+            path.name: [reason for _, _, _, reason in changes]
+            for path, changes in swift.items()}
+        for path, changes in swift.items():
+            trackpad_plan.setdefault(path, []).extend(changes)
+        # Code identity carrier: hao_codeid_decide after Security's two validity bodies (src/codeid_carrier.py,
+        # row codeid_carrier), so every native and hao process answers listed code's requirement checks from its
+        # Apple-signed reference (/usr/lib/hao/stub-identities, native-identities).
+        carrier, counts['code_identity_carrier'] = codeid_plan(mount/'System/Library/dyld', codeid_carrier)
+        for path, changes in carrier.items():
+            trackpad_plan.setdefault(path, []).extend(changes)
         resigned = []
         for cache in sorted((mount/'System/Library/dyld').glob('dyld_shared_cache_x86_64*')):
             if cache.suffix in ('.map', '.atlas') or cache.is_symlink():
@@ -451,6 +481,10 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
                 resigned.append(cache.name)
             os.chflags(cache, metadata.st_flags)
         counts['resigned_4k'] = resigned
+        images, totals, issues = swift_refs.verify(mount/'System/Library/dyld', 'x86_64')
+        if issues:
+            raise RuntimeError(f'x86_64 cache: {len(issues)} bad Swift metadata references, first: {issues[0]}')
+        counts['swift_references_x86_64'] = dict(images=images, **totals, bad=0)
         os.chmod(mount, stat.S_IMODE(metadata.st_mode))
         os.chflags(mount, metadata.st_flags)
         caches = mount/'System/Library/dyld'
@@ -465,9 +499,30 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
     run('cp', '-c', current/'os.dmg', current/'os.clone.dmg')
     run('sh', Path(__file__).with_name('cryptex-cache-alias.sh'), preboot)
     counts['rosetta_cache_alias'] = 'Cryptexes/Rosetta/System/Library/dyld -> ../../../OS/System/Library/dyld'
-    remove(current/'app.dmg')
-    run('cp', payload/'app.dmg', current/'app.dmg')
+    counts['app'] = install_app_cryptex(payload, current, workspace, hao)
     return counts
+
+
+def install_app_cryptex(payload, current, workspace, hao):
+    """Install the App cryptex (Safari and its agents). Apple's image as it is when the hao payload has no stubs for
+    it; otherwise, as for the OS cryptex, a fresh raw image with the same files, the stubs embedded, sealed."""
+    if not cryptex_stubs.entries(hao, 'App'):
+        remove(current/'app.dmg')
+        run('cp', payload/'app.dmg', current/'app.dmg')
+        return dict(image="Apple's app.dmg", hao_stubs=dict(embedded=0, already=0))
+    work = current/'.golden-gate-app.dmg'
+    with image_mount(payload/'app.dmg', workspace/'golden-app') as source:
+        new_image(work, logical_size(source)+(256 << 20), source)
+        metadata = source.stat()
+        with image_mount(work, workspace/'combined-app', writable=True) as mount:
+            replace_tree(source, mount, CRYPTEX_KEEP)
+            stubs = cryptex_stubs.embed(hao, 'App', mount)
+            os.chmod(mount, stat.S_IMODE(metadata.st_mode))
+            os.chflags(mount, metadata.st_flags)
+    seal = seal_image(work)
+    remove(current/'app.dmg')
+    os.replace(work, current/'app.dmg')
+    return dict(image='Fresh raw APFS container; AppOS files with hao stubs; sealed', hao_stubs=stubs, seal=seal)
 
 
 def arguments(argv=None):
@@ -477,6 +532,8 @@ def arguments(argv=None):
     parser.add_argument('--driverkit-artifact', type=Path, required=True,
                         help='tahoe_driverkit_donors artifact (x86_64 DriverKit cache for the cryptex)')
     parser.add_argument('--donor-tool', type=Path, required=True, help='tools/tahoe-donors/make')
+    parser.add_argument('--hao-runtime', type=Path, required=True,
+                        help='hao_runtime payload (its stubs for programs in the App and OS cryptexes)')
     return parser.parse_args(argv)
 
 
@@ -501,7 +558,9 @@ def main():
         display_installer.resign_clients(system, source, workspace, RESIGN_WITH_27_ENTITLEMENTS,
                                         resign_with_entitlements)
         counts = install_cryptex(payload, preboot, group, golden_os, rosetta, workspace,
-                                 driverkit_artifact=args.driverkit_artifact, donor_tool=args.donor_tool)
+                                 driverkit_artifact=args.driverkit_artifact, donor_tool=args.donor_tool,
+                                 codeid_carrier=Path(__file__).resolve().parent/'inputs/codeid_carrier',
+                                 hao=args.hao_runtime)
         version = system/'System/Library/CoreServices/SystemVersion.plist'
         for rel in ('System/Library/CoreServices/SystemVersion.plist',
                     'boot/System/Library/CoreServices/SystemVersion.plist',

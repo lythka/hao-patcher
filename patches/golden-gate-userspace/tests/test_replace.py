@@ -27,12 +27,14 @@ class ReplaceTest(unittest.TestCase):
 
     def test_cryptex_needs_the_explicit_tahoe_driverkit_donor(self):
         # 27.x has no x86_64 DriverKit; there is no fallback to a previously installed Tahoe cryptex.
-        for missing in ([], ['--driverkit-artifact', 'donor'], ['--donor-tool', 'extractor']):
+        # The hao payload is required too: its stubs go into the cryptexes this recipe builds.
+        full = ['--driverkit-artifact', 'donor', '--donor-tool', 'extractor', '--hao-runtime', 'hao']
+        for drop in range(0, len(full), 2):
             with self.assertRaises(SystemExit), patch('sys.stderr'):
-                module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', *missing])
-        args = module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p',
-                                 '--driverkit-artifact', 'donor', '--donor-tool', 'extractor'])
-        self.assertEqual((args.driverkit_artifact, args.donor_tool), (Path('donor'), Path('extractor')))
+                module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', *full[:drop], *full[drop+2:]])
+        args = module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', *full])
+        self.assertEqual((args.driverkit_artifact, args.donor_tool, args.hao_runtime),
+                         (Path('donor'), Path('extractor'), Path('hao')))
 
     def test_installs_no_system_trees(self):
         # The base layers own System/Data; this recipe has no base-tree replacement or keep list.
