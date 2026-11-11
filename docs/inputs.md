@@ -80,7 +80,7 @@ come from Tahoe:
 |---|---|
 | Tahoe Kernel Debug Kit | Intel kernel-extension binaries, overlaid on the installer's extension tree |
 | Tahoe installer | Extension resources, DriverKit runtime and extensions, HID and other native plugins, selected executables and graphics framework bases |
-| Tahoe SystemOS | The generic x86_64 DriverKit dyld cache |
+| Tahoe SystemOS | The generic x86_64 DriverKit dyld cache; CoreWiFi, cut out of its x86_64h OS cache (`cache_images`) |
 | Tahoe boot and Recovery | Intel boot files, BaseSystem and Recovery resources |
 | OCLP Universal-Binaries | Legacy graphics, wireless and audio drivers for this model |
 

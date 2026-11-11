@@ -1,0 +1,4 @@
+# Tahoe 26.7.3 (25G342) OS cryptex dyld_shared_cache_x86_64h (main file; it pins its six subcaches by UUID), copied from
+# cryptex-system-x86_64 rebuilt by pipeline/unpack's ripatch from the 25G342 installer (SHA256SUMS.txt beside it). The
+# Intel cryptex has no generic x86_64 OS cache. The --cache of tools/tahoe-donors native: source of its cache_images (CoreWiFi).
+70f759a58b6ada3ebeef6ab40c22a50100a534d01b67439f4feca18fd1098e8b store/inputs/25G342/os-cryptex-x86_64h/dyld_shared_cache_x86_64h

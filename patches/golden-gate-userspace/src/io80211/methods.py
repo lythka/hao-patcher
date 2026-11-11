@@ -1,6 +1,6 @@
-"""Method-level coverage for a library a compat library replaces (IO80211, WiFiPeerToPeer): the Objective-C selectors a
-27.x build's clients may send to classes the replacement provides (the compat library's stand-ins or OCLP's wrapper)
-and that the provided class does not implement.
+"""Method-level coverage for a library a compat library replaces (IO80211, WiFiPeerToPeer, CoreWiFi): the Objective-C
+selectors a 27.x build's clients may send to classes the replacement provides (the compat library's stand-ins, OCLP's
+wrapper, or for CoreWiFi Tahoe's own library) and that the provided class does not implement.
 
 coverage.py proves every class a client binds exists. A class that exists but lacks a method a 27.x client sends still
 raises `unrecognized selector` at run time (WiFiAgent: -[WiFiP2PKeychainAgent activate] on the r43 stand-in). For each
@@ -18,7 +18,15 @@ architecture: 27.x programs are arm64e and run under hao, against the same x86_6
 cache as one client: its importers bind LEAF's classes through shared GOTs that do not name the image, so its selectors
 are the union over every cached importer of LEAF and its gaps are coarse.
 
-Result: `errors` are gaps on compat stand-ins named by an on-disk client; `reported` are stand-in gaps named only by the
+CoreWiFi differs in three ways (check()'s keywords). Its replacement is Tahoe's whole CoreWiFi, whose method lists are
+readable, so a gap on a Tahoe class is fixable and an error too, even when only the cache's importers name it
+(`answerable`, `strict`). Instances of 27.x CoreWiFi classes
+reach clients through CoreWiFi's API without the client binding the class, so every class the build defines is checked
+for every client (`every_class`), not only bound ones. And the compat library adds its methods at run time with
+class_addMethod (its kMethods table, `added`), which ipsw cannot see; an added method a provider already answers is an
+error (class_addMethod would skip it: the entry is dead or the table is stale).
+
+Result: `errors` are gaps on compat stand-ins (or other answerable providers) named by an on-disk client; `reported` are stand-in gaps named only by the
 cache union, and gaps on OCLP classes whose method lists can be read; `unverified` are OCLP classes whose own method
 list cannot be read offline (OCLP's WiFiPeerToPeerOld.dylib is cut from a 13.7.2 shared cache and its method lists
 name selectors relative to that cache's selector base), with the selectors clients name on them.
@@ -86,18 +94,32 @@ def methods_of(classes, name):
     return found
 
 
-def assess(build_classes, providers, nsobject, clients):
+def answered(providers, name):
+    """Selectors class NAME answers across PROVIDERS: at each class of its superclass chain (the chain of the first
+    provider defining the class), every provider's methods on that class name (its own list or categories)."""
+    found, seen = set(), set()
+    while name and name not in seen:
+        seen.add(name)
+        found |= set().union(*(classes.get(name, {}).get('methods', set()) for _, _, classes in providers))
+        name = next((classes[name]['super'] for _, _, classes in providers if classes.get(name, {}).get('defined')),
+                    None)
+    return found
+
+
+def assess(build_classes, providers, nsobject, clients, every_class=False):
     """BUILD_CLASSES the build's own LEAF classes (parse_classes); PROVIDERS [(name, exported class names, classes)] in
     resolution order; NSOBJECT the selectors NSObject answers; CLIENTS {client: (bound class names, selector names)}.
     Returns {class: {'provider': name or None, 'readable': bool, 'gaps': {selector: [client, ...]}}} for every bound
-    class the build defines."""
+    class the build defines, or with EVERY_CLASS every class it defines (a provider then also provides a class it
+    defines without exporting it)."""
     report = {}
     for client, (bound, selectors) in sorted(clients.items()):
-        for name in sorted(bound):
+        for name in sorted(build_classes if every_class else bound):
             if name not in build_classes:
                 continue
-            exporter = next(((pname, classes) for pname, exported, classes in providers if name in exported), None)
-            known = set().union(*(methods_of(classes, name) for _, _, classes in providers))
+            exporter = next(((pname, classes) for pname, exported, classes in providers
+                             if name in exported or every_class and classes.get(name, {}).get('defined')), None)
+            known = answered(providers, name)
             readable = bool(exporter) and exporter[1].get(name, {}).get('defined', False)
             entry = report.setdefault(name, {'provider': exporter[0] if exporter else None, 'readable': readable,
                                              'gaps': {}})
@@ -107,8 +129,9 @@ def assess(build_classes, providers, nsobject, clients):
     return report
 
 
-def classify(report, leaf):
-    """(errors, reported, unverified) texts for assess()'s REPORT."""
+def classify(report, leaf, answerable=('compat',), strict=False):
+    """(errors, reported, unverified) texts for assess()'s REPORT; a gap is an error when its class comes from an
+    ANSWERABLE provider and an on-disk client names it, or with STRICT any client (the cache union too)."""
     errors, reported, unverified = [], [], []
     for name, entry in sorted(report.items()):
         if entry['provider'] and not entry['readable']:
@@ -118,7 +141,7 @@ def classify(report, leaf):
             continue
         for selector, users in sorted(entry['gaps'].items()):
             text = f'{selector[0]}[{name} {selector[1:]}] from {entry["provider"] or "nothing"} (named by {", ".join(users)})'
-            if entry['provider'] == 'compat' and any(user != CACHE for user in users):
+            if entry['provider'] in answerable and (strict or any(user != CACHE for user in users)):
                 errors.append(f'MISSING method: {text}; the build\'s {leaf} implements it')
             else:
                 reported.append(text)
@@ -176,25 +199,37 @@ def provider(name, path):
     return (name, exported_classes(path), parse_classes(out('ipsw', 'macho', 'info', path, '--objc', '--no-color')))
 
 
-def check(cache, root, oclp, compat, leaf, reexported, disk):
-    """Method coverage for one build. DISK is coverage.disk_imports() for LEAF. Returns a record for build.json whose
-    'errors' are unanswered stand-in methods named by an on-disk client."""
+def check(cache, root, oclp, compat, leaf, reexported, disk, wrapper='OCLP', added=None, every_class=False,
+          answerable=('compat',), strict=False):
+    """Method coverage for one build. DISK is coverage.disk_imports() for LEAF; OCLP the folder holding the replaced
+    library (WRAPPER names whose: OCLP's wrapper, or Tahoe's CoreWiFi); ADDED {class: {'-selector'}} the methods the
+    compat library adds at run time. Returns a record for build.json whose 'errors' are unanswered methods (on an
+    ANSWERABLE provider's class) named by an on-disk client (STRICT: by any client), and added methods a provider
+    already answers."""
     build_classes = cache_classes(cache, leaf)
     if not build_classes:
         return dict(classes=0, errors=[], reported=[], unverified=[])
-    providers = [provider('compat', compat), provider(f'OCLP {leaf}', Path(oclp)/leaf)] + [
-        provider(f'OCLP {name}', Path(oclp)/name) for name in reexported]
+    providers = [provider('compat', compat), provider(f'{wrapper} {leaf}', Path(oclp)/leaf)] + [
+        provider(f'{wrapper} {name}', Path(oclp)/name) for name in reexported]
+    dead = []
+    for name, selectors in sorted((added or {}).items()):
+        dead += [f'ALREADY ANSWERED: compat adds {s[0]}[{name} {s[1:]}], which {name} already has; class_addMethod '
+                 'skips it' for s in sorted(selectors & answered(providers, name))]
+        providers[0][2].setdefault(name, {'super': None, 'defined': False, 'methods': set()})['methods'] |= selectors
     bound, selectors, images = cache_client(cache, leaf)
     clients = {CACHE: (bound, selectors)}
     per_client = {}
     for symbol, uses in disk.items():
         m = CLASS_SYMBOL.match(symbol)
-        for client, arch, _ in uses if m else ():
-            per_client.setdefault((client, arch), set()).add(m[1])
+        for client, arch, _ in uses if m or every_class else ():
+            names = per_client.setdefault((client, arch), set())
+            if m:
+                names.add(m[1])
     for (client, arch), names in sorted(per_client.items()):
         text = out('ipsw', 'macho', 'info', Path(root)/client, '--arch', arch, '--objc', '--objc-refs', '--no-color')
         clients[f'{client} [{arch}]'] = (names, parse_selrefs(text))
-    report = assess(build_classes, providers, nsobject_selectors(cache), clients)
-    errors, reported, unverified = classify(report, leaf)
+    report = assess(build_classes, providers, nsobject_selectors(cache), clients, every_class)
+    errors, reported, unverified = classify(report, leaf, answerable, strict)
     return dict(classes=len(build_classes), cache_importers=len(images), clients=sorted(clients),
-                errors=errors, reported=reported, unverified=unverified)
+                added=sorted(f'-[{c} {s[1:]}]' for c, sels in (added or {}).items() for s in sels),
+                errors=dead + errors, reported=reported, unverified=unverified)

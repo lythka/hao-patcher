@@ -1,0 +1,3 @@
+# CoreWiFi compatibility dylib made by patches/golden-gate-userspace/src/corewifi/make (r50; environment, symbol and
+# method coverage checked on 26B131 against the Tahoe CoreWiFi of row tahoe_native_donors).
+ce944f715e31d8eec567f811c2b903be3bdb99b8a870bccb63b5a3b5b67c708b store/artifacts/corewifi-compat-26B131-20261111-ce944f715e31/corewifi_compat.dylib

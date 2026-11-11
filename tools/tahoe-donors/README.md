@@ -23,6 +23,31 @@ Outputs are new artifact directories with selected payload files and manifests
 recording content hashes, modes, ownership, symlink targets and source identity.
 No Apple payload is included in Git. The original inputs are read-only.
 
+## Libraries from the donor's shared cache
+
+Tahoe ships some libraries only inside its OS shared cache. The recipe's
+`cache_images` names them (today CoreWiFi, from the x86_64h OS cache: Tahoe's
+airportd needs the CoreWiFi it was built with). `native --cache DIR` cuts each
+one out of the cache family in `DIR` (donor-inputs' `out/os-cache/`) with
+[`tools/cache-dylib`](../cache-dylib/README.md), keeping its install name, signs it
+ad hoc, verifies it with cache-dylib's `check.py` (bound GOT slots, resolvable
+Swift references, no instruction Ivy Bridge lacks) and adds it to the `system`
+role at its own path, with the recipe's owner, mode and flags. The extraction
+records (every symbol bound per dependency, the Objective-C repairs) go to
+`cache-images.json` beside the manifest.
+
+Apple's extractor cannot do this. `dsc_extractor` (and `dyld_shared_cache_util
+-extract`, which calls it), built from dyld-1378 source, writes files for
+debuggers: it zeroes the rebase, bind and lazy-bind information and the export
+trie, and keeps the cache's segment order. `ipsw dyld extract` (with or without
+`--slide`/`--objc`) likewise writes no fixups. dyld refuses all of these
+(`__DATA_CONST segment missing SG_READ_ONLY flag`, then `segment '__DATA_DIRTY'
+vm address out of order`), and even past that nothing would rebind their
+uniqued GOT slots.
+
+The file keeps the original install name and path, so it can serve as a
+library provider for a rebuilt shared cache as well as an on-disk file.
+
 ## Composition rules
 
 - Copy Golden Gate System/Data first, then apply these donors.
@@ -53,4 +78,5 @@ list. Mixed-architecture, missing and resource-only roots remain candidates;
 with Tahoe's IOHDIXController, as established by the 27-first laptop test.
 
 ## Revisions
+- r11 2026-11-11 `native --cache`: the recipe's `cache_images` (Tahoe CoreWiFi from the x86_64h OS cache) are cut out with tools/cache-dylib, verified and added to the system role at their own path; extraction records in `cache-images.json`.
 - r10 2026-11-11 Select positively identified native target roots before extracting the Tahoe payload; support fat64 Mach-O headers. DriverKit fixture metadata now follows the actual optional metadata argument.

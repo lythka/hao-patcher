@@ -1,2 +1,5 @@
-# Derived for Golden Gate 26B131 with Tahoe 25G342; see the artifact build.json.
-- store/artifacts/minimal-native-25G342-26B131
+# Derived for Golden Gate 26B131 with Tahoe 25G342; see the artifact build.json. tools/tahoe-donors r11 `native` (cache-dylib r3) over the
+# same donor-inputs output as minimal-native-25G342-26B131 (recipe-cache-images.json = its recipe.json plus intel-donors'
+# os_cache/cache_images) with --cache = row tahoe_os_cache_x86_64h: identical entries plus Tahoe's CoreWiFi, cut from the
+# x86_64h OS cache at its own path (cache-images.json holds the extraction and check.py records).
+- store/artifacts/minimal-native-25G342-26B131-corewifi-r3
