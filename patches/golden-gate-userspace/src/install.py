@@ -25,6 +25,7 @@ from cache_pages import resign_file
 from legacy_trackpad import plan_cache_family, apply_edits
 from endpoint_security import plan_cache_family as endpoint_plan
 from core_routine import plan_cache_family as routine_plan
+import swift_refs
 def matrix_plan(cache):
     package = Path(__file__).resolve().parent / 'build/metal-fixes'
     result = subprocess.check_output([sys.executable, '-I', str(package/'metal-fixes'),
@@ -439,6 +440,14 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
             for path, changes in audio.items()}
         for path, changes in audio.items():
             trackpad_plan.setdefault(path, []).extend(changes)
+        # Apple's x86_64 cache leaves some Swift conformance type references unadjusted (they point at unrelated
+        # bytes; a name lookup that scans them faults). The arm64e cache beside it names the intended types.
+        swift = swift_refs.plan_cache_family(mount/'System/Library/dyld')
+        counts['swift_conformance_types'] = {
+            path.name: [reason for _, _, _, reason in changes]
+            for path, changes in swift.items()}
+        for path, changes in swift.items():
+            trackpad_plan.setdefault(path, []).extend(changes)
         resigned = []
         for cache in sorted((mount/'System/Library/dyld').glob('dyld_shared_cache_x86_64*')):
             if cache.suffix in ('.map', '.atlas') or cache.is_symlink():
@@ -451,6 +460,10 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
                 resigned.append(cache.name)
             os.chflags(cache, metadata.st_flags)
         counts['resigned_4k'] = resigned
+        images, totals, issues = swift_refs.verify(mount/'System/Library/dyld', 'x86_64')
+        if issues:
+            raise RuntimeError(f'x86_64 cache: {len(issues)} bad Swift metadata references, first: {issues[0]}')
+        counts['swift_references_x86_64'] = dict(images=images, **totals, bad=0)
         os.chmod(mount, stat.S_IMODE(metadata.st_mode))
         os.chflags(mount, metadata.st_flags)
         caches = mount/'System/Library/dyld'

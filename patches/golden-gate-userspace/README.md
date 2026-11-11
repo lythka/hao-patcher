@@ -25,9 +25,10 @@ System tree.
 `src/kc-hook.sh` runs `src/install.py` after [darwin27-kernel](../darwin27-kernel/README.md) has built the kernel
 collections; the runner calls it like every other recipe. It:
 - builds the combined OS cryptex from Golden Gate's native libraries and RosettaOS's x86_64 shared cache, adds
-  Tahoe's generic Intel DriverKit cache, applies the native cache repairs, re-signs the cache with 4 KiB code pages
-  (`src/cache_pages.py`; the x86_64 kernel registers only 4 KiB page signatures) and seals the image so 27.0's
-  launchd can graft it;
+  Tahoe's generic Intel DriverKit cache, applies the native cache repairs (including the Swift conformance repair
+  below), re-signs the cache with 4 KiB code pages (`src/cache_pages.py`; the x86_64 kernel registers only 4 KiB
+  page signatures), checks every Swift metadata reference of the x86_64 cache (`src/swift_refs.py`, stops on any
+  bad one) and seals the image so 27.0's launchd can graft it;
 - links Rosetta's cache directory to the combined cache (`src/cryptex-cache-alias.sh`), because native dyld still
   looks there;
 - gives Tahoe programs that serve 27.0 clients (WindowServer) the 27.0 program's Info.plist and entitlements;
@@ -43,6 +44,25 @@ Which framework sits beneath OCLP's replacements is decided by the base layers, 
 artifact (`minimal-native-25G342-26B131`) Metal, OpenCL, AppleGVA, AppleGVACore, GPUCompiler, MTLCompiler, IO80211
 and WiFiPeerToPeer are the 27.x build's own, with OCLP's overlay on top. The older 26A428 artifact still installs
 Tahoe's copies of those frameworks first.
+
+### Swift conformance type references
+Apple's x86_64 cache (RosettaOS, untouched) has direct conformance type references that point at unrelated bytes
+instead of the type's descriptor: 21 in 26A428 and 47 in 26B131, in PaperKit (macOS and iOSSupport),
+PhoneAppIntents (26B131) and `_MusicKitInternal_AppIntents`, all for nested enums (`SharedPaperPage.Tag`,
+`MusicItemSiriUnion.MusicItemSiriUnionCases`, ...). Every record of one type points to the same spot just before
+its records. Any native Swift lookup by mangled name that scans those images faults: on 26B131 Cmd-Space's
+Siri AI.app took SIGBUS in `ParsedTypeIdentity::parse` reading the "descriptor"'s name pointer, which lands in the
+gap between `.06`'s data and linkedit mappings. The arm64e cache of the same build has no such reference.
+`src/swift_refs.py` takes, for each broken record, the type the same arm64e record names (same image, same index,
+same protocol), finds the one x86_64 descriptor of that image with the same context path and rewrites the 4-byte
+reference; it refuses a record it cannot match exactly once. After the re-sign it walks every image's
+`__swift5_types`, `__swift5_proto` and `__swift5_protos` (targets, indirect slots, descriptor names, witness
+tables) and the install stops on any bad reference.
+
+```sh
+python3.14 -I patches/golden-gate-userspace/src/swift_refs.py X86_64_CACHE_DIR            # verify
+python3.14 -I patches/golden-gate-userspace/src/swift_refs.py X86_64_CACHE_DIR --plan --reference ARM64E_CACHE_DIR
+```
 
 ### IO80211
 OCLP's Modern Wireless wrapper replaces IO80211 and re-exports IO80211Old.dylib. Once a file overrides the cached
@@ -106,7 +126,7 @@ python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests
 # optional: WIFIP2P_OCLP_DIR / IO80211_OCLP_DIR = OCLP's 13.7.2-25 framework folders
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/build/tests
 ```
-The fixtures cover the DriverKit requirement, the absence of any System-tree replacement, special modes, native cache repair plans
+The fixtures cover the DriverKit requirement, the absence of any System-tree replacement, special modes, native cache repair plans (the Swift conformance repair and verifier on an authored two-architecture cache)
 and adapter ordering. A built image must still pass filesystem, boot, native-service and application checks.
 
 ## Validation
@@ -117,8 +137,11 @@ started without the libobjc abort. An image built with r43, and coreaudiod start
 r46 (stand-in methods) is host-tested only: an x86_64 probe sends WiFiAgent's `-activate`/`-invalidate` under
 Rosetta. Not yet shown on an image: WiFiAgent logging "XPCListener started." in a user session, its
 `com.apple.wifi.WiFiAgent` endpoint `active = 1`, and Setup's own join reaching the password sheet.
+The Swift conformance repair (r47) is checked on host copies of the 26B131 cache only (verifier 47 -> 0 bad
+references); an image built with it, and Siri AI.app launching from Cmd-Space, are not yet tested. Neither r46 nor r47 has been validated on an image.
 
 ## Revisions
+- r47 2026-11-11 Repair the x86_64 cache's broken Swift conformance type references (47 in 26B131, 21 in 26A428; Apple's own RosettaOS cache) from the arm64e cache's records, and refuse a combined cryptex whose x86_64 cache still has a bad Swift metadata reference (`src/swift_refs.py`). Fixes the SIGBUS of Siri AI.app (Cmd-Space) in `swift_getTypeByMangledName`. Host: plan, apply, 4 KiB re-sign and verify on a copy of 26B131's cache (47 -> 0); image and boot validation pending.
 - r46 2026-11-11 WiFiPeerToPeer compat: the `WiFiP2PKeychainAgent` stand-in answers `-activate`/`-invalidate` (27.x's WiFiAgent threw on them in every user session before opening its listener, so Setup's own Wi-Fi join timed out after 80 s), and `WiFiAwareStateMonitor` answers 27.x airportd's monitoring calls; all no-ops. New method-level pass (`src/io80211/methods.py`) in both libraries' coverage check: fails on a stand-in method an on-disk 27.x client names, records the rest. New `wifip2p_compat` artifacts for 26B131 and 26A428 (same library, checked against each build).
 - r45 2026-11-11 `src/kc-hook.sh` is the real entry point (the runner no longer calls `install.py` itself); it takes the DriverKit donor and donor tool from `TAHOE_DRIVERKIT_ARTIFACT`/`TAHOE_DONOR_TOOL`. Removed the unused Tahoe-first mode (`--prepared-system`, the System/Data base-tree replacement and its keep list, the DriverKit fallbacks). README: 26B131, no `*_fix_source` rows, which frameworks come from 27.x. Same files installed (`golden-gate-userspace.json` drops the empty keep-list fields); boot validation pending.
 - r44 2026-11-11 IO80211 compat also exports `Apple80211StartMonitoringEvent`: OCLP's wrapper forwards it through `dlsym(RTLD_NEXT)` and calls the result unchecked; in 27.x's translated processes that lookup is NULL (sharingd SIGSEGV loop on the 26B131 laptop, also on the earlier image). The compat function looks it up in IO80211Old.dylib by handle and keeps the wrapper's return value (0). Same library for 26A428 and 26B131 (coverage-checked on both).
