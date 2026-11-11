@@ -369,7 +369,14 @@ def main():
             elif cache_images is not None and any(x86(os.path.join(tree, rel)) for rel in tahoe_machos_under(r)):
                 donor_roots.append(r); choices.append((r, 'donor', 'target has no x86_64 code on disk or in its cache'))
             else:
-                choices.append((r, 'target', 'target supplies it (no binaries)'))
+                # No Mach-O to compare (plists, EFI loaders, resources): the target must have every donor file.
+                lacking = [rel for rel in tahoe_machos_under(r) if not os.path.lexists(os.path.join(a.target_system, rel))]
+                if lacking:
+                    donor_roots.append(r)
+                    choices.append((r, 'donor', 'target lacks %d of the donor files, e.g. %s' % (
+                        len(lacking), ', '.join(os.path.basename(x) for x in lacking[:3]))))
+                else:
+                    choices.append((r, 'target', 'target has every donor file (no binaries)'))
         req = dict(req, system_roots=donor_roots,
                    legacy_framework_base_roots=[r for r in req['legacy_framework_base_roots'] if r in donor_roots])
     recipe = dict(req, origin=dict(build=build, version=version, installer_sha256=sha(a.installer),
