@@ -34,15 +34,19 @@ Tested with macOS 27.2.1 (26B131), 2026-11-11.
 - Maps: tiles, search, place cards, current location.
 - Photos: import, thumbnails, full-size view.
 - Spotlight opens and searches.
+- macOS 27's ARM-only programs run on the Intel CPU through hao-runtime, including the
+  Geekbench 6 ARM CPU benchmark's workloads.
 
-**Not working yet**
-- Spotlight lists web results instead of local apps (its ranking data never downloads).
-- Live Text: the analysis service runs text recognition but has not returned a result yet.
-- Maps pin shadows (shader repair built, not yet checked).
-- The first login of a new account is slow for about 10 minutes (account template in progress).
-- ARM programs run translated: general code at roughly 1/2 to 1/3 of native speed, vector and
-  floating-point heavy code much slower (Geekbench ARM run in progress).
-- Weather and other apps vary; sleep and updates are untested.
+**In development**
+- Spotlight: local app results (the cause is found: its search data isn't downloaded).
+- Live Text: the analysis service runs text recognition on the HD 4000; results in Photos
+  and Preview are being finished.
+- Maps pin shadows: the VectorKit shader repair is built and installed.
+- Faster first login for new accounts: a preloaded account template is built.
+- Performance of translated code: general code runs at about 1/2 to 1/3 of native speed;
+  vector and floating-point work is profiled, with hao-runtime optimizations lined up.
+- Weather: its crash is fixed in hao-runtime and its interface units.
+- Sleep and updates: not tested yet.
 
 ## Requirements
 
@@ -88,8 +92,8 @@ refuses a set that breaks that order.
   [optional cache recipes](docs/building.md#optional-cache-recipes)).
 - **Build:** recipes run once, in set-file order ([layer order](docs/building.md#layer-order)).
 
-In progress: Live Text, a fast first login for new accounts, Spotlight's local results,
-Maps shadows (repair on `main`, not yet checked).
+In development: Live Text, a fast first login for new accounts, Spotlight's local results,
+Maps shadows, faster translated vector and floating-point code.
 
 ## Fixes
 
