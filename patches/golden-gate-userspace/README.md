@@ -16,6 +16,8 @@ System tree.
   ([tools/display-fixes](../../tools/display-fixes)).
 - `io80211_compat`: the IO80211 compatibility library, built and checked for one build by `src/io80211/make`.
 - `wifip2p_compat`: the WiFiPeerToPeer compatibility library, built and checked for one build by `src/wifip2p/make`.
+- `hao_runtime`: the [hao-runtime](../hao-runtime/README.md) payload, read only (`src/read-from-share.txt`): its
+  stubs for the arm64-only programs in the App and OS cryptexes.
 - The native cache repairs' source is not an input row: `make.sh` copies `tools/metal-fixes` and
   `tools/audiomxd-fix` from this checkout into the staged recipe (`build/`).
 - From the runner, not a row of this patch: `golden-image.py` sets `TAHOE_DRIVERKIT_ARTIFACT` (the assembly's
@@ -28,6 +30,9 @@ collections; the runner calls it like every other recipe. It:
   Tahoe's generic Intel DriverKit cache, applies the native cache repairs, re-signs the cache with 4 KiB code pages
   (`src/cache_pages.py`; the x86_64 kernel registers only 4 KiB page signatures) and seals the image so 27.0's
   launchd can graft it;
+- embeds hao's stubs into the cryptexes' arm64-only programs before sealing (`src/cryptex_stubs.py`, below), and
+  for that rebuilds the App cryptex the same way (fresh raw image, AppOS's files, stubs, sealed); with no App stub in
+  the payload it installs Apple's `app.dmg` unchanged;
 - links Rosetta's cache directory to the combined cache (`src/cryptex-cache-alias.sh`), because native dyld still
   looks there;
 - gives Tahoe programs that serve 27.0 clients (WindowServer) the 27.0 program's Info.plist and entitlements;
@@ -100,10 +105,24 @@ to that cache, so they cannot be read offline. 27.x's x86_64 IO80211 defines no 
 It requires the explicit DriverKit donor and never takes DriverKit from an earlier installed image. It installs OS libraries only; it does not generate
 Swift metadata, shader warm-up caches, icon indexes or account state.
 
+### hao stubs in the cryptexes
+Safari's agents (`/System/Cryptexes/App/usr/libexec`) and the XPC services of Safari's and WebKit's frameworks
+(SystemOS, e.g. `SafariShared.framework/.../com.apple.Safari.SearchHelper.xpc`) are arm64-only programs inside the
+App and OS cryptexes, which the running system grafts at `/System/Volumes/Preboot/Cryptexes/{App,OS}`. Without a stub
+launchd runs them through `/usr/libexec/hao` with hao's code identity instead of their own, so a container or
+entitlement lookup fails: SearchHelper asked containermanager with an empty identifier and aborted in
+`+[NSString stringWithUTF8String:]`. The 26B131 hao payload is built from a root that has both cryptexes at those
+paths, so its manifest names them there (2 App and 24 OS programs) and `stub-identities` lists them. hao-runtime's own
+installer runs later on the System volume, where those paths are empty graft points, and records them as missing.
+`src/cryptex_stubs.py` embeds them into the image being built, with the payload's `hao-install.py` checks (source
+hash, bound Info.plist and seal, merged hash) and fails if any entry of that cryptex is not embedded. A payload built
+without the cryptexes (the 26A428 one) has no such entries: nothing changes.
+
 ## Verify
 ```sh
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests
 # optional: WIFIP2P_OCLP_DIR / IO80211_OCLP_DIR = OCLP's 13.7.2-25 framework folders
+# optional: HAO_RUNTIME_PAYLOAD (hao payload) + GOLDEN_APP_CRYPTEX (mounted app.dmg): real App cryptex embedding
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/build/tests
 ```
 The fixtures cover the DriverKit requirement, the absence of any System-tree replacement, special modes, native cache repair plans
@@ -117,8 +136,12 @@ started without the libobjc abort. An image built with r43, and coreaudiod start
 r46 (stand-in methods) is host-tested only: an x86_64 probe sends WiFiAgent's `-activate`/`-invalidate` under
 Rosetta. Not yet shown on an image: WiFiAgent logging "XPCListener started." in a user session, its
 `com.apple.wifi.WiFiAgent` endpoint `active = 1`, and Setup's own join reaching the password sheet.
+r47 (cryptex stubs) is host-tested only (fixtures, and the real 26B131 payload's App stubs embedded into copies of
+AppOS's programs). Not yet shown: an image whose cryptexes graft with the rebuilt App image, and SearchHelper and the
+WebKit XPC services running under their own identity (process path the helper's, not `/usr/libexec/hao`).
 
 ## Revisions
+- r47 2026-11-11 Embed hao's stubs into the arm64-only programs of the App and OS cryptexes (Safari's agents, Safari's and WebKit's XPC services) before sealing; the App cryptex is rebuilt as a fresh sealed image when the payload has App stubs. New input `hao_runtime` (read from the share). Without them those programs ran through `/usr/libexec/hao` under hao's identity and Safari's SearchHelper aborted on an empty container identifier. Host tests only; image build and boot pending.
 - r46 2026-11-11 WiFiPeerToPeer compat: the `WiFiP2PKeychainAgent` stand-in answers `-activate`/`-invalidate` (27.x's WiFiAgent threw on them in every user session before opening its listener, so Setup's own Wi-Fi join timed out after 80 s), and `WiFiAwareStateMonitor` answers 27.x airportd's monitoring calls; all no-ops. New method-level pass (`src/io80211/methods.py`) in both libraries' coverage check: fails on a stand-in method an on-disk 27.x client names, records the rest. New `wifip2p_compat` artifacts for 26B131 and 26A428 (same library, checked against each build).
 - r45 2026-11-11 `src/kc-hook.sh` is the real entry point (the runner no longer calls `install.py` itself); it takes the DriverKit donor and donor tool from `TAHOE_DRIVERKIT_ARTIFACT`/`TAHOE_DONOR_TOOL`. Removed the unused Tahoe-first mode (`--prepared-system`, the System/Data base-tree replacement and its keep list, the DriverKit fallbacks). README: 26B131, no `*_fix_source` rows, which frameworks come from 27.x. Same files installed (`golden-gate-userspace.json` drops the empty keep-list fields); boot validation pending.
 - r44 2026-11-11 IO80211 compat also exports `Apple80211StartMonitoringEvent`: OCLP's wrapper forwards it through `dlsym(RTLD_NEXT)` and calls the result unchecked; in 27.x's translated processes that lookup is NULL (sharingd SIGSEGV loop on the 26B131 laptop, also on the earlier image). The compat function looks it up in IO80211Old.dylib by handle and keeps the wrapper's return value (0). Same library for 26A428 and 26B131 (coverage-checked on both).
