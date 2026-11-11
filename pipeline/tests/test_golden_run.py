@@ -50,6 +50,18 @@ class GoldenRun(unittest.TestCase):
             (path/('apply.sh' if stage=='post' else 'hook.sh' if name in hook_sh else 'kc-hook.sh')).touch()
         return share
 
+    def test_boot_efi_archive_carries_opencore_and_oclp_licenses(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as folder:
+            prepared=Path(folder)/'boot-efi';(prepared/'payload/EFI/OC').mkdir(parents=True)
+            (prepared/'payload/EFI/OC/OpenCore.efi').write_bytes(b'oc');(prepared/'manifest.json').write_text('{}')
+            archive=RUN['boot_efi_archive'](prepared,Path(folder))
+            with zipfile.ZipFile(archive) as bundle:
+                names=set(bundle.namelist())
+                self.assertIn('payload/EFI/OC/OpenCore.efi',names);self.assertIn('manifest.json',names)
+                self.assertIn('Redistribution and use',bundle.read('LICENSES/OpenCorePkg-LICENSE.txt').decode())
+                self.assertIn('Dortania',bundle.read('LICENSES/OpenCore-Legacy-Patcher-LICENSE.txt').decode())
+
     def test_configuration_runs_every_recipe_in_set_order(self):
         rows=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace'),
               ('oclp-hook','later-fix'),('oclp-hook','selectors'),('post','post-one'),('post','post-two')]
@@ -72,6 +84,17 @@ class GoldenRun(unittest.TestCase):
         for bad in ('caches',[''],[1]):
             with self.assertRaises(ValueError):RUN['skipped_groups']({'skip_optional':bad})
 
+    def test_dev_build_follows_dev_status_recipes(self):
+        base=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace'),('post','hao-opencore')]
+        for rows,value in ((base,'0'),(base+[('post','dev-access')],'1')):
+            with self.subTest(dev=value),tempfile.TemporaryDirectory() as folder:
+                config=RUN['guest_config'](dict(size_bytes=80,name='GG'),self.share(folder,rows),'/guest/job')
+                self.assertEqual(value,config['environment']['IMAGE_DEV_BUILD'])
+        sets=TOP/'pipeline/sets'
+        names=lambda n:[l.split('#',1)[0].strip() for l in (sets/(n+'.txt')).read_text().splitlines() if l.split('#',1)[0].strip()]
+        self.assertTrue(RUN['dev_build'](names('dev-bs-test')))
+        self.assertFalse(RUN['dev_build'](names('golden-gate-26B131')))
+
     def test_set_order_must_be_run_order(self):
         base=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace')]
         cases=[([('oclp-hook','golden-gate-userspace'),('oclp-hook','darwin27-kernel')],(),'must start with darwin27-kernel then golden-gate-userspace'),
@@ -88,7 +111,7 @@ class GoldenRun(unittest.TestCase):
         import importlib.util
         spec=importlib.util.spec_from_file_location('patches_module',TOP/'pipeline/patches.py')
         patches=importlib.util.module_from_spec(spec);spec.loader.exec_module(patches)
-        for name in ('golden-gate','dev-bs-test','dev-golden-bootstrap'):
+        for name in ('golden-gate-26B131','golden-gate','dev-bs-test','dev-golden-bootstrap'):
             rows=[(stage,patch) for stage,patch,_ in patches.plan(str(TOP/'pipeline/sets'/(name+'.txt')),
                                                                   str(TOP/'pipeline/targets/mbp92.json'),'25G342')]
             with self.subTest(set=name),tempfile.TemporaryDirectory() as folder:
@@ -98,6 +121,18 @@ class GoldenRun(unittest.TestCase):
                         self.assertTrue((TOP/'patches'/patch/'src/kc-hook.sh').is_file(),patch)
                         self.assertFalse((TOP/'patches'/patch/'src/hook.sh').exists(),patch)
                 RUN['set_order'](share)
+
+    def test_release_26B131_set_is_the_dev_set_without_dev_recipes(self):
+        def names(name):
+            return [l.split('#',1)[0].strip() for l in (TOP/'pipeline/sets'/(name+'.txt')).read_text().splitlines()
+                    if l.split('#',1)[0].strip()]
+        def dev(name):
+            return json.loads((TOP/'patches'/name/'patch.json').read_text()).get('status')=='dev'
+        self.assertEqual([n for n in names('dev-bs-test') if not dev(n)],names('golden-gate-26B131'))
+        assembly=json.loads((TOP/'pipeline/assemblies/mbp92-26B131.json').read_text())
+        developer=json.loads((TOP/'pipeline/assemblies/dev-26B131.json').read_text())
+        self.assertEqual('golden-gate-26B131',assembly.pop('patch_set'));developer.pop('patch_set')
+        self.assertEqual(developer,assembly)
 
     def fixture_job(self, root, rc, workspace=None):
         share=root/'share';source=share/'assembly-source';source.mkdir(parents=True)

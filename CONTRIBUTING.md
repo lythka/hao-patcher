@@ -45,6 +45,7 @@ A fix is a recipe in `patches/` plus the source that builds its inputs.
 - Ad-hoc sign every x86_64 binary you build before running it (`codesign -s - FILE`).
 - Never launch GUI applications built for the target on your host.
 - Keep third-party source with its license and list it in that tool's `NOTICE.md`.
+- The repository is public: `pipeline/tests/test_private_references.py` fails on paths into private repositories or home folders.
 
 ## Commit messages
 

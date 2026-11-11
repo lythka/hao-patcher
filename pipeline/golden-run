@@ -16,6 +16,7 @@ import sys
 import time
 import tempfile
 import uuid
+import zipfile
 
 TOP = Path(__file__).resolve().parent.parent
 GUEST = '/private/var/ssdshare'
@@ -86,6 +87,13 @@ def set_order(share):
     return rows
 
 
+def dev_build(names, patches=TOP/'patches'):
+    """A dev build is one whose set includes a recipe with status "dev" (dev-access): recipes then add dev-only
+    diagnostics (IMAGE_DEV_BUILD=1), so a release set never carries them."""
+    return any(json.loads((patches/n/'patch.json').read_text()).get('status') == 'dev'
+               for n in names if (patches/n/'patch.json').is_file())
+
+
 def guest_config(recipe, share, local):
     rows = set_order(share)
     hooks = [(name, folder) for stage, name, folder in rows if stage == 'oclp-hook']
@@ -105,7 +113,8 @@ def guest_config(recipe, share, local):
                 hooks=[dict(name=name,kc_hook=local+'/hooks/'+folder+'/kc-hook.sh') for name,folder in hooks],
                 posts=[dict(name=name,script=local+'/post/'+folder+'/apply.sh',folder=local+'/post/'+folder)
                        for stage,name,folder in rows if stage=='post'],
-                environment=dict(PYTHONPATH=local+'/site',PYTHONDONTWRITEBYTECODE='1',TMPDIR=local+'/tmp',S=GUEST,OCLP=GUEST+'/oclp'))
+                environment=dict(PYTHONPATH=local+'/site',PYTHONDONTWRITEBYTECODE='1',TMPDIR=local+'/tmp',S=GUEST,OCLP=GUEST+'/oclp',
+                                 IMAGE_DEV_BUILD='1' if dev_build([name for _,name,_ in rows]) else '0'))
 
 
 def job_script(local, share=GUEST, owner='root:wheel', workspace=None):
@@ -344,6 +353,19 @@ def readonly_workspace(state, command):
             if attached:command(['hdiutil','detach',mount],capture_output=True)
 
 
+# The exported EFI redistributes OpenCore and OCLP-generated files: their license texts go with it.
+EFI_LICENSES={'LICENSES/OpenCorePkg-LICENSE.txt':TOP/'pipeline/licenses/OpenCorePkg-LICENSE.txt',
+              'LICENSES/OpenCore-Legacy-Patcher-LICENSE.txt':TOP/'tools/oclp-integration/LICENSE.txt'}
+
+
+def boot_efi_archive(prepared,repository):
+    """boot-efi.zip from the guest's prepared EFI (payload/, manifest.json) plus EFI_LICENSES."""
+    archive=shutil.make_archive(str(Path(repository)/'boot-efi'),'zip',root_dir=prepared)
+    with zipfile.ZipFile(archive,'a',zipfile.ZIP_DEFLATED) as bundle:
+        for name,source in EFI_LICENSES.items():bundle.write(source,name)
+    return archive
+
+
 def capture_workspace(state,output,command):
     assembled(output)
     repository=Path(state['repository'])
@@ -355,7 +377,7 @@ def capture_workspace(state,output,command):
         command([ssdimg,'-C',repository,'commit','-m','Golden Gate '+state['recipe']['golden_build']+'; '+state['commit']])
     prepared=output/'guest/boot-efi'
     if prepared.exists() and json.loads((prepared/'manifest.json').read_text())['kernel_repairs_applied']:
-        archive=shutil.make_archive(str(repository/'boot-efi'),'zip',root_dir=prepared)
+        archive=boot_efi_archive(prepared,repository)
         state['boot_efi']=dict(path=archive,sha256=digest(archive),manifest=json.loads((prepared/'manifest.json').read_text()))
     state.update(status='committed',capture_source='read-only stopped builder workspace',capture_tool_sha256=digest(Path(__file__)))
 

@@ -37,5 +37,5 @@ OCLP's other test scripts need OCLP's Python dependencies.
 ## License
 
 OpenCore Legacy Patcher is developed by Dortania and the OpenCore Legacy Patcher
-contributors under the BSD 3-Clause license ([LICENSE.txt](LICENSE.txt)), which also
+contributors under the BSD 4-Clause license ([LICENSE.txt](LICENSE.txt)), which also
 covers `target.patch`.

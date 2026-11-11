@@ -1,7 +1,8 @@
 # Building an image
 
-The base is macOS 27 (26A428; 26B131 in development). Tahoe supplies only the donor files the
-inputs list.
+The base is macOS 27.2.1 (26B131), with Tahoe 25G342 as the donor; the 27.0 (26A428) assembly
+`mbp92-golden-first.json` is older and no longer maintained. Tahoe supplies only the donor files
+the inputs list.
 
 ## Requirements
 
@@ -22,8 +23,7 @@ inputs list.
 `plan` prints a set's run order and every input it needs:
 
 ```sh
-python3.14 -I pipeline/patches.py plan pipeline/sets/golden-gate.txt pipeline/targets/mbp92.json 25G332
-python3.14 -I pipeline/patches.py plan pipeline/sets/dev-bs-test.txt pipeline/targets/mbp92.json 25G342 \
+python3.14 -I pipeline/patches.py plan pipeline/sets/golden-gate-26B131.txt pipeline/targets/mbp92.json 25G342 \
   --locks pipeline/inputs/golden/26B131:pipeline/inputs/25G342:pipeline/inputs/common   # 26B131, as golden-run looks up rows
 ```
 
@@ -47,10 +47,10 @@ account's first login are slower.
 ## 2. Build
 
 ```sh
-python3.14 -I pipeline/golden-run pipeline/assemblies/mbp92-golden-first.json --repo /path/to/image-repository
+python3.14 -I pipeline/golden-run pipeline/assemblies/mbp92-26B131.json --repo /path/to/image-repository
 ```
 
-The [assembly](../pipeline/assemblies/mbp92-golden-first.json) selects target, OS and donor
+The [assembly](../pipeline/assemblies/mbp92-26B131.json) selects target, OS and donor
 builds, image sizes, donor rows and the patch set.
 
 ### Layer order
@@ -94,9 +94,9 @@ what it adds and why.
 The guest detaches the image. The host mounts the stopped VM's workspace read-only and commits
 the image with [`ssdimg`](../tools/ssdimg), with no copy through the shared folder.
 
-With `hao-opencore` in the set, `boot-efi.zip` sits beside `image.json`. It holds the final ESP
-and a manifest of model, OS build, KC and every EFI file. Install it after restoring the
-matching image. Don't regenerate a stock OCLP EFI instead: it drops the OpenCore additions.
+With `hao-opencore` in the set, `boot-efi.zip` sits beside `image.json`. It holds the final ESP,
+a manifest of model, OS build, KC and every EFI file, and the OpenCorePkg and OCLP license texts
+(`LICENSES/`). Install it after restoring the matching image. Don't regenerate a stock OCLP EFI instead: it drops the OpenCore additions.
 
 If export was interrupted, resume with `golden-run --capture-record RECORD`. This needs a
 successful assembly record and a stopped VM.

@@ -6,34 +6,34 @@ VALIDATION), ok = a boot test proved the current revision.
 
 Optional: the patch's optional group (skipped when its inputs are missing or the group is skipped).
 
-| Patch | Rev | Stage | Status | Optional | golden-gate | recovery | stock | Validation | Newest revision |
-|---|---|---|---|---|---|---|---|---|---|
-| darwin27-kernel | r5 | oclp-hook | experiment |  | x |  |  | ok | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
-| darwin27-sandbox-disk-space | r2 | oclp-hook | experiment |  | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
-| dev-access | r3 | post | dev |  |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
-| golden-gate-corespotlight-compat | r4 | oclp-hook | experiment |  | x |  |  | ok | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
-| golden-gate-font-registry | r2 | post | experiment | caches |  |  |  | ok | r2 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch  |
-| golden-gate-hello | r3 | oclp-hook | experiment |  | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
-| golden-gate-icon-caches | r2 | post | experiment | caches |  |  |  | ok | r2 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch  |
-| golden-gate-metal-framebuffer | r3 | oclp-hook | experiment |  | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
-| golden-gate-metal-libraries | r16 | oclp-hook | experiment |  | x |  |  | **needs** | r16 2026-11-11 26B131 artifact adds VectorKit, AlloyCommon and VFX (cache/metallib r54), superseding OCLP's 26 |
-| golden-gate-native-identities | r1 | oclp-hook | experiment |  | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
-| golden-gate-shader-caches | r9 | post | experiment | caches |  |  |  | ok | r9 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch  |
-| golden-gate-user-seed | r5 | post | experiment | caches |  |  |  | ok | r5 2026-11-11 Optional (group caches) with needs_any caches: skipped when no cache patch runs, since the copie |
-| golden-gate-userspace | r52 | oclp-hook | experiment |  | x |  |  | ok | r52 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
-| golden-gate-windowserver-filter | r5 | oclp-hook | experiment |  | x |  |  | ok | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
-| hao-opencore | r34 | post | experiment |  | x |  |  | ok | r34 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d; HaoExec  |
-| hao-runtime | r60 | oclp-hook | experiment |  | x |  |  | ok | r60 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
-| metalold-selectors | r3 | oclp-hook | product |  | x |  |  | ok | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
-| rec-audio | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-bluetooth-input | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-brightness-keys | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-display-ethernet | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-install-volume | r3 | post | product |  |  |  |  | **needs** | r3 2026-11-10 Initial public release. |
-| rec-language-list | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-power | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-progress-phase | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-reinstall | r3 | recovery | product |  |  | x |  | **needs** | r3 2026-11-10 Initial public release. |
-| rec-startup-guard | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-wifi | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-wifi-autojoin | r1 | recovery | product |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| Patch | Rev | Stage | Status | Optional | golden-gate-26B131 | golden-gate | recovery | stock | Validation | Newest revision |
+|---|---|---|---|---|---|---|---|---|---|---|
+| darwin27-kernel | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
+| darwin27-sandbox-disk-space | r2 | oclp-hook | experiment |  |  | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
+| dev-access | r3 | post | dev |  |  |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
+| golden-gate-corespotlight-compat | r4 | oclp-hook | experiment |  | x | x |  |  | ok | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
+| golden-gate-font-registry | r2 | post | experiment | caches | x |  |  |  | ok | r2 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch  |
+| golden-gate-hello | r3 | oclp-hook | experiment |  | x | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
+| golden-gate-icon-caches | r2 | post | experiment | caches | x |  |  |  | ok | r2 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch  |
+| golden-gate-metal-framebuffer | r3 | oclp-hook | experiment |  | x | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
+| golden-gate-metal-libraries | r16 | oclp-hook | experiment |  | x | x |  |  | **needs** | r16 2026-11-11 26B131 artifact adds VectorKit, AlloyCommon and VFX (cache/metallib r54), superseding OCLP's 26 |
+| golden-gate-native-identities | r1 | oclp-hook | experiment |  | x | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
+| golden-gate-shader-caches | r9 | post | experiment | caches | x |  |  |  | ok | r9 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch  |
+| golden-gate-user-seed | r5 | post | experiment | caches | x |  |  |  | ok | r5 2026-11-11 Optional (group caches) with needs_any caches: skipped when no cache patch runs, since the copie |
+| golden-gate-userspace | r52 | oclp-hook | experiment |  | x | x |  |  | ok | r52 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
+| golden-gate-windowserver-filter | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
+| hao-opencore | r35 | post | experiment |  | x | x |  |  | ok | r35 2026-11-11 `hao_nx_stats=1` and `hao_bridge_stats=1` only in dev builds (`IMAGE_DEV_BUILD=1`); `hao_crash= |
+| hao-runtime | r60 | oclp-hook | experiment |  | x | x |  |  | ok | r60 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
+| metalold-selectors | r3 | oclp-hook | product |  | x | x |  |  | ok | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
+| rec-audio | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-bluetooth-input | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-brightness-keys | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-display-ethernet | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-install-volume | r3 | post | product |  |  |  |  |  | **needs** | r3 2026-11-10 Initial public release. |
+| rec-language-list | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-power | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-progress-phase | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-reinstall | r3 | recovery | product |  |  |  | x |  | **needs** | r3 2026-11-10 Initial public release. |
+| rec-startup-guard | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-wifi | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-wifi-autojoin | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |

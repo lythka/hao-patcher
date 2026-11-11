@@ -90,7 +90,7 @@ answer for each. Its table adds to MetalOld's base classes and does not depend o
 HD 4000 driver, so it could ship in the 3802 Metal payload for every legacy GPU.
 
 ## Validation
-Laptop 2026-11-11, image 4d1c48c (26B131): the accelerated desktop and the Metal paths of Maps, Safari and Preview run on the HD 4000. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Laptop 2026-11-11, image 4d1c48c (26B131): the accelerated desktop and the Metal paths of Maps, Safari and Preview run on the HD 4000.
 Earlier: Host tests cover every answer, the kill switch and the Mach-O, and
 on the target a native probe of `setForwardProgressUsage:` fails without the shim and
 succeeds with it. Quick Look of USDZ files and WindowServer's desktop effects on a

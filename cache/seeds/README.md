@@ -43,7 +43,7 @@ each index header and `__cache_info__`), `hao.txt` (`/private/var/db/hao`), `ps.
   build (IconServices resets such an index at start).
 - font-registry: `setup.tar` (Setup's (248) `com.apple.FontRegistry`, WAL folded in) and `user/fontregistry.user`
   (the user's, with its user-font-folder row set to fontd's "not seen" state under `/var/empty/Library/Fonts`, as
-  mac-image's `cache/font-registry` r2; seed.zsh writes the new account's home into it). Refuses a seed that still
+  the earlier Tahoe image project's font-registry recipe r2; seed.zsh writes the new account's home into it). Refuses a seed that still
   names the harvest user's home.
 Each gets `build.json` (inputs, counts, index geometry, registry versions, source commit) and `SHA256SUMS`; the folder
 name ends in the first 12 hex of SHA256SUMS' hash. An existing folder is never overwritten.
@@ -55,7 +55,7 @@ name ends in the first 12 hex of SHA256SUMS' hash. An existing folder is never o
 - On bf10de4 the caches persist across boots: Setup's iconservicesagent tree was last written on boot 1 (07:55) and
   not touched on boot 2, while Setup Assistant, Control Center and the video decoder added records on boot 2.
 - IconServices 27 (26B123 host, 26B131 laptop): store-info version 4 as in Tahoe; index version 11 with
-  **172-byte records** (Tahoe: 152). Harvested indexes are shipped as they are; mac-image's generator (universe,
+  **172-byte records** (Tahoe: 152). Harvested indexes are shipped as they are; the earlier Tahoe image project's generator (universe,
   render, append) needs the 27 record layout before it can add records.
 - An icon index record's digest of a bundle includes the bundle folder's mtime; a harvested index serves the next
   image only for bundles whose folder mtimes the build reproduces. The closed loop shows any that do not.

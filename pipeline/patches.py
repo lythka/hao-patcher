@@ -135,7 +135,7 @@ def plan(setfile, target, build, root=os.path.join(TOP, 'patches'), locks=None, 
     return out
 
 
-TRACKED_SETS = ('golden-gate', 'recovery', 'stock')
+TRACKED_SETS = ('golden-gate-26B131', 'golden-gate', 'recovery', 'stock')
 
 
 def tracker(root=os.path.join(TOP, 'patches')):

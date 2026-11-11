@@ -25,7 +25,7 @@ ditto "$P/inputs/hao_runtime/HaoExec.kext" "$ESP/EFI/OC/Kexts/HaoExec.kext"
 /private/var/ssdshare/py/bin/python3.12 -I "$P/src/early_kexts.py" \
     "$SYS" "$ESP" "$P/src/early-kexts.txt"
 /private/var/ssdshare/py/bin/python3.12 - "$ESP/EFI/OC/config.plist" <<'PYCONFIG'
-import plistlib,sys
+import os,plistlib,sys
 p=sys.argv[1]
 with open(p,'rb') as f:d=plistlib.load(f)
 d['Kernel']['Add']=[x for x in d['Kernel']['Add'] if x.get('BundlePath')!='HaoExec.kext']
@@ -45,12 +45,14 @@ for key in ('bootercfg', 'bootercfg-once'):
 args=[a for a in n.get('boot-args','').split() if a not in ('debug=0x100', '-v', 'startup_debug=1')]
 # amfi_get_out_of_my_way=1: hao gives each arm64-only program an ad-hoc signed x86_64 slice carrying the
 # program's own (Apple-private) entitlements; AMFIPass alone kills such a PID 1 (experimental sets only).
-# hao_crash/hao_nx_stats/hao_bridge_stats: hao's crash lines, NX fault tables and bridge statistics, the
-# diagnostics the QEMU runs use, so a hardware boot reports the same (hao's own boot-args; experimental sets only).
+# hao_crash: hao's crash lines (cheap, every build). hao_nx_stats/hao_bridge_stats: NX fault tables and bridge
+# statistics, the diagnostics the QEMU runs use; they cost time on every translated native call, so only dev builds
+# (golden-run sets IMAGE_DEV_BUILD=1 when the set has a status-dev recipe) get them.
+dev=os.environ.get('IMAGE_DEV_BUILD')=='1'
 for arg in ('-lilubetaall', '-pmap_pcid_disable', 'amfi_get_out_of_my_way=1',
-            'hao_crash=1', 'hao_nx_stats=1', 'hao_bridge_stats=1',
+            'hao_crash=1') + (('hao_nx_stats=1', 'hao_bridge_stats=1') if dev else ()) + (
             # IntelCommpage reports CSR_ALLOW_APPLE_INTERNAL so 27.0's dyld honours OCLP's on-disk Metal roots.
-            'ic_csr_internal=1'):
+            'ic_csr_internal=1',):
     if arg not in args:args.append(arg)
 n['boot-args']=' '.join(args)
 # Keep boot.efi/OpenCore evidence on the ESP for collection from Recovery.

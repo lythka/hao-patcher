@@ -38,7 +38,7 @@ trees with their owners (0, 88, 248, 92). On the laptop: MTLCompilerService CPU 
 against bf10de4 (4:21, 476); then `make compare` on a new harvest.
 
 ## Validation
-Laptop 2026-11-11, image 4d1c48c (26B131): MTLCompilerService was not among the busiest processes during first boot (bf10de4 without the seed: 4:21 CPU at 9 min). Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Laptop 2026-11-11, image 4d1c48c (26B131): MTLCompilerService was not among the busiest processes during first boot (bf10de4 without the seed: 4:21 CPU at 9 min).
 Earlier: r8 is built and chain-tested on the host only; no image with it has booted.
 r9 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r8's, so the result above stands.
 

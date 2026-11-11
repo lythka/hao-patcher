@@ -1,8 +1,8 @@
 # dev-access
 
 Root SSH into a bench image on the test laptop, so a test boot can be checked and the laptop sent back to NetBoot
-with no one at the keyboard. Dev set only (`pipeline/sets/dev.txt`): it puts the test host's private key into the
-image, which AGENTS.md allows only for dev images.
+with no one at the keyboard. Dev sets only (`dev-bs-test`): it puts the test host's private key into the
+image, which is allowed only in dev images.
 
 ## What it installs (Data volume)
 | Path | From |
@@ -16,9 +16,9 @@ image, which AGENTS.md allows only for dev images.
 Apple's `ssh.plist` and the Remote Login setting are not touched.
 
 ## Origin
-The root-ssh-key part of `~/ssd-tools-archive/ssd-tools/patchset/data/data.dev-access` (staged by
-`handoff/testssh/stage-testssh.sh`, 161bb103). The archive's testbench recorder, TCC rows and early capture are
-the `testbench` patch; its IconServices logging profile is `dev-telemetry`.
+The root-SSH-key part of the earlier Tahoe test tooling's dev-access data; the keys are the dev SSH key pair (kept
+outside the repo). That tooling's testbench recorder, TCC rows and early capture are the `testbench` patch; its
+IconServices logging profile is `dev-telemetry`.
 
 ## Verify
 After a test boot: `ssh -i ~/.ssh/mbp92_test root@<laptop> sw_vers` answers with the image's build.

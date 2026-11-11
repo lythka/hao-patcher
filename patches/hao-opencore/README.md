@@ -43,7 +43,8 @@ display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments
 | `-lilubetaall` | Lets Lilu-based OCLP kexts load on an unknown kernel version. |
 | `-pmap_pcid_disable` | Disables PCID in the target kernel's pmap; part of the boot configuration known to work. |
 | `amfi_get_out_of_my_way=1` | `hao-runtime` signs each program's x86_64 slice ad hoc with its own entitlements, including Apple-private ones (launchd: Preboot, graftdmg, trust caches). With AMFIPass alone, AMFI rejects `/sbin/launchd` and the kernel panics. |
-| `hao_crash=1 hao_nx_stats=1 hao_bridge_stats=1` | hao's crash lines, NX fault tables and bridge statistics on the console. |
+| `hao_crash=1` | hao's crash lines on the console. |
+| `hao_nx_stats=1 hao_bridge_stats=1` | Dev builds only (`IMAGE_DEV_BUILD=1`, set by golden-run when the set has a status `dev` recipe such as `dev-access`): hao's NX fault tables and bridge statistics. They cost time on every translated native call. |
 | `ic_csr_internal=1` | IntelCommpage reports `CSR_ALLOW_APPLE_INTERNAL`. 27.0's x86_64 dyld scans the disk for shared-cache overrides only when `csr_check(0x10)` succeeds, and the booter drops that bit from NVRAM; without it OCLP's on-disk Metal and MetalOld never load. |
 
 `-v`, `startup_debug=1` and `debug=0x100` are removed if the base config has them: early-boot evidence comes from
@@ -88,12 +89,16 @@ must still die with VM guard flavor 13 (status 137), which shows the fix leaves 
 has a 15-second alarm. Finally load a website in Safari and scroll, navigate and reload.
 
 ## Validation
-Laptop 2026-11-11, image 4d1c48c (26B131): boots with r33; r34's HaoExec.kext and stamp_identity.py are byte-identical to r33's. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Laptop 2026-11-11, image 4d1c48c (26B131, dev build): boots with r33; r34's HaoExec.kext and stamp_identity.py are byte-identical to r33's.
+r35 writes the same config.plist as r34 in a dev build (host test and a direct comparison of the two scripts), so
+the result above stands for dev builds. A non-dev build (`mbp92-26B131.json`, without the two statistics
+boot-args) has not been booted yet.
 Earlier: Host tests pass, and the binder verifies every fileset member and repair site against the
 reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox adapters pass in QEMU; a full
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r35 2026-11-11 `hao_nx_stats=1` and `hao_bridge_stats=1` only in dev builds (`IMAGE_DEV_BUILD=1`); `hao_crash=1` stays in every build. Dev builds get r34's config.plist unchanged.
 - r34 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d; HaoExec and stamp_identity.py come from it. No recipe change; boot validation pending.
 - r33 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 7415a0b; HaoExec comes from it (rebuilt by that commit). No recipe change; boot validation pending.
 - r32 2026-11-11 No longer copies OpenCore.efi and OpenRuntime.efi from `opencore_debug`: the base EFI build already installs every OpenCore binary from that same archive. Input row `opencore_debug` dropped from this patch (the runner still reads it for the base EFI). Same ESP bytes expected; build validation pending.

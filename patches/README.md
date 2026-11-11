@@ -5,7 +5,8 @@ source it builds, and its tests. A set in `pipeline/sets/` lists the patches an 
 [TRACKER.md](TRACKER.md) lists every patch with its revision, stage, sets and validation state.
 
 ```sh
-python3.14 -I pipeline/patches.py plan pipeline/sets/golden-gate.txt pipeline/targets/mbp92.json 25G332
+python3.14 -I pipeline/patches.py plan pipeline/sets/golden-gate-26B131.txt pipeline/targets/mbp92.json 25G342 \
+  --locks pipeline/inputs/golden/26B131:pipeline/inputs/25G342:pipeline/inputs/common
 python3.14 -I pipeline/patches.py path golden-gate-corespotlight-compat
 python3.14 -I pipeline/patches.py check
 ```
