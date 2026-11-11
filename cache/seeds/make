@@ -360,7 +360,8 @@ def make(args):
         if not counts['system_files'] and not counts['user_files']:
             raise SystemExit('make: the harvest has no Metal cache files')
         write_tar(w / 'data.tar', members)
-        made.append(('shader_caches_golden_gate', finish(w, out_dir, 'shader-caches', h, {'counts': counts}), 'data.tar'))
+        # A folder row: golden-gate-shader-caches reads build.json and data.tar inside it.
+        made.append(('shader_caches_golden_gate', finish(w, out_dir, 'shader-caches', h, {'counts': counts}), None))
         # icons
         w = tmp / 'icon'; (w / 'user').mkdir(parents=True)
         tar, user, report = icon_members(h)
