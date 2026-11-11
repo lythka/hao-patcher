@@ -2,13 +2,8 @@
 # Run after golden-gate-userspace, which replaces OCLP's System libraries.
 set -eu
 SYS=$1
-IN="$(dirname "$0")/inputs/metallib_repairs_golden_gate"
-find "$IN/System" -type f -name '*.metallib' | while IFS= read -r source; do
-    relative=${source#"$IN/"}
-    install -d -m 755 "$(dirname "$SYS/$relative")"
-    install -o 0 -g 0 -m 644 "$source" "$SYS/$relative"
-    echo "golden-gate-metal-libraries: installed /$relative"
-done
+# Each repaired library replaces the System's only if that library is the one it was made from (install_libraries.py).
+"${OCLP_PYTHON:?}" -I "$(dirname "$0")/install_libraries.py" "$SYS" "$(dirname "$0")/inputs/metallib_repairs_golden_gate"
 RUNTIME="$(dirname "$0")/inputs/metal_quad_runtime_golden_gate"
 relative=System/Library/Extensions/AppleIntelGraphicsShared.bundle/Contents/Resources/runtime.igil64.split
 install -d -m 755 "$(dirname "$SYS/$relative")"

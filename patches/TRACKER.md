@@ -11,9 +11,9 @@ VALIDATION), ok = a boot test proved the current revision.
 | dev-access | r3 | post | dev |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
 | golden-gate-code-identity | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-10 Initial public release. |
 | golden-gate-corespotlight-compat | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
-| golden-gate-hello | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-10 Initial public release. |
+| golden-gate-hello | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-11 The hello library row is a System-rooted folder with `SOURCES`; the hook refuses a System librar |
 | golden-gate-metal-framebuffer | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
-| golden-gate-metal-libraries | r13 | oclp-hook | experiment | x |  |  | **needs** | r13 2026-11-10 Initial public release. |
+| golden-gate-metal-libraries | r14 | oclp-hook | experiment | x |  |  | **needs** | r14 2026-11-11 Installs a repaired library only over the System library it was made from (`SOURCES`), or over  |
 | golden-gate-userspace | r41 | oclp-hook | experiment | x |  |  | **needs** | r41 2026-11-11 IO80211 compat for 26B131: adds `Apple80211Get20MhzChannelIndexBitmap` (bound by WiFiAnalytics  |
 | golden-gate-windowserver-filter | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-10 Initial public release. |
 | hao-opencore | r29 | post | experiment | x |  |  | **needs** | r29 2026-11-10 Initial public release. |
