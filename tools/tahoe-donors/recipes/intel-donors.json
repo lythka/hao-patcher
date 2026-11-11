@@ -110,7 +110,19 @@
   ],
   "keep_donor_roots": [
     "System/DriverKit",
+    "System/Library/CoreServices/PlatformSupport.plist",
     "System/Library/CoreServices/boot.efi",
-    "System/Library/CoreServices/PlatformSupport.plist"
-  ]
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.plist",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.ram.plist",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.spb.plist",
+    "System/Library/PrivateFrameworks/DiskImages2.framework/Versions/A/XPCServices/diskimagescontroller.xpc",
+    "usr/libexec/diskimagesiod"
+  ],
+  "kext_paired_roots": {
+    "usr/libexec/diskimagesiod": "IOHDIXController.kext (disk image attach)",
+    "System/Library/PrivateFrameworks/DiskImages2.framework/Versions/A/XPCServices/diskimagescontroller.xpc": "IOHDIXController.kext (disk image attach)",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.plist": "diskimagesiod (kext-paired)",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.ram.plist": "diskimagesiod (kext-paired)",
+    "System/Library/LaunchDaemons/com.apple.diskimagesiod.spb.plist": "diskimagesiod (kext-paired)"
+  }
 }

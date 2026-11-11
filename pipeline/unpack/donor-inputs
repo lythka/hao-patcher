@@ -353,7 +353,7 @@ def main():
         for r in req['system_roots']:
             t = os.path.join(a.target_system, r)
             if r in keep:
-                donor_roots.append(r); choices.append((r, 'donor', 'pinned (keep_donor_roots)')); continue
+                donor_roots.append(r); choices.append((r, 'donor', 'pinned: ' + req.get('kext_paired_roots', {}).get(r, 'keep_donor_roots'))); continue
             if not os.path.lexists(t):
                 donor_roots.append(r); choices.append((r, 'donor', 'target lacks it')); continue
             files = [t] if not os.path.isdir(t) else [os.path.join(d, f) for d, _, fs in os.walk(t) for f in fs]
