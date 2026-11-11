@@ -1,10 +1,11 @@
 // CoreWiFi compatibility library (row corewifi_compat, made and checked by make in this folder).
 //
-// Installed as CoreWiFi, it re-exports Tahoe 25G342's x86_64 CoreWiFi (CoreWiFiTahoe.dylib, cut from that build's
-// shared cache by tools/cache-dylib) so that Tahoe's airportd, the only Intel airportd this image has, runs with the
-// CoreWiFi it was built with, and every 27.x client uses the same copy (dyld repoints the cached clients' bindings to
-// this file). It adds only what 27.x clients bind or send that Tahoe's CoreWiFi lacks; make's coverage check
-// (corewifi_coverage.py) stops the build if a client's import or selector is left unanswered.
+// Installed as CoreWiFi, it re-exports Tahoe 25G342's x86_64 CoreWiFi (a native Tahoe donor, cut from that build's
+// shared cache by tools/tahoe-donors; install.py renames it CoreWiFiTahoe.dylib) so that Tahoe's airportd, the only
+// Intel airportd this image has, runs with the CoreWiFi it was built with, and every 27.x client uses the same copy
+// (dyld repoints the cached clients' bindings to this file). It adds only what 27.x clients bind or send that Tahoe's
+// CoreWiFi lacks; make's coverage and method checks (../io80211/coverage.py, methods.py) stop the build if a
+// client's import or selector is left unanswered.
 //
 // Symbols, bound strongly by on-disk 27.x clients:
 // - CWFEventLinkQualityAssessmentKey (SymptomEvaluator): 27.x's value. Tahoe's CoreWiFi posts no link-quality

@@ -31,8 +31,8 @@ class ReplaceTest(unittest.TestCase):
         full = ['--driverkit-artifact', 'donor', '--donor-tool', 'extractor', '--hao-runtime', 'hao']
         for drop in range(0, len(full), 2):
             with self.assertRaises(SystemExit), patch('sys.stderr'):
-                module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', *full[:drop], *full[drop+2:]])
-        args = module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', *full])
+                module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', 'corewifi', *full[:drop], *full[drop+2:]])
+        args = module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', 'corewifi', *full])
         self.assertEqual((args.driverkit_artifact, args.donor_tool, args.hao_runtime),
                          (Path('donor'), Path('extractor'), Path('hao')))
 

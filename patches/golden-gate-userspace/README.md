@@ -16,6 +16,8 @@ System tree.
   ([tools/display-fixes](../../tools/display-fixes)).
 - `io80211_compat`: the IO80211 compatibility library, built and checked for one build by `src/io80211/make`.
 - `wifip2p_compat`: the WiFiPeerToPeer compatibility library, built and checked for one build by `src/wifip2p/make`.
+- `corewifi_compat`: the CoreWiFi compatibility library, built and checked for one build (and its Tahoe CoreWiFi
+  donor) by `src/corewifi/make`. Rows exist for 26B131 only.
 - `codeid_carrier`: the code identity carrier's objects (`carrier.o` and hao-runtime's `libhao_codeid.a`), made by
   `src/codeid/make` (common row: the objects are build-independent; each cache is checked when it is edited).
 - `hao_runtime`: the [hao-runtime](../hao-runtime/README.md) payload, read only (`src/read-from-share.txt`): its
@@ -43,12 +45,14 @@ collections; the runner calls it like every other recipe. It:
   would otherwise call as code;
 - installs the WiFiPeerToPeer compatibility library over OCLP's WiFiPeerToPeer wrapper, which lacks the Wi-Fi Aware
   classes 27.x's AirPlay stack extends;
+- installs the CoreWiFi compatibility library in front of Tahoe's CoreWiFi, which the native Tahoe donors put at
+  CoreWiFi's path, so Tahoe's airportd and every 27.x client share the CoreWiFi airportd was built with;
 - disables jobs that cannot run on an Intel Mac (`hybridsearchd` exits on non-Apple silicon and would restart in a
   loop);
 - restores setuid/setgid modes after copying.
 
 Which framework sits beneath OCLP's replacements is decided by the base layers, not here. With the 26B131 donor
-artifact (`minimal-native-25G342-26B131`) Metal, OpenCL, AppleGVA, AppleGVACore, GPUCompiler, MTLCompiler, IO80211
+artifact (`minimal-native-25G342-26B131-corewifi`) Metal, OpenCL, AppleGVA, AppleGVACore, GPUCompiler, MTLCompiler, IO80211
 and WiFiPeerToPeer are the 27.x build's own, with OCLP's overlay on top. The older 26A428 artifact still installs
 Tahoe's copies of those frameworks first.
 
@@ -124,6 +128,48 @@ are the Wi-Fi Aware pairing, datapath and bootstrapping classes), gaps on OCLP's
 OCLP classes: WiFiPeerToPeerOld.dylib is cut from a 13.7.2 shared cache and its method lists name selectors relative
 to that cache, so they cannot be read offline. 27.x's x86_64 IO80211 defines no classes, so its pass records none.
 
+### CoreWiFi
+The image's airportd is Tahoe's (27.x has no Intel one), and airportd hosts CoreWiFi's XPC server and auto-join
+(CWFXPCManager, CWFAutoJoinManager live in CoreWiFi). With 27.x's CoreWiFi underneath it crashed on auto-join: 27.x
+changed three callout reply blocks (an added `reason` argument lands where Tahoe's code expects the `NSError`, so
+`objc_retain(0x2)`) and renumbered 213 of its 302 XPC request types (30 of the 48 airportd answers). So the image goes
+back to Tahoe 25G342's CoreWiFi for every process: airportd and its clients then agree by construction.
+
+Tahoe has CoreWiFi only inside its x86_64h OS cache. The native donors cut it out (`tools/tahoe-donors`,
+recipe `cache_images`, with `tools/cache-dylib`) and install it at `CoreWiFi.framework/Versions/A/CoreWiFi` with its
+own install name. `install.py` then renames it `CoreWiFiTahoe.dylib` (install name and file, re-signed) and installs
+the compat library as `CoreWiFi`, re-exporting it, the same way as IO80211 and WiFiPeerToPeer. dyld loads the file
+instead of the cached 27.x CoreWiFi and repoints the cached clients' bindings to it. airportd is not edited.
+
+`src/corewifi/corewifi_compat.m` adds what 27.x clients need beyond Tahoe's CoreWiFi:
+- `CWFEventLinkQualityAssessmentKey` (SymptomEvaluator) and the class `CWFColocatedConsentResult` (SpeakerGroupSetupKit),
+  both strong imports;
+- 16 methods 27.x clients name on Tahoe's classes (its `kMethods` table), added at load with `class_addMethod`, which
+  never replaces a method: no-op getters/setters, `ENOTSUP` from `setBTCoexActiveProfileName:error:` and
+  `performColocatedNetworkScanWithConsentStatus:`, and `-[CWFConfigurationProfileManager activateWithCompletion:]`,
+  which runs Tahoe's `-activate` and then the completion block (threadradiod, nearbyd, sharingd).
+
+```sh
+python3.14 -I patches/golden-gate-userspace/src/corewifi/make ARTIFACTS --system SYSTEM_ROOT \
+  --cache X86_64_DYLD_CACHE --donors TAHOE_NATIVE_DONORS --oclp OCLP_ROOT \
+  --io80211-compat IO80211_COMPAT --wifip2p-compat WIFIP2P_COMPAT
+```
+
+`make` stops with `MISSING/unsupported` or `MISSING method` and makes no artifact unless:
+- every symbol Tahoe's CoreWiFi binds (the donor's `cache-images.json`) is exported by the build's x86_64 cache or,
+  for IO80211 and WiFiPeerToPeer, by the image's own compat, wrapper and Old files;
+- every CoreWiFi symbol a client binds resolves to the compat library or Tahoe's CoreWiFi (`src/io80211/coverage.py`;
+  cache importers whose only uses are CoreWiFi's own need no answer). The build's own airportd, wifip2pd and
+  WiFiMigratorPlugin are skipped: the donors and OCLP replace them, and their replacements' imports are checked instead;
+- the method pass (`src/io80211/methods.py`) finds no gap on a class Tahoe's CoreWiFi or the compat library provides,
+  checking every class of the build's CoreWiFi (instances reach clients through CoreWiFi's API without a binding),
+  whoever names the selector, with the `kMethods` table counted. Classes only 27.x has (link-quality assessment,
+  direct-to-cloud stats, network path monitor) are recorded: Tahoe's CoreWiFi never creates them, so those features
+  are off on this Mac.
+
+On 26B131 Tahoe's CoreWiFi binds nothing the build lacks, 57 client symbols resolve (55 to Tahoe's CoreWiFi, 2 to the
+compat library) and the method pass finds no gap over 172 classes and 50 clients.
+
 ### Code identity
 macOS 27 programs run through hao's stubs, which are signed ad hoc, and several native Apple programs are re-signed ad
 hoc by later recipes; every check of a code requirement (`anchor apple`, `identifier ... and anchor apple`) then
@@ -194,6 +240,7 @@ without the cryptexes (the 26A428 one) has no such entries: nothing changes.
 ```sh
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests
 # optional: WIFIP2P_OCLP_DIR / IO80211_OCLP_DIR = OCLP's 13.7.2-25 framework folders
+# optional on a macOS 27 host: COREWIFI_DONORS = tahoe_native_donors artifact, COREWIFI_COMPAT = corewifi_compat.dylib
 # optional: HAO_RUNTIME_PAYLOAD (hao payload) + GOLDEN_APP_CRYPTEX (mounted app.dmg): real App cryptex embedding
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/build/tests
 # code identity carrier: HAO_RUNTIME = hao-runtime checkout (runs it); CODEID_CACHE = an image cache folder (plans it)
@@ -231,8 +278,13 @@ r47, r48 (code identity carrier) and r49 (cryptex stubs) has been validated on a
 r49 (cryptex stubs) is host-tested only (fixtures, and the real 26B131 payload's App stubs embedded into copies of
 AppOS's programs). Not yet shown: an image whose cryptexes graft with the rebuilt App image, and SearchHelper and the
 WebKit XPC services running under their own identity (process path the helper's, not `/usr/libexec/hao`).
+r50 (Tahoe CoreWiFi + compat) is host-tested only: under Rosetta the compat library re-exports an authored stand-in
+and, on a macOS 27 host, the real Tahoe CoreWiFi in front of the cached 27.x CoreWLAN, with no duplicate classes.
+Not yet shown on the laptop: airportd surviving auto-join, `networksetup -setairportnetwork` joining, auto-join after a
+reboot, no airportd `.ips`.
 
 ## Revisions
+- r50 2026-11-11 CoreWiFi: Tahoe 25G342's CoreWiFi (a native donor, cut from Tahoe's cache by tools/tahoe-donors r11) under a compat library (new input `corewifi_compat`, `src/corewifi`) that adds 2 symbols and 16 methods 27.x clients need; installed by the same wrapper-compat installer as IO80211/WiFiPeerToPeer (renamed `CoreWiFiTahoe.dylib`). Fixes airportd's crash on auto-join (27.x CoreWiFi's callouts and request numbers). The method pass gains every-class, run-time-added and strict modes for it; patch-table symbols only the replaced library uses need no answer. Replaces the separate golden-gate-corewifi recipe. Host tests only.
 - r49 2026-11-11 Embed hao's stubs into the arm64-only programs of the App and OS cryptexes (Safari's agents, Safari's and WebKit's XPC services) before sealing; the App cryptex is rebuilt as a fresh sealed image when the payload has App stubs. New input `hao_runtime` (read from the share). Without them those programs ran through `/usr/libexec/hao` under hao's identity and Safari's SearchHelper aborted on an empty container identifier. The payload (hao-runtime 7415a0b) also ships `usr/lib/hao/stub-identities` (961 stubs, the 26 cryptex stubs included) that r48's carrier and golden-gate-native-identities read. Host tests only; image build and boot pending.
 - r48 2026-11-11 Code identity carrier: hao-runtime's `hao_codeid_decide` (row `codeid_carrier`, hao-runtime 53d26c3 sources) linked into the free tails of the main x86_64 subcache and called after `SecCodeCheckValidityWithErrors` and `SecStaticCodeCheckValidityWithErrors` (their forwarders and SecTaskValidateForRequirement included), for every native and hao process; replaces golden-gate-code-identity's per-daemon interposer. Host-run against this Mac's x86_64 cache; planned on 26A428 and 26B131; boot validation pending.
 - r47 2026-11-11 Repair the x86_64 cache's broken Swift conformance type references (47 in 26B131, 21 in 26A428; Apple's own RosettaOS cache) from the arm64e cache's records, and refuse a combined cryptex whose x86_64 cache still has a bad Swift metadata reference (`src/swift_refs.py`). Fixes the SIGBUS of Siri AI.app (Cmd-Space) in `swift_getTypeByMangledName`. Host: plan, apply, 4 KiB re-sign and verify on a copy of 26B131's cache (47 -> 0); image and boot validation pending.

@@ -1,0 +1,256 @@
+#!/opt/homebrew/bin/python3.14
+"""Build the CoreWiFi compat library (input row corewifi_compat) into a new, recorded artifact and check it covers one
+27.x build:
+
+    make STORE_ARTIFACTS --system SYSTEM_ROOT --cache X86_64_DYLD_CACHE --donors TAHOE_NATIVE_DONORS --oclp OCLP_ROOT
+         --io80211-compat FILE --wifip2p-compat FILE
+
+SYSTEM_ROOT is the build's System volume (its SystemVersion.plist names the build and its programs are the on-disk
+clients), X86_64_DYLD_CACHE its RosettaOS dyld_shared_cache_x86_64. TAHOE_NATIVE_DONORS is the tahoe_native_donors
+artifact the image installs: its payload/system holds Tahoe's CoreWiFi (cut from Tahoe's cache by tools/tahoe-donors,
+recipe cache_images; cache-images.json lists what it binds) and the Tahoe programs that replace the build's own.
+OCLP_ROOT is OCLP's overlay root (13.7.2-25); the two files are the image's IO80211 and WiFiPeerToPeer compat
+libraries (rows io80211_compat, wifip2p_compat).
+
+Checks; any failure stops the build and makes no artifact:
+- environment: every symbol Tahoe's CoreWiFi binds is exported by the build's x86_64 cache or, for IO80211 and
+  WiFiPeerToPeer, by the image's own files (compat library, OCLP wrapper renamed ...OCLP.dylib, ...Old.dylib);
+- symbols (../io80211/coverage.py, leaf CoreWiFi): every CoreWiFi symbol a 27.x client binds (cache patch table,
+  on-disk programs except those the donors or OCLP replace) resolves to this library or Tahoe's CoreWiFi, and every
+  donor or OCLP program linking CoreWiFi finds its imports there too;
+- methods (../io80211/methods.py): every class the build's CoreWiFi defines, for every client, with the kMethods
+  table of corewifi_compat.m counted as added methods; a gap on a class Tahoe's CoreWiFi or this library provides is
+  MISSING method, whoever names it (classes only 27.x has are recorded: Tahoe's CoreWiFi never creates them)."""
+import argparse
+import datetime
+import hashlib
+import json
+from pathlib import Path
+import plistlib
+import re
+import subprocess
+import sys
+import tempfile
+
+HERE = Path(__file__).resolve().parent
+PATCH = HERE.parents[1]
+TOP = PATCH.parents[1]
+LEAF = 'CoreWiFi'
+FRAMEWORK = f'/System/Library/PrivateFrameworks/{LEAF}.framework/Versions/A'
+DONOR = f'System/Library/PrivateFrameworks/{LEAF}.framework/Versions/A'
+NAME = 'corewifi_compat.dylib'
+COVERAGE = HERE.parent/'io80211'/'coverage.py'
+DSC = TOP/'tools/cache-dylib'
+PRIVATE = '/System/Library/PrivateFrameworks'
+MACHO = (b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe', b'\xca\xfe\xba\xbf')
+TABLE_ENTRY = re.compile(r'^\s*\{"(\w+)", "([\w:]+)", "([^"]+)", \(IMP\)(\w+)\},$', re.M)
+
+
+def run(*args):
+    return subprocess.check_output(list(map(str, args)), cwd=TOP, text=True).strip()
+
+
+def sha256(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def build(out):
+    """Compile corewifi_compat.m into OUT/corewifi_compat.dylib (install name CoreWiFi, re-exporting
+    CoreWiFiTahoe.dylib), ad-hoc signed. Returns its path."""
+    binary = Path(out)/NAME
+    run('xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O2', '-Wall', '-Wextra', '-Werror',
+        '-fobjc-arc', '-dynamiclib', '-fvisibility=hidden', '-Wl,-not_for_dyld_shared_cache',
+        '-install_name', f'{FRAMEWORK}/{LEAF}', '-compatibility_version', '1.0.0', '-current_version', '1006.2.0',
+        f'-Wl,-reexport_library,{HERE/"CoreWiFiTahoe.tbd"}', '-framework', 'Foundation', HERE/'corewifi_compat.m',
+        '-o', binary)
+    run('codesign', '-f', '-s', '-', binary)
+    return binary
+
+
+def added_methods(source=HERE/'corewifi_compat.m'):
+    """{class: {'-selector'}} of the kMethods table: the instance methods the library's constructor adds."""
+    table = {}
+    for name, selector, _, _ in TABLE_ENTRY.findall(Path(source).read_text()):
+        table.setdefault(name, set()).add('-' + selector)
+    return table
+
+
+def links_corewifi(path):
+    try:
+        with open(path, 'rb') as stream:
+            return stream.read(4) in MACHO and f'{FRAMEWORK}/{LEAF}'.encode() in Path(path).read_bytes()
+    except OSError:
+        return False
+
+
+def replacing_programs(roots):
+    """{relative path: file} for Mach-Os under ROOTS (the donor payload, OCLP's overlay) that link CoreWiFi, outside
+    CoreWiFi's own framework: the image installs them over the build's own."""
+    found = {}
+    for root in roots:
+        for path in sorted(Path(root).rglob('*')):
+            if path.is_file() and not path.is_symlink() and f'/{LEAF}.framework/' not in str(path) \
+                    and links_corewifi(path):
+                found[str(path.relative_to(root))] = path
+    return found
+
+
+def program_imports(programs, coverage):
+    """{symbol: {client}} of the programs' CoreWiFi imports, each architecture."""
+    found = {}
+    for relative, path in sorted(programs.items()):
+        for arch in coverage.out('lipo', '-archs', path).split():
+            for line in coverage.out('xcrun', 'dyld_info', '-arch', arch, '-imports', path).splitlines():
+                if f'(from {LEAF})' in line:
+                    found.setdefault(line.split()[1], set()).add(f'{relative} [{arch}]' + (
+                        ' (weak)' if 'weak-import' in line else ''))
+    return found
+
+
+def file_exports(path, dsc):
+    """(exports, re-exported install names, dependencies) of an on-disk Mach-O's x86_64 slice."""
+    import struct
+    data = Path(path).read_bytes()
+    magic, = struct.unpack_from('>I', data)
+    if magic in (0xCAFEBABE, 0xCAFEBABF):
+        count, wide = struct.unpack_from('>I', data, 4)[0], magic == 0xCAFEBABF
+        for i in range(count):
+            cpu, _, offset, size = struct.unpack_from('>iiQQ' if wide else '>iiII', data, 8 + i*(32 if wide else 20))
+            if cpu == 0x01000007:
+                data = data[offset:offset + size]
+                break
+        else:
+            raise ValueError(f'{path}: no x86_64 slice')
+    ncmds, = struct.unpack_from('<I', data, 16)
+    at, trie, reexports, dylibs = 32, None, [], []
+    for _ in range(ncmds):
+        cmd, size = struct.unpack_from('<II', data, at)
+        if cmd == dsc.LC_DYLD_EXPORTS_TRIE:
+            off, length = struct.unpack_from('<II', data, at + 8)
+            trie = data[off:off + length]
+        elif cmd in (dsc.LC_DYLD_INFO, dsc.LC_DYLD_INFO_ONLY):
+            off, length = struct.unpack_from('<II', data, at + 40)
+            trie = data[off:off + length] if length else trie
+        elif cmd in dsc.DYLIB_COMMANDS:
+            name_off, = struct.unpack_from('<I', data, at + 8)
+            dylibs.append(data[at + name_off:at + size].split(b'\0', 1)[0].decode())
+            if cmd == dsc.LC_REEXPORT_DYLIB:
+                reexports.append(dylibs[-1])
+        at += size
+    return (dsc.parse_trie(trie) if trie else {}), reexports, dylibs
+
+
+def environment(binds, cache_dir, overrides, weak=()):
+    """BINDS {install name: [symbols]} (the donor's extraction record), CACHE_DIR the build's x86_64 cache folder,
+    OVERRIDES {install name: file the image installs there}, WEAK weakly linked install names (a missing bind there is
+    set to NULL). Returns (missing, weak_missing, where)."""
+    sys.path.insert(0, str(DSC))
+    import dsc
+    cache, files = dsc.Cache(cache_dir, 'x86_64'), {}
+
+    def library(name):
+        if name in overrides:
+            if name not in files:
+                files[name] = file_exports(overrides[name], dsc)
+            return 'on disk', files[name]
+        try:
+            image = cache.image(name)
+        except LookupError:
+            return None
+        return 'x86_64 cache', (image.exports(), [p for c, p in image.dylibs if c == dsc.LC_REEXPORT_DYLIB],
+                                [p for c, p in image.dylibs])
+
+    def has(name, symbol, seen=()):
+        lib = None if name in seen else library(name)
+        if lib is None:
+            return False
+        exports, reexports, dylibs = lib[1]
+        if symbol in exports:
+            flags, value = exports[symbol]
+            if flags & dsc.EXPORT_SYMBOL_FLAGS_REEXPORT:
+                ordinal, other = value
+                return 0 < ordinal <= len(dylibs) and has(dylibs[ordinal - 1], other, seen + (name,))
+            return True
+        return any(has(r, symbol, seen + (name,)) for r in reexports)
+    try:
+        missing, weak_missing, where = [], [], {}
+        for name, symbols in sorted(binds.items()):
+            lib = library(name)
+            where[name] = lib[0] if lib else 'missing'
+            for symbol in symbols:
+                if not has(name, symbol):
+                    (weak_missing if name in weak else missing).append(f'{name}: {symbol}')
+        return missing, weak_missing, where
+    finally:
+        cache.close()
+
+
+def main(args):
+    sys.path.insert(0, str(COVERAGE.parent))
+    import coverage
+    root = Path(args.artifacts).resolve()
+    system = Path(args.system)
+    macos_build = plistlib.loads((system/'System/Library/CoreServices/SystemVersion.plist').read_bytes())[
+        'ProductBuildVersion']
+    donors = Path(args.donors)
+    tahoe_dir = donors/'payload/system'/DONOR
+    record = json.loads((donors/'cache-images.json').read_text())[f'{DONOR}/{LEAF}']
+    extraction = record['extraction']
+    if sha256(tahoe_dir/LEAF) != next(e['sha256'] for e in json.loads((donors/'manifest.json').read_text())['entries']
+                                      if e['path'] == f'{DONOR}/{LEAF}'):
+        sys.exit(f'{tahoe_dir/LEAF}: differs from its donor manifest')
+    sources = {str(p.relative_to(TOP)): sha256(p) for p in sorted(HERE.iterdir()) if p.is_file()}
+    for helper in (COVERAGE, COVERAGE.parent/'methods.py', DSC/'dsc.py'):
+        sources[str(helper.relative_to(TOP))] = sha256(helper)
+    overrides = {}
+    for leaf, compat in (('IO80211', args.io80211_compat), ('WiFiPeerToPeer', args.wifip2p_compat)):
+        oclp = Path(args.oclp)/f'System/Library/PrivateFrameworks/{leaf}.framework/Versions/A'
+        overrides[f'{PRIVATE}/{leaf}.framework/Versions/A/{leaf}'] = compat
+        overrides[f'{PRIVATE}/{leaf}.framework/Versions/A/{leaf}OCLP.dylib'] = oclp/leaf
+        overrides[f'{PRIVATE}/{leaf}.framework/Versions/A/{leaf}Old.dylib'] = oclp/f'{leaf}Old.dylib'
+    weak = {d['path'] for d in extraction['dependencies'] if d['weak']}
+    missing, weak_missing, where = environment(extraction['binds'], Path(args.cache).parent, overrides, weak)
+    programs = replacing_programs((donors/'payload/system', args.oclp))
+    added = added_methods()
+    with tempfile.TemporaryDirectory(prefix='corewifi-compat-') as tmp:
+        binary = build(tmp)
+        checked = coverage.check(args.cache, system, tahoe_dir, binary, LEAF, (), tuple(programs), 'Tahoe',
+                                 added=added, every_class=True, answerable=('compat', f'Tahoe {LEAF}'), strict=True)
+        providers = [('compat', coverage.exports(binary)), (f'Tahoe {LEAF}', coverage.exports(tahoe_dir/LEAF))]
+        replaced_symbols, replaced_errors = coverage.assess(program_imports(programs, coverage), {}, providers, LEAF,
+                                                            'Tahoe')
+        errors = [f'MISSING/unsupported: Tahoe\'s CoreWiFi binds {m}, which {macos_build} does not export'
+                  for m in missing] + checked['errors'] + replaced_errors
+        if errors:
+            sys.exit('\n'.join(errors))
+        digest = sha256(binary)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        out = root/f'corewifi-compat-{macos_build}-{now:%Y%m%d}-{digest[:12]}'
+        out.mkdir()
+        (out/NAME).write_bytes(binary.read_bytes())
+        (out/NAME).chmod(0o755)
+        (out/'build.json').write_text(json.dumps({
+            'unit': 'patches/golden-gate-userspace/src/corewifi',
+            'revision': json.loads((PATCH/'patch.json').read_text())['revision'],
+            'commit': run('git', 'rev-parse', 'HEAD'),
+            'dirty': bool(run('git', 'status', '--porcelain', '--', PATCH, DSC)),
+            'date': now.isoformat(), 'inputs': sources,
+            'compiler': run('xcrun', 'clang', '--version'),
+            'sha256': digest,
+            'tahoe_corewifi': dict(donors=str(donors.resolve()), sha256=sha256(tahoe_dir/LEAF),
+                                   cache=record['cache'], cache_main_sha256=record['main_sha256']),
+            'environment': dict(missing=missing, weak_missing=weak_missing, libraries=where,
+                                overrides={n: dict(path=str(Path(p).resolve()), sha256=sha256(p))
+                                           for n, p in overrides.items()}),
+            'coverage': dict(build=macos_build, cache=str(Path(args.cache).resolve()), **checked),
+            'replacing_programs': dict(programs=sorted(programs), symbols=replaced_symbols),
+        }, indent=2, default=sorted)+'\n')
+        print(out)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('artifacts', type=Path)
+    for option in ('system', 'cache', 'donors', 'oclp', 'io80211-compat', 'wifip2p-compat'):
+        parser.add_argument('--'+option, type=Path, required=True)
+    main(parser.parse_args())

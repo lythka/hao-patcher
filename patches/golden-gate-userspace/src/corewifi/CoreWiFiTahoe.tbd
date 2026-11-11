@@ -1,0 +1,11 @@
+--- !tapi-tbd
+# Link-time stand-in for Tahoe's CoreWiFi under its new name: the image's CoreWiFi (corewifi_compat.dylib)
+# re-exports it, and the re-export needs only the install name at link time (its symbols are looked up at run time).
+tbd-version:     4
+targets:         [ x86_64-macos ]
+install-name:    '/System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFiTahoe.dylib'
+current-version: 1006.2
+exports:
+  - targets:     [ x86_64-macos ]
+    symbols:     [ _CoreWiFiTahoeLinkStandIn ]
+...

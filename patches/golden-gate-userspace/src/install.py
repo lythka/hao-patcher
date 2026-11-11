@@ -4,8 +4,8 @@ The base layers (pipeline/stages/golden-image.py) already copied Golden Gate's S
 donors and OCLP's hardware overlay; nothing here replaces or keeps System trees. This installs the combined OS cryptex
 (Golden Gate SystemOS + RosettaOS x86_64 cache + Tahoe's x86_64 DriverKit cache, with the cache repairs and the code
 identity carrier) and the App cryptex, each with the hao stubs of its arm64-only programs (src/cryptex_stubs.py),
-the OCLP compat libraries, the display-state shim and its re-signed clients, and disables jobs that cannot run on this
-Mac."""
+the OCLP compat libraries, the CoreWiFi compat library in front of Tahoe's CoreWiFi, the display-state shim and its
+re-signed clients, and disables jobs that cannot run on this Mac."""
 import argparse
 from contextlib import contextmanager, ExitStack
 import importlib.machinery
@@ -294,6 +294,13 @@ IO80211 = 'System/Library/PrivateFrameworks/IO80211.framework/Versions/A/'
 # wifip2p_compat, made and checked by src/wifip2p/make) defines them and re-exports the wrapper, renamed
 # WiFiPeerToPeerOCLP.dylib, in the same way.
 WIFIP2P = 'System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/'
+# airportd crashes on auto-join without this: the image's airportd is Tahoe's (27.x has no Intel one) and hosts
+# CoreWiFi's XPC server, but 27.x's CoreWiFi changed three callout reply blocks (objc_retain(0x2)) and renumbered 213
+# of its 302 request types. The native Tahoe donors put Tahoe 25G342's own CoreWiFi (cut from its shared cache by
+# tools/tahoe-donors) at the framework path; the compat library (row corewifi_compat, made and checked by
+# src/corewifi/make) re-exports it, renamed CoreWiFiTahoe.dylib, and adds the 2 symbols and 16 methods 27.x clients
+# need beyond it, so airportd and every client share Tahoe's CoreWiFi.
+COREWIFI = 'System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/'
 
 
 def install_io80211(system, compat, workspace):
@@ -304,15 +311,30 @@ def install_wifip2p(system, compat, workspace):
     install_wrapper_compat(system, compat, workspace, WIFIP2P, 'WiFiPeerToPeer')
 
 
-def install_wrapper_compat(system, compat, workspace, folder, leaf):
-    """Rename OCLP's wrapper SYSTEM/FOLDER/LEAF to LEAFOCLP.dylib (install name and file, re-signed with its
-    identifier) and install COMPAT, which re-exports it, as LEAF."""
-    wrapper, renamed = system/folder/leaf, system/folder/f'{leaf}OCLP.dylib'
+def install_corewifi(system, compat, workspace):
+    """The compat library in front of Tahoe's CoreWiFi, when the native donors supplied it (tahoe-donors recipe
+    cache_images). Without it (an older donor artifact, e.g. the 27-first one of dev-golden-bootstrap) 27.x's cached
+    CoreWiFi stays, and the record says so: Tahoe's airportd then crashes on auto-join."""
+    tahoe = system/COREWIFI/'CoreWiFi'
+    if not tahoe.is_file() or tahoe.is_symlink():
+        print('CoreWiFi: NOT INSTALLED: the native donors supplied no Tahoe CoreWiFi; the cached 27.x CoreWiFi stays',
+              flush=True)
+        return 'not installed: no Tahoe CoreWiFi from the native donors (27.x cached CoreWiFi kept)'
+    install_wrapper_compat(system, compat, workspace, COREWIFI, 'CoreWiFi', 'Tahoe')
+    return 'Tahoe CoreWiFi (native donor) as CoreWiFiTahoe.dylib, under the compat library'
+
+
+def install_wrapper_compat(system, compat, workspace, folder, leaf, suffix='OCLP'):
+    """Rename the library SYSTEM/FOLDER/LEAF (OCLP's wrapper, or a Tahoe donor) to LEAF+SUFFIX.dylib (install name and
+    file, re-signed with its identifier) and install COMPAT, which re-exports it, as LEAF."""
+    wrapper, renamed = system/folder/leaf, system/folder/f'{leaf}{suffix}.dylib'
+    if not wrapper.is_file() or wrapper.is_symlink():
+        raise SystemExit(f'{wrapper}: no {leaf} library to put the compat library in front of')
     data = bytearray(wrapper.read_bytes())
-    set_install_name(data, ('/'+folder+leaf).encode(), ('/'+folder+f'{leaf}OCLP.dylib').encode())
+    set_install_name(data, ('/'+folder+leaf).encode(), ('/'+folder+renamed.name).encode())
     details = subprocess.run(['codesign', '-dv', str(wrapper)], check=True, capture_output=True, text=True).stderr
     identifier = next(l.split('=', 1)[1] for l in details.splitlines() if l.startswith('Identifier='))
-    staged = workspace/f'{leaf}OCLP.dylib'
+    staged = workspace/renamed.name
     staged.write_bytes(data)
     run('codesign', '-f', '-s', '-', '-i', identifier, '--preserve-metadata=entitlements,flags,runtime', staged)
     flags = wrapper.stat().st_flags
@@ -320,7 +342,7 @@ def install_wrapper_compat(system, compat, workspace, folder, leaf):
     for source, target in ((staged, renamed), (compat, wrapper)):
         install_file(source, target)
         os.chflags(target, flags)
-    print(f'{leaf}: compat library re-exports OCLP\'s wrapper as', renamed.name, 'identifier', identifier, flush=True)
+    print(f'{leaf}: compat library re-exports the original as', renamed.name, 'identifier', identifier, flush=True)
 
 
 def merge_rosetta(source, target, counts):
@@ -527,7 +549,7 @@ def install_app_cryptex(payload, current, workspace, hao):
 
 def arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('system', 'payload', 'shim', 'io80211', 'wifip2p'):
+    for name in ('system', 'payload', 'shim', 'io80211', 'wifip2p', 'corewifi'):
         parser.add_argument(name, type=Path)
     parser.add_argument('--driverkit-artifact', type=Path, required=True,
                         help='tahoe_driverkit_donors artifact (x86_64 DriverKit cache for the cryptex)')
@@ -555,6 +577,7 @@ def main():
         display_installer.install_library(system, shim, install_file)
         install_io80211(system, io80211, workspace)
         install_wifip2p(system, wifip2p, workspace)
+        corewifi = install_corewifi(system, args.corewifi, workspace)
         display_installer.resign_clients(system, source, workspace, RESIGN_WITH_27_ENTITLEMENTS,
                                         resign_with_entitlements)
         counts = install_cryptex(payload, preboot, group, golden_os, rosetta, workspace,
@@ -569,7 +592,7 @@ def main():
             target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
             remove(target)
             run('ditto', version, target)
-        metadata.update(installation_order="golden-first", disabled_jobs=disabled,
+        metadata.update(installation_order="golden-first", disabled_jobs=disabled, corewifi=corewifi,
                         cryptex=counts,
                         boot_metadata='Tahoe Intel bootloader, collection layout and cryptex tickets retained',
                         validation='Built only; full Golden Gate boot and desktop untested')

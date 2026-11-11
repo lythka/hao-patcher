@@ -7,8 +7,7 @@
 #
 # oclp-hook entries (src/kc-hook.sh, System writable, before the snapshot):
 darwin27-kernel                   # Boot/System kernel collections around the 27 x86_64 kernel and the Intel kexts. First: everything after edits on top of them
-golden-gate-userspace             # combined OS cryptex (x86_64 dyld cache, Tahoe DriverKit, cache repairs, code identity carrier in Security), IO80211/WiFiPeerToPeer compat, display shim. Second, same reason
-golden-gate-corewifi              # Tahoe 25G342's CoreWiFi as an on-disk override of the cached 27.x one (airportd is Tahoe's and hosts CoreWiFi's server; 27.x's callouts and request numbers broke it), plus a compat library for 27.x clients. After golden-gate-userspace, whose IO80211/WiFiPeerToPeer files it binds
+golden-gate-userspace             # combined OS cryptex (x86_64 dyld cache, Tahoe DriverKit, cache repairs, code identity carrier in Security), IO80211/WiFiPeerToPeer/CoreWiFi compat, display shim. Second, same reason
 hao-runtime                       # hao, plus an x86_64 launch slice in every arm64-only 27 program so it runs on Intel
 golden-gate-metal-libraries       # the build's own RenderBox/Tungsten/MPS/MetalFX/CoreRE metallibs repaired for the HD 4000 compiler; deliberately supersedes OCLP's Tahoe RenderBox/Tungsten copies
 golden-gate-hello                 # first-boot hello and Welcome to Mac: repaired hello shader, un-skip in OCLP's Metal wrapper

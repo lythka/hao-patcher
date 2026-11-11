@@ -1,7 +1,7 @@
 """Check that every IO80211 symbol a 27.x build's clients bind is answered correctly once the compat library
 replaces IO80211 and re-exports OCLP's wrapper (IO80211OCLP.dylib, which re-exports IO80211Old.dylib). The same
-check serves any other OCLP wrapper a compat library replaces (src/wifip2p: WiFiPeerToPeer): pass LEAF and the
-wrapper's re-exported libraries to check().
+check serves any other library a compat library replaces (src/wifip2p: OCLP's WiFiPeerToPeer wrapper; src/corewifi:
+Tahoe's CoreWiFi, WRAPPER 'Tahoe'): pass LEAF and the wrapper's re-exported libraries to check().
 
 Clients: the x86_64 shared cache's own users of IO80211 (its dyld patch table, which lists every symbol bound in the
 cache and is what dyld repoints when a file overrides a cached dylib) and every Mach-O under the System root that
@@ -66,9 +66,20 @@ def target_kinds(cache, workspace, leaf=LEAF):
 
 
 def cache_imports(cache, leaf=LEAF):
-    """Symbols of LEAF bound by images in CACHE (its patch table)."""
-    text = out('ipsw', 'dyld', 'patches', cache, '-i', leaf, '--no-color')
-    return {m[1] for m in re.finditer(r'^0x[0-9a-f]+: (\S+)', text, re.M)}
+    """Symbols of LEAF bound by images in CACHE (its patch table), leaving out those whose only uses are LEAF's own
+    (replacing LEAF removes those uses). A uniqued GOT use counts as foreign: it does not name the image."""
+    bound, symbol, users = set(), None, set()
+    for line in out('ipsw', 'dyld', 'patches', cache, '-i', leaf, '--no-color').splitlines() + ['0x0: ']:
+        m = re.match(r'^0x[0-9a-f]+: (\S*)$', line)
+        if m:
+            if symbol and users - {leaf}:
+                bound.add(symbol)
+            symbol, users = m[1], set()
+            continue
+        parts = line.split()
+        if symbol and len(parts) >= 2 and parts[0].startswith('0x') and parts[1] in ('PATCH', 'GOT'):
+            users.add(parts[-1] if parts[1] == 'PATCH' and not parts[-1].startswith('(') else 'uniqued GOT')
+    return bound
 
 
 def disk_imports(root, leaf=LEAF, replaced=()):
@@ -97,7 +108,7 @@ def disk_imports(root, leaf=LEAF, replaced=()):
     return found
 
 
-def assess(imports, kinds, providers, leaf=LEAF):
+def assess(imports, kinds, providers, leaf=LEAF, wrapper='OCLP'):
     """IMPORTS {symbol: [client, ...]} (a client is a string; weak ones end in ' (weak)'), KINDS the build's
     LEAF {symbol: 'code'|'data'}, PROVIDERS [(name, {symbol: segment})] in resolution order.
     Returns (resolved {symbol: provider}, errors [text])."""
@@ -110,7 +121,7 @@ def assess(imports, kinds, providers, leaf=LEAF):
                 resolved[symbol] = 'weak, unresolved'
                 continue
             errors.append(f'MISSING/unsupported: {symbol} (bound by {", ".join(clients)}) is provided by neither the '
-                          f'compat library nor OCLP\'s {leaf}')
+                          f'compat library nor {wrapper}\'s {leaf}')
             continue
         name, segment = provider
         if kinds.get(symbol) == 'code' and segment != '__TEXT':
@@ -121,10 +132,12 @@ def assess(imports, kinds, providers, leaf=LEAF):
     return resolved, errors
 
 
-def check(cache, root, oclp, compat, leaf=LEAF, reexported=('IO80211Old.dylib',), replaced=()):
+def check(cache, root, oclp, compat, leaf=LEAF, reexported=('IO80211Old.dylib',), replaced=(), wrapper='OCLP',
+          **method_options):
     """Run every step for one build; returns a record for build.json, with 'errors' empty when coverage holds.
-    OCLP is the folder holding OCLP's LEAF wrapper and the REEXPORTED libraries it re-exports, in order; REPLACED
-    the on-disk clients OCLP overwrites (see disk_imports)."""
+    OCLP is the folder holding the replaced LEAF (OCLP's wrapper, or with WRAPPER 'Tahoe' Tahoe's library) and the
+    REEXPORTED libraries it re-exports, in order; REPLACED the on-disk clients the image overwrites (see disk_imports).
+    METHOD_OPTIONS go to methods.check (added, every_class, answerable)."""
     with tempfile.TemporaryDirectory(prefix=f'{leaf.lower()}-coverage-') as workspace:
         kinds, uuid = target_kinds(cache, workspace, leaf)
     in_cache = cache_imports(cache, leaf)
@@ -132,12 +145,12 @@ def check(cache, root, oclp, compat, leaf=LEAF, reexported=('IO80211Old.dylib',)
     disk = disk_imports(root, leaf, replaced)
     for symbol, uses in disk.items():
         imports.setdefault(symbol, set()).update(f'{c} [{a}]' + (' (weak)' if w else '') for c, a, w in uses)
-    providers = [('compat', exports(compat)), (f'OCLP {leaf}', exports(Path(oclp)/leaf))] + [
-        (f'OCLP {name}', exports(Path(oclp)/name)) for name in reexported]
-    resolved, errors = assess(imports, kinds, providers, leaf)
-    method_record = methods.check(cache, root, oclp, compat, leaf, reexported, disk)
+    providers = [('compat', exports(compat)), (f'{wrapper} {leaf}', exports(Path(oclp)/leaf))] + [
+        (f'{wrapper} {name}', exports(Path(oclp)/name)) for name in reexported]
+    resolved, errors = assess(imports, kinds, providers, leaf, wrapper)
+    method_record = methods.check(cache, root, oclp, compat, leaf, reexported, disk, wrapper, **method_options)
     return dict(**{f'{leaf.lower()}_uuid': uuid}, cache_symbols=len(in_cache), disk_clients=sorted(
                     {c for uses in disk.values() for c, _, _ in uses}),
-                replaced_by_oclp=sorted(replaced),
+                **{'replaced_by_oclp' if wrapper == 'OCLP' else 'replaced': sorted(replaced)},
                 symbols={s: resolved.get(s, 'ERROR') for s in sorted(imports)}, methods=method_record,
                 errors=errors + method_record['errors'])

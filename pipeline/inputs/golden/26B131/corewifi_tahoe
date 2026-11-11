@@ -1,3 +1,0 @@
-# Tahoe 25G342's x86_64 CoreWiFi cut from its dyld_shared_cache_x86_64h (row tahoe_os_cache_x86_64h) by tools/cache-dylib, as
-# CoreWiFiTahoe.dylib; made and checked against 26B131 (SystemOS + RosettaOS x86_64 cache) by patches/golden-gate-corewifi/build/make (r1).
-4ba72423bc2b7a4b22797cb4fbb4ba164dbae28aae784376f04976c9cd6a850b store/artifacts/corewifi-tahoe-25G342-26B131-20261111-67895c37aaae/CoreWiFiTahoe.dylib
