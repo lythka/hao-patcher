@@ -20,6 +20,7 @@ ALLOWED = {
     'tools/qemu-vm/qemu-vm': ({'private evidence folder'},
                               "the repository's own git-ignored store/ folder, where QEMU runs keep their evidence"),
     'cache/seeds/tests/test_seeds.py': ({'home folder'}, 'fixture paths of the harvest account benchtest'),
+    'cache/seeds/tests/test_template.py': ({'home folder'}, 'fixture paths of the harvest account benchtest, which the template rule must strip'),
     'patches/golden-gate-font-registry/README.md': ({'home folder'}, 'names the harvest account benchtest'),
     'tools/first-boot-seeds/rootls': ({'home folder'}, 'the /Users/ pattern rootls refuses in a root store'),
     'tools/first-boot-seeds/tests/test_rootls.py': ({'home folder'}, 'fixture strings rootls must refuse'),

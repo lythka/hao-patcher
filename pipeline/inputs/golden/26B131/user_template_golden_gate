@@ -1,0 +1,5 @@
+# User Template of 26B131 made by cache/seeds/template r1 from template-harvest-26B131-3b2291a-20261113-105926.cpio:
+# the benchtest account's first login on image 3b2291a (2026-11-13, collect-template.sh, sha256 fe0cb1df...).
+# 336 containers (305 personality flags added, 137 sandbox profiles and 11,392 symlinks removed), 2 group containers,
+# chronod cache with 31 descriptors from 27 extensions (2 PeopleWidget rows removed), 3 Reminders stores.
+- store/artifacts/user-template-26B131-20261113-96e70e178981

@@ -11,6 +11,9 @@
     "cache/seeds/tests/test_seeds.py": [
      "home folder"
     ],
+    "cache/seeds/tests/test_template.py": [
+     "home folder"
+    ],
     "patches/golden-gate-font-registry/README.md": [
      "home folder"
     ],

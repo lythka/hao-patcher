@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+"""cache/seeds/template: the User Template artifact from one first-login harvest (cache/seeds/collect-template.sh).
+
+    template HARVEST.cpio [--out DIR]   -> DIR/user-template-<build>-<date>-<hash12>/{user-template.cpio,build.json,
+                                           SHA256SUMS} and prints its input row (user_template_golden_gate)
+
+macOS copies /Library/User Template/Non_localized into every new home when the account is created, so what the
+template holds exists from the account's first second. This applies mac-image's user-template rule (archive BETA7
+data.user-seed C1-C3, mac-image patches/user-template r5) to the harvest and refuses anything that still names the
+harvest account:
+- containers: folders with their xattrs (containermanager identity, data-container personality), the
+  containermanagerd metadata plist and chronod's widget placeholders only; no symlinks (DirectoryTools touches every
+  path of the new home and a dangling link becomes an empty file). Each metadata plist gets MCMMetadataSchemaVersion 0
+  (containermanagerd re-runs its schema and makes the links itself, for the new user), loses the harvest user's
+  compiled sandbox profile (SandboxProfileData and its validation info: _HOME, _USER, the cache folder are compiled
+  into it), and gets MCMMetadataInfo.LSDataContainerPersonalityInfo = true, so secinitd does not synthesize the
+  container's personality (icons) at the container's first launch (BETA7 C1: 2,184 icon requests -> 0; on 26B131
+  under hao secinitd fails to store it, so it retried at every launch: 158 failures in benchtest's first 10 min).
+- chronod: chrono.sql keeps only ExtensionMetadata and Descriptors (the widget descriptor cache, the same for every
+  user of this build and locale) without PeopleViewService rows (their default intent is the user's own contact
+  card); com.apple.chronod.plist keeps migrationState and drops boot- and session-specific keys.
+- Reminders: remindd's local stores (fixed account and list IDs for every new user), nothing else.
+- com.apple.provenance and com.apple.quarantine xattrs are dropped (the host adds them when it extracts).
+"""
+import argparse
+import datetime
+import hashlib
+import json
+import os
+import plistlib
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+UNIT, REVISION = 'cache/seeds/template', 1
+NL = 'Library/User Template/Non_localized'
+META = '.com.apple.containermanagerd.metadata.plist'
+PLACEHOLDERS = 'Data/SystemData/com.apple.chrono/placeholders/'
+CHRONO = 'Group Containers/group.com.apple.chronod/chronod/chrono.sql'
+CHRONO_KEEP = ('ExtensionMetadata', 'Descriptors')
+CHRONO_DROP_DIR = 'Group Containers/group.com.apple.chronod/chronod/replicator'
+PEOPLE = 'com.apple.PeopleViewService.'
+CHRONOD_PLIST = 'Preferences/com.apple.chronod.plist'
+CHRONOD_DROP = ('lastKnownTimes', 'NetworkEnabledAfterBootNotification.lastLaunchBootSessionUUID',
+                'extensionsPendingDescriptorRefetch')
+STORES = 'Group Containers/group.com.apple.reminders/Container_v1/Stores/'
+DROP_XATTRS = ('com.apple.provenance', 'com.apple.quarantine')
+
+
+def sha_file(p):
+    with open(p, 'rb') as f:
+        return hashlib.file_digest(f, 'sha256').hexdigest()
+
+
+def kept(rel):
+    """Whether a file below Library/ belongs in the template."""
+    p = rel.split('/')
+    if p[0] == 'Containers':
+        return len(p) == 3 and p[2] == META or len(p) > 2 and '/'.join(p[2:]).startswith(PLACEHOLDERS)
+    if rel.startswith('Group Containers/'):
+        return (len(p) == 3 and p[2] == META) or rel == CHRONO or (rel.startswith(STORES) and rel.endswith('.sqlite')
+                                                                   and rel.count('/') == STORES.count('/'))
+    return rel == CHRONOD_PLIST
+
+
+def load_plist(p):
+    raw = p.read_bytes()
+    return plistlib.loads(raw), plistlib.FMT_BINARY if raw.startswith(b'bplist') else plistlib.FMT_XML
+
+
+def metadata(p, container, stats):
+    d, fmt = load_plist(p)
+    d['MCMMetadataSchemaVersion'] = 0
+    info = d.setdefault('MCMMetadataInfo', {})
+    for k in ('SandboxProfileData', 'SandboxProfileDataValidationInfo'):
+        if info.pop(k, None) is not None and k == 'SandboxProfileData':
+            stats['sandbox_profiles_removed'] += 1
+    if container:
+        if info.get('LSDataContainerPersonalityInfo') is not True:
+            stats['personality_flags_added'] += 1
+        info['LSDataContainerPersonalityInfo'] = True
+    with open(p, 'r+b') as f:      # in place: the file keeps its xattrs
+        f.write(plistlib.dumps(d, fmt=fmt))
+        f.truncate()
+
+
+def chrono(p, stats):
+    db = sqlite3.connect(p)
+    tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")]
+    missing = [t for t in CHRONO_KEEP if t not in tables]
+    if missing:
+        raise SystemExit('template: chrono.sql has no %s table' % ', '.join(missing))
+    for t in tables:
+        if t not in CHRONO_KEEP:
+            db.execute('DELETE FROM "%s"' % t)
+    for t in CHRONO_KEEP:
+        # keys are '<C6 AC 01 len>::<bundle id>' (BETA7 NOTES-widgets-containers), so match inside the key
+        stats['chrono_people_rows_removed'] += db.execute('DELETE FROM "%s" WHERE instr(bundleIdentifier, ?) > 0' % t,
+                                                          ('::' + PEOPLE,)).rowcount
+    db.commit()
+    stats['chrono_extensions'] = db.execute('SELECT count(*) FROM ExtensionMetadata').fetchone()[0]
+    stats['chrono_descriptors'] = db.execute('SELECT count(*) FROM Descriptors').fetchone()[0]
+    stats['chrono_ingested_by'] = sorted({r[0] for r in db.execute('SELECT DISTINCT ingestedByVersion FROM ExtensionMetadata') if r[0]})
+    db.execute('VACUUM')
+    db.close()
+
+
+def account(diag):
+    a = {}
+    for line in (diag / 'account.txt').read_text().splitlines():
+        if '\t' in line:
+            k, v = line.split('\t', 1)
+            a[k] = v
+    if not a.get('user') or not a.get('home'):
+        raise SystemExit('template: diag/account.txt names no user and home (not made by collect-template.sh?)')
+    return a
+
+
+def build_of(diag):
+    for line in (diag / 'system.txt').read_text().splitlines():
+        if line.startswith('BuildVersion'):
+            return line.split()[-1]
+    raise SystemExit('template: no BuildVersion in diag/system.txt')
+
+
+def xattr_names(p):
+    r = subprocess.run(['xattr', p], capture_output=True, text=True)
+    return [n for n in r.stdout.splitlines() if n]
+
+
+def contamination(lib, needles):
+    """Files below lib that contain one of needles (bytes). xattrs are not read: the containermanager identity holds
+    ids, the personality an icon set."""
+    hits = []
+    for root, dirs, files in os.walk(lib):
+        for n in files:
+            p = os.path.join(root, n)
+            data = open(p, 'rb').read()
+            hits += ['%s: %r' % (os.path.relpath(p, lib), x) for x in needles if x in data]
+    return hits
+
+
+def apply_rule(lib, stats):
+    # every surviving entry keeps the harvest's mtime (what account creation copies), not the time of this run
+    times = {}
+    for root, dirs, files in os.walk(lib):
+        for n in [''] + dirs + files:
+            p = os.path.join(root, n) if n else root
+            if not os.path.islink(p):
+                st = os.lstat(p)
+                times[p] = (st.st_atime_ns, st.st_mtime_ns)
+    rule(lib, stats)
+    for p in sorted(times, key=lambda p: -p.count(os.sep)):
+        if os.path.lexists(p):
+            os.utime(p, ns=times[p], follow_symlinks=False)
+
+
+def rule(lib, stats):
+    for root, dirs, files in os.walk(lib, topdown=True):
+        for n in dirs + files:
+            p = os.path.join(root, n)
+            rel = os.path.relpath(p, lib)
+            if os.path.islink(p):
+                os.unlink(p)
+                stats['symlinks_removed'] += 1
+            elif n in files and not kept(rel):
+                os.unlink(p)
+                stats['files_removed'] += 1
+        dirs[:] = [d for d in dirs if os.path.isdir(os.path.join(root, d))]
+    for c in sorted((lib / 'Containers').iterdir()) if (lib / 'Containers').is_dir() else []:
+        stats['containers'] += 1
+        names = xattr_names(c)
+        stats['personality_xattrs'] += 'com.apple.data-container-personality' in names
+        if (c / META).is_file():
+            metadata(c / META, True, stats)
+        else:
+            stats['containers_without_metadata'] += 1
+    for g in sorted((lib / 'Group Containers').iterdir()) if (lib / 'Group Containers').is_dir() else []:
+        stats['group_containers'] += 1
+        if (g / META).is_file():
+            metadata(g / META, False, stats)
+    shutil.rmtree(lib / CHRONO_DROP_DIR, ignore_errors=True)   # chronod's replicator database (folder only by now)
+    if (lib / CHRONO).is_file():
+        chrono(lib / CHRONO, stats)
+    if (lib / CHRONOD_PLIST).is_file():
+        d, fmt = load_plist(lib / CHRONOD_PLIST)
+        for k in CHRONOD_DROP:
+            d.pop(k, None)
+        (lib / CHRONOD_PLIST).write_bytes(plistlib.dumps(d, fmt=fmt))
+    stats['reminders_stores'] = len(list((lib / STORES).glob('*.sqlite'))) if (lib / STORES).is_dir() else 0
+    stats['placeholder_files'] = sum(1 for _ in (lib / 'Containers').glob('*/' + PLACEHOLDERS + '**/*')
+                                     if _.is_file()) if (lib / 'Containers').is_dir() else 0
+    for x in DROP_XATTRS:
+        subprocess.run(['xattr', '-r', '-d', x, str(lib)], capture_output=True)
+
+
+def commit():
+    here = Path(__file__).resolve().parent
+    rev = subprocess.run(['git', '-C', str(here), 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+    dirty = subprocess.run(['git', '-C', str(here), 'status', '--porcelain', '--', '.'], capture_output=True,
+                           text=True).stdout.strip()
+    return rev, not dirty
+
+
+def template(args):
+    harvest = Path(args.harvest).resolve()
+    out_dir = Path(args.out).resolve() if args.out else harvest.parent
+    with tempfile.TemporaryDirectory(dir=out_dir, prefix='.template-') as tmp:
+        x = Path(tmp) / 'x'
+        subprocess.run(['ditto', '-x', str(harvest), str(x)], check=True)
+        diag, lib = x / 'diag', x / NL / 'Library'
+        acct, build = account(diag), build_of(diag)
+        if not lib.is_dir():
+            raise SystemExit('template: the harvest has no %s/Library' % NL)
+        stats = {k: 0 for k in ('containers', 'group_containers', 'personality_xattrs', 'personality_flags_added',
+                                'sandbox_profiles_removed', 'symlinks_removed', 'files_removed',
+                                'containers_without_metadata', 'chrono_people_rows_removed')}
+        apply_rule(lib, stats)
+        needles = [acct['home'].encode(), ('/' + acct['user'] + '/').encode()]
+        if len(acct.get('realname', '')) >= 4:
+            needles.append(acct['realname'].encode())
+        hits = contamination(lib, needles)
+        if hits:
+            raise SystemExit('template: the result still names the harvest account:\n  ' + '\n  '.join(hits[:20]))
+        work = Path(tmp) / 'artifact'
+        work.mkdir()
+        stage = Path(tmp) / 'stage'
+        (stage / NL).parent.mkdir(parents=True)
+        os.rename(x / NL, stage / NL)
+        subprocess.run(['ditto', '-c', str(stage), str(work / 'user-template.cpio')], check=True)
+        rev, clean = commit()
+        record = {'unit': UNIT, 'revision': REVISION, 'kind': 'user-template', 'commit': rev, 'clean': clean,
+                  'build': build, 'harvest': {'name': harvest.name, 'sha256': sha_file(harvest)},
+                  'account': {'uid': acct.get('uid'), 'created': acct.get('created')}, 'counts': stats}
+        (work / 'build.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n')
+        sums = ''.join('%s  %s\n' % (sha_file(work / n), n) for n in ('build.json', 'user-template.cpio'))
+        (work / 'SHA256SUMS').write_text(sums)
+        name = 'user-template-%s-%s-%s' % (build, datetime.date.today().strftime('%Y%m%d'),
+                                           hashlib.sha256(sums.encode()).hexdigest()[:12])
+        final = out_dir / name
+        if final.exists():
+            raise SystemExit('template: %s exists; not overwritten' % final)
+        os.rename(work, final)
+    print(json.dumps(stats, sort_keys=True))
+    print('pipeline/inputs/golden/%s/user_template_golden_gate:' % build)
+    print('  # User Template of %s made by %s r%d from %s' % (build, UNIT, REVISION, harvest.name))
+    print('  -  %s' % final)
+    return 0
+
+
+def main(argv):
+    p = argparse.ArgumentParser(prog='template', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument('harvest'); p.add_argument('--out')
+    return template(p.parse_args(argv))
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

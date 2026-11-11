@@ -1,6 +1,8 @@
 """The seed patches as a chain on a fixture Data volume: golden-gate-user-seed, -font-registry, -shader-caches,
--icon-caches (their set order), fed by cache/seeds/make from a synthetic harvest. Runs unprivileged: install's
+-icon-caches, -user-template (their set order), fed by cache/seeds/make and cache/seeds/template from synthetic
+harvests. Runs unprivileged: install's
 -o/-g and chown are shimmed, so owners are checked in the artifacts (cache/seeds tests), not here."""
+import json
 import os
 import plistlib
 import shutil
@@ -13,11 +15,15 @@ from pathlib import Path
 TOP = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(TOP / 'cache/seeds/tests'))
 import test_seeds  # noqa: E402  (the harvest fixture)
+import test_template  # noqa: E402  (the first-login home fixture)
 
-CHAIN = ('golden-gate-user-seed', 'golden-gate-font-registry', 'golden-gate-shader-caches', 'golden-gate-icon-caches')
+CHAIN = ('golden-gate-user-seed', 'golden-gate-font-registry', 'golden-gate-shader-caches', 'golden-gate-icon-caches',
+         'golden-gate-user-template')
 ROWS = {'golden-gate-font-registry': ('font_registry_golden_gate', 'font-registry'),
         'golden-gate-shader-caches': ('shader_caches_golden_gate', 'shader-caches'),
-        'golden-gate-icon-caches': ('icon_caches_golden_gate', 'icon-caches')}
+        'golden-gate-icon-caches': ('icon_caches_golden_gate', 'icon-caches'),
+        'golden-gate-user-template': ('user_template_golden_gate', 'user-template')}
+TEMPLATE = 'Library/User Template/Non_localized/Library'
 SEED = 'Library/Application Support/PerUserSeed'
 SHIMS = {'install': '#!/bin/sh\nn=\nfor a do shift; case $n$a in -o|-g) n=1;; 1*) n=;; *) set -- "$@" "$a";; esac; done\n'
                     'exec /usr/bin/install "$@"\n',
@@ -51,10 +57,23 @@ class SeedChainTest(unittest.TestCase):
         out.mkdir()
         r = test_seeds.run(h.path, '--out', out)
         self.assertEqual(r.returncode, 0, r.stderr)
+        # the template artifact names the collecting machine's build: give it the fixture's
+        home = test_template.Home(self.d / 'first-login')
+        r = test_template.template(home.collect(self.d / 'template-harvest.cpio'), out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        record = next(out.glob('user-template-*')) / 'build.json'
+        record.write_text(record.read_text().replace('"build": "%s"' % json.loads(record.read_text())['build'],
+                                                     '"build": "26B131"'))
         return out
+
+    def data_volume(self):
+        data = self.d / 'data'
+        (data / TEMPLATE / 'Preferences').mkdir(parents=True)   # the stock template
+        return data
 
     def apply(self, name, data, sys_root, artifacts):
         folder = self.d / 'hooks' / name
+        shutil.rmtree(folder, ignore_errors=True)
         shutil.copytree(TOP / 'patches' / name, folder, ignore=shutil.ignore_patterns('tests'))
         if name in ROWS:
             row, kind = ROWS[name]
@@ -64,8 +83,7 @@ class SeedChainTest(unittest.TestCase):
                               env=dict(self.env, DATA=str(data), SYS=str(sys_root), P=str(folder)))
 
     def test_chain(self):
-        artifacts, data, sys_root = self.artifacts(), self.d / 'data', self.system('26B131')
-        data.mkdir()
+        artifacts, data, sys_root = self.artifacts(), self.data_volume(), self.system('26B131')
         for name in CHAIN:
             r = self.apply(name, data, sys_root, artifacts)
             self.assertEqual(r.returncode, 0, name + ': ' + r.stdout + r.stderr)
@@ -85,10 +103,39 @@ class SeedChainTest(unittest.TestCase):
         self.assertEqual(plist['ProgramArguments'][2],
                          (TOP / 'patches/golden-gate-user-seed/src/seed.zsh').read_text())
         self.assertEqual(plist['WatchPaths'], ['/private/var/db/dslocal/nodes/Default/users'])
+        # the User Template: containers by the rule, chronod's cache, Reminders' store
+        t = data / TEMPLATE
+        self.assertEqual(sorted(p.name for p in (t / 'Containers').iterdir()),
+                         ['com.apple.stocks.widget', 'com.apple.weather'])
+        self.assertEqual([p for p in t.rglob('*') if p.is_symlink()], [])
+        self.assertTrue((t / 'Group Containers/group.com.apple.chronod/chronod/chrono.sql').is_file())
+        self.assertTrue((t / 'Group Containers/group.com.apple.reminders/Container_v1/Stores/Data-local.sqlite').is_file())
+        self.assertTrue((t / 'Preferences/com.apple.chronod.plist').is_file())
+
+    def test_template_refuses_second_run(self):
+        artifacts, data, sys_root = self.artifacts(), self.data_volume(), self.system('26B131')
+        self.assertEqual(self.apply('golden-gate-user-template', data, sys_root, artifacts).returncode, 0)
+        r = self.apply('golden-gate-user-template', data, sys_root, artifacts)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('exists already', r.stderr)
+
+    def test_template_refuses_rule_breach(self):
+        artifacts, data, sys_root = self.artifacts(), self.data_volume(), self.system('26B131')
+        art = next(artifacts.glob('user-template-*'))
+        x = self.d / 'breach'
+        subprocess.run(['ditto', '-x', str(art / 'user-template.cpio'), str(x)], check=True)
+        m = x / TEMPLATE / 'Containers/com.apple.weather/.com.apple.containermanagerd.metadata.plist'
+        d = plistlib.loads(m.read_bytes())
+        d['MCMMetadataSchemaVersion'] = 44
+        m.write_bytes(plistlib.dumps(d))
+        (art / 'user-template.cpio').unlink()
+        subprocess.run(['ditto', '-c', str(x), str(art / 'user-template.cpio')], check=True)
+        r = self.apply('golden-gate-user-template', data, sys_root, artifacts)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('does not follow the template rule', r.stderr)
 
     def test_wrong_build_refused(self):
-        artifacts, data, sys_root = self.artifacts(), self.d / 'data', self.system('26B200')
-        data.mkdir()
+        artifacts, data, sys_root = self.artifacts(), self.data_volume(), self.system('26B200')
         self.assertEqual(self.apply('golden-gate-user-seed', data, sys_root, artifacts).returncode, 0)
         for name in CHAIN[1:]:
             r = self.apply(name, data, sys_root, artifacts)
@@ -96,8 +143,7 @@ class SeedChainTest(unittest.TestCase):
             self.assertIn('is 26B200', r.stderr)
 
     def test_order_enforced(self):
-        artifacts, data, sys_root = self.artifacts(), self.d / 'data', self.system('26B131')
-        data.mkdir()
+        artifacts, data, sys_root = self.artifacts(), self.data_volume(), self.system('26B131')
         r = self.apply('golden-gate-shader-caches', data, sys_root, artifacts)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn('after golden-gate-user-seed', r.stderr)

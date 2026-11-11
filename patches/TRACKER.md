@@ -26,7 +26,8 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-native-identities | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-13 `native_identities.py` reads each executable's headers and code signature only, and a slice's by |
 | golden-gate-root-launchservices | r1 | post | experiment | boot-seeds |  |  |  |  | **needs** | r1 2026-11-12 New: install root's LaunchServices store and auth.db from a builder boot of the same image (row  |
 | golden-gate-shader-caches | r13 | post | experiment | caches | x |  |  |  | **needs** | r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) f |
-| golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
+| golden-gate-user-seed | r8 | post | experiment | caches | x |  |  |  | **needs** | r8 2026-11-13 Tests and README only: the seed chain includes golden-gate-user-template; README names it. seed. |
+| golden-gate-user-template | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-13 26B131 input row user_template_golden_gate (harvest of benchtest's first login on image 3b2291a: |
 | golden-gate-userspace | r65 | oclp-hook | experiment |  | x | x |  |  | **needs** | r65 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 43af852 (hao-runt |
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
 | hao-opencore | r51 | post | experiment |  | x | x |  |  | **needs** | r51 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 43af852 (hao-runt |

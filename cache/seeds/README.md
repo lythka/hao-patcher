@@ -10,6 +10,7 @@ the inputs the seed patches install, so the next image starts with them:
 | `shader-caches-<build>-*` (`shader_caches_golden_gate`) | `patches/golden-gate-shader-caches` |
 | `icon-caches-<build>-*` (`icon_caches_golden_gate`) | `patches/golden-gate-icon-caches` |
 | `font-registry-<build>-*` (`font_registry_golden_gate`) | `patches/golden-gate-font-registry` |
+| `user-template-<build>-*` (`user_template_golden_gate`), from `collect-template.sh` + `template` | `patches/golden-gate-user-template` |
 
 The per-user parts go to `Library/Application Support/PerUserSeed/`, which `patches/golden-gate-user-seed`'s
 seed.zsh copies into each new account.
@@ -52,6 +53,33 @@ each index header and `__cache_info__`), `hao.txt` (`/private/var/db/hao`), `ps.
 Each gets `build.json` (inputs, counts, index geometry, registry versions, source commit) and `SHA256SUMS`; the folder
 name ends in the first 12 hex of SHA256SUMS' hash. An existing folder is never overwritten.
 
+## User Template (`collect-template.sh`, `template`)
+The account's own Library at its first login (containers, chronod's widget descriptor cache, remindd's stores) is not
+a cache folder seed.zsh can fill: macOS copies `/Library/User Template/Non_localized` into the new home when the
+account is created, so it goes there (`patches/golden-gate-user-template`, mac-image's `user-template` with the
+archive BETA7 rule). Harvest it from an account whose first login has settled (Setup done, desktop up ~15 min);
+apps opened in it add containers (metadata only), so harvest before using it where possible.
+
+```sh
+# 1. On the laptop (read-only except a temp folder; root SSH): SEED_USER is the account
+ssh root@LAPTOP 'SEED_USER=benchtest sh -s' < cache/seeds/collect-template.sh \
+    > store/artifacts/template-harvest-<build>-<image>-<stamp>.cpio
+# 2. On the host: the artifact next to the harvest, and its row (user_template_golden_gate)
+python3.14 -I cache/seeds/template store/artifacts/template-harvest-<build>-<image>-<stamp>.cpio
+```
+- `collect-template.sh` writes a ditto (cpio) archive, not a tar: the containers' xattrs (containermanager identity,
+  data-container personality, up to ~2 MB each) must survive. It copies `Library/Containers`, the chronod and
+  Reminders group containers and `com.apple.chronod.plist`, then drops every file but the containermanagerd metadata
+  plists and widget placeholders (no app data leaves the laptop), and copies the databases with `sqlite3 .backup`.
+  `diag/` holds sw_vers, the account (user, uid, home, real name, creation time), each container's birth time and
+  xattr names, and the symlink counts.
+- `template` applies the rule (patches/golden-gate-user-template README, "What ships"): no symlinks, metadata schema
+  0, the harvest user's compiled sandbox profiles removed, the personality flag on every container, chrono.sql
+  reduced to ExtensionMetadata and Descriptors without PeopleViewService rows, chronod.plist without its session
+  keys, Reminders' `*.sqlite` only. It refuses a result that still contains the account's home path, `/<user>/` or
+  its real name. Entries keep the harvest's mtimes. The cpio is not byte-reproducible (ditto writes inode numbers),
+  so each run makes a new folder. `build.json` counts what the rule did.
+
 ## Facts this is built on
 - Metal keys follow each function's bitcode hash, and Apple rebuilds every metallib per build: 26A428 -> 26B131
   (metalfe 32023.921 -> .922) kept 0 of 3,437 function hashes in the six libraries `cache/metallib` repairs. A pack
@@ -66,4 +94,5 @@ name ends in the first 12 hex of SHA256SUMS' hash. An existing folder is never o
 
 ## Verify
 `python3.14 -I -B -m unittest discover -s cache/seeds/tests`: collect.sh on a fixture tree; make on a synthetic
-harvest (owners, ancestors, user-tree normalisation, index checks, the font placeholder, compare).
+harvest (owners, ancestors, user-tree normalisation, index checks, the font placeholder, compare);
+collect-template.sh on a fixture home and template on its harvest (the rule, the account-trace refusal).
