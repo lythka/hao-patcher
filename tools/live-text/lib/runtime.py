@@ -72,7 +72,9 @@ def build(output, install_root, compat, metallib, detector, source_metallib):
     def compile(name, source, *extra):
         run('xcrun', 'clang++' if str(source).endswith('.mm') else 'clang', '-arch', 'x86_64',
             '-mmacosx-version-min=13.0', '-O2', '-dynamiclib', source, *extra,
-            '-Wl,-install_name,' + root + '/' + name, '-o', out/name)
+            # A /usr/lib install name makes ld treat the library as shared-cache eligible and refuse
+            # -undefined dynamic_lookup; these helpers are never in a dyld cache.
+            '-Wl,-install_name,' + root + '/' + name, '-Wl,-not_for_dyld_shared_cache', '-o', out/name)
         # An unsigned x86_64 image hangs in exec on Apple silicon hosts; sign every output.
         run('codesign', '-f', '-s', '-', out/name)
 

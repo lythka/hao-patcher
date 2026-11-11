@@ -84,6 +84,19 @@ class RuntimeTests(unittest.TestCase):
         folder = self.root/name
         return folder, runtime.build(folder, str(folder), self.adapters, stand_in, detector_bundle, stand_in)
 
+    def test_system_install_root_builds(self):
+        """The image's root is under /usr/lib, which ld treats as dyld-shared-cache eligible."""
+        source = self.root/'system-detector'
+        source.mkdir()
+        (source/'model.mil').write_text(detector.PIXEL_INPUT + '\n' + detector.PIXEL_TO_TENSOR + '\n')
+        stand_in = self.root/'system.metallib'
+        stand_in.write_bytes(b'authored metallib stand-in')
+        folder = self.root/'system'
+        record = runtime.build(folder, '/usr/lib/hao-live-text', self.adapters, stand_in, source, stand_in)
+        self.assertEqual(record['load_paths'], ['/usr/lib/hao-live-text/' + runtime.UMBRELLA])
+        for name in runtime.HELPERS + [runtime.UMBRELLA]:
+            self.assertEqual(run('otool', '-D', folder/name).splitlines()[-1], '/usr/lib/hao-live-text/' + name)
+
     def test_build_records_every_file_and_install_name(self):
         source = self.root/'authored-detector'
         source.mkdir()
