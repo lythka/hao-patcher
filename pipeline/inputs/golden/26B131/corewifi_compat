@@ -1,0 +1,3 @@
+# CoreWiFi compat library (installed as CoreWiFi, re-exporting CoreWiFiTahoe.dylib) made by patches/golden-gate-corewifi/build/make (r1;
+# symbol, method and environment coverage checked on 26B131). Same artifact as corewifi_tahoe.
+5d6a552efd627e5c3f8424954a12471d45e18ef18ace5b9472dd2a09503f1bec store/artifacts/corewifi-tahoe-25G342-26B131-20261111-67895c37aaae/CoreWiFi
