@@ -210,7 +210,7 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
                 return next(d for d in (golden_lock,build_lock,common) if (d/row).is_file())
             command(['zsh',pipeline/'stages/inputs.sh',share,pipeline/'targets'/(recipe['target']+'.json'),
                      build_lock,common,recipe['oclp'],pipeline/'sets'/(recipe['patch_set']+'.txt'),'golden-first'])
-            used_rows=set(recipe['inputs'].values()) | {'kdk','python_arm64','python_site','fl'}
+            used_rows=set(recipe['inputs'].values()) | {'kdk','python_arm64','python_site','fl','opencore_debug'}
             for line in (share/'patches.txt').read_text().splitlines():
                 used_rows.update(line.split()[2:])
             manifest=(share/'MANIFEST.txt').read_text()
@@ -236,9 +236,11 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
             shutil.copy2(share/'pristine/fl',source/'fl')
             shutil.copytree(TOP/'tools/tahoe-donors',source/'tahoe-donors',ignore=shutil.ignore_patterns('__pycache__'))
             shutil.copytree(extras/'hardware/install-tools',source/'hardware')
-            (source/'esp').mkdir(mode=0o755)
-            esp=lockrows['path'](str(pipeline/'targets'/(recipe['target']+'.json')),'esp')
-            command(['tar','-xf',esp,'-C',source/'esp'])
+            command([share/'py/bin/python3.12','-I',pipeline/'stages/build-efi.py',
+                     '--source',share/'oclp','--site',share/'site',
+                     '--target',pipeline/'targets'/(recipe['target']+'.json'),
+                     '--revision',recipe['oclp'],'--opencore',lockrows['path'](str(lock_of('opencore_debug')),'opencore_debug'),
+                     '--out',source/'esp','--record',record/'base-efi.json'])
             config=guest_config(recipe,share,local);write(share/'guest-config.json',config)
             shutil.copy2(share/'guest-config.json',record/'guest-config.json')
             for name in ('patches.txt','MANIFEST.txt','profile.json'):
