@@ -43,6 +43,7 @@ Earlier: r8 is built and chain-tested on the host only; no image with it has boo
 r9 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r8's, so the result above stands.
 
 ## Revisions
+- r10 2026-11-11 Row `shader_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (84 user trees, was 57: adds Maps/VectorKit, Safari and WebKit records, and the repaired VectorKit/VFX libraries). No recipe change.
 - r9 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch instead of stopping. apply.sh unchanged.
 - r8 2026-11-11 Restored for 26B131 with a pack harvested from 26B131 itself (cache/seeds), ancestors and owners from the harvest instead of src/folders.tsv. Root cause: a54ec244 removed the patch, and the 26A428 pack cannot serve 26B131 (every function hash changed).
 - r7 2026-11-09 Preserve r6 and add 166 native records observed in Setup/app consumer trees (26A428).

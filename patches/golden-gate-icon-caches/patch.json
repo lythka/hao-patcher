@@ -1,5 +1,5 @@
 {
- "revision": 2,
+ "revision": 3,
  "stage": "post",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G342"]},
  "inputs": ["icon_caches_golden_gate"],

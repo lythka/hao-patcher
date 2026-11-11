@@ -36,5 +36,6 @@ Earlier: built and chain-tested on the host only; no image with it has booted.
 r2 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r1's, so the result above stands.
 
 ## Revisions
+- r3 2026-11-11 Row `icon_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (668 store units, was 540). No recipe change.
 - r2 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch instead of stopping. apply.sh unchanged.
 - r1 2026-11-11 IconServices store and indexes harvested from 26B131 (bf10de4), with the 27 index checks. Root cause: a54ec244 removed Tahoe's icon-caches and no 27 artifact existed, so every account rendered every icon in the translated agent.
