@@ -1,2 +1,2 @@
-# IO80211 compatibility dylib made and checked against 26A428's clients by patches/golden-gate-userspace/src/io80211/make.
-6adf6e7698fb1f8bc4f8e2cd0209222500ae0f2be68732dd024927c9cd9ccd0a store/artifacts/io80211-compat-26A428-20261111-6adf6e7698fb/io80211_compat.dylib
+# IO80211 compatibility dylib made and checked against 26A428's clients by patches/golden-gate-userspace/src/io80211/make (r44).
+c0558983229bde97959ad9053e995480dda2af36045e714070715c1116fe8bc1 store/artifacts/io80211-compat-26A428-20261111-c0558983229b/io80211_compat.dylib

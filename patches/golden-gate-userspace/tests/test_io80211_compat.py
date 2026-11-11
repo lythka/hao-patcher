@@ -26,6 +26,7 @@ SEVEN = ['apple80211_apmodetoStr', 'apple80211_authtype_uppertoStr', 'apple80211
          'apple80211_roam_status_bss_flagstoStr', 'convertAssocStatusToAssocResult', 'convertPhyTypeToString',
          'convertToApple80211Error']
 ADDED = ['Apple80211Get20MhzChannelIndexBitmap']   # 27.x exports OCLP's wrapper lacks
+FORWARDED = ['Apple80211StartMonitoringEvent']      # the wrapper's RTLD_NEXT forwarder, now looked up in IO80211Old
 # Codes a later build's table adds, which an earlier build passes through: (build, function, input).
 NEWER = {('26A428', 'convertToApple80211Error', 0xe0822410)}
 
@@ -64,12 +65,12 @@ class Library(unittest.TestCase):
     def test_exports_and_load_commands(self):
         exports = [line.split()[-1] for line in sh('dyld_info', '-exports', self.lib).splitlines()
                    if line.strip().startswith('0x')]
-        self.assertEqual(sorted(exports), sorted('_'+n for n in SEVEN+ADDED))
+        self.assertEqual(sorted(exports), sorted('_'+n for n in SEVEN+ADDED+FORWARDED))
         libs = sh('otool', '-L', self.lib)
         self.assertIn(f'{FRAMEWORK}/IO80211OCLP.dylib (compatibility version 1.0.0, current version 1.0.0, reexport)', libs)
         self.assertEqual(sh('otool', '-D', self.lib).splitlines()[-1], f'{FRAMEWORK}/IO80211')
-        segments = [line.split()[-1] for line in sh('otool', '-l', self.lib).splitlines() if 'segname' in line]
-        self.assertNotIn('__DATA', segments)   # string literals and jump tables only: nothing to rebase or bind
+        # every export is code (the forwarder's cached pointer and its dlopen/dlsym imports are the only data)
+        self.assertEqual(set(coverage.exports(self.lib).values()), {'__TEXT'})
 
     @unittest.skipUnless(platform.machine() == 'arm64', 'runs the x86_64 library under Rosetta')
     def test_matches_every_build_over_every_run(self):
@@ -136,6 +137,10 @@ class Library(unittest.TestCase):
         for name, where in got[before].items():
             if name in SEVEN:
                 self.assertEqual(where[0], 'IO80211')   # before: the wrapper's data variable
+                self.assertEqual(got[after][name][0], 'IO80211')
+                self.assertNotEqual(got[after][name][1], where[1])
+            elif name in FORWARDED:
+                self.assertEqual(where[0], 'IO80211')   # before: the wrapper's RTLD_NEXT forwarder
                 self.assertEqual(got[after][name][0], 'IO80211')
                 self.assertNotEqual(got[after][name][1], where[1])
             elif name in ADDED:

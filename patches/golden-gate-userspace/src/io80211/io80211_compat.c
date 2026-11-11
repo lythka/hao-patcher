@@ -4,6 +4,8 @@
 //   apple80211_authtype_uppertoStr);
 // - one it does not export at all (Apple80211Get20MhzChannelIndexBitmap, bound by WiFiAnalytics), which dyld
 //   cannot bind to anything once the wrapper overrides the cached IO80211.
+// - one it forwards through a lookup that fails in translated processes (Apple80211StartMonitoringEvent, see the
+//   end of this file).
 // Ported from the x86_64 IO80211 of 26A428 (1585.79, UUID 79BE178F) and 26B131 (1587.10, UUID CA44E6CB), the
 // RosettaOS dyld caches 27.x's WiFiPolicy/CoreWiFi/WiFiAnalytics are linked with. A full 32-bit sweep of both
 // (tests/io80211-expected-BUILD-x86_64.txt) differs in one point: 26B131 maps 0xe0822410 to -3998. All eight are leaf
@@ -226,4 +228,22 @@ EXPORT uint64_t Apple80211Get20MhzChannelIndexBitmap(uint32_t channel, uint32_t 
     else if (flags & 0x2000) bit = (channel & 0xff) >> 2;
     else return 0;
     return (uint64_t)1 << (bit & 63);
+}
+
+// OCLP's wrapper exports Apple80211StartMonitoringEvent as a forwarder: dlsym(RTLD_NEXT, its own name), called without a
+// check, its result discarded and 0 returned. In 27.x's translated processes that lookup comes back NULL, so the call
+// lands at address 0 (sharingd SIGSEGV loop, 26B131 laptop boots of 2026-11-11). IO80211Old.dylib (re-exported by the
+// wrapper, always loaded with it) has the implementation; look it up in that image by handle instead, and keep the
+// wrapper's contract (always 0; a missing implementation is skipped, not called).
+#include <dlfcn.h>
+#define IO80211_OLD "/System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211Old.dylib"
+
+EXPORT int Apple80211StartMonitoringEvent(void *handle, int event) {
+    static int (*old)(void *, int);
+    if (!old) {
+        void *image = dlopen(IO80211_OLD, RTLD_LAZY | RTLD_NOLOAD);
+        if (image) old = (int (*)(void *, int))dlsym(image, "Apple80211StartMonitoringEvent");
+    }
+    if (old) old(handle, event);
+    return 0;
 }
