@@ -32,7 +32,7 @@ records earlier evidence.
 | Safari | Works, including YouTube. |
 | Control Center | Opens; Wi-Fi, Bluetooth, AirDrop, Now Playing, Display and Sound work. |
 | Maps | Map tiles, search, place cards and current location work. Pin shadows are missing (VectorKit shaders, fix in progress). |
-| Photos | Import, thumbnails and full-size view work. Live Text does not: OCLP blocks the analysis service on this GPU. |
+| Photos | Import, thumbnails and full-size view work. Live Text does not: OCLP blocks the analysis service on this GPU (recipes in the dev-bs-test set, not yet boot-tested). |
 | Calendar, Terminal, System Settings | Work. |
 | Notification Center, widgets | Notification Center restarts in a loop and some widgets crash; fixed in hao-runtime, not yet in an image. |
 | Spotlight | Crashes on 26B131 because of broken references in Apple's Intel shared cache; repair in progress. |
@@ -116,6 +116,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 | Legacy Metal selectors | `metalold-selectors` | [patches/metalold-selectors/build](patches/metalold-selectors/build) |
 | CoreSpotlight API adapter | `golden-gate-corespotlight-compat` | [patches/golden-gate-corespotlight-compat/build](patches/golden-gate-corespotlight-compat/build) |
 | Display and WindowServer adapters | `golden-gate-windowserver-filter` | [tools/display-fixes](tools/display-fixes), [tools/display-state-shim](tools/display-state-shim) |
+| Live Text (Vision text recognition, Photos text selection) | `metal-compiler-compat`, `golden-gate-live-text-shared`, `golden-gate-live-text-service` (dev-bs-test only) | [tools/live-text](tools/live-text), [cache/metallib](cache/metallib) |
 | Userspace, Wi-Fi and pre-login audio adapters | `golden-gate-userspace` | [patches/golden-gate-userspace](patches/golden-gate-userspace), [tools/audiomxd-fix](tools/audiomxd-fix) |
 | ARM-only programs | `hao-runtime`, `hao-opencore` | [hao-runtime](https://github.com/lythka/hao-runtime) payload |
 | Apple code identity of hao and re-signed programs | `golden-gate-userspace` (carrier in Security), `golden-gate-native-identities` | [patches/golden-gate-userspace/src/codeid](patches/golden-gate-userspace/src/codeid), hao-runtime `libhao_codeid` |
