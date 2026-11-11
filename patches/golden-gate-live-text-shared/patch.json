@@ -1,0 +1,8 @@
+{
+ "revision": 2,
+ "stage": "oclp-hook",
+ "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
+ "inputs": ["live_text_framework"],
+ "status": "experiment",
+ "validated": false
+}

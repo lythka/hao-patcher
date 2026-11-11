@@ -1,0 +1,7 @@
+{
+ "revision": 2,
+ "stage": "post",
+ "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
+ "status": "experiment",
+ "validated": false
+}

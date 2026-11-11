@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Build Live Text (Vision text recognition on the HD 4000) for a Golden Gate image, from explicit Apple inputs.
+
+  live-text inputs --system APPLE_SYSTEM_ROOT --oclp-hardware OCLP_HARDWARE_ARTIFACT --output NEW
+  live-text build --inputs INPUTS --startup-library LIBHELLOBLUR --output NEW [--install-root /usr/lib/hao-live-text]
+  live-text test
+
+`inputs` copies the three Apple inputs (MPSNDArray's default.metallib and TextRecognition's text detector from the
+target build's System, OCLP's legacy MTLCompilerService bundle files) into a new folder with build.json. `build`
+makes, in a new folder:
+  components/compiler-adapters  cache/metallib translation-build (compat.dylib, gpu-client.dylib)
+  components/mpsndarray         MPSNDArray's library with only the legacy barrier/atomic ABI repaired
+  components/runtime            lib/runtime.py
+  compiler-service/             row metal_compiler_compat (patches/metal-compiler-compat)
+  framework/                    row live_text_framework (patches/golden-gate-live-text-shared)
+Nothing here runs a GPU program or an Apple application.
+"""
+import argparse
+import datetime
+import hashlib
+import json
+from pathlib import Path
+import plistlib
+import shutil
+import subprocess
+import sys
+
+UNIT = Path(__file__).resolve().parent
+REPO = UNIT.parents[1]
+sys.path.insert(0, str(UNIT/'lib'))
+import compiler_service  # noqa: E402
+import framework  # noqa: E402
+import runtime  # noqa: E402
+
+MPSNDARRAY = runtime.SOURCE_METALLIB
+DETECTOR = ('System/Library/PrivateFrameworks/TextRecognition.framework/Versions/A/Resources/'
+            'cr_td_model_v3_e5.mlmodelc.bundle')
+SERVICE = 'System/Library/Frameworks/Metal.framework/Versions/A/XPCServices/MTLCompilerService.xpc/Contents'
+SERVICE_FILES = {'MTLCompilerService': 'MacOS/MTLCompilerService', 'Info.plist': 'Info.plist',
+                 'CodeResources': '_CodeSignature/CodeResources'}
+DEFAULT_ROOT = '/usr/lib/hao-live-text'
+
+
+def sha(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as stream:
+        for block in iter(lambda: stream.read(4 << 20), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def run(*args, **kwargs):
+    return subprocess.run(list(map(str, args)), check=True, **kwargs)
+
+
+def git(*args):
+    return subprocess.check_output(['git', '-C', str(REPO), *args], text=True).strip()
+
+
+def tree(folder):
+    folder = Path(folder)
+    return {str(p.relative_to(folder)): sha(p) for p in sorted(folder.rglob('*')) if p.is_file()}
+
+
+def stage_inputs(system, hardware, output):
+    system, hardware, output = (Path(p).resolve() for p in (system, hardware, output))
+    version = plistlib.loads((system/'System/Library/CoreServices/SystemVersion.plist').read_bytes())
+    services = sorted(hardware.glob('payload/*/' + SERVICE))
+    if len(services) != 1:
+        raise ValueError('expected one %s in the OCLP hardware artifact, found %d' % (SERVICE, len(services)))
+    output.mkdir(parents=True, exist_ok=False)
+    shutil.copyfile(system/MPSNDARRAY, output/'MPSNDArray.metallib')
+    source = system/DETECTOR
+    for path in sorted(source.rglob('*')):
+        if path.is_file() and not path.is_symlink():
+            target = output/'detector'/path.relative_to(source)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
+    (output/'service').mkdir()
+    for name, relative in SERVICE_FILES.items():
+        shutil.copyfile(services[0]/relative, output/'service'/name)
+    record = dict(unit='tools/live-text', operation='inputs', system_build=version['ProductBuildVersion'],
+                  date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                  sources={'MPSNDArray.metallib': str(system/MPSNDARRAY), 'detector': str(source),
+                           'service': str(services[0])},
+                  files=tree(output))
+    (output/'build.json').write_text(json.dumps(record, indent=2) + '\n')
+    return record
+
+
+def check_inputs(folder):
+    folder = Path(folder).resolve()
+    record = json.loads((folder/'build.json').read_text())
+    if record.get('operation') != 'inputs' or tree(folder) != dict(record['files'], **{'build.json': sha(folder/'build.json')}):
+        raise ValueError('input folder differs from its build.json')
+    return record
+
+
+def legacy_sync(source, output):
+    """cache/metallib's legacy barrier/atomic ABI pass only (build_metallib.py --legacy-sync-only)."""
+    lib = REPO/'cache/metallib/lib'
+    code = ('import runpy,sys;sys.path.insert(0,sys.argv[1]);sys.argv=sys.argv[2:];'
+            'runpy.run_path(sys.argv[0],run_name="__main__")')
+    run(sys.executable, '-I', '-c', code, lib, lib/'build_metallib.py', source, output, '--legacy-sync-only')
+
+
+def build(inputs, startup, output, install_root):
+    inputs, startup, output = (Path(p).resolve() for p in (inputs, startup, output))
+    record = check_inputs(inputs)
+    output.mkdir(parents=True, exist_ok=False)
+    pieces = output/'components'
+    pieces.mkdir()
+    run(sys.executable, '-I', REPO/'cache/metallib/make', 'translation-build', pieces/'compiler-adapters')
+    legacy_sync(inputs/'MPSNDArray.metallib', pieces/'mpsndarray')
+    runtime.build(pieces/'runtime', install_root, pieces/'compiler-adapters',
+                  pieces/'mpsndarray/default.metallib', inputs/'detector', inputs/'MPSNDArray.metallib')
+    compiler_service.build(inputs/'service', pieces/'compiler-adapters', output/'compiler-service')
+    framework.build(startup, pieces/'runtime', output/'framework')
+    manifest = dict(unit='tools/live-text', operation='build', system_build=record['system_build'],
+                    commit=git('rev-parse', 'HEAD'),
+                    dirty=bool(git('status', '--porcelain', '--', str(UNIT), str(REPO/'cache/metallib'))),
+                    date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    inputs={'inputs': str(inputs), 'inputs_build_json': sha(inputs/'build.json'),
+                            'startup_library': str(startup), 'startup_library_sha256': sha(startup)},
+                    install_root=install_root,
+                    # Installers refuse a System whose MPSNDArray library is not the one repaired here.
+                    mpsndarray_source=dict(path=MPSNDARRAY, sha256=sha(inputs/'MPSNDArray.metallib')),
+                    outputs={name: tree(output/name) for name in ('compiler-service', 'framework')})
+    (output/'build.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    return manifest
+
+
+def test():
+    return run(sys.executable, '-I', '-B', '-m', 'unittest', 'discover', '-s', UNIT/'tests').returncode
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest='command', required=True)
+    command = sub.add_parser('inputs', help='copy the Apple inputs into a new folder')
+    command.add_argument('--system', type=Path, required=True, help='the target build\'s System root')
+    command.add_argument('--oclp-hardware', type=Path, required=True, help='tools/oclp-hardware artifact')
+    command.add_argument('--output', type=Path, required=True)
+    command = sub.add_parser('build', help='build the compiler-service and framework rows')
+    command.add_argument('--inputs', type=Path, required=True, help='folder made by `inputs`')
+    command.add_argument('--startup-library', type=Path, required=True, help='the image\'s libhelloblur.dylib (row libhelloblur)')
+    command.add_argument('--install-root', default=DEFAULT_ROOT)
+    command.add_argument('--output', type=Path, required=True)
+    sub.add_parser('test', help='run the host tests (x86_64 fixtures through Rosetta; no GPU program)')
+    args = parser.parse_args(argv)
+    try:
+        if args.command == 'inputs':
+            print(json.dumps(stage_inputs(args.system, args.oclp_hardware, args.output), indent=2))
+        elif args.command == 'build':
+            print(json.dumps(build(args.inputs, args.startup_library, args.output, args.install_root), indent=2))
+        else:
+            return test()
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        parser.exit(1, 'live-text: %s\n' % error)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

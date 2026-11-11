@@ -136,6 +136,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 | Tahoe CoreWiFi for Tahoe's airportd | native Tahoe donor + `golden-gate-userspace` (compat library) | [tools/tahoe-donors](tools/tahoe-donors), [tools/cache-dylib](tools/cache-dylib), [patches/golden-gate-userspace/src/corewifi](patches/golden-gate-userspace/src/corewifi) |
 | ARM-only programs | `hao-runtime`, `hao-opencore` | [hao-runtime](https://github.com/lythka/hao-runtime) payload |
 | Apple code identity of hao and re-signed programs | `golden-gate-userspace` (carrier in Security), `golden-gate-native-identities` | [patches/golden-gate-userspace/src/codeid](patches/golden-gate-userspace/src/codeid), hao-runtime `libhao_codeid` |
+| Live Text (Vision text recognition) | `metal-compiler-compat`, `golden-gate-live-text-shared`, `golden-gate-live-text-service` | [tools/live-text](tools/live-text), [cache/metallib](cache/metallib) |
 
 [patches/README.md](patches/README.md) describes the recipe format, and
 [patches/TRACKER.md](patches/TRACKER.md) lists every recipe with its stage and
