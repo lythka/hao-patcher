@@ -10,6 +10,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | darwin27-sandbox-disk-space | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
 | dev-access | r3 | post | dev |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
 | golden-gate-corespotlight-compat | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
+| golden-gate-corewifi | r1 | oclp-hook | experiment |  |  |  | **needs** | r1 2026-11-11 First version: Tahoe 25G342's CoreWiFi (tools/cache-dylib) installed as an on-disk override of t |
 | golden-gate-font-registry | r1 | post | experiment |  |  |  | **needs** | r1 2026-11-11 Setup and per-user font registries harvested from 26B131 (bf10de4). Root cause: a54ec244 removed |
 | golden-gate-hello | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
 | golden-gate-icon-caches | r1 | post | experiment |  |  |  | **needs** | r1 2026-11-11 IconServices store and indexes harvested from 26B131 (bf10de4), with the 27 index checks. Root c |

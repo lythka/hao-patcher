@@ -1,0 +1,18 @@
+{
+  "revision": 1,
+  "stage": "oclp-hook",
+  "applies": {
+    "models": [
+      "MacBookPro9,2"
+    ],
+    "builds": [
+      "25G342"
+    ]
+  },
+  "status": "experiment",
+  "validated": false,
+  "inputs": [
+    "corewifi_tahoe",
+    "corewifi_compat"
+  ]
+}
