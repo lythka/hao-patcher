@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parents[1]  # repository root: patches/, cache/, tools/
 UNIT = REPO/'tools/kernel-foundation'
 PROFILES = ROOT/'profiles'
-REVISION = 40
+REVISION = 41
 SCRIPTS = {'repair-binding': REPO/'patches/hao-opencore/src/repair_binding.py',
            'commpage-kext': UNIT/'commpage_build.py',
            'iosurface-layout': UNIT/'iosurface_layout.py',

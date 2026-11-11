@@ -52,4 +52,5 @@ part of unit discovery: they drive a paused QEMU guest over GDB, or build a test
 inside a guest, and need a VM you supply.
 
 ## Revisions
+- r41 2026-11-11 Remove unsupported filter nodes only when they are isolated roots of operations absent from the donor, with no retained references or auxiliary root tables. Fixes the 26B131 apsd profile refusing conversion (filter 110) and blocking Setup Assistant. Host decision-equivalence tests pass; the laptop accepts the converted profile in a separate probe. A full boot with the new kext remains open.
 - r40 2026-11-11 Bind the Sandbox operation layout to the supplied userspace cache UUID. Use vendored commpage source without requiring an unused older kernel binary. Kernel collection and hardware validation remain separate from host tests.

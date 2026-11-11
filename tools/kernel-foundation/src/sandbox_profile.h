@@ -54,6 +54,41 @@ static inline unsigned sandbox_donor_op(const struct sandbox_op_layout *L, unsig
     return op - below;
 }
 
+/* Only discard unsupported filter nodes that are isolated roots of removed operations.
+ * A retained operation, another node, or a message-policy table may still reference a
+ * node. Refuse those cases; never substitute an allow/deny decision for a live filter.
+ * There can be at most one such root per removed operation (operation indices are u8).
+ */
+static inline unsigned sandbox_node_index(unsigned index, const unsigned short *removed, unsigned removed_count) {
+    unsigned below = 0;
+    for (unsigned i = 0; i < removed_count; i++) {
+        if (removed[i] == index) return ~0u;
+        below += removed[i] < index;
+    }
+    return index - below;
+}
+
+static inline unsigned sandbox_removed_roots(const unsigned char *p, size_t ops, size_t nodes, unsigned count,
+                                             const struct sandbox_op_layout *L, unsigned short *removed) {
+    unsigned total = 0;
+    if (p[5] || p[6] || p[7] || p[8] || sandbox_u16(p + 0xe)) return 0; /* auxiliary roots need a separate layout proof */
+    for (unsigned d = 0; d < L->drop_count && total < 256; d++) {
+        unsigned root = sandbox_u16(p + ops + 2 * L->drop[d]);
+        if (root >= count || sandbox_node_index(root, removed, total) == ~0u) continue;
+        const unsigned char *node = p + nodes + 8 * (size_t)root;
+        if (node[0] != 0 || (node[1] & 0x7f) <= L->filter_max) continue;
+        int referenced = 0;
+        for (unsigned op = 0; op < L->target_ops && !referenced; op++)
+            referenced = sandbox_donor_op(L, op) != ~0u && sandbox_u16(p + ops + 2 * op) == root;
+        for (unsigned n = 0; n < count && !referenced; n++) {
+            const unsigned char *other = p + nodes + 8 * (size_t)n;
+            referenced = other[0] == 0 && (sandbox_u16(other + 4) == root || sandbox_u16(other + 6) == root);
+        }
+        if (!referenced) removed[total++] = (unsigned short)root;
+    }
+    return total;
+}
+
 /* The MIG bitmap object a syscall-mig mask filter node refers to: its offset, or 0 if it is not one. */
 static inline size_t sandbox_mig_object(const unsigned char *p, size_t size, size_t data, const unsigned char *node,
                                         const struct sandbox_op_layout *L, unsigned *reason) {
@@ -91,10 +126,13 @@ static inline void sandbox_mig_remap(unsigned char *p, size_t at, const struct s
 
 /* Check every node (and, with write, renumber message-filter modifiers and remap MIG bitmaps). Returns a reason or 0. */
 static inline unsigned sandbox_modifiers(unsigned char *p, size_t size, size_t nodes, unsigned count,
-                                         size_t data, const struct sandbox_op_layout *L, int write) {
+                                         size_t data, const struct sandbox_op_layout *L, int write,
+                                         const unsigned short *removed, unsigned removed_count) {
     for (unsigned n = 0; n < count; n++) {
+        if (sandbox_node_index(n, removed, removed_count) == ~0u) continue;
         unsigned char *node = p + nodes + 8 * (size_t)n;
         if (node[0] == 0) {
+            if (sandbox_u16(node + 4) >= count || sandbox_u16(node + 6) >= count) return SANDBOX_REASON_ENTRY;
             if ((node[1] & 0x7f) == 0 || (node[1] & 0x7f) > L->filter_max) return SANDBOX_REASON_FILTER;
             if (L->mig_filter && node[1] == L->mig_filter) {
                 /* One routine inline: its index moves to the donor's; a routine the donor lacks matches nothing. */
@@ -167,21 +205,40 @@ static inline int sandbox_profile_adapt(unsigned char *p, size_t size, const str
             *reason = SANDBOX_REASON_ENTRY; return SANDBOX_REFUSED;
         }
     }
-    *reason = sandbox_modifiers(p, size, nodes, count, data, L, 0);
+    unsigned short removed[256];
+    unsigned removed_count = sandbox_removed_roots(p, ops, nodes, count, L, removed);
+    *reason = sandbox_modifiers(p, size, nodes, count, data, L, 0, removed, removed_count);
     if (*reason) return SANDBOX_REFUSED;
-    sandbox_modifiers(p, size, nodes, count, data, L, 1);
+    sandbox_modifiers(p, size, nodes, count, data, L, 1, removed, removed_count);
     size_t w = ops;
     for (unsigned i = 0; i < L->target_ops; i++) {
         if (sandbox_donor_op(L, i) == ~0u) continue;
-        p[w] = p[ops + 2 * i];
-        p[w + 1] = p[ops + 2 * i + 1];
+        unsigned entry = sandbox_node_index(sandbox_u16(p + ops + 2 * i), removed, removed_count);
+        p[w] = (unsigned char)entry;
+        p[w + 1] = (unsigned char)(entry >> 8);
         w += 2;
     }
     size_t donor_nodes = (w + 7) & ~(size_t)7;
     memset(p + w, 0, donor_nodes - w);
-    memmove(p + donor_nodes, p + nodes, size - nodes);
+    w = donor_nodes;
+    for (unsigned n = 0; n < count; n++) {
+        if (sandbox_node_index(n, removed, removed_count) == ~0u) continue;
+        unsigned char *node = p + nodes + 8 * (size_t)n;
+        if (node[0] == 0) {
+            for (unsigned edge = 4; edge <= 6; edge += 2) {
+                unsigned next = sandbox_node_index(sandbox_u16(node + edge), removed, removed_count);
+                node[edge] = (unsigned char)next;
+                node[edge + 1] = (unsigned char)(next >> 8);
+            }
+        }
+        memmove(p + w, node, 8);
+        w += 8;
+    }
+    memmove(p + w, p + data, size - data);
+    p[2] = (unsigned char)(count - removed_count);
+    p[3] = (unsigned char)((count - removed_count) >> 8);
     p[4] = (unsigned char)L->donor_ops;
-    *new_size = size - (nodes - donor_nodes);
+    *new_size = size - (nodes - donor_nodes) - 8 * (size_t)removed_count;
     return SANDBOX_ADAPTED;
 }
 

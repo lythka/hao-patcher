@@ -168,6 +168,61 @@ def terminal(action=0, inline=None, count=0, offset=0):
     return bytes([1, action, 0, 0, count, 0])+struct.pack('<H', offset)
 
 
+class RemovedOperationRoots(unittest.TestCase):
+    layout = synthetic_layout()
+
+    def fixture(self, **changes):
+        values = dict(nodes=(filter_node(110, 3, 4), filter_node(1, 2, 4),
+                             filter_node(6, 3, 4), terminal(0), terminal(5)),
+                      entries=[0 if op == 2 else 1 for op in range(204)], data=b'keptdata')
+        values.update(changes)
+        return profile(**values)
+
+    def decision(self, data, op, matches):
+        s = shape(data)
+        index = u16(data, s['ops'] + 2*op)
+        for _ in range(s['count']):
+            at = s['nodes'] + 8*index
+            if data[at] == 1:
+                return data[at:at+8]
+            index = u16(data, at + (4 if data[at+1] in matches else 6))
+        self.fail('cycle in decision graph')
+
+    def test_pruning_preserves_every_retained_operation_decision(self):
+        before = self.fixture()
+        status, reason, after = adapt(before, self.layout)
+        self.assertEqual((status, reason), (1, 0))
+        self.assertEqual(shape(after)['count'], 4)
+        self.assertEqual(after[shape(after)['data']:], b'keptdata')
+        for target, donor in enumerate(self.layout['map'][:204]):
+            if donor is None:
+                continue
+            for matches in (set(), {1}, {6}, {1, 6}):
+                self.assertEqual(self.decision(before, target, matches), self.decision(after, donor, matches))
+
+    def test_shared_unsupported_filters_still_refuse_without_writes(self):
+        entries = [0 if op in (2, 100) else 1 for op in range(204)]
+        cases = [self.fixture(entries=entries),
+                 self.fixture(nodes=(filter_node(110, 3, 4), filter_node(1, 0, 4),
+                                     filter_node(6, 3, 4), terminal(0), terminal(5))),
+                 self.fixture(tables=(0, 0, 0, 0, 0, 1)),
+                 self.fixture(tables=(0, 1, 0, 0, 0, 0)),
+                 self.fixture(nodes=(filter_node(110, 0, 4), filter_node(1, 2, 4),
+                                     filter_node(6, 3, 4), terminal(0), terminal(5)))]
+        for before in cases:
+            self.assertEqual(adapt(before, self.layout), (2, 4, before))
+
+    def test_later_validation_failure_does_not_partially_prune(self):
+        before = self.fixture(nodes=(filter_node(110, 3, 4), filter_node(1, 2, 4),
+                                     filter_node(111, 3, 4), terminal(0), terminal(5)))
+        self.assertEqual(adapt(before, self.layout), (2, 4, before))
+
+    def test_invalid_retained_edge_refuses_without_writes(self):
+        before = self.fixture(nodes=(filter_node(110, 3, 4), filter_node(1, 5, 4),
+                                     filter_node(6, 3, 4), terminal(0), terminal(5)))
+        self.assertEqual(adapt(before, self.layout), (2, 32, before))
+
+
 class Generator(unittest.TestCase):
     def test_drops_inserted_operations_and_keeps_order(self):
         layout = synthetic_layout()

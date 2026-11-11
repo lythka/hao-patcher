@@ -93,5 +93,6 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r31 2026-11-11 Use the Sandbox operation adapter that prunes isolated unsupported roots from removed operations. The previous adapter refused apsd and left Setup Assistant waiting on its activation-record request. Full boot validation pending.
 - r30 2026-11-11 Bind 26B131 kernel repairs and IntelCommpage to the freshly linked collection, and stamp HaoExec for that kernel. Boot validation pending.
 - r29 2026-11-10 Initial public release.

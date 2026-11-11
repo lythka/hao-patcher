@@ -16,7 +16,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-metal-libraries | r14 | oclp-hook | experiment | x |  |  | **needs** | r14 2026-11-11 Installs a repaired library only over the System library it was made from (`SOURCES`), or over  |
 | golden-gate-userspace | r42 | oclp-hook | experiment | x |  |  | **needs** | r42 2026-11-11 Locate CoreRoutine, EndpointSecurity and trackpad repair sites by unique instruction shapes in  |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
-| hao-opencore | r30 | post | experiment | x |  |  | **needs** | r30 2026-11-11 Bind 26B131 kernel repairs and IntelCommpage to the freshly linked collection, and stamp HaoExe |
+| hao-opencore | r31 | post | experiment | x |  |  | **needs** | r31 2026-11-11 Use the Sandbox operation adapter that prunes isolated unsupported roots from removed operation |
 | hao-runtime | r58 | oclp-hook | experiment | x |  |  | **needs** | r58 2026-11-11 Select the 26B131 payload with regenerated interface units and AOT; async provider and URLReque |
 | metalold-selectors | r2 | oclp-hook | product | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
 | rec-audio | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
