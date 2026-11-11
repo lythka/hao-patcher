@@ -2,7 +2,9 @@
 
 Shared-compiler mode only: shaders compile in the image's (repaired) MTLCompilerService, never in a private
 compiler. The runtime holds
-  libLiveText.dylib          umbrella; needs every helper below, so one load command attaches them all
+  LiveText.dylib             umbrella; needs every helper below, so one load command attaches them all. Short
+                             name: libhelloblur d471519b has 64 bytes of header padding, and the load command for
+                             /usr/lib/hao-live-text/LiveText.dylib takes 64 (libLiveText.dylib would take 72)
   libLiveTextConfig.dylib    process-local settings (HAO_LIVE_TEXT_ROOT, VISION_MPSNDARRAY_LIBRARY), first
   gpu-client.dylib           cache/metallib's GPU-client adapter (cold and cached translated shaders)
   libLiveTextPolicy.dylib    TextRecognition E5 compiles: GPU device mask, the prepared detector, MPSGraph non-memref
@@ -26,7 +28,7 @@ REPO = UNIT.parents[1]
 sys.path.insert(0, str(HERE))
 import detector as detector_tool  # noqa: E402
 
-UMBRELLA = 'libLiveText.dylib'
+UMBRELLA = 'LiveText.dylib'
 # The System library the runtime's MPSNDArray.metallib replaces for HD 4000 devices (installers check its hash).
 SOURCE_METALLIB = ('System/Library/Frameworks/MetalPerformanceShaders.framework/Versions/A/Frameworks/'
                    'MPSNDArray.framework/Versions/A/Resources/default.metallib')
