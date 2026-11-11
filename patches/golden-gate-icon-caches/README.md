@@ -16,7 +16,7 @@ Post patch; list it after golden-gate-user-seed (apply.sh refuses otherwise) and
 Store `store-info.plist` version 4 and `<UUID>.isdata` units as in Tahoe. Index `store.index` version 11, 4000
 buckets for a new account, **172-byte records** (Tahoe 25G332: 152); harvest: root 168, Setup 598, user 801 records,
 540 store units (937 MB). The index's `__cache_info__` must name the running build or the agent resets the index.
-Shipped as harvested; mac-image's generator (cache/icons: universe, render, append) needs the 27 record layout before
+Shipped as harvested; the earlier Tahoe image project's icon generator (universe, render, append) needs the 27 record layout before
 it can add records for icons no harvest drew.
 
 ## Limits
@@ -31,7 +31,7 @@ against bf10de4 (1:24 Setup, 2:13 benchtest at 08:22); `log show --predicate 'su
 with private data shows records served, not generated.
 
 ## Validation
-Laptop 2026-11-11, image 4d1c48c (26B131): iconservicesagent was not among the busiest processes during first boot (bf10de4 without the seed: 1:24 CPU at 9 min). Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Laptop 2026-11-11, image 4d1c48c (26B131): iconservicesagent was not among the busiest processes during first boot (bf10de4 without the seed: 1:24 CPU at 9 min).
 Earlier: built and chain-tested on the host only; no image with it has booted.
 r2 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r1's, so the result above stands.
 

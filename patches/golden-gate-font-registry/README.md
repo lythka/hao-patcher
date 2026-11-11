@@ -2,7 +2,7 @@
 
 fontd's font registries of this OS build, so Setup and each new account do not wait while fontd scans every font
 from scratch. One input, `font_registry_golden_gate`, made by `cache/seeds/make` from a laptop harvest of an image of
-the same build (`cache/seeds/README.md`; the recipe of mac-image's `cache/font-registry` r2).
+the same build (`cache/seeds/README.md`; the recipe of the earlier Tahoe image project's font-registry recipe r2).
 
 | From the artifact | Installed at | Read by |
 |---|---|---|
@@ -23,9 +23,9 @@ Host: `patches/golden-gate-user-seed/tests` (the seed chain). On the laptop: `pe
 registry placed" for the new account; fontd's scan count at Setup and first login.
 
 ## Validation
-Laptop 2026-11-11, image 4d1c48c (26B131): the user seed placed fontd's registry in the new account before its first login; text renders in Setup and apps. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Laptop 2026-11-11, image 4d1c48c (26B131): the user seed placed fontd's registry in the new account before its first login; text renders in Setup and apps.
 Earlier: built and chain-tested on the host only; no image with it has booted. OPEN (carried from
-mac-image): that fontd adopts a seeded registry without a full rescan.
+the earlier Tahoe image project): that fontd adopts a seeded registry without a full rescan.
 r2 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r1's, so the result above stands.
 
 ## Revisions

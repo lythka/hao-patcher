@@ -88,7 +88,7 @@ must still die with VM guard flavor 13 (status 137), which shows the fix leaves 
 has a 15-second alarm. Finally load a website in Safari and scroll, navigate and reload.
 
 ## Validation
-Laptop 2026-11-11, image 4d1c48c (26B131): boots with r33; r34's HaoExec.kext and stamp_identity.py are byte-identical to r33's. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Laptop 2026-11-11, image 4d1c48c (26B131): boots with r33; r34's HaoExec.kext and stamp_identity.py are byte-identical to r33's.
 Earlier: Host tests pass, and the binder verifies every fileset member and repair site against the
 reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox adapters pass in QEMU; a full
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.

@@ -1,7 +1,7 @@
 # golden-gate-user-seed
 
-Gives every new account the seeded caches before its apps first need them: a launchd daemon runs mac-image's
-`src/seed.zsh` (seed7, unchanged) as root at boot and whenever the local users folder changes, and for each account
+Gives every new account the seeded caches before its apps first need them: a launchd daemon runs
+`src/seed.zsh` (the earlier Tahoe image project's seed7, unchanged) as root at boot and whenever the local users folder changes, and for each account
 created less than 600 s ago copies what `PerUserSeed` holds into that account's cache folders. On its own it places
 nothing; the payloads come from the patches listed after it.
 
@@ -34,7 +34,7 @@ account: `/private/var/log/peruser-seed.log` shows the icon index, the Metal tre
 the new uid before its desktop started.
 
 ## Validation
-Laptop 2026-11-11, image 4d1c48c (26B131): seed.zsh saw the new account 2.3 s after creation and placed the icon index, font registry and 17 Metal trees before its first login. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Laptop 2026-11-11, image 4d1c48c (26B131): seed.zsh saw the new account 2.3 s after creation and placed the icon index, font registry and 17 Metal trees before its first login.
 Earlier: r4 is built only on the host fixture; no image with it has booted. On 26A428 images r2/r3's runtime
 placed trees (owner sessions 2026-11-06), not re-checked on 26B131.
 r5 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r4's, so the result above stands.
