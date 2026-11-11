@@ -180,7 +180,8 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
     local=workspace['mount']+'/job'
     workspace_image=work/'workspace.img'
     work.mkdir(parents=True,exist_ok=False);record.mkdir(parents=True,exist_ok=False)
-    env=dict(os.environ,VMBIN=os.environ.get('VMBIN',str(store/'vm/bin')),VMCTL=str(pipeline/'vm/vmctl'))
+    env=dict(os.environ,VMBIN=os.environ.get('VMBIN',str(store/'vm/bin')),VMCTL=str(pipeline/'vm/vmctl'),
+             GOLDEN_LOCK=str(pipeline/'inputs/golden'/recipe['golden_build']))
     state=dict(unit='pipeline',operation='golden-first',recipe=recipe,recipe_sha256=digest(recipe_path),
                workspace=str(TOP),work=str(work),repository=str(repository),guest_local=local,
                guest_workspace=dict(workspace,image=str(workspace_image)),
@@ -202,6 +203,10 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
         try:
             lockrows=runpy.run_path(str(pipeline/'lock.py'))
             build_lock=pipeline/'inputs'/recipe['donor_build'];common=pipeline/'inputs/common'
+            # Rows of the Golden Gate build come first: inputs/golden/<golden_build>, then the donor build, then common.
+            golden_lock=pipeline/'inputs/golden'/recipe['golden_build']
+            def lock_of(row):
+                return next(d for d in (golden_lock,build_lock,common) if (d/row).is_file())
             command(['zsh',pipeline/'stages/inputs.sh',share,pipeline/'targets'/(recipe['target']+'.json'),
                      build_lock,common,recipe['oclp'],pipeline/'sets'/(recipe['patch_set']+'.txt'),'golden-first'])
             used_rows=set(recipe['inputs'].values()) | {'kdk','python_arm64','python_site','fl'}
@@ -212,14 +217,14 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
             used_rows.add('psp_'+psp_line.split('PatcherSupportPkg ',1)[1].split()[0])
             input_records={}
             for row in sorted(used_rows):
-                row_lock=build_lock if (build_lock/row).is_file() else common
+                row_lock=lock_of(row)
                 value=lockrows['rows'](str(row_lock))[row]
                 input_records[row]=dict(sha256=value[0],path=value[1],row=(row_lock/row).read_text())
             write(record/'inputs.json',input_records)
             sources={}
             extras=share/'assembly-inputs';extras.mkdir(mode=0o755)
             for role,row in recipe['inputs'].items():
-                source=Path(lockrows['path'](str(build_lock if (build_lock/row).exists() else common),row))
+                source=Path(lockrows['path'](str(lock_of(row)),row))
                 command(['ditto',source,extras/role]);sources[role]=dict(row=row,path=str(source))
                 if (source/'build.json').exists():shutil.copy2(source/'build.json',record/(role+'-input.json'))
             source=share/'assembly-source';source.mkdir(mode=0o755)

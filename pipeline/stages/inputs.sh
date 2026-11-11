@@ -54,7 +54,9 @@ ditto $PY/python $SHARE/py; ditto $(common python_site) $SHARE/site
 
 python3 -I $TOP/pipeline/patches.py plan $SET $TARGET ${LOCK:t:r} > $SHARE/plan.txt
 awk '$1 != "recovery"' $SHARE/plan.txt > $SHARE/patches.txt; rm $SHARE/plan.txt   # recovery patches: pipeline/recovery
-row() { if [[ -f $LOCK/$1 ]]; then in $1; else common $1; fi; }   # a patch input: the build's row, else common's
+# A patch input: the Golden Gate build's row (GOLDEN_LOCK, golden-first only), else the donor build's, else common's.
+GOLDEN_LOCK=${GOLDEN_LOCK:-}
+row() { if [[ -n $GOLDEN_LOCK && -f $GOLDEN_LOCK/$1 ]]; then $L path $GOLDEN_LOCK $1; elif [[ -f $LOCK/$1 ]]; then in $1; else common $1; fi; }
 i=0
 while read -r stage name ins; do
     i=$((i + 1))

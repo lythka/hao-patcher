@@ -8,6 +8,7 @@ VALIDATION), ok = a boot test proved the current revision.
 |---|---|---|---|---|---|---|---|---|
 | darwin27-kernel | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-10 Initial public release. |
 | darwin27-sandbox-disk-space | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-10 Initial public release. |
+| dev-access | r3 | post | dev |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
 | golden-gate-code-identity | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-10 Initial public release. |
 | golden-gate-corespotlight-compat | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-10 Initial public release. |
 | golden-gate-hello | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-10 Initial public release. |

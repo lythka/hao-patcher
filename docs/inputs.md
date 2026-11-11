@@ -65,8 +65,11 @@ overlays.
 
 Each file under `pipeline/inputs/25G332/` and `pipeline/inputs/common/` is one
 input row: optional `#` comment lines, then `SHA256 PATH` (or `- PATH` for a
-directory). The build-specific folder overrides `common/`. `25G332` names the
-donor build; the installed system is still 26A428.
+directory). A row is looked up first in `pipeline/inputs/golden/<golden_build>/`
+(rows made from that Golden Gate build: its IPSW, kernel, userspace and the fixes
+derived from them), then in the donor build's folder (`25G332`, named by the
+assembly's `donor_build`), then in `common/`. Rows not yet moved to a
+`golden/` folder belong to 26A428.
 
 The checked-in rows give the expected hash and a path under `store/`. Put your
 files at those paths, or edit the path; never change a hash to make a different

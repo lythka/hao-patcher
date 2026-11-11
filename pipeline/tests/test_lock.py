@@ -156,7 +156,9 @@ class Key(unittest.TestCase):
 
 class Repo(unittest.TestCase):
     def test_shipped_locks_and_targets_parse(self):
-        for d in (TOP / 'pipeline/inputs').iterdir():
+        inputs = TOP / 'pipeline/inputs'
+        locks = [d for d in inputs.iterdir() if d.name != 'golden'] + sorted((inputs / 'golden').glob('*'))
+        for d in locks:
             for f in d.iterdir():
                 data = [l.split('#', 1)[0].split() for l in f.read_text().splitlines() if not l.lstrip().startswith('#')]
                 self.assertEqual([len(x) for x in data if x], [2], '%s/%s' % (d.name, f.name))
