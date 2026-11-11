@@ -14,7 +14,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-hello | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-10 Initial public release. |
 | golden-gate-metal-framebuffer | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
 | golden-gate-metal-libraries | r13 | oclp-hook | experiment | x |  |  | **needs** | r13 2026-11-10 Initial public release. |
-| golden-gate-userspace | r40 | oclp-hook | experiment | x |  |  | **needs** | r40 2026-11-10 Initial public release. |
+| golden-gate-userspace | r41 | oclp-hook | experiment | x |  |  | **needs** | r41 2026-11-11 IO80211 compat for 26B131: adds `Apple80211Get20MhzChannelIndexBitmap` (bound by WiFiAnalytics  |
 | golden-gate-windowserver-filter | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-10 Initial public release. |
 | hao-opencore | r29 | post | experiment | x |  |  | **needs** | r29 2026-11-10 Initial public release. |
 | hao-runtime | r57 | oclp-hook | experiment | x |  |  | **needs** | r57 2026-11-10 Initial public release. |

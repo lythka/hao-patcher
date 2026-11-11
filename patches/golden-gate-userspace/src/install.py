@@ -281,9 +281,10 @@ def install_file(source, target):
 # airportd SIGBUS without this: OCLP's Modern Wireless wrapper (PatcherSupportPkg 13.7.2-25 IO80211, kept as
 # an OCLP path) exports 7 functions 27.0's callers use as 8-byte data (a pointer to a CFString of the name), so a call
 # from WiFiPolicy (-[WiFiUsageLinkSession eventDictionary:] -> apple80211_authtype_uppertoStr) runs the wrapper's
-# __DATA. The compat library (row io80211_compat, made by src/io80211/make) defines the 7 as 26A428's x86_64 IO80211
-# does and re-exports the wrapper, renamed IO80211OCLP.dylib, so every other name resolves as before and the
-# wrapper's initializers still run (it re-exports IO80211Old.dylib itself).
+# __DATA, and it lacks Apple80211Get20MhzChannelIndexBitmap, which WiFiAnalytics binds. The compat library (row
+# io80211_compat, made and checked against the build's clients by src/io80211/make) defines the 8 as the build's
+# x86_64 IO80211 does and re-exports the wrapper, renamed IO80211OCLP.dylib, so every other name resolves as before
+# and the wrapper's initializers still run (it re-exports IO80211Old.dylib itself).
 IO80211 = 'System/Library/PrivateFrameworks/IO80211.framework/Versions/A/'
 
 

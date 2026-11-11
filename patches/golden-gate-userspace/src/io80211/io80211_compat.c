@@ -1,10 +1,17 @@
-// The seven IO80211 functions OCLP's Modern Wireless wrapper exports as data (an 8-byte pointer to a CFString of the
-// function's own name), so a call lands in the wrapper's __DATA and faults (airportd SIGBUS in WiFiPolicy,
-// -[WiFiUsageLinkSession eventDictionary:] -> apple80211_authtype_uppertoStr). Ported from 26A428's x86_64
-// IO80211 (the RosettaOS dyld cache 27.0's WiFiPolicy/CoreWiFi are linked with); same tables as 26A428 arm64e.
-// All seven are leaf functions: a 32-bit argument (two for convertAssocStatusToAssocResult) to a C string literal
-// or an int. Addresses read: README "Root cause". This library re-exports OCLP's wrapper (IO80211OCLP.dylib), so
-// every other IO80211 name resolves as before.
+// IO80211 functions 27.x callers bind to that OCLP's Modern Wireless wrapper (with its IO80211Old.dylib) gets wrong:
+// - seven it exports as data (an 8-byte pointer to a CFString of the function's own name), so a call lands in the
+//   wrapper's __DATA and faults (airportd SIGBUS in WiFiPolicy, -[WiFiUsageLinkSession eventDictionary:] ->
+//   apple80211_authtype_uppertoStr);
+// - one it does not export at all (Apple80211Get20MhzChannelIndexBitmap, bound by WiFiAnalytics), which dyld
+//   cannot bind to anything once the wrapper overrides the cached IO80211.
+// Ported from the x86_64 IO80211 of 26A428 (1585.79, UUID 79BE178F) and 26B131 (1587.10, UUID CA44E6CB), the
+// RosettaOS dyld caches 27.x's WiFiPolicy/CoreWiFi/WiFiAnalytics are linked with. A full 32-bit sweep of both
+// (tests/io80211-expected-BUILD-x86_64.txt) differs in one point: 26B131 maps 0xe0822410 to -3998. All eight are leaf
+// functions of 32-bit arguments. coverage.py checks a build's clients against this library and OCLP's (README
+// "IO80211"). This library re-exports OCLP's wrapper (IO80211OCLP.dylib), so every other IO80211 name resolves as
+// before.
+#include <stdint.h>
+
 #define EXPORT __attribute__((visibility("default")))
 
 EXPORT const char *apple80211_apmodetoStr(int mode) {
@@ -96,7 +103,7 @@ EXPORT const char *convertPhyTypeToString(int phy) {
 }
 
 // errno values and IOReturn codes to Apple80211 errors (-3900...); anything else passes through.
-// Tahoe's 25G332 table stops at 0xe0822409; 27.0 adds 0xe082240a..0xe082240f.
+// Tahoe's 25G332 table stops at 0xe0822409; 27.0 adds 0xe082240a..0xe082240f, 27.2.1 0xe0822410.
 EXPORT int convertToApple80211Error(int error) {
     switch ((unsigned)error) {
     case 16: return -3951;          // EBUSY
@@ -115,6 +122,7 @@ EXPORT int convertToApple80211Error(int error) {
     case 0xe082240d: return -3995;
     case 0xe082240e: return -3996;
     case 0xe082240f: return -3997;
+    case 0xe0822410: return -3998;  // 26B131; 26A428 passes it through
     default: return error;
     }
 }
@@ -205,4 +213,17 @@ EXPORT int convertAssocStatusToAssocResult(int status, int kind) {
     case 0xffff: return 0;
     default: return 0xffff;
     }
+}
+
+// The bit of a 20 MHz channel in its band's index bitmap: 2.4 GHz channel N is bit N, 5 GHz (N + 24) / 4, 6 GHz N / 4
+// (channel flags 0x8, 0x10, 0x2000, tested in that order; only the low byte of a 5 or 6 GHz channel counts). 0 unless
+// the 20 MHz flag (0x2) is set. Identical code in 26A428 and 26B131.
+EXPORT uint64_t Apple80211Get20MhzChannelIndexBitmap(uint32_t channel, uint32_t flags) {
+    unsigned bit;
+    if (!(flags & 0x2)) return 0;
+    if (flags & 0x8) bit = channel;
+    else if (flags & 0x10) bit = ((channel & 0xff) + 24) >> 2;
+    else if (flags & 0x2000) bit = (channel & 0xff) >> 2;
+    else return 0;
+    return (uint64_t)1 << (bit & 63);
 }

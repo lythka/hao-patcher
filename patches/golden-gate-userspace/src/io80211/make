@@ -1,9 +1,15 @@
 #!/opt/homebrew/bin/python3.14
-"""Build the IO80211 compat library (input row io80211_compat) into a new, recorded artifact: make STORE_ARTIFACTS."""
+"""Build the IO80211 compat library (input row io80211_compat) into a new, recorded artifact and check it covers one
+27.x build: make STORE_ARTIFACTS --system SYSTEM_ROOT --cache X86_64_DYLD_CACHE --oclp OCLP_IO80211_DIR.
+SYSTEM_ROOT is the build's System volume (its SystemVersion.plist names the build and its programs are the on-disk
+clients), X86_64_DYLD_CACHE its RosettaOS dyld_shared_cache_x86_64, OCLP_IO80211_DIR the folder holding OCLP's IO80211
+and IO80211Old.dylib. Any import nothing answers (coverage.py) stops the build with MISSING/unsupported."""
+import argparse
 import datetime
 import hashlib
 import json
 from pathlib import Path
+import plistlib
 import subprocess
 import sys
 import tempfile
@@ -31,15 +37,21 @@ def build(out):
     return binary
 
 
-def main(root):
+def main(root, system, cache, oclp):
+    sys.path.insert(0, str(HERE))
+    import coverage
     root = Path(root).resolve()
+    macos_build = plistlib.loads((Path(system)/'System/Library/CoreServices/SystemVersion.plist').read_bytes())['ProductBuildVersion']
     sources = {str(p.relative_to(TOP)): hashlib.sha256(p.read_bytes()).hexdigest()
                for p in sorted(HERE.iterdir()) if p.is_file()}
     with tempfile.TemporaryDirectory(prefix='io80211-compat-') as tmp:
         binary = build(tmp)
+        record = coverage.check(cache, system, oclp, binary)
+        if record['errors']:
+            sys.exit('\n'.join(record['errors']))
         digest = hashlib.sha256(binary.read_bytes()).hexdigest()
         now = datetime.datetime.now(datetime.timezone.utc)
-        out = root/f'io80211-compat-26A428-{now:%Y%m%d}-{digest[:12]}'
+        out = root/f'io80211-compat-{macos_build}-{now:%Y%m%d}-{digest[:12]}'
         out.mkdir()
         (out/NAME).write_bytes(binary.read_bytes())
         (out/NAME).chmod(0o755)
@@ -51,12 +63,17 @@ def main(root):
             'date': now.isoformat(), 'inputs': sources,
             'compiler': run('xcrun', 'clang', '--version'),
             'sha256': digest,
+            'coverage': dict(build=macos_build, cache=str(Path(cache).resolve()),
+                             oclp={name: hashlib.sha256((Path(oclp)/name).read_bytes()).hexdigest()
+                                   for name in ('IO80211', 'IO80211Old.dylib')}, **record),
         }, indent=2)+'\n')
         print(out)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print(__doc__)
-        sys.exit(0 if len(sys.argv) == 1 else 2)
-    main(sys.argv[1])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('artifacts', type=Path)
+    for option in ('system', 'cache', 'oclp'):
+        parser.add_argument('--'+option, type=Path, required=True)
+    args = parser.parse_args()
+    main(args.artifacts, args.system, args.cache, args.oclp)
