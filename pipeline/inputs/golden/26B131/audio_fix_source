@@ -1,2 +1,2 @@
-# Source package of darwin27-audiomxd-fixes (exp/272 dbe97ec, r2); golden-gate-userspace runs its plan command.
-- store/artifacts/audio-fix-source-26B131-20261111-8bdfcb6d0ba5
+# Source package of tools/audiomxd-fix (r2, hao-patcher 865199cb); golden-gate-userspace runs its plan command.
+- store/artifacts/audio-fix-source-26B131-20261111-7d3c72077684
