@@ -18,4 +18,8 @@ golden-gate-metal-framebuffer     # framebuffer reads for RenderBox symbols, a s
 golden-gate-native-identities     # Apple originals of the native programs the image re-signed ad hoc + /usr/lib/hao/native-identities, for golden-gate-userspace's code identity carrier. Last oclp-hook: after every recipe that re-signs
 # post entries (apply.sh, after the snapshot, System read-only):
 hao-opencore                      # OpenCore: kernel repairs bound to this image's BootKC, IntelCommpage, HaoExec, early display/Ethernet kexts, boot-args
+golden-gate-user-seed             # seed.zsh daemon: copies PerUserSeed (is/, metal/, fonts/) into each new account before its apps start. Before the three seeds below, which fill PerUserSeed
+golden-gate-font-registry         # fontd registries of this build: Setup's in place, the user seed into PerUserSeed/fonts
+golden-gate-shader-caches         # HD 4000 Metal caches harvested from this build: system accounts in place, user trees into PerUserSeed/metal
+golden-gate-icon-caches           # IconServices store and root/Setup indexes harvested from this build; user index into PerUserSeed/is
 dev-access                        # dev only: root SSH with the bench host's key, so a test boot can be checked unattended

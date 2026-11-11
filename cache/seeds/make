@@ -1,0 +1,429 @@
+#!/usr/bin/env python3
+"""cache/seeds/make: the shader, icon and font seed artifacts from one laptop harvest (cache/seeds/collect.sh).
+
+    make HARVEST.tar [--uid UID] [--out DIR]     -> DIR/shader-caches-<build>-<date>-<hash12>/
+                                                    DIR/icon-caches-<build>-<date>-<hash12>/
+                                                    DIR/font-registry-<build>-<date>-<hash12>/
+                                                    and prints their input rows
+    make compare PACK.tar HARVEST.tar [--uid UID] -> every Metal cache file the harvest has that the pack lacks or
+                                                    holds with other bytes (the misses of a seeded boot), per tree
+
+HARVEST.tar is Data-rooted (private/var/folders/..., Library/Caches/...) plus diag/ (cache-dirs.tsv: uid and cache
+folder of every account, folders.txt: mode uid gid flags path of every ancestor, system.txt: sw_vers). DIR defaults
+to the harvest's folder. UID is the harvested user account (uid >= 501); default: the only one in the harvest.
+
+shader-caches: data.tar for patches/golden-gate-shader-caches. System accounts' (uid < 501) com.apple.metal and
+  com.apple.metalfe trees at their own paths with their owners and modes, every ancestor folder from folders.txt
+  first; the user's trees under Library/Application Support/PerUserSeed/metal/<bundle path>/ (root, 755/644), which
+  patches/golden-gate-user-seed's seed.zsh copies into each new account.
+icon-caches: icon-caches.tar (the shared store Library/Caches/com.apple.iconservices.store and the system accounts'
+  C/com.apple.iconservices folders with their ancestors) and user/ (the user's index files) for
+  patches/golden-gate-icon-caches. The index header is checked (version 11, heap = count x record size).
+font-registry: setup.tar (the Setup account's (248) com.apple.FontRegistry folder, WAL folded in) and
+  user/fontregistry.user (the user's registry, its user-font-folder row reset to /var/empty/Library/Fonts; seed.zsh
+  writes the new account's home into it) for patches/golden-gate-font-registry.
+Each artifact gets build.json and SHA256SUMS; nothing existing is overwritten.
+"""
+import argparse
+import datetime
+import hashlib
+import io
+import json
+import shutil
+import sqlite3
+import struct
+import subprocess
+import sys
+import tarfile
+import tempfile
+from pathlib import Path
+
+UNIT, REVISION = 'cache/seeds', 1
+SEED = 'Library/Application Support/PerUserSeed'
+STORE = 'Library/Caches/com.apple.iconservices.store'
+METAL = ('com.apple.metal', 'com.apple.metalfe')
+SETUP_UID = 248
+USER_DOMAIN = 1                           # fontd dir_table domain of ~/Library/Fonts
+PLACEHOLDER = '/var/empty/Library/Fonts'  # seed.zsh's place_fonts replaces it with <home>/Library/Fonts
+INDEX_VERSION = 11
+
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha_file(p):
+    with open(p, 'rb') as f:
+        return hashlib.file_digest(f, 'sha256').hexdigest()
+
+
+class Harvest:
+    def __init__(self, path, uid=None):
+        self.path = Path(path)
+        self.tar = tarfile.open(self.path)
+        self.members = [m for m in self.tar.getmembers() if not m.name.startswith('diag/')]
+        for m in self.members:
+            m.name = m.name.rstrip('/')
+        self.names = {m.name for m in self.members}
+        self.mtime = max((m.mtime for m in self.members), default=0)   # for folders known only from diag/
+        self.cache_uid = {}
+        for line in self.text('diag/cache-dirs.tsv').splitlines():
+            if '\t' in line:
+                u, c = line.split('\t', 1)
+                self.cache_uid[c.rstrip('/')] = int(u)
+        self.folders = {}
+        for line in self.text('diag/folders.txt').splitlines():
+            f = line.split(' ', 4)
+            if len(f) == 5:
+                self.folders[f[4]] = (int(f[0], 8), int(f[1]), int(f[2]), f[3])
+        system = self.text('diag/system.txt')
+        self.build = next((l.split()[-1] for l in system.splitlines() if l.startswith('BuildVersion')), None)
+        if not self.build:
+            raise SystemExit('make: no BuildVersion in diag/system.txt')
+        users = sorted({u for u in self.cache_uid.values() if u >= 501})
+        if uid is None:
+            if len(users) != 1:
+                raise SystemExit('make: harvest has user accounts %s; pass --uid' % users)
+            uid = users[0]
+        elif uid not in users:
+            raise SystemExit('make: uid %d has no cache folder in the harvest (%s)' % (uid, users))
+        self.uid = uid
+
+    def text(self, name):
+        try:
+            return self.tar.extractfile(name).read().decode()
+        except KeyError:
+            raise SystemExit('make: harvest has no %s (not made by cache/seeds/collect.sh?)' % name)
+
+    def data(self, m):
+        return self.tar.extractfile(m).read() if m.isfile() else b''
+
+    def account(self, name):
+        """(cache folder, uid, path below C/) of a private/var/folders member, else None."""
+        p = name.split('/')
+        if p[:3] != ['private', 'var', 'folders'] or len(p) < 6 or p[5] != 'C':
+            return None
+        c = '/'.join(p[:6])
+        if c not in self.cache_uid:
+            raise SystemExit('make: %s is in no account listed in diag/cache-dirs.tsv' % name)
+        return c, self.cache_uid[c], '/'.join(p[6:])
+
+    def ancestors(self, path, stop):
+        """Directory members for path's ancestors below stop (exclusive), from diag/folders.txt, outermost first."""
+        out, q = [], path.rsplit('/', 1)[0]
+        while q and q != stop and q.startswith(stop + '/'):
+            if q in self.names:      # inside an archived tree: the member itself carries its metadata
+                q = q.rsplit('/', 1)[0]
+                continue
+            if q not in self.folders:
+                raise SystemExit('make: no metadata for ancestor folder %s in diag/folders.txt' % q)
+            mode, uid, gid, _ = self.folders[q]
+            t = tarfile.TarInfo(q)
+            t.type, t.mode, t.uid, t.gid, t.mtime = tarfile.DIRTYPE, mode, uid, gid, self.mtime
+            out.append(t)
+            q = q.rsplit('/', 1)[0]
+        return out[::-1]
+
+
+def metal_root(rest):
+    """Index of the com.apple.metal(fe) component in a path below C/, else None."""
+    parts = rest.split('/')
+    return next((i for i, x in enumerate(parts) if x in METAL), None)
+
+
+def shader_members(h):
+    """[(TarInfo, bytes)] of the shader pack, ancestors first, sorted; and counts."""
+    out, seen, counts = [], set(), {'system_files': 0, 'user_files': 0, 'trees': set()}
+
+    def add(t, data=b''):
+        if t.name in seen:
+            return
+        seen.add(t.name)
+        out.append((t, data))
+
+    for m in h.members:
+        a = h.account(m.name)
+        if not a or metal_root(a[2]) is None or not (m.isdir() or m.isfile()):
+            continue
+        c, uid, rest = a
+        parts = rest.split('/')
+        tree = '/'.join(parts[:metal_root(rest) + 1])
+        if uid < 501:
+            for t in h.ancestors(m.name, 'private/var/folders'):
+                add(t)
+            t = tarfile.TarInfo(m.name)
+            t.type, t.mode, t.uid, t.gid, t.mtime, t.size = m.type, m.mode, m.uid, m.gid, m.mtime, m.size
+            add(t, h.data(m))
+            counts['trees'].add(c + '/' + tree)
+            counts['system_files'] += m.isfile()
+        elif uid == h.uid:
+            name = SEED + '/metal/' + rest
+            for i in range(1, len(parts)):
+                d = tarfile.TarInfo(SEED + '/metal/' + '/'.join(parts[:i]))
+                d.type, d.mode, d.uid, d.gid, d.mtime = tarfile.DIRTYPE, 0o755, 0, 0, h.mtime
+                add(d)
+            t = tarfile.TarInfo(name)
+            t.type, t.uid, t.gid, t.mtime, t.size = m.type, 0, 0, m.mtime, m.size
+            t.mode = 0o755 if m.isdir() else 0o644
+            add(t, h.data(m))
+            counts['trees'].add(SEED + '/metal/' + tree)
+            counts['user_files'] += m.isfile()
+    out.sort(key=lambda x: x[0].name)
+    counts['trees'] = sorted(counts['trees'])
+    return out, counts
+
+
+def write_tar(path, members):
+    with tarfile.open(path, 'w', format=tarfile.PAX_FORMAT) as t:
+        for info, data in members:
+            info.uname = info.gname = ''
+            t.addfile(info, io.BytesIO(data) if info.isfile() else None)
+
+
+def index_summary(data):
+    if len(data) < 20:
+        raise SystemExit('make: icon index shorter than its header')
+    version, one, count, buckets, heap = struct.unpack_from('<5I', data)
+    if version != INDEX_VERSION:
+        raise SystemExit('make: icon index version %d, expected %d' % (version, INDEX_VERSION))
+    if count and heap % count:
+        raise SystemExit('make: icon index heap %d is not a multiple of its %d records' % (heap, count))
+    return {'version': version, 'records': count, 'buckets': buckets, 'heap': heap,
+            'record_size': heap // count if count else None}
+
+
+def cache_info_build(data):
+    import plistlib
+    try:
+        return plistlib.loads(data).get('ProductBuildVersion')
+    except Exception:
+        return None
+
+
+def icon_members(h):
+    tar, user, report = [], {}, {'system_indexes': {}, 'store_units': 0}
+    seen = set()
+    for m in h.members:
+        if m.name == STORE or m.name.startswith(STORE + '/'):
+            if not (m.isdir() or m.isfile()):
+                continue
+            for t in h.ancestors(m.name, 'Library/Caches'):
+                if t.name not in seen:
+                    seen.add(t.name); tar.append((t, b''))
+            report['store_units'] += m.name.endswith('.isdata')
+            seen.add(m.name); tar.append((m, h.data(m)))
+            continue
+        a = h.account(m.name)
+        if not a or not (a[2] == 'com.apple.iconservices' or a[2].startswith('com.apple.iconservices/')):
+            continue
+        c, uid, rest = a
+        if uid == h.uid:
+            if m.isfile() and rest.count('/') == 1:
+                user[rest.split('/', 1)[1]] = h.data(m)
+        elif uid < 501 and (m.isdir() or m.isfile()):
+            for t in h.ancestors(m.name, 'private/var/folders'):
+                if t.name not in seen:
+                    seen.add(t.name); tar.append((t, b''))
+            seen.add(m.name); tar.append((m, h.data(m)))
+            if m.name.endswith('/store.index'):
+                report['system_indexes'][str(uid)] = index_summary(h.data(m))
+    if not report['store_units']:
+        raise SystemExit('make: the harvest has no icon store units')
+    for f in ('store.index', '__cache_info__'):
+        if f not in user:
+            raise SystemExit('make: uid %d has no com.apple.iconservices/%s' % (h.uid, f))
+    report['user_index'] = index_summary(user['store.index'])
+    report['user_files'] = sorted(user)
+    for name, data in [('user', user['__cache_info__'])] + [
+            (m.name, d) for m, d in tar if m.name.endswith('/__cache_info__')]:
+        b = cache_info_build(data)
+        if b != h.build:
+            raise SystemExit('make: %s __cache_info__ says build %s, the harvest is %s' % (name, b, h.build))
+    tar.sort(key=lambda x: x[0].name)
+    return tar, user, report
+
+
+def fold(db_bytes, wal_bytes, out):
+    """Write the SQLite file with its WAL folded in to out."""
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / 'r.db'
+        p.write_bytes(db_bytes)
+        if wal_bytes:
+            Path(str(p) + '-wal').write_bytes(wal_bytes)
+        db = sqlite3.connect(p)
+        db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+        db.execute('PRAGMA journal_mode=DELETE')
+        db.close()
+        shutil.copyfile(p, out)
+
+
+def neutral(path):
+    """Reset the registry's user-font-folder rows to fontd's 'not seen' state under PLACEHOLDER (as
+    cache/font-registry r2 did) -> the paths replaced."""
+    db = sqlite3.connect(path)
+    replaced = [r[0] for r in db.execute('SELECT path_column FROM dir_table WHERE domain_column = ?', (USER_DOMAIN,))]
+    with db:
+        db.execute('UPDATE dir_table SET path_column = ?, bookmark_ref_column = NULL, flags_column = 0 '
+                   'WHERE domain_column = ?', (PLACEHOLDER, USER_DOMAIN))
+    db.execute('VACUUM')
+    db.close()
+    return replaced
+
+
+def registry_summary(path):
+    db = sqlite3.connect('file:%s?immutable=1' % path, uri=True)
+    r = {'version': list(db.execute('SELECT * FROM version_table').fetchone() or []),
+         'fonts': db.execute('SELECT count(*) FROM font_table').fetchone()[0],
+         'dirs': [list(x) for x in db.execute('SELECT path_column, domain_column FROM dir_table ORDER BY rowid')]}
+    db.close()
+    return r
+
+
+def font_members(h, work):
+    by = {}
+    for m in h.members:
+        a = h.account(m.name)
+        if a and (a[2] == 'com.apple.FontRegistry' or a[2].startswith('com.apple.FontRegistry/')):
+            by.setdefault(a[1], []).append(m)
+    for uid in (SETUP_UID, h.uid):
+        if not any(m.name.endswith('/fontregistry.user') for m in by.get(uid, [])):
+            raise SystemExit('make: uid %d has no com.apple.FontRegistry/fontregistry.user' % uid)
+
+    def registry(uid, out):
+        ms = {m.name.rsplit('/', 1)[1]: m for m in by[uid] if m.isfile()}
+        fold(h.data(ms['fontregistry.user']),
+             h.data(ms['fontregistry.user-wal']) if 'fontregistry.user-wal' in ms else b'', out)
+        return ms['fontregistry.user']
+
+    setup_db = work / 'setup.db'
+    db_member = registry(SETUP_UID, setup_db)
+    tar = []
+    for t in h.ancestors(db_member.name, 'private/var/folders'):
+        tar.append((t, b''))
+    for m in sorted(by[SETUP_UID], key=lambda m: m.name):
+        if m.isdir():
+            tar.append((m, b''))
+        elif m is db_member:
+            t = tarfile.TarInfo(m.name)
+            t.mode, t.uid, t.gid, t.mtime = m.mode, m.uid, m.gid, m.mtime
+            data = setup_db.read_bytes(); t.size = len(data)
+            tar.append((t, data))
+        elif m.isfile() and not m.name.endswith(('-wal', '-shm')):
+            tar.append((m, h.data(m)))
+    names = [t.name for t, _ in tar]
+    user_db = work / 'user.db'
+    registry(h.uid, user_db)
+    replaced = neutral(user_db)
+    report = {'setup': registry_summary(setup_db), 'user_seed': registry_summary(user_db),
+              'replaced_user_dirs': replaced, 'placeholder': PLACEHOLDER, 'setup_members': sorted(names)}
+    homes = {d.rsplit('/Library/Fonts', 1)[0] for d in replaced if d.endswith('/Library/Fonts')}
+    report['home_path_bytes_left'] = sum(user_db.read_bytes().count(x.encode()) for x in homes)
+    if report['home_path_bytes_left']:
+        raise SystemExit('make: the user seed still names %s' % sorted(homes))
+    return tar, user_db, report
+
+
+def commit():
+    here = Path(__file__).resolve().parent
+    rev = subprocess.run(['git', '-C', str(here), 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+    dirty = subprocess.run(['git', '-C', str(here), 'status', '--porcelain', '--', '.'], capture_output=True,
+                           text=True).stdout.strip()
+    return rev, not dirty
+
+
+def finish(work, out_dir, kind, h, record):
+    rev, clean = commit()
+    record = dict({'unit': UNIT, 'revision': REVISION, 'kind': kind, 'commit': rev, 'clean': clean,
+                   'date': datetime.date.today().isoformat(), 'build': h.build, 'harvest': h.path.name,
+                   'harvest_sha256': sha_file(h.path), 'user_uid': h.uid}, **record)
+    (work / 'build.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n')
+    rows = ''.join('%s  %s\n' % (sha_file(p), p.relative_to(work).as_posix())
+                   for p in sorted(work.rglob('*')) if p.is_file())
+    (work / 'SHA256SUMS').write_text(rows)
+    final = out_dir / ('%s-%s-%s-%s' % (kind, h.build, record['date'].replace('-', ''), sha(rows.encode())[:12]))
+    if final.exists():
+        shutil.rmtree(work)
+    else:
+        work.rename(final)
+    return final
+
+
+def make(args):
+    h = Harvest(args.harvest, args.uid)
+    out_dir = Path(args.out or h.path.parent).resolve()
+    made = []
+    with tempfile.TemporaryDirectory(dir=out_dir) as tmp:
+        tmp = Path(tmp)
+        # shaders
+        w = tmp / 'shader'; w.mkdir()
+        members, counts = shader_members(h)
+        if not counts['system_files'] and not counts['user_files']:
+            raise SystemExit('make: the harvest has no Metal cache files')
+        write_tar(w / 'data.tar', members)
+        made.append(('shader_caches_golden_gate', finish(w, out_dir, 'shader-caches', h, {'counts': counts}), 'data.tar'))
+        # icons
+        w = tmp / 'icon'; (w / 'user').mkdir(parents=True)
+        tar, user, report = icon_members(h)
+        write_tar(w / 'icon-caches.tar', tar)
+        for f, data in user.items():
+            (w / 'user' / f).write_bytes(data)
+        made.append(('icon_caches_golden_gate', finish(w, out_dir, 'icon-caches', h, report), None))
+        # fonts
+        w = tmp / 'font'; (w / 'user').mkdir(parents=True)
+        scratch = tmp / 'font-scratch'; scratch.mkdir()
+        tar, user_db, report = font_members(h, scratch)
+        write_tar(w / 'setup.tar', tar)
+        shutil.copyfile(user_db, w / 'user/fontregistry.user')
+        made.append(('font_registry_golden_gate', finish(w, out_dir, 'font-registry', h, report), None))
+    store = (Path(__file__).resolve().parents[2] / 'store').resolve()   # rows name store/..., the store is a symlink
+    for row, path, single in made:
+        rel = Path('store') / path.relative_to(store) if path.is_relative_to(store) else path
+        print('pipeline/inputs/golden/%s/%s:' % (h.build, row))
+        print('  # made by %s r%d from %s' % (UNIT, REVISION, h.path.name))
+        print('  %s %s/%s' % (sha_file(path / single), rel, single) if single else '  - %s' % rel)
+
+
+def metal_files(tar_path, h=None):
+    """{tree-relative key: sha256} of every Metal cache file, user trees under PerUserSeed/metal."""
+    out = {}
+    if h is None:
+        with tarfile.open(tar_path) as t:
+            for m in t:
+                if m.isfile() and any('/%s/' % x in '/' + m.name for x in METAL):
+                    out[m.name] = sha(t.extractfile(m).read())
+        return out
+    for t, data in shader_members(h)[0]:
+        if t.isfile():
+            out[t.name] = sha(data)
+    return out
+
+
+def compare(args):
+    pack = metal_files(args.pack)
+    harvest = metal_files(None, Harvest(args.harvest, args.uid))
+    trees = {}
+    for name, digest in sorted(harvest.items()):
+        state = 'new' if name not in pack else 'changed' if pack[name] != digest else None
+        if state:
+            tree = name.rsplit('/com.apple.metal', 1)[0]
+            trees.setdefault(tree, []).append((state, name))
+    for tree, files in sorted(trees.items()):
+        print('%s: %s' % (tree, ', '.join('%s %s' % (s, n.rsplit('/', 1)[1]) for s, n in files)))
+    missing = sorted(set(pack) - set(harvest))
+    print('compare: %d of %d harvested Metal files new or changed against the pack (%d trees); %d pack files not in '
+          'the harvest' % (sum(map(len, trees.values())), len(harvest), len(trees), len(missing)))
+    return 1 if trees else 0
+
+
+def main(argv):
+    if argv[:1] == ['compare']:
+        p = argparse.ArgumentParser(prog='make compare')
+        p.add_argument('pack'); p.add_argument('harvest'); p.add_argument('--uid', type=int)
+        return compare(p.parse_args(argv[1:]))
+    p = argparse.ArgumentParser(prog='make', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument('harvest'); p.add_argument('--uid', type=int); p.add_argument('--out')
+    return make(p.parse_args(argv))
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

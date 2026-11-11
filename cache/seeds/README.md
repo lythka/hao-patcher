@@ -1,0 +1,65 @@
+# cache/seeds: shader, icon and font seeds from a laptop harvest
+
+A booted image compiles Metal shaders, renders icons and builds fontd's registry for every account it runs, and on
+the MacBookPro9,2 that is minutes of CPU at first boot and first login (bf10de4, 26B131: MTLCompilerService 4:21,
+iconservicesagent 1:24 at Setup + 9 min, load 476). These two tools take what one running image made and turn it into
+the inputs the seed patches install, so the next image starts with them:
+
+| Artifact (row in `pipeline/inputs/golden/<build>/`) | Installed by |
+|---|---|
+| `shader-caches-<build>-*` (`shader_caches_golden_gate`) | `patches/golden-gate-shader-caches` |
+| `icon-caches-<build>-*` (`icon_caches_golden_gate`) | `patches/golden-gate-icon-caches` |
+| `font-registry-<build>-*` (`font_registry_golden_gate`) | `patches/golden-gate-font-registry` |
+
+The per-user parts go to `Library/Application Support/PerUserSeed/`, which `patches/golden-gate-user-seed`'s
+seed.zsh copies into each new account.
+
+```sh
+# 1. On the laptop (read-only, root SSH; best when idle, after Setup and a desktop session):
+ssh root@LAPTOP 'sh -s' < cache/seeds/collect.sh > store/artifacts/harvest-<build>-<image>-<stamp>.tar
+# 2. On the host: the three artifacts next to the harvest, and their rows
+python3.14 -I cache/seeds/make store/artifacts/harvest-<build>-<image>-<stamp>.tar [--uid 501]
+# 3. Closed loop, after a boot of an image with the pack: what that boot still compiled
+python3.14 -I cache/seeds/make compare store/artifacts/shader-caches-<build>-*/data.tar NEW_HARVEST.tar
+```
+
+## What a harvest holds (`collect.sh`)
+Paths relative to `/` (Data-rooted): every account's `com.apple.metal` and `com.apple.metalfe` trees under
+`private/var/folders/*/*/C/`, the shared icon store `Library/Caches/com.apple.iconservices.store`, every account's
+`C/com.apple.iconservices` and `C/com.apple.FontRegistry` folders, and `diag/`: `cache-dirs.tsv` (uid and cache
+folder of every account), `folders.txt` (mode, uid, gid, flags of every ancestor folder, so `make` can recreate them
+with their owners), `metal-files.txt` (every Metal cache file with size and mtime), `icons.txt` (store unit count,
+each index header and `__cache_info__`), `hao.txt` (`/private/var/db/hao`), `ps.txt`, `log-counts.txt`,
+`xattrs.txt`, `system.txt`. `SEED_ROOT` points it at a fixture tree (tests), `SEED_NO_LOG=1` skips `log show`.
+
+## What `make` writes
+- shader-caches `data.tar`: the system accounts' (uid < 501) trees at their paths with their owners and modes, each
+  ancestor folder from `folders.txt` before them (an image has no `C/<bundle>` folder for a system account until
+  that process runs, and tar would make a missing one root-owned); the user's trees under
+  `PerUserSeed/metal/<bundle path>/` (root, 755/644).
+- icon-caches: `icon-caches.tar` (the shared store, root's and the other system accounts' index folders with their
+  ancestors) and `user/` (the user's `store.index`, `__cache_info__`). Refuses an index that is not version 11 or
+  whose heap is not a whole number of records, and any `__cache_info__` whose ProductBuildVersion is not the harvest's
+  build (IconServices resets such an index at start).
+- font-registry: `setup.tar` (Setup's (248) `com.apple.FontRegistry`, WAL folded in) and `user/fontregistry.user`
+  (the user's, with its user-font-folder row set to fontd's "not seen" state under `/var/empty/Library/Fonts`, as
+  mac-image's `cache/font-registry` r2; seed.zsh writes the new account's home into it). Refuses a seed that still
+  names the harvest user's home.
+Each gets `build.json` (inputs, counts, index geometry, registry versions, source commit) and `SHA256SUMS`; the folder
+name ends in the first 12 hex of SHA256SUMS' hash. An existing folder is never overwritten.
+
+## Facts this is built on
+- Metal keys follow each function's bitcode hash, and Apple rebuilds every metallib per build: 26A428 -> 26B131
+  (metalfe 32023.921 -> .922) kept 0 of 3,437 function hashes in the six libraries `cache/metallib` repairs. A pack
+  serves only the build it was harvested or generated from.
+- On bf10de4 the caches persist across boots: Setup's iconservicesagent tree was last written on boot 1 (07:55) and
+  not touched on boot 2, while Setup Assistant, Control Center and the video decoder added records on boot 2.
+- IconServices 27 (26B123 host, 26B131 laptop): store-info version 4 as in Tahoe; index version 11 with
+  **172-byte records** (Tahoe: 152). Harvested indexes are shipped as they are; mac-image's generator (universe,
+  render, append) needs the 27 record layout before it can add records.
+- An icon index record's digest of a bundle includes the bundle folder's mtime; a harvested index serves the next
+  image only for bundles whose folder mtimes the build reproduces. The closed loop shows any that do not.
+
+## Verify
+`python3.14 -I -B -m unittest discover -s cache/seeds/tests`: collect.sh on a fixture tree; make on a synthetic
+harvest (owners, ancestors, user-tree normalisation, index checks, the font placeholder, compare).
