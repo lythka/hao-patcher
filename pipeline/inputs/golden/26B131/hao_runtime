@@ -1,4 +1,7 @@
-# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 7415a0b).
+# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 790720d).
 # Built from a root that includes the App and OS cryptexes (their 26 programs are embedded by golden-gate-userspace).
-# Regenerated interface units (1,895); stub-identities; no async provider yet (needs a booted 26B131 image).
-- store/artifacts/hao-runtime-26B131-20261111-7415a0b0252f/payload
+# Interface units u3 (1,895, matched 1895/1895 against the x86_64 cache 262FA161, report in units-match.txt);
+# stub-identities; AOT for 969 paths bound to libhao 69f0f458. No async provider yet.
+# Laptop-confirmed (live swap on image 4d1c48c): CoreUtils va_list rows (rapportd), Optional-witness fix (Control
+# Center). Not yet confirmed: 064ae8a's WeatherIntents case, Photos, the 4 changed u3 units, the _ISDVLog row.
+- store/artifacts/hao-runtime-26B131-20261111-790720dcccd6/payload
