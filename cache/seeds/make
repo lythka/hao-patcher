@@ -375,9 +375,9 @@ def make(args):
         write_tar(w / 'setup.tar', tar)
         shutil.copyfile(user_db, w / 'user/fontregistry.user')
         made.append(('font_registry_golden_gate', finish(w, out_dir, 'font-registry', h, report), None))
-    top = Path(__file__).resolve().parents[2]
+    store = (Path(__file__).resolve().parents[2] / 'store').resolve()   # rows name store/..., the store is a symlink
     for row, path, single in made:
-        rel = path.relative_to(top) if path.is_relative_to(top) else path
+        rel = Path('store') / path.relative_to(store) if path.is_relative_to(store) else path
         print('pipeline/inputs/golden/%s/%s:' % (h.build, row))
         print('  # made by %s r%d from %s' % (UNIT, REVISION, h.path.name))
         print('  %s %s/%s' % (sha_file(path / single), rel, single) if single else '  - %s' % rel)

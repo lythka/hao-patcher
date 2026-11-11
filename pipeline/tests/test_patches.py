@@ -59,7 +59,9 @@ class Repo(unittest.TestCase):
         # oclp-hook: src/hook.sh or src/kc-hook.sh; post and recovery: apply.sh; inputs are lock rows
         rows = set()
         for lock in (TOP / 'pipeline/inputs').iterdir():
-            rows |= {f.name for f in lock.iterdir()}
+            rows |= {f.name for f in lock.iterdir() if f.is_file()}
+        for lock in (TOP / 'pipeline/inputs/golden').iterdir():   # golden-run reads inputs/golden/<build> first
+            rows |= {f.name for f in lock.iterdir() if f.is_file()}
         for pj in (TOP / 'patches').glob('*/patch.json'):
             p, d = json.loads(pj.read_text()), pj.parent
             if p.get('status') == 'unfinished':   # no recipe yet, in no set (patches.check keeps it out of shipping)
