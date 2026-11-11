@@ -1,4 +1,9 @@
-"""Install Golden Gate userspace while retaining the tested Intel hardware foundation."""
+"""Make the already installed Golden Gate System run natively on Intel (run by src/kc-hook.sh).
+
+The base layers (pipeline/stages/golden-image.py) already copied Golden Gate's System/Data and installed the Tahoe
+donors and OCLP's hardware overlay; nothing here replaces or keeps System trees. This installs the combined OS cryptex
+(Golden Gate SystemOS + RosettaOS x86_64 cache + Tahoe's x86_64 DriverKit cache, with the cache repairs), the OCLP
+compat libraries, the display-state shim and its re-signed clients, and disables jobs that cannot run on this Mac."""
 import argparse
 from contextlib import contextmanager, ExitStack
 import importlib.machinery
@@ -78,14 +83,6 @@ def volume_mount(device, folder):
             yield folder
         finally:
             run('diskutil', 'unmount', device)
-
-
-def data_device(group):
-    info = plistlib.loads(run('diskutil', 'apfs', 'listVolumeGroups', '-plist', output=True))
-    return next(volume['DeviceIdentifier'] for container in info['Containers']
-                for item in container.get('VolumeGroups', [])
-                if item['APFSVolumeGroupUUID'].upper() == group.upper()
-                for volume in item['Volumes'] if volume['Role'] == 'Data')
 
 
 def protected(path, keep):
@@ -321,19 +318,6 @@ def install_wrapper_compat(system, compat, workspace, folder, leaf):
     print(f'{leaf}: compat library re-exports OCLP\'s wrapper as', renamed.name, 'identifier', identifier, flush=True)
 
 
-def oclp_paths(record, volume):
-    paths = set()
-    for patch in record.values():
-        if not isinstance(patch, dict):
-            continue
-        for operation, folders in patch.items():
-            if operation not in (f'Merge {volume} Volume', f'Overwrite {volume} Volume'):
-                continue
-            for folder, entries in folders.items():
-                paths.update(str(Path(folder.lstrip('/'))/name) for name in entries)
-    return paths
-
-
 def merge_rosetta(source, target, counts):
     """Keep ARM resources and add the native Intel cache and missing signed slices."""
     for item in source.iterdir():
@@ -398,22 +382,7 @@ def seal_image(image):
     return next((line for line in out.splitlines() if 'root hash' in line.lower()), out.strip()[-200:])
 
 
-def install_driverkit_cache(source, target):
-    """Install an explicitly extracted Intel DriverKit cache family."""
-    files = sorted(Path(source).glob('dyld_shared_cache_x86_64*'))
-    if not files:
-        raise RuntimeError(f'no x86_64 DriverKit cache in {source}')
-    target = Path(target)
-    target.mkdir(mode=0o755, parents=True, exist_ok=True)
-    for item in files:
-        destination = target/item.name
-        remove(destination)
-        copy_path(item, destination)
-    return [item.name for item in files]
-
-
-def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driverkit_cache=None,
-                    driverkit_artifact=None, donor_tool=None):
+def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driverkit_artifact, donor_tool):
     current = preboot/group/'cryptex1/current'
     work = current/'.golden-gate-os.dmg'
     # Resizing either source container hangs in APFSContainerGetMinimalSize.
@@ -435,18 +404,10 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
     with image_mount(work, workspace/'combined-os', writable=True) as mount:
         replace_tree(golden_os, mount, {'.fseventsd', '.Spotlight-V100', '.Trashes'})
         merge_rosetta(rosetta, mount, counts)
-        # Golden Gate-first callers supply the extracted donor family explicitly.
-        # The existing Tahoe-first route remains usable until its replacement is boot-tested.
+        # 27.x ships DriverKit only for arm64e: add the explicitly extracted Tahoe x86_64 DriverKit cache family.
         driverkit = 'System/DriverKit/System/Library/dyld'
-        if driverkit_artifact is not None:
-            run(sys.executable, '-I', donor_tool, 'install-driverkit',
-                '--artifact', driverkit_artifact, '--cryptex', mount)
-            counts['driverkit_x86_64'] = sorted(p.name for p in (mount/driverkit).glob('dyld_shared_cache_x86_64*'))
-        elif driverkit_cache is not None:
-            counts['driverkit_x86_64'] = install_driverkit_cache(driverkit_cache, mount/driverkit)
-        else:
-            with image_mount(current/'os.dmg', workspace/'donor-os') as donor:
-                counts['driverkit_x86_64'] = install_driverkit_cache(donor/driverkit, mount/driverkit)
+        run(sys.executable, '-I', donor_tool, 'install-driverkit', '--artifact', driverkit_artifact, '--cryptex', mount)
+        counts['driverkit_x86_64'] = sorted(p.name for p in (mount/driverkit).glob('dyld_shared_cache_x86_64*'))
         # RosettaOS signs the x86_64 cache with 16 KiB code pages for Apple silicon; the
         # x86_64 kernel refuses that signature (dyld: "code signature registration for
         # shared cache failed"). Re-sign it with 4 KiB pages before sealing.
@@ -513,22 +474,10 @@ def arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('system', 'payload', 'shim', 'io80211', 'wifip2p'):
         parser.add_argument(name, type=Path)
-    parser.add_argument('--prepared-system', action='store_true',
-                        help='Golden Gate System/Data and donor overlays are already installed')
-    parser.add_argument('--driverkit-artifact', type=Path)
-    parser.add_argument('--donor-tool', type=Path)
-    args = parser.parse_args(argv)
-    if args.prepared_system and (args.driverkit_artifact is None or args.donor_tool is None):
-        parser.error('--prepared-system requires --driverkit-artifact and --donor-tool')
-    return args
-
-
-def install_base_trees(source, system, data, system_keep, data_keep, data_anchors, prepared=False):
-    if prepared:
-        print('Using previously installed Golden Gate System/Data and explicit donor overlays', flush=True)
-        return
-    replace_tree(source/'System/Library/Templates/Data', data, data_keep, anchors=data_anchors)
-    replace_tree(source, system, system_keep)
+    parser.add_argument('--driverkit-artifact', type=Path, required=True,
+                        help='tahoe_driverkit_donors artifact (x86_64 DriverKit cache for the cryptex)')
+    parser.add_argument('--donor-tool', type=Path, required=True, help='tools/tahoe-donors/make')
+    return parser.parse_args(argv)
 
 
 def main():
@@ -537,75 +486,6 @@ def main():
     display_installer = load_display_installer()
     group, preboot_device = os.environ['GRP'], os.environ['PBU']
     metadata = json.loads((payload/'userspace.json').read_text())
-    patch_record = system/'System/Library/CoreServices/OpenCore-Legacy-Patcher.plist'
-    oclp = plistlib.loads(patch_record.read_bytes())
-    system_keep = oclp_paths(oclp, 'System') | {
-        '.fseventsd', '.Spotlight-V100', '.Trashes', '.vol', 'dev',
-        'System/Volumes', 'System/Library/Extensions', 'System/Library/Kernels',
-        # 27.0 ships DriverKit only for arm64e (no x86_64 runtime or DriverKit dyld cache): keep Tahoe's runtime
-        # and its driver extensions, which the native collections' personalities name, as for the kexts.
-        'System/DriverKit', 'System/Library/DriverExtensions',
-        # 27.0's HID event plugins are arm64e only; the native x86_64 HID event system (WindowServer, hidd) needs
-        # Tahoe's (x86_64 + arm64e) to turn keyboard and trackpad input into events.
-        'System/Library/HIDPlugins',
-        # 27.0's cursor-art dylibs are arm64e only; the x86_64 SkyLight dlopens them for every builtin cursor
-        # ("Unknown builtin cursor com.apple.coregraphics.Arrow"). Tahoe's carry identical art plus x86_64.
-        'System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/CursorAsset',
-        'System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/CursorAsset_base',
-        # 27.0's airportd (arm64 only, run by hao) calls _apple80211_roam_profile_typetoStr, which OCLP's Tahoe IO80211
-        # wrapper exports as a CFString pointer (data); Tahoe's x86_64 airportd, the client OCLP pairs with that wrapper, does not.
-        'usr/libexec/airportd',
-        # metalold-selectors (oclp-hook) adds this dylib for OCLP's HD 4000 driver bundle; 27.0 has no such file.
-        'usr/lib/libmetalold-selectors.dylib',
-        # WindowServer is a launcher for SkyLight's SLXServer (same imports and __SLSERVER/__CGSERVER sections in Tahoe
-        # x86_64 and 27.0 arm64e); Tahoe's x86_64 one runs 27.0's SkyLight server natively instead of under hao.
-        'System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer',
-        # Plugin bundles 27.0 ships arm64e only that native x86_64 code loads (UserEventAgent, configd, opendirectoryd,
-        # usernotificationsd, mds...); Tahoe's carry x86_64 (scan: evidence arm64-only-bundles-27.0-vs-tahoe.tsv).
-        'System/Library/Accounts/DataclassOwners/FreeformDataclassOwner.bundle',
-        'System/Library/Accounts/DataclassOwners/PassbookDataclassOwnerPlugin.bundle',
-        'System/Library/Accounts/Notification/AOSKitNotificationPlugin.bundle',
-        'System/Library/Audio/Plug-Ins/RemoteInput/AudioAppleSiriRemoteInput.bundle',
-        'System/Library/CoreServices/UAUPlugins/NetAuthAccountUpdater.bundle',
-        'System/Library/CoreServices/UAUPlugins/PCSAccountUpdater.bundle',
-        'System/Library/CoreServices/UAUPlugins/UAULoginItemsAndTALUpdater.bundle',
-        'System/Library/CoreServices/UAUPlugins/UserAccountUpdater8021XPlugin.bundle',
-        'System/Library/CoreServices/WiFiMigratorPlugin.bundle',
-        'System/Library/Filesystems/NetFSPlugins/ftp.bundle',
-        'System/Library/OpenDirectory/Modules/ActiveDirectory.bundle',
-        'System/Library/OpenDirectory/Modules/NetLogon.bundle',
-        'System/Library/OpenDirectory/Modules/proxy.bundle',
-        'System/Library/Spotlight/RichText.mdimporter',
-        'System/Library/SystemConfiguration/CaptiveNetworkSupport.bundle',
-        'System/Library/SystemConfiguration/EAPOLController.bundle',
-        'System/Library/UserEventPlugins/com.apple.cts.plugin',
-        'System/Library/UserEventPlugins/com.apple.nsurlsessiond.plugin',
-        'System/Library/UserEventPlugins/com.apple.opendirectory.matching.plugin',
-        'System/Library/UserEventPlugins/com.apple.rapport.events.plugin',
-        'System/Library/UserEventPlugins/com.apple.rcdevent.matching.plugin',
-        'System/Library/UserEventPlugins/EAPOLMonitor.plugin',
-        'System/Library/UserNotifications/Bundles/com.apple.universalcontrol.notifications.displays-preferences.bundle',
-        'System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.autohotspot.bundle',
-        'System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.diagnostics.bundle',
-        'System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.join.bundle',
-        'System/Library/UserNotifications/Bundles/com.apple.wifi.usernotifications.recommend.bundle',
-        # Tahoe's disk-image controller and I/O daemon speak AppleDiskImages2 ABI 9, the version of the Tahoe kext that
-        # serves them (27.0's speak ABI 11); both are self-contained (they do not link DiskImages2.framework).
-        'System/Library/PrivateFrameworks/DiskImages2.framework/Versions/A/XPCServices/diskimagescontroller.xpc',
-        'usr/libexec/diskimagesiod',
-        'System/Library/LaunchDaemons/com.apple.diskimagesiod.plist',
-        'System/Library/LaunchDaemons/com.apple.diskimagesiod.ram.plist',
-        'System/Library/LaunchDaemons/com.apple.diskimagesiod.spb.plist',
-        # The existing link has the same target. APFS rejects re-setting its
-        # protected com.apple.fs.altlink attribute through a filesystem copy.
-        'System/Cryptexes/OS',
-        'System/Library/KernelCollections',
-        'System/Library/CoreServices/boot.efi', 'System/Library/CoreServices/PlatformSupport.plist',
-        'System/Library/CoreServices/OpenCore-Legacy-Patcher.plist',
-        'usr/standalone'}
-    data_keep = oclp_paths(oclp, 'Data') | {
-        '.fseventsd', '.Spotlight-V100', '.Trashes',
-        'Library/Extensions', 'Library/KernelCollections'}
     # Never recursively clean mountpoints after a failed unmount: Preboot is
     # writable and a TemporaryDirectory cleanup would walk its still-mounted files.
     workspace = Path(tempfile.mkdtemp(prefix='golden-gate-'))
@@ -613,19 +493,7 @@ def main():
         source = stack.enter_context(image_mount(payload/'filesystem.dmg', workspace/'filesystem'))
         golden_os = stack.enter_context(image_mount(payload/'os.dmg', workspace/'golden-os'))
         rosetta = stack.enter_context(image_mount(payload/'rosetta.dmg', workspace/'rosetta'))
-        data = stack.enter_context(volume_mount(data_device(group), workspace/'data'))
         preboot = stack.enter_context(volume_mount(preboot_device, workspace/'preboot'))
-        # Keep the destination's APFS firmlink objects. Their contents come from the new Data template.
-        data_anchors = set()
-        for line in (source/'usr/share/firmlinks').read_text().splitlines():
-            if line.strip():
-                original, destination = line.split()[:2]
-                system_keep.add(original.lstrip('/'))
-                data_anchors.add(destination.lstrip('/'))
-        if not args.prepared_system:
-            print('Preserving Intel foundation:', json.dumps(sorted(system_keep)), flush=True)
-        install_base_trees(source, system, data, system_keep, data_keep, data_anchors,
-                           prepared=args.prepared_system)
         disabled = disable_jobs(system)
         display_installer.install_library(system, shim, install_file)
         install_io80211(system, io80211, workspace)
@@ -642,10 +510,7 @@ def main():
             target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
             remove(target)
             run('ditto', version, target)
-        metadata.update(installation_order="golden-first" if args.prepared_system else "legacy-replacement",
-                        native_system_paths=sorted(system_keep) if not args.prepared_system else [],
-                        native_data_paths=sorted(data_keep) if not args.prepared_system else [],
-                        data_firmlink_anchors=sorted(data_anchors), disabled_jobs=disabled,
+        metadata.update(installation_order="golden-first", disabled_jobs=disabled,
                         cryptex=counts,
                         boot_metadata='Tahoe Intel bootloader, collection layout and cryptex tickets retained',
                         validation='Built only; full Golden Gate boot and desktop untested')

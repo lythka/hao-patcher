@@ -9,9 +9,11 @@ applications, framework exports or shader state.
 ## How it works
 
 [build/](build/README.md) builds the `metal_framebuffer` input,
-`libmetal-framebuffer.dylib`. The kc-hook installs it after `golden-gate-userspace`
-and adds a weak dependency on it to the legacy HD 4000 Metal driver; the dylib
-hooks pipeline factories without creating a device from the driver's initializer.
+`libmetal-framebuffer.dylib`. The kc-hook runs in set order, after
+`metalold-selectors` (both add a weak dependency to the same driver binary), installs
+the dylib and adds a weak dependency on it to the legacy HD 4000 Metal driver from
+OCLP's hardware overlay; the dylib hooks pipeline factories without creating a device
+from the driver's initializer.
 
 Before pipeline creation the adapter lowers specialized framebuffer inputs into
 attachment-texture reads and builds a new Metal library whose hash is derived from
@@ -22,6 +24,13 @@ base instance and primitive IDs.
 Because runtime shader keys change, shader-pack records for these pipelines must be
 regenerated from actual requests and appended to the pack; old shader binaries are
 never relabelled.
+
+## Builds
+
+The `metal_framebuffer` input (rows in `pipeline/inputs/25G332` and `25G342`,
+artifact `metal-framebuffer-26A428-...`) was built and probed for 27.0 (26A428). It is
+not yet checked on 27.2.1 (26B131): the dev-26B131 assembly uses the same artifact,
+and nobody has rerun the probe matrix against 26B131's RenderBox shaders.
 
 ## Verify
 
@@ -35,8 +44,9 @@ Control Center symbols render, and that no process loading it crashes.
 NEEDS VALIDATION. The adapter passes the HD 4000 probe matrix and renders the real
 Wi-Fi symbol correctly, and Setup renders with it installed. The full desktop
 (Control Center, login window) and shader-pack records for the transformed requests
-remain open.
+remain open. Nothing has been checked on 26B131.
 
 ## Revisions
+- r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. Recipe unchanged.
 
 - r2 2026-11-10 Initial public release.

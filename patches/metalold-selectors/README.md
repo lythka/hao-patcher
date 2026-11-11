@@ -52,6 +52,19 @@ out so the call still fails loudly. The full list is in
 
 `METALOLD_SELECTORS=0` in a process's environment disables the shim for that process.
 
+## When it runs
+
+`src/kc-hook.sh` runs in set order like every other recipe. It needs only OCLP's HD 4000 Metal driver bundle, which
+the hardware overlay (a base layer) installs, so nothing requires it to run before the kernel collections. The set
+lists it just before [golden-gate-metal-framebuffer](../golden-gate-metal-framebuffer/README.md), which adds a second
+weak dylib to the same driver binary; that keeps the load-command order of the earlier builds.
+
+## Builds
+
+The `metalold_selectors` input (rows in `pipeline/inputs/25G332` and `25G342`) was built and surveyed for 27.0
+(26A428). It is not yet checked on 27.2.1 (26B131): the dev-26B131 assembly uses the same artifact, and nobody has
+re-run the survey against 26B131's Metal clients.
+
 ## Build
 
 ```sh
@@ -62,7 +75,7 @@ See [build/README.md](build/README.md) for the survey options and outputs.
 
 ## Verify
 
-- The oclp log shows the hook's two SHA-256 lines.
+- The build log shows the kc-hook's two SHA-256 lines (step `recipe metalold-selectors`).
 - In the image, `otool -L` on the driver lists `/usr/lib/libmetalold-selectors.dylib
   (weak)`, and `codesign -vvv` accepts both files.
 - On the target, in a user session: `qlmanage -p` of a system USDZ file shows the
@@ -81,8 +94,9 @@ HD 4000 driver, so it could ship in the 3802 Metal payload for every legacy GPU.
 NEEDS VALIDATION. Host tests cover every answer, the kill switch and the Mach-O, and
 on the target a native probe of `setForwardProgressUsage:` fails without the shim and
 succeeds with it. Quick Look of USDZ files and WindowServer's desktop effects on a
-built image remain open.
+built image remain open, and nothing has been checked on 26B131.
 
 ## Revisions
 
+- r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe once, in set order; the sets list it before golden-gate-metal-framebuffer, the order it already had in effect. README: built for 26A428, not yet checked on 26B131. Build validation pending.
 - r2 2026-11-10 Initial public release.

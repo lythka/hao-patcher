@@ -1,11 +1,13 @@
 #!/bin/sh
-# metalold-selectors (oclp-hook): the macOS 26 Metal selectors that OCLP's MetalOld stack does not answer, added by a
-# dylib the HD 4000 Metal driver bundle loads. Runs after OCLP's Metal 3802 patch set put the driver bundle in place.
+# metalold-selectors (kc-hook): the macOS 26 Metal selectors that OCLP's MetalOld stack does not answer, added by a
+# dylib the HD 4000 Metal driver bundle loads. Needs only OCLP's Metal 3802 driver bundle (hardware overlay), so it
+# runs in set order; the set lists it before golden-gate-metal-framebuffer, which adds its own weak dylib to the
+# same driver binary.
 #   usr/lib/libmetalold-selectors.dylib (new)                       <- inputs/metalold_selectors (build/)
 #   System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver
 #       + one LC_LOAD_WEAK_DYLIB for the dylib in the zero padding after its load commands, re-signed ad hoc
 # Both files are ad hoc signed, so the image's OpenCore boot-args must relax AMFI (see hao-opencore).
-#   hook.sh SYSTEM_MOUNT DATA_MOUNT     env OCLP_PYTHON
+#   kc-hook.sh SYSTEM_MOUNT     env OCLP_PYTHON
 set -eu
 S=${1:?System mount}; H=$(cd "$(dirname "$0")" && pwd)
 DRIVER=$S/System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver

@@ -1,9 +1,13 @@
 # golden-gate-userspace
 
-Installs Golden Gate (macOS 27.0, 26A428) userspace into the Intel image: its system libraries, the combined OS
-cryptex with the x86_64 shared cache, and the adapters that let 27.0 clients use the Tahoe programs and drivers kept
-for this Mac. In the Golden Gate-first build, System, Data and the Tahoe donors are already in place, and
-`--prepared-system` keeps those trees.
+Makes the Golden Gate userspace (macOS 27.0 26A428 or 27.2.1 26B131, whichever build the assembly selects) run
+natively on the Intel image: the combined OS cryptex with the x86_64 shared cache, and the adapters that let 27.x
+clients use the Tahoe programs and drivers kept for this Mac. It is the second entry of every Golden Gate set, after
+[darwin27-kernel](../darwin27-kernel/README.md); every later recipe edits what these two produce.
+
+The base layers (`pipeline/stages/golden-image.py`, [docs/building.md](../../docs/building.md)) already installed
+Golden Gate's System and Data, the Tahoe donors and OCLP's hardware overlay. This recipe does not copy or keep any
+System tree.
 
 ## Inputs
 - `golden_gate_userspace`: the IPSW's filesystem, SystemOS, AppOS and RosettaOS images, made by
@@ -12,12 +16,14 @@ for this Mac. In the Golden Gate-first build, System, Data and the Tahoe donors 
   ([tools/display-fixes](../../tools/display-fixes)).
 - `io80211_compat`: the IO80211 compatibility library, built and checked for one build by `src/io80211/make`.
 - `wifip2p_compat`: the WiFiPeerToPeer compatibility library, built and checked for one build by `src/wifip2p/make`.
-- `metal_fix_source`, `audio_fix_source`: source of the native cache repairs.
-- The Golden Gate-first runner also passes a Tahoe DriverKit artifact.
+- The native cache repairs' source is not an input row: `make.sh` copies `tools/metal-fixes` and
+  `tools/audiomxd-fix` from this checkout into the staged recipe (`build/`).
+- From the runner, not a row of this patch: `golden-image.py` sets `TAHOE_DRIVERKIT_ARTIFACT` (the assembly's
+  `tahoe_driverkit_donors`) and `TAHOE_DONOR_TOOL` (`tools/tahoe-donors/make`), which `src/kc-hook.sh` passes on.
 
 ## How it works
 `src/kc-hook.sh` runs `src/install.py` after [darwin27-kernel](../darwin27-kernel/README.md) has built the kernel
-collections. It:
+collections; the runner calls it like every other recipe. It:
 - builds the combined OS cryptex from Golden Gate's native libraries and RosettaOS's x86_64 shared cache, adds
   Tahoe's generic Intel DriverKit cache, applies the native cache repairs, re-signs the cache with 4 KiB code pages
   (`src/cache_pages.py`; the x86_64 kernel registers only 4 KiB page signatures) and seals the image so 27.0's
@@ -31,7 +37,12 @@ collections. It:
   classes 27.x's AirPlay stack extends;
 - disables jobs that cannot run on an Intel Mac (`hybridsearchd` exits on non-Apple silicon and would restart in a
   loop);
-- restores setuid/setgid modes after copying, and keeps the Tahoe framework bases beneath OCLP's replacements.
+- restores setuid/setgid modes after copying.
+
+Which framework sits beneath OCLP's replacements is decided by the base layers, not here. With the 26B131 donor
+artifact (`minimal-native-25G342-26B131`) Metal, OpenCL, AppleGVA, AppleGVACore, GPUCompiler, MTLCompiler, IO80211
+and WiFiPeerToPeer are the 27.x build's own, with OCLP's overlay on top. The older 26A428 artifact still installs
+Tahoe's copies of those frameworks first.
 
 ### IO80211
 OCLP's Modern Wireless wrapper replaces IO80211 and re-exports IO80211Old.dylib. Once a file overrides the cached
@@ -69,7 +80,7 @@ python3.14 -I patches/golden-gate-userspace/src/wifip2p/make ARTIFACTS \
 `make` runs the same coverage check as IO80211 (`src/io80211/coverage.py`, given the library name). It skips the
 build's own `usr/libexec/wifip2pd`, which OCLP overwrites with its x86_64 program, and records that it did so.
 
-It refuses to inherit DriverKit from an earlier installed image. It installs OS libraries only; it does not generate
+It requires the explicit DriverKit donor and never takes DriverKit from an earlier installed image. It installs OS libraries only; it does not generate
 Swift metadata, shader warm-up caches, icon indexes or account state.
 
 ## Verify
@@ -78,7 +89,7 @@ python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests
 # optional: WIFIP2P_OCLP_DIR / IO80211_OCLP_DIR = OCLP's 13.7.2-25 framework folders
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/build/tests
 ```
-The fixtures cover prepared-System preservation, the DriverKit requirement, special modes, native cache repair plans
+The fixtures cover the DriverKit requirement, the absence of any System-tree replacement, special modes, native cache repair plans
 and adapter ordering. A built image must still pass filesystem, boot, native-service and application checks.
 
 ## Validation
@@ -88,6 +99,7 @@ The WiFiPeerToPeer library (r43) was swapped live onto a running 26B131 image on
 started without the libobjc abort. An image built with r43, and coreaudiod starting on it, are not yet tested.
 
 ## Revisions
+- r45 2026-11-11 `src/kc-hook.sh` is the real entry point (the runner no longer calls `install.py` itself); it takes the DriverKit donor and donor tool from `TAHOE_DRIVERKIT_ARTIFACT`/`TAHOE_DONOR_TOOL`. Removed the unused Tahoe-first mode (`--prepared-system`, the System/Data base-tree replacement and its keep list, the DriverKit fallbacks). README: 26B131, no `*_fix_source` rows, which frameworks come from 27.x. Same files installed (`golden-gate-userspace.json` drops the empty keep-list fields); boot validation pending.
 - r44 2026-11-11 IO80211 compat also exports `Apple80211StartMonitoringEvent`: OCLP's wrapper forwards it through `dlsym(RTLD_NEXT)` and calls the result unchecked; in 27.x's translated processes that lookup is NULL (sharingd SIGSEGV loop on the 26B131 laptop, also on the earlier image). The compat function looks it up in IO80211Old.dylib by handle and keeps the wrapper's return value (0). Same library for 26A428 and 26B131 (coverage-checked on both).
 - r43 2026-11-11 WiFiPeerToPeer compat: defines the 36 Wi-Fi Aware classes OCLP's 13.7.2 wrapper lacks (26A428 and 26B131 bind the same set), which made coreaudiod, AirPlayXPCHelper, ControlCenter and sharingd abort in libobjc; new row `wifip2p_compat`. The IO80211 coverage check takes the library name and skips clients OCLP overwrites.
 - r42 2026-11-11 Locate CoreRoutine, EndpointSecurity and trackpad repair sites by unique instruction shapes in the supplied cache; preserve relocated branch targets and refuse missing or ambiguous sites. Audio and Metal repair source now comes directly from this checkout. Host fixtures and both 26A428/26B131 caches checked; boot validation pending.

@@ -1,10 +1,9 @@
 #!/bin/sh
-# golden-gate-hello (kc-hook, after golden-gate-userspace): the first-boot "hello" and Welcome to Mac on the HD 4000 for
-# macOS 27, run after the userspace replacement (an oclp-hook's System files are replaced by 27's there) and with
-# the build's own hello shaders, rewritten by cache/metallib:
+# golden-gate-hello (kc-hook, in set order after golden-gate-userspace): the first-boot "hello" and Welcome to Mac on
+# the HD 4000 for macOS 27, with the build's own hello shaders, rewritten by cache/metallib:
 #   SetupAssistantSupportUI default.metallib  <- inputs/hello_metallib_golden_gate (the build's own library rewritten
 #                                                by cache/metallib; installed only over the library it was made from)
-#   Metal.framework/Versions/A/Metal          <- OCLP's wrapper (kept by golden-gate-userspace), edit-metal.py: the
+#   Metal.framework/Versions/A/Metal          <- OCLP's wrapper (hardware overlay), edit-metal.py: the
 #                                                hello un-skip + LC_LOAD_WEAK_DYLIB libhelloblur, re-signed ad hoc
 #   usr/lib/libhelloblur.dylib (new)          <- inputs/libhelloblur (blur cache + Continue warm-up)
 set -eu

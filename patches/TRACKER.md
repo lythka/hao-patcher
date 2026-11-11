@@ -6,19 +6,19 @@ VALIDATION), ok = a boot test proved the current revision.
 
 | Patch | Rev | Stage | Status | golden-gate | recovery | stock | Validation | Newest revision |
 |---|---|---|---|---|---|---|---|---|
-| darwin27-kernel | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Use the measured 26B131 Intel kernel with the 25G342 Tahoe donor kexts. Boot validation pending. |
-| darwin27-sandbox-disk-space | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-10 Initial public release. |
+| darwin27-kernel | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
+| darwin27-sandbox-disk-space | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
 | dev-access | r3 | post | dev |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
 | golden-gate-code-identity | r6 | oclp-hook | experiment | x |  |  | **needs** | r6 2026-11-11 Generate the identity map from the 26B131 System and matching hao payload. Boot validation pendi |
 | golden-gate-corespotlight-compat | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
-| golden-gate-hello | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-11 The hello library row is a System-rooted folder with `SOURCES`; the hook refuses a System librar |
-| golden-gate-metal-framebuffer | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
-| golden-gate-metal-libraries | r14 | oclp-hook | experiment | x |  |  | **needs** | r14 2026-11-11 Installs a repaired library only over the System library it was made from (`SOURCES`), or over  |
-| golden-gate-userspace | r44 | oclp-hook | experiment | x |  |  | **needs** | r44 2026-11-11 IO80211 compat also exports `Apple80211StartMonitoringEvent`: OCLP's wrapper forwards it throug |
+| golden-gate-hello | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
+| golden-gate-metal-framebuffer | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
+| golden-gate-metal-libraries | r15 | oclp-hook | experiment | x |  |  | **needs** | r15 2026-11-11 README: runs in set order after golden-gate-userspace (which no longer replaces System); docume |
+| golden-gate-userspace | r45 | oclp-hook | experiment | x |  |  | **needs** | r45 2026-11-11 `src/kc-hook.sh` is the real entry point (the runner no longer calls `install.py` itself); it t |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
-| hao-opencore | r31 | post | experiment | x |  |  | **needs** | r31 2026-11-11 Use the Sandbox operation adapter that prunes isolated unsupported roots from removed operation |
+| hao-opencore | r32 | post | experiment | x |  |  | **needs** | r32 2026-11-11 No longer copies OpenCore.efi and OpenRuntime.efi from `opencore_debug`: the base EFI build alr |
 | hao-runtime | r58 | oclp-hook | experiment | x |  |  | **needs** | r58 2026-11-11 Select the 26B131 payload with regenerated interface units and AOT; async provider and URLReque |
-| metalold-selectors | r2 | oclp-hook | product | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
+| metalold-selectors | r3 | oclp-hook | product | x |  |  | **needs** | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
 | rec-audio | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-bluetooth-input | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-brightness-keys | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |

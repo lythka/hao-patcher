@@ -109,7 +109,9 @@ else
     # Normalize only the new local output; never chown the shared input.
     chown -R root:wheel "$WORK/kdk-intel"
     rsync -r -i -a --checksum "$WORK/kdk-intel/" "$SYSTEM/System/Library/Extensions/"
-    echo 'STEP darwin27-kernel'
+    # The only install of the Darwin 27 x86_64 kernel file. It belongs to the base because the OCLP hardware
+    # overlay (next layer) reads its Darwin version; patches/darwin27-kernel later links the collections around it.
+    echo 'STEP darwin27-kernel-file'
     install -d -m 755 "$SYSTEM/System/Library/Kernels"
     if [ -e "$SYSTEM/System/Library/Kernels/kernel" ] || [ -L "$SYSTEM/System/Library/Kernels/kernel" ]; then
         chflags -h noschg,nouchg,norestricted "$SYSTEM/System/Library/Kernels/kernel"

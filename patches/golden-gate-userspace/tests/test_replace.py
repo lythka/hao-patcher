@@ -25,44 +25,19 @@ class ReplaceTest(unittest.TestCase):
             self.assertEqual((target/'group').stat().st_mode & 0o7777, 0o2555)
             self.assertEqual(outside.stat().st_mode & 0o7777, 0o600)
 
-    def test_prepared_golden_system_keeps_applied_donors(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            system, data = root/'system', root/'data'
-            system.mkdir(); data.mkdir()
-            (system/'native-driver').write_bytes(b'Tahoe donor after Golden copy')
-            (data/'first-boot-template').write_bytes(b'Golden template')
-            module.install_base_trees(root/'absent-original', system, data, set(), set(), set(), prepared=True)
-            self.assertEqual((system/'native-driver').read_bytes(), b'Tahoe donor after Golden copy')
-            self.assertEqual((data/'first-boot-template').read_bytes(), b'Golden template')
-
-    def test_prepared_mode_cannot_inherit_a_tahoe_cryptex(self):
-        with self.assertRaises(SystemExit):
-            module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', '--prepared-system'])
-        args = module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', '--prepared-system',
+    def test_cryptex_needs_the_explicit_tahoe_driverkit_donor(self):
+        # 27.x has no x86_64 DriverKit; there is no fallback to a previously installed Tahoe cryptex.
+        for missing in ([], ['--driverkit-artifact', 'donor'], ['--donor-tool', 'extractor']):
+            with self.assertRaises(SystemExit), patch('sys.stderr'):
+                module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', *missing])
+        args = module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p',
                                  '--driverkit-artifact', 'donor', '--donor-tool', 'extractor'])
-        self.assertEqual(args.driverkit_artifact, Path('donor'))
+        self.assertEqual((args.driverkit_artifact, args.donor_tool), (Path('donor'), Path('extractor')))
 
-    def test_explicit_driverkit_family_needs_no_installed_donor_image(self):
-        import shutil
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            source, target = root/'extracted', root/'golden/System/DriverKit/dyld'
-            source.mkdir()
-            for name in ('dyld_shared_cache_x86_64', 'dyld_shared_cache_x86_64.01', 'dyld_shared_cache_arm64e'):
-                (source/name).write_text(name)
-            with patch.object(module, 'copy_path', side_effect=shutil.copy2):
-                copied = module.install_driverkit_cache(source, target)
-            self.assertEqual(copied, ['dyld_shared_cache_x86_64', 'dyld_shared_cache_x86_64.01'])
-            self.assertEqual(sorted(p.name for p in target.iterdir()), copied)
-            self.assertFalse((root/'os.dmg').exists())
-
-    def test_missing_explicit_driverkit_family_stops(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            with self.assertRaisesRegex(RuntimeError, 'no x86_64 DriverKit cache'):
-                module.install_driverkit_cache(root, root/'output')
-            self.assertFalse((root/'output').exists())
+    def test_installs_no_system_trees(self):
+        # The base layers own System/Data; this recipe has no base-tree replacement or keep list.
+        for name in ('install_base_trees', 'oclp_paths', 'install_driverkit_cache', 'data_device'):
+            self.assertFalse(hasattr(module, name), name)
 
     def test_external_mps_plan_preserves_binary_edits_and_paths(self):
         cache = Path('/input/cache family')

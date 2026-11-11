@@ -46,16 +46,20 @@ isolated arm64 macOS VM does all formatting, file installation, kernel-collectio
 builds and snapshot creation. The host then exports the stopped image and commits it
 to an image repository. Each build keeps a record of its inputs, patch plan and logs.
 
-Patches run in the order listed in their set (`pipeline/sets/`) and in stages:
+Fixed base layers come first (Golden Gate System and volumes, Tahoe and KDK Intel
+kexts, the kernel file, Tahoe native roots, boot files, OCLP's hardware overlay; see
+[Layer order](building.md#layer-order)). Patches then run exactly in the order listed in
+their set (`pipeline/sets/`), by stage:
 
 | Stage | When it runs |
 |---|---|
-| `oclp-hook` | `hook.sh` after the hardware overlay; `kc-hook.sh` after the kernel collections and userspace are in place |
+| `oclp-hook` | `src/kc-hook.sh`, after the base layers, in set order; `darwin27-kernel` and `golden-gate-userspace` always first |
 | `post` | After the system snapshot, with the System volume read-only |
 | `recovery` | In the offline Recovery build |
 
 The stage name `oclp-hook` comes from the older Tahoe-first runner, where these
-scripts ran as hooks of OCLP's root patcher.
+scripts ran as hooks of OCLP's root patcher (`hook.sh`); Golden Gate sets do not use
+`hook.sh`.
 
 ## What the image leaves out
 

@@ -1,8 +1,8 @@
 # Building an image
 
-hao-patcher installs **macOS 27.0 (26A428) first**, then adds the Intel components
-MacBookPro9,2 needs. Tahoe provides only the donor files the image lists; it is not
-installed as the base system.
+hao-patcher installs **macOS 27 first** (27.0 26A428 by default; 27.2.1 26B131 in
+development), then adds the Intel components MacBookPro9,2 needs. Tahoe provides only
+the donor files the image lists; it is not installed as the base system.
 
 ## Requirements
 
@@ -28,11 +28,13 @@ never on the host.
 3. Point the rows under `pipeline/inputs/` at your files (see
    [Input rows](inputs.md#input-rows)).
 
-List every input that the patch set uses:
+List every input that the patch set uses, in run order:
 
 ```sh
 python3.14 -I pipeline/patches.py plan pipeline/sets/golden-gate.txt \
   pipeline/targets/mbp92.json 25G332
+python3.14 -I pipeline/patches.py plan pipeline/sets/dev-bs-test.txt \
+  pipeline/targets/mbp92.json 25G342      # the 26B131 development set
 ```
 
 ## 2. Build
@@ -46,23 +48,51 @@ The [assembly recipe](../pipeline/assemblies/mbp92-golden-first.json) selects th
 target, the Golden Gate and donor builds, image sizes, the patch set and the donor
 inputs. The default `golden-gate` set contains only compatibility fixes.
 
-The build runs these steps inside a fresh builder VM clone
-([`golden-image.py`](../pipeline/stages/golden-image.py)):
+### Layer order
 
-1. Create a new APFS disk and copy Golden Gate's System volume into it, then add
-   the Data, Preboot, Recovery and VM volumes.
-2. Add the Tahoe extension tree, the Kernel Debug Kit's Intel kernel extensions,
-   the Tahoe native donors and the Golden Gate x86_64 kernel.
-3. Install the Tahoe boot and Recovery files and the EFI partition.
-4. Apply the OCLP hardware overlay.
-5. Run each `oclp-hook` patch's `hook.sh`.
-6. Build the kernel collections around the Darwin 27 kernel (`darwin27-kernel`).
-7. Install the Golden Gate userspace repairs and Tahoe DriverKit
-   (`golden-gate-userspace`).
-8. Run each remaining patch's `kc-hook.sh`, including hao (`hao-runtime`).
-9. Update Preboot, bless the System volume and create its snapshot.
-10. Run the `post` patches against the read-only System, such as the OpenCore
-    configuration (`hao-opencore`).
+The build runs inside a fresh builder VM clone
+([`golden-image.py`](../pipeline/stages/golden-image.py), list `LAYERS`). Each layer
+lands on top of the ones before it. The base layers are fixed and the same for every
+set:
+
+| # | Layer | What it adds | Why |
+|---|---|---|---|
+| 1 | `layout` | New raw image, GPT, APFS container, System volume | Empty target |
+| 2 | `golden-system` | Golden Gate's System volume, from the build's `filesystem.dmg` | The OS itself; copied while System is the only volume so APFS keeps its identity |
+| 3 | `group-volumes` | Data (grouped with System), Preboot, Recovery, VM; the ESP mounted | macOS volume layout |
+| 4 | `golden-finalize` | Data template and firmlinks (27's own); Tahoe `System/Library/Extensions` and the KDK's Intel kexts; the Darwin 27 x86_64 kernel file; Tahoe native roots | 27 ships no x86_64 kexts and lacks some x86_64 programs and plug-ins. The kernel file is installed here, once, because the next layers read it |
+| 5 | `boot-and-esp` | Tahoe's Intel Preboot and Recovery files; the OpenCore ESP from `build-efi.py` | 27 has no Intel boot files; the ESP already holds the OpenCore DEBUG binaries |
+| 6 | `hardware` | OCLP's MacBookPro9,2 overlay (HD 4000 Metal/OpenGL, wireless, audio) | Legacy hardware support; it checks the kernel file's Darwin version |
+
+Which frameworks the Tahoe native roots replace depends on the donor artifact. The
+26B131 artifact (`minimal-native-25G342-26B131`) keeps 27.x's Metal, OpenCL,
+AppleGVA, AppleGVACore, GPUCompiler, MTLCompiler, IO80211 and WiFiPeerToPeer under
+OCLP's overlay; the 26A428 artifact installs Tahoe's copies of those first.
+
+Then come the set's recipes, **strictly in set-file order**. Each `oclp-hook` recipe
+runs once, through its own `src/kc-hook.sh SYSTEM`, with System writable:
+
+7. `darwin27-kernel` links the Boot and System kernel collections around the kernel
+   file and the Intel kexts. The runner keeps a copy of this exact BootKC in the
+   build record.
+8. `golden-gate-userspace` builds the combined OS cryptex (x86_64 dyld cache, Tahoe
+   DriverKit, cache repairs) and installs the IO80211/WiFiPeerToPeer compatibility
+   libraries and the display shim.
+9. Every other `oclp-hook` entry, in the order the set lists them, each with a
+   comment saying what it adds and why (`pipeline/sets/*.txt`).
+
+After the recipes:
+
+10. `snapshot`: Preboot update, bless and the System snapshot.
+11. `posts`: each `post` entry's `apply.sh` in set order, with System read-only, such
+    as the OpenCore configuration (`hao-opencore`).
+12. `efi-bundle`: the final ESP and its manifest.
+
+`pipeline/golden-run` refuses a set that breaks this, before staging further:
+the first two `oclp-hook` entries must be `darwin27-kernel` then
+`golden-gate-userspace` (every later recipe edits what they produce), a recipe may not
+use `src/hook.sh` (the Tahoe-first runner's OCLP hook), and no `oclp-hook` entry may
+follow a `post` entry. `patches.py plan` therefore prints the true run order.
 
 The guest detaches the completed image and flushes its workspace. After the VM
 stops, the host mounts that workspace **read-only** and captures the image directly

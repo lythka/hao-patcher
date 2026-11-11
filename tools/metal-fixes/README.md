@@ -35,7 +35,7 @@ python3.14 -I metal-fixes mps-apply --cache X86_DYLD_CACHE_DIRECTORY --output NE
 | `runtime` | OCLP's Intel runtime bitcode with the added quad and collective helpers, and the repaired `iCBE.dylib` | `metal_quad_runtime_golden_gate` |
 | `compiler-runtime` | Optional compiler and client adapter dylibs | none |
 | `framebuffer` | `libmetal-framebuffer.dylib` and its regression fixtures (not run) | `metal_framebuffer` |
-| `mps-plan` | The MPS initializer edits for a cache, as JSON | used by `patches/golden-gate-userspace` (`metal_fix_source`) |
+| `mps-plan` | The MPS initializer edits for a cache, as JSON | used by `patches/golden-gate-userspace` (staged from the checkout by its `make.sh`) |
 | `mps-apply` | A copy of the cache family with the MPS repair, re-signed with 4 KiB pages, and `build.json` | none |
 
 Each artifact's manifest records the hashes of its input files and the source

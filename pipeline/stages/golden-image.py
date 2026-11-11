@@ -6,16 +6,16 @@ All image/APFS operations run in that guest, never on the host. CONFIG names a
 new regular image, a new work directory, size_bytes, name, python, layout_helper,
 pristine_script, kdk_preparer, payload (filesystem/os/app/rosetta.dmg), kernel, kdk, fl,
 donor_tool, donors {native,extensions,boot,driverkit,recovery}, esp (tree),
-hardware {tool,artifact}, kernel_hook (staged kc-hook.sh), userspace
-{install,shim,io80211,wifip2p}, hooks [{name,hook,kc_hook}], posts
-[{name,script,folder}], and environment. Absent per-hook scripts are explicit
-null values. Staged hook folders already contain their declared input files.
-The host runner owns input selection/staging and source identities.
+hardware {tool,artifact}, hooks [{name,kc_hook}] in set order, posts
+[{name,script,folder}] in set order, and environment. Staged hook folders already
+contain their declared input files. The host runner owns input selection/staging,
+source identities and the set-order rules (see pipeline/golden-run).
 
-System is copied while it is the sole ungrouped volume; Data is then created
-unmounted and grouped without replacing the protected cryptex altlink. Tahoe
-appears only through explicit donor/build-tool roles. There is no Tahoe
-pristine installation or SystemVersion substitution.
+Order (LAYERS below, then the set's recipes, then snapshot/posts/EFI):
+the base layers are fixed and the same for every set; everything after them is a
+set entry, run strictly in set-file order. Tahoe appears only through explicit
+donor/build-tool roles. There is no Tahoe pristine installation or SystemVersion
+substitution.
 """
 import argparse
 from datetime import datetime, timezone
@@ -197,33 +197,26 @@ class Image:
                  '--system-root',self.mounts['system'],'--data-root',self.mounts['data'],
                  '--report',self.work/'hardware.json')
 
-    def pre_hooks(self):
-        for hook in self.config['hooks']:
-            if not hook['hook'] and not hook['kc_hook']:
-                raise ValueError('declared hook has no script: '+hook['name'])
-            if hook['hook']:
-                self.step('hook '+hook['name'],lambda h=hook:self.run('sh','-eu',h['hook'],self.mounts['system'],self.mounts['data']))
-
-    def kernel(self):
-        for directory in [self.mounts['system']/'System/Library/KernelCollections',
-                          self.mounts['preboot']/self.group/'boot/System/Library/KernelCollections']:
-            directory.mkdir(mode=0o755,parents=True,exist_ok=True)
-        self.run('sh','-eu',self.config['kernel_hook'],self.mounts['system'])
-        # Kernel repairs are derived from this exact collection after the bootstrap build.
-        self.run('ditto',self.mounts['system']/'System/Library/KernelCollections/BootKernelExtensions.kc',
-                 self.work/'BootKernelExtensions.kc')
-
-    def userspace(self):
-        self.run('rm','-rf',self.mounts['system']/'.Spotlight-V100')
+    def recipes(self):
+        """Every oclp-hook recipe of the set, in set order, each through its own src/kc-hook.sh SYSTEM.
+        golden-run guarantees darwin27-kernel then golden-gate-userspace come first; the environment
+        carries the runner-only facts those two need (volume UUIDs, donor DriverKit artifact and tool)."""
         c = self.config
-        self.run(c['python'],'-I',c['userspace']['install'],self.mounts['system'],c['payload'],
-                 c['userspace']['shim'],c['userspace']['io80211'],c['userspace']['wifip2p'],'--prepared-system',
-                 '--driverkit-artifact',c['donors']['driverkit'],'--donor-tool',c['donor_tool'])
-
-    def kc_hooks(self):
-        for hook in self.config['hooks']:
-            if hook['kc_hook']:
-                self.step('kc-hook '+hook['name'],lambda h=hook:self.run('sh','-eu',h['kc_hook'],self.mounts['system']))
+        environment = dict(self.environment, TAHOE_DRIVERKIT_ARTIFACT=str(c['donors']['driverkit']),
+                           TAHOE_DONOR_TOOL=str(c['donor_tool']))
+        for hook in c['hooks']:
+            if not hook.get('kc_hook'):
+                raise ValueError('set entry has no src/kc-hook.sh: '+hook['name'])
+        # A Spotlight index the builder may have started on the offline System is not image content;
+        # drop it before recipes walk System (snapshot drops it again).
+        self.run('rm','-rf',self.mounts['system']/'.Spotlight-V100')
+        for hook in c['hooks']:
+            self.step('recipe '+hook['name'],lambda h=hook:self.run('sh','-eu',h['kc_hook'],self.mounts['system'],env=environment))
+            if hook['name'] == 'darwin27-kernel':
+                # Keep the collection exactly as darwin27-kernel linked it, before later recipes:
+                # the dev-golden-bootstrap assembly derives row darwin27_boot_kc (kernel repairs) from it.
+                self.run('ditto',self.mounts['system']/'System/Library/KernelCollections/BootKernelExtensions.kc',
+                         self.work/'BootKernelExtensions.kc')
 
     def snapshot(self):
         system = self.mounts['system']
@@ -310,6 +303,23 @@ class Image:
         return errors
 
 
+# The fixed order of every Golden Gate image: (step, Image method, why).
+LAYERS = [
+    ('layout', 'create', 'new raw image: GPT, one APFS container, its System volume'),
+    ('golden-system', 'system', 'the macOS 27 System itself, copied from the build\'s filesystem.dmg while it is the only volume'),
+    ('group-volumes', 'group_volumes', 'Data grouped with System, then Preboot, Recovery and VM volumes; the ESP mounted'),
+    ('golden-finalize', 'finalize', 'Data template and firmlinks (27\'s own); Tahoe Extensions + KDK Intel kexts, because 27 '
+     'has no Intel drivers; the Darwin 27 x86_64 kernel file, which the hardware overlay checks; Tahoe native roots '
+     '(x86_64 code 27 lacks)'),
+    ('boot-and-esp', 'bootstrap', 'Tahoe\'s Intel Preboot and Recovery files, because 27 has none; the generated OpenCore ESP'),
+    ('hardware', 'hardware', 'OCLP\'s legacy hardware overlay (HD 4000 Metal/OpenGL, wireless, audio) over all of the above'),
+    ('recipes', 'recipes', 'the set\'s oclp-hook recipes in set order: darwin27-kernel, golden-gate-userspace, then fixes'),
+    ('snapshot', 'snapshot', 'Preboot update, bless and the System snapshot'),
+    ('posts', 'posts', 'the set\'s post recipes in set order, System read-only (OpenCore config, dev access)'),
+    ('efi-bundle', 'export_efi', 'the final ESP exported with a manifest for installation after restore'),
+]
+
+
 def _assemble(config, commands=None):
     work = Path(config['work']); work.mkdir(parents=True, exist_ok=False, mode=0o755)
     commands = commands or Commands(work)
@@ -321,13 +331,8 @@ def _assemble(config, commands=None):
                   status='building',validation='BUILD ONLY; boot and complete product acceptance remain untested')
     error = None
     try:
-        for name, action in [('layout',image.create),('golden-system',image.system),
-                             ('group-volumes',image.group_volumes),('golden-finalize',image.finalize),
-                             ('boot-and-esp',image.bootstrap),('hardware',image.hardware),
-                             ('pre-kernel-hooks',image.pre_hooks),('darwin27-kernel-kc',image.kernel),
-                             ('prepared-userspace',image.userspace),('remaining-kc-hooks',image.kc_hooks),
-                             ('snapshot',image.snapshot),('posts',image.posts),('efi-bundle',image.export_efi)]:
-            image.step(name,action)
+        for name, method, _ in LAYERS:
+            image.step(name,getattr(image,method))
         record['status'] = 'assembled'
     except BaseException as caught:
         error = caught; record.update(status='failed',error=str(caught))

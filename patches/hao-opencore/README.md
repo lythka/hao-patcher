@@ -8,9 +8,11 @@ display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments
 
 `apply.sh` edits the image's OCLP ESP (`$ESP/EFI/OC`):
 
-- OpenCore.efi and OpenRuntime.efi come from the official OpenCore 1.0.5 DEBUG release (the donor's version), so
-  the ESP log records each kernel patch result. `Misc.Debug.Target` keeps logging (0x01) and the file log (0x40)
-  and clears on-screen output (0x02), which OCLP's base config enables.
+- OpenCore.efi, OpenRuntime.efi and every other OpenCore binary are already the official OpenCore 1.0.5 DEBUG
+  release (the donor's version) when this runs: `pipeline/stages/build-efi.py` replaces all of them in OCLP's
+  generated EFI from the `opencore_debug` archive. The DEBUG build makes the ESP log record each kernel patch result.
+  `Misc.Debug.Target` keeps logging (0x01) and the file log (0x40) and clears on-screen output (0x02), which OCLP's
+  base config enables.
 - `src/repair_binding.py` binds the recorded kernel repairs (early VM range initialization, ascending early
   kernel-map bounds, bootstrap physical-page aliases) to this image's BootKC. The repairs are RIP-relative code
   tied to one collection layout, and kmutil gives every build a new enclosing UUID and build paths. The binder
@@ -58,7 +60,6 @@ This patch has status `experiment` because of `amfi_get_out_of_my_way=1`; it is 
   ([tools/kernel-fixes](../../tools/kernel-fixes/README.md)).
 - `kernel_repair_efi`: the three repairs and IntelCommpage, from `tools/kernel-foundation` `make vm-esp`
   ([tools/kernel-foundation](../../tools/kernel-foundation/README.md)).
-- `opencore_debug`: `OpenCore-1.0.5-DEBUG.zip`.
 
 ## Verify
 
@@ -93,6 +94,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r32 2026-11-11 No longer copies OpenCore.efi and OpenRuntime.efi from `opencore_debug`: the base EFI build already installs every OpenCore binary from that same archive. Input row `opencore_debug` dropped from this patch (the runner still reads it for the base EFI). Same ESP bytes expected; build validation pending.
 - r31 2026-11-11 Use the Sandbox operation adapter that prunes isolated unsupported roots from removed operations. The previous adapter refused apsd and left Setup Assistant waiting on its activation-record request. Full boot validation pending.
 - r30 2026-11-11 Bind 26B131 kernel repairs and IntelCommpage to the freshly linked collection, and stamp HaoExec for that kernel. Boot validation pending.
 - r29 2026-11-10 Initial public release.

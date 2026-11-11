@@ -1,13 +1,8 @@
 #!/bin/sh
+# The ESP's OpenCore binaries are already the OpenCore 1.0.5 DEBUG release: pipeline/stages/build-efi.py replaces
+# every *.efi of OCLP's generated EFI from the opencore_debug archive. This recipe adds only the image's kernel
+# repairs, kexts and configuration.
 set -eu
-/private/var/ssdshare/py/bin/python3.12 -I - "$P/inputs/opencore_debug" "$ESP" <<'PYDEBUG'
-from pathlib import Path
-import sys,zipfile
-with zipfile.ZipFile(sys.argv[1]) as archive:
-    for name in ('OpenCore.efi', 'Drivers/OpenRuntime.efi'):
-        dest = Path(sys.argv[2])/'EFI/OC'/name
-        dest.write_bytes(archive.read('X64/EFI/OC/'+name))
-PYDEBUG
 # kmutil embeds its build directory and a fresh enclosing UUID. Bind the unchanged
 # repairs only after verifying the complete referenced kernel/kext segment closure.
 REPAIR_WORK=$(mktemp -d /private/var/tmp/kernel-repairs.XXXXXX)

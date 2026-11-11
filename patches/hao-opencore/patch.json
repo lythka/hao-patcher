@@ -1,5 +1,5 @@
 {
-  "revision": 31,
+  "revision": 32,
   "stage": "post",
   "applies": {
     "models": [
@@ -13,7 +13,6 @@
   "inputs": [
     "hao_runtime",
     "kernel_repair_efi",
-    "opencore_debug",
     "kernel_repair_binding"
   ],
   "status": "experiment",

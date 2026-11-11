@@ -8,8 +8,8 @@ under macOS 27 (Golden Gate; 26A428 and 26B131).
   YES.
 - Apple's hello fragment shaders (`textFragment`, `textFragment_watchPreview`) crash the HD 4000 compiler in
   `SelectionDAG::LegalizeOp`, in 27.0 as in Tahoe. The other hello functions compile.
-- [golden-gate-userspace](../golden-gate-userspace/README.md) replaces System with 27.0's, so the changes must be made
-  in a kc-hook that runs after it.
+- The edited Metal wrapper is OCLP's, from the hardware overlay; the recipe runs in set order after
+  [golden-gate-userspace](../golden-gate-userspace/README.md), like every fix.
 
 ## How it works
 `src/kc-hook.sh` installs three files as root:wheel with the `restricted` flag, like Apple's:
@@ -33,5 +33,6 @@ NEEDS VALIDATION: on a MacBookPro9,2 the Language Chooser played hello and MTLCo
 without a crash; frame rate on the HD 4000 and `textFragment_watchPreview` are untested.
 
 ## Revisions
+- r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Recipe unchanged.
 - r2 2026-11-11 The hello library row is a System-rooted folder with `SOURCES`; the hook refuses a System library the rewrite was not made from. 26B131 library (the rewrite touches the same eight functions as 26A428's).
 - r1 2026-11-10 Initial public release.

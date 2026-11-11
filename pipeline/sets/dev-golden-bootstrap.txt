@@ -1,3 +1,6 @@
-# Build the collection before deriving its kernel repairs; this image is not bootable.
-darwin27-kernel
-golden-gate-userspace
+# dev-golden-bootstrap: build the kernel collection before its kernel repairs exist; the image is not bootable.
+# Selected by pipeline/assemblies/dev-26B131-bootstrap.json. The runner keeps the BootKC exactly as darwin27-kernel
+# linked it (build record guest-output/guest/BootKernelExtensions.kc); row darwin27_boot_kc and the kernel repair
+# binding are derived from it. Same base layers and ordering rules as golden-gate.txt.
+darwin27-kernel                   # Boot/System kernel collections around the 27 x86_64 kernel and the Intel kexts: the collection the repairs are bound to
+golden-gate-userspace             # required second entry of every golden set; the collection above does not depend on it

@@ -55,30 +55,54 @@ def create_workspace_image(path, size_bytes):
     Path(path).chmod(0o644)
 
 
-def guest_config(recipe, share, local):
+# Every golden set starts with these two: every later recipe edits the kernel collections and userspace they produce.
+FIRST_RECIPES = ('darwin27-kernel', 'golden-gate-userspace')
+
+
+def set_order(share):
+    """The set's (stage, name, staged folder) rows in set order, after checking that set order is run order:
+    darwin27-kernel then golden-gate-userspace first, every oclp-hook recipe through src/kc-hook.sh only
+    (golden-image.py runs them in one loop), and no oclp-hook after a post (posts run after the snapshot)."""
     rows = []
     for number, line in enumerate((share/'patches.txt').read_text().splitlines(), 1):
         stage, name, *inputs = line.split()
         rows.append((stage, name, '%02d-%s' % (number, name)))
+    hooks = [name for stage, name, _ in rows if stage == 'oclp-hook']
+    if tuple(hooks[:2]) != FIRST_RECIPES:
+        raise ValueError('a golden set must start with darwin27-kernel then golden-gate-userspace (found %s): every '
+                         'later recipe edits the kernel collections and userspace those two produce' % ', '.join(hooks[:2]))
+    for stage, name, folder in rows:
+        if stage != 'oclp-hook':
+            continue
+        if (share/'hooks'/folder/'hook.sh').is_file():
+            raise ValueError(name+': src/hook.sh is the Tahoe-first runner\'s OCLP hook; golden sets run each recipe '
+                             'once, in set order, through src/kc-hook.sh')
+        if not (share/'hooks'/folder/'kc-hook.sh').is_file():
+            raise ValueError(name+': an oclp-hook recipe in a golden set needs src/kc-hook.sh')
+    stages = [stage for stage, _, _ in rows]
+    if 'post' in stages and 'oclp-hook' in stages[stages.index('post'):]:
+        raise ValueError('a post recipe precedes an oclp-hook recipe; posts run after the snapshot, so list them last '
+                         'and the set reads in run order')
+    return rows
+
+
+def guest_config(recipe, share, local):
+    rows = set_order(share)
     hooks = [(name, folder) for stage, name, folder in rows if stage == 'oclp-hook']
-    selected = {name:folder for name, folder in hooks}
-    kernel = local+'/hooks/'+selected['darwin27-kernel']
-    userspace = local+'/hooks/'+selected['golden-gate-userspace']
+    selected = dict(hooks)
     kdk, = (share/'kdk').iterdir()
     return dict(image=local+'/target.img', work=local+'/work',size_bytes=recipe['size_bytes'],name=recipe['name'],
                 python=local+'/py/bin/python3.12',layout_helper=local+'/source/golden-layout.py',
-                pristine_script=local+'/source/golden-pristine.sh',payload=GUEST+'/hooks/'+selected['golden-gate-userspace']+'/inputs/golden_gate_userspace',
-                kernel=kernel+'/inputs/darwin27_kernel',kdk=GUEST+'/kdk/'+kdk.name,
+                pristine_script=local+'/source/golden-pristine.sh',
+                # Base layers read two recipe inputs: the 27.x filesystem (golden-system) and the x86_64 kernel file
+                # (golden-finalize: the hardware overlay checks its Darwin version; darwin27-kernel links around it).
+                payload=GUEST+'/hooks/'+selected['golden-gate-userspace']+'/inputs/golden_gate_userspace',
+                kernel=local+'/hooks/'+selected['darwin27-kernel']+'/inputs/darwin27_kernel',kdk=GUEST+'/kdk/'+kdk.name,
                 kdk_preparer=local+'/source/kdk_intel_payload.py',fl=local+'/source/fl',
                 donor_tool=local+'/source/tahoe-donors/make',
                 donors={role:GUEST+'/assembly-inputs/'+role for role in ('native','extensions','boot','driverkit','recovery')},
                 esp=local+'/source/esp',hardware=dict(tool=local+'/source/hardware/apply',artifact=GUEST+'/assembly-inputs/hardware'),
-                kernel_hook=kernel+'/kc-hook.sh',
-                userspace=dict(install=userspace+'/install.py',shim=userspace+'/inputs/display_state_shim',io80211=userspace+'/inputs/io80211_compat',
-                              wifip2p=userspace+'/inputs/wifip2p_compat'),
-                hooks=[dict(name=name,hook=local+'/hooks/'+folder+'/hook.sh' if (share/'hooks'/folder/'hook.sh').is_file() else None,
-                            kc_hook=local+'/hooks/'+folder+'/kc-hook.sh' if (share/'hooks'/folder/'kc-hook.sh').is_file() else None)
-                       for name,folder in hooks if name not in ('darwin27-kernel','golden-gate-userspace')],
+                hooks=[dict(name=name,kc_hook=local+'/hooks/'+folder+'/kc-hook.sh') for name,folder in hooks],
                 posts=[dict(name=name,script=local+'/post/'+folder+'/apply.sh',folder=local+'/post/'+folder)
                        for stage,name,folder in rows if stage=='post'],
                 environment=dict(PYTHONPATH=local+'/site',PYTHONDONTWRITEBYTECODE='1',TMPDIR=local+'/tmp',S=GUEST,OCLP=GUEST+'/oclp'))
@@ -211,6 +235,7 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
                 return next(d for d in (golden_lock,build_lock,common) if (d/row).is_file())
             command(['zsh',pipeline/'stages/inputs.sh',share,pipeline/'targets'/(recipe['target']+'.json'),
                      build_lock,common,recipe['oclp'],pipeline/'sets'/(recipe['patch_set']+'.txt'),'golden-first'])
+            set_order(share)  # refuse a set whose order is not its run order before any further staging
             used_rows=set(recipe['inputs'].values()) | {'kdk','python_arm64','python_site','fl','opencore_debug'}
             for line in (share/'patches.txt').read_text().splitlines():
                 used_rows.update(line.split()[2:])

@@ -114,7 +114,7 @@ class OclpKeys(unittest.TestCase):
         self.assertEqual(set(self.keys([])), {'full', 'resume'})
 
     def test_shipped_set_points(self):
-        """golden-gate: a point before each of its seven kc-hooks (the plan, not the cache)."""
+        """golden-gate: a point before each of its kc-hooks (the plan, not the cache); every recipe is a kc-hook."""
         plan = subprocess.run([sys.executable, '-I', str(TOP / 'pipeline/patches.py'), 'plan',
                                str(TOP / 'pipeline/sets/golden-gate.txt'), str(TOP / 'pipeline/targets/mbp92.json'),
                                '25G332'], capture_output=True, text=True, check=True).stdout
@@ -129,12 +129,12 @@ class OclpKeys(unittest.TestCase):
                                                   'darwin27-sandbox-disk-space', 'hao-runtime',
                                                   'golden-gate-metal-libraries', 'golden-gate-hello',
                                                   'golden-gate-windowserver-filter', 'golden-gate-corespotlight-compat',
-                                                  'golden-gate-metal-framebuffer', 'golden-gate-code-identity'])
+                                                  'metalold-selectors', 'golden-gate-metal-framebuffer',
+                                                  'golden-gate-code-identity'])
         self.assertEqual(points[4][1], ['darwin27-kernel', 'golden-gate-userspace', 'darwin27-sandbox-disk-space'])
-        # metalold-selectors is a plain oclp-hook: it runs in OCLP's own pass, before every kc-hook, so every point's key has it.
+        # No recipe has a hook.sh any more, so the state before hao-runtime holds exactly the kc-hooks before it.
         self.assertEqual([l.split()[1] for l in points[4][2]],
-                         ['darwin27-kernel', 'golden-gate-userspace', 'darwin27-sandbox-disk-space', 'metalold-selectors'])
-
+                         ['darwin27-kernel', 'golden-gate-userspace', 'darwin27-sandbox-disk-space'])
 
 if __name__ == '__main__':
     unittest.main()

@@ -54,9 +54,20 @@ Recipes, source and limits are in [cache/metallib/README.md](../../cache/metalli
 - `metal_quad_runtime_golden_gate`: the extended `runtime.igil64.split` and
   `iCBE.dylib`, made by `cache/metallib/make runtime-build`.
 
-The kc-hook must run after `golden-gate-userspace`, which replaces System; an
-ordinary OCLP hook would be overwritten. Shader-pack records keyed to the old
-libraries must be re-keyed from captured requests before an image uses this patch.
+The kc-hook runs in set order after `golden-gate-userspace`. Shader-pack records keyed
+to the old libraries must be re-keyed from captured requests before an image uses this
+patch.
+
+### Deliberate supersede of OCLP's RenderBox and Tungsten libraries
+
+OCLP's hardware overlay (a base layer) writes Tahoe's RenderBox and Tungsten
+`default.metallib` (patch sets "Metal 3802 .metallibs Tahoe" and "Tahoe Graphics" in
+`tools/oclp-hardware/profiles/mbp92.json`); this recipe then replaces both with the
+OS build's own libraries, repaired. The overlay is not trimmed: its installer is the
+frozen copy inside the `oclp_hardware` artifact and has no per-destination skip, and
+its profile is generated from OCLP and not edited by hand. The two writes are cheap,
+and the overlay's record (`OpenCore-Legacy-Patcher.plist`) still lists them, which is
+how `install_libraries.py` recognises OCLP's copies.
 
 ## Limitations
 
@@ -85,6 +96,7 @@ matching Tungsten library. A complete image with every library, shader-cache
 re-keying and full-workload performance remain open.
 
 ## Revisions
+- r15 2026-11-11 README: runs in set order after golden-gate-userspace (which no longer replaces System); documents that replacing OCLP's RenderBox and Tungsten libraries is a deliberate supersede. Recipe unchanged.
 - r14 2026-11-11 Installs a repaired library only over the System library it was made from (`SOURCES`), or over OCLP's copy on the build it was made from; 26B131 libraries.
 
 - r13 2026-11-10 Initial public release.

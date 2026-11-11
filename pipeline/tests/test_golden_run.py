@@ -42,24 +42,56 @@ class GoldenRun(unittest.TestCase):
                 with RUN['readonly_workspace'](state,command):pass
         self.assertEqual(calls,[])
 
-    def test_configuration_preserves_selected_hook_order_and_os_roles(self):
+    def share(self, folder, rows, hook_sh=()):
+        share=Path(folder);(share/'kdk/KDK_25.kdk').mkdir(parents=True)
+        (share/'patches.txt').write_text(''.join(stage+' '+name+' input\n' for stage,name in rows))
+        for i,(stage,name) in enumerate(rows,1):
+            path=share/('hooks' if stage=='oclp-hook' else 'post')/('%02d-%s'%(i,name));path.mkdir(parents=True)
+            (path/('apply.sh' if stage=='post' else 'hook.sh' if name in hook_sh else 'kc-hook.sh')).touch()
+        return share
+
+    def test_configuration_runs_every_recipe_in_set_order(self):
+        rows=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace'),
+              ('oclp-hook','later-fix'),('oclp-hook','selectors'),('post','post-one'),('post','post-two')]
         with tempfile.TemporaryDirectory() as folder:
-            share=Path(folder);(share/'kdk/KDK_25.kdk').mkdir(parents=True)
-            rows=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace'),
-                  ('oclp-hook','later-fix'),('post','post-one'),('oclp-hook','selectors')]
-            (share/'patches.txt').write_text(''.join(stage+' '+name+' input\n' for stage,name in rows))
-            for i,(stage,name) in enumerate(rows,1):
-                path=share/('hooks' if stage=='oclp-hook' else 'post')/('%02d-%s'%(i,name));path.mkdir(parents=True)
-                (path/('apply.sh' if stage=='post' else 'kc-hook.sh')).touch()
-            (share/'hooks/05-selectors/hook.sh').touch()
+            share=self.share(folder,rows)
             config=RUN['guest_config'](dict(size_bytes=80,name='GG',golden_build='26A428',donor_build='25G332'),share,'/guest/job')
-            self.assertEqual(['later-fix','selectors'],[h['name'] for h in config['hooks']])
-            self.assertEqual(['post-one'],[p['name'] for p in config['posts']])
-            self.assertTrue(config['kernel_hook'].endswith('01-darwin27-kernel/kc-hook.sh'))
-            self.assertTrue(config['userspace']['install'].endswith('02-golden-gate-userspace/install.py'))
+            self.assertEqual(['darwin27-kernel','golden-gate-userspace','later-fix','selectors'],[h['name'] for h in config['hooks']])
+            self.assertTrue(all(h['kc_hook'].endswith('%02d-%s/kc-hook.sh'%(i,h['name'])) for i,h in enumerate(config['hooks'],1)))
+            self.assertEqual(['post-one','post-two'],[p['name'] for p in config['posts']])
+            self.assertNotIn('kernel_hook',config);self.assertNotIn('userspace',config)
+            self.assertTrue(config['kernel'].endswith('01-darwin27-kernel/inputs/darwin27_kernel'))
+            self.assertTrue(config['payload'].endswith('02-golden-gate-userspace/inputs/golden_gate_userspace'))
             self.assertIn('/assembly-inputs/native',config['donors']['native'])
             self.assertEqual('/guest/job/tmp',config['environment']['TMPDIR'])
             self.assertEqual('golden-pristine.sh',Path(config['pristine_script']).name)
+
+    def test_set_order_must_be_run_order(self):
+        base=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace')]
+        cases=[([('oclp-hook','golden-gate-userspace'),('oclp-hook','darwin27-kernel')],(),'must start with darwin27-kernel then golden-gate-userspace'),
+               ([('oclp-hook','fix')]+base,(),'must start with darwin27-kernel then golden-gate-userspace'),
+               (base+[('oclp-hook','selectors')],('selectors',),'selectors: src/hook.sh'),
+               (base+[('post','opencore'),('oclp-hook','late-fix')],(),'post recipe precedes an oclp-hook')]
+        for rows,hook_sh,message in cases:
+            with self.subTest(message=message),tempfile.TemporaryDirectory() as folder:
+                share=self.share(folder,rows,hook_sh)
+                with self.assertRaisesRegex(ValueError,message):
+                    RUN['guest_config'](dict(size_bytes=80,name='GG'),share,'/guest/job')
+
+    def test_shipped_golden_sets_are_in_run_order(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('patches_module',TOP/'pipeline/patches.py')
+        patches=importlib.util.module_from_spec(spec);spec.loader.exec_module(patches)
+        for name in ('golden-gate','dev-bs-test','dev-golden-bootstrap'):
+            rows=[(stage,patch) for stage,patch,_ in patches.plan(str(TOP/'pipeline/sets'/(name+'.txt')),
+                                                                  str(TOP/'pipeline/targets/mbp92.json'),'25G342')]
+            with self.subTest(set=name),tempfile.TemporaryDirectory() as folder:
+                share=self.share(folder,rows)
+                for stage,patch in rows:
+                    if stage=='oclp-hook':
+                        self.assertTrue((TOP/'patches'/patch/'src/kc-hook.sh').is_file(),patch)
+                        self.assertFalse((TOP/'patches'/patch/'src/hook.sh').exists(),patch)
+                RUN['set_order'](share)
 
     def fixture_job(self, root, rc, workspace=None):
         share=root/'share';source=share/'assembly-source';source.mkdir(parents=True)

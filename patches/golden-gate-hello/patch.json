@@ -1,5 +1,5 @@
 {
- "revision": 2,
+ "revision": 3,
  "stage": "oclp-hook",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
  "inputs": ["hello_metallib_golden_gate", "libhelloblur"],

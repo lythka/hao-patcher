@@ -12,7 +12,7 @@ python3.14 -I pipeline/golden-run pipeline/assemblies/mbp92-golden-first.json \
 |---|---|
 | `target` | Hardware description under `pipeline/targets/` |
 | `golden_build`, `donor_build` | Installed OS and separately selected donor build |
-| `patch_set` | Ordered compatibility recipes; currently `golden-gate` |
+| `patch_set` | Ordered recipes, run in file order (`pipeline/sets/`): `golden-gate` (26A428), `dev-bs-test` (bench), `dev-golden-bootstrap` |
 | `inputs` | Native, extensions, boot, DriverKit, Recovery and hardware artifacts |
 | `size_bytes` | Target raw-image capacity |
 | `workspace_size_bytes` | Separate sparse maintenance-workspace capacity |

@@ -70,8 +70,12 @@ class FakeCommands:
             artifact=Path(a[a.index('--artifact')+1]);target=Path(a[a.index('--destination')+1])
             assert target.name=='DATA-UUID'
             shutil.copytree(artifact/'payload'/role,target,dirs_exist_ok=True)
-        elif a[:3]==['sh','-eu',self.config['kernel_hook']]:
-            (Path(a[3])/'System/Library/KernelCollections/BootKernelExtensions.kc').write_bytes(b'authored collection')
+        elif a[:3]==['sh','-eu',self.config['hooks'][0]['kc_hook']]:
+            kc=Path(a[3])/'System/Library/KernelCollections';kc.mkdir(parents=True,exist_ok=True)
+            (kc/'BootKernelExtensions.kc').write_bytes(b'authored collection')
+        elif a[:2]==['sh','-eu'] and any(a[2]==h['kc_hook'] for h in self.config['hooks'][1:]):
+            # A later recipe changes the collection; the record keeps darwin27-kernel's bytes.
+            (Path(a[3])/'System/Library/KernelCollections/BootKernelExtensions.kc').write_bytes(b'edited by '+a[2].encode())
         elif a[0]=='ditto':
             source,target=map(Path,a[-2:])
             if source.is_dir():shutil.copytree(source,target,dirs_exist_ok=True)
@@ -93,12 +97,12 @@ class GoldenImageTests(unittest.TestCase):
                python='/staged/python',layout_helper='/staged/layout.py',pristine_script='/staged/pristine.sh',
                payload='/staged/golden-payload',kernel='/staged/kernel',kdk='/staged/kdk',kdk_preparer='/staged/kdk-preparer.py',
                fl='/staged/fl',donor_tool='/staged/tahoe-donors/make',donors={},esp=str(self.root/'esp'),
-               hardware=dict(tool='/staged/hardware/apply',artifact='/staged/hardware'),kernel_hook='/staged/kernel/kc-hook.sh',
-               userspace=dict(install='/staged/userspace/install.py',shim='/staged/display.dylib',io80211='/staged/io80211.dylib',
-                                wifip2p='/staged/wifip2p.dylib'),
-               hooks=[dict(name='selectors',hook='/staged/selectors/hook.sh',kc_hook=None),
-                      dict(name='hao',hook='/staged/hao/hook.sh',kc_hook='/staged/hao/kc-hook.sh'),
-                      dict(name='metal',hook=None,kc_hook='/staged/metal/kc-hook.sh')],
+               hardware=dict(tool='/staged/hardware/apply',artifact='/staged/hardware'),
+               hooks=[dict(name='darwin27-kernel',kc_hook='/staged/kernel/kc-hook.sh'),
+                      dict(name='golden-gate-userspace',kc_hook='/staged/userspace/kc-hook.sh'),
+                      dict(name='hao',kc_hook='/staged/hao/kc-hook.sh'),
+                      dict(name='selectors',kc_hook='/staged/selectors/kc-hook.sh'),
+                      dict(name='metal',kc_hook='/staged/metal/kc-hook.sh')],
                posts=[dict(name='esp',script='/staged/posts/esp/apply.sh',folder='/staged/posts/esp')],
                environment=dict(PYTHONPATH='/staged/site',OCLP='/staged/oclp'))
         for key in ('native','extensions','driverkit','boot','recovery'):
@@ -126,13 +130,17 @@ class GoldenImageTests(unittest.TestCase):
         hardware=at(lambda x:self.config['hardware']['tool'] in x)
         self.assertEqual(a[finalize][a[finalize].index('--native-artifact')+1],self.config['donors']['native'])
         self.assertLess(finalize,hardware)  # Whole Tahoe framework bases precede PSP merges.
-        kernel=at(lambda x:self.config['kernel_hook'] in x)
-        userspace=at(lambda x:self.config['userspace']['install'] in x)
-        before=[at(lambda x,p=h['hook']:p in x) for h in self.config['hooks'] if h['hook']]
-        after=[at(lambda x,p=h['kc_hook']:p in x) for h in self.config['hooks'] if h['kc_hook']]
-        self.assertTrue(all(hardware<i<kernel for i in before));self.assertLess(kernel,userspace)
-        self.assertTrue(all(userspace<i for i in after));self.assertEqual(after,sorted(after))
-        self.assertIn('--prepared-system',a[userspace]);self.assertIn(self.config['donors']['driverkit'],a[userspace])
+        recipes=[at(lambda x,p=h['kc_hook']:p in x) for h in self.config['hooks']]
+        self.assertLess(hardware,recipes[0]);self.assertEqual(recipes,sorted(recipes))  # one loop, set order
+        for h in self.config['hooks']:
+            self.assertEqual(a[at(lambda x,p=h['kc_hook']:p in x)],['sh','-eu',h['kc_hook'],str(Path(self.config['work'])/'mnt/system')])
+        userspace=next(row for row in self.fake.entries if self.config['hooks'][1]['kc_hook'] in row['command'])
+        self.assertEqual(userspace['environment']['TAHOE_DRIVERKIT_ARTIFACT'],self.config['donors']['driverkit'])
+        self.assertEqual(userspace['environment']['TAHOE_DONOR_TOOL'],self.config['donor_tool'])
+        self.assertEqual(userspace['environment']['GRP'],'DATA-UUID')
+        steps=[row['name'] for row in record['steps']]
+        self.assertEqual([n for n in steps if not n.startswith(('recipe ','post '))],[n for n,_,_ in golden.LAYERS])
+        self.assertEqual([n[7:] for n in steps if n.startswith('recipe ')],[h['name'] for h in self.config['hooks']])
         post=next(row for row in self.fake.entries if self.config['posts'][0]['script'] in row['command'])
         self.assertEqual(post['environment']['GRP'],'DATA-UUID');self.assertEqual(post['environment']['P'],'/staged/posts/esp')
         self.assertEqual(post['environment']['SYSU'],'SYSTEM-UUID');self.assertEqual(post['environment']['OCLP_PYTHON'],'/staged/python')
@@ -152,15 +160,13 @@ class GoldenImageTests(unittest.TestCase):
         self.assertEqual((core/'.root_uuid').read_text(),'DATA-UUID')
         self.assertEqual(plistlib.loads((core/'SystemVersion.plist').read_bytes())['ProductVersion'],'27.0')
         self.assertFalse((work/'mnt/system/System/Library/CoreServices/.disk_label').exists())
-        self.assertTrue((work/'mnt/preboot/DATA-UUID/boot/System/Library/KernelCollections').is_dir())
-        self.assertTrue((work/'mnt/system/System/Library/KernelCollections').is_dir())
         self.assertIn('GRP=DATA-UUID',(work/'uuids.env').read_text())
         self.assertEqual(a[-1],['hdiutil','detach','/dev/disk70'])
 
     def test_hardware_failure_stops_required_later_components_and_detaches(self):
         self.fake.fail=lambda a:self.config['hardware']['tool'] in a
         with self.assertRaises(subprocess.CalledProcessError):golden.assemble(self.config,self.fake)
-        self.assertFalse(any(self.config['kernel_hook'] in a for a in self.commands()))
+        self.assertFalse(any(h['kc_hook'] in a for h in self.config['hooks'] for a in self.commands()))
         record=json.loads((Path(self.config['work'])/'build.json').read_text())
         self.assertEqual(record['status'],'failed');self.assertIsNone(record['attached_device'])
         self.assertTrue(Path(self.config['image']).is_file())
@@ -173,10 +179,10 @@ class GoldenImageTests(unittest.TestCase):
         self.assertEqual(record['status'],'failed');self.assertEqual(record['attached_device'],'/dev/disk70')
         self.assertFalse(any(a[:2]==['hdiutil','detach'] for a in self.commands()))
 
-    def test_hook_without_scripts_is_not_silently_skipped(self):
-        self.config['hooks']=[dict(name='required-fix',hook=None,kc_hook=None)]
-        with self.assertRaisesRegex(ValueError,'no script'):golden.assemble(self.config,self.fake)
-        self.assertFalse(any(self.config['kernel_hook'] in a for a in self.commands()))
+    def test_recipe_without_kc_hook_is_not_silently_skipped(self):
+        self.config['hooks'].append(dict(name='required-fix',kc_hook=None))
+        with self.assertRaisesRegex(ValueError,'no src/kc-hook.sh: required-fix'):golden.assemble(self.config,self.fake)
+        self.assertFalse(any(h['kc_hook'] and h['kc_hook'] in a for h in self.config['hooks'] for a in self.commands()))
 
     def test_missing_recovery_role_does_not_report_complete_image(self):
         del self.config['donors']['recovery']

@@ -34,7 +34,7 @@ sudo python3 -I audiomxd-fix install --cache OFFLINE_CRYPTEX_CACHE_DIRECTORY --a
 
 - `plan` prints the file/offset edits as JSON. The image build uses this:
   [`patches/golden-gate-userspace`](../../patches/golden-gate-userspace) applies
-  the edits before it re-signs the cache (input row `audio_fix_source`).
+  the edits before it re-signs the cache (its `make.sh` stages this folder from the checkout).
 - `build` copies only the affected subcache, applies the edit, re-signs it with
   4 KiB pages and writes the input and output hashes to `build.json`.
 - `install` checks those hashes and keeps ownership, modes and flags. Run it

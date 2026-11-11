@@ -1,14 +1,21 @@
-# Golden Gate first, explicit Tahoe donors, no development services or warm caches.
-# The assembly recipe selects this set; order is significant.
-darwin27-kernel
-golden-gate-userspace
-darwin27-sandbox-disk-space
-hao-runtime
-golden-gate-metal-libraries
-golden-gate-hello
-golden-gate-windowserver-filter
-golden-gate-corespotlight-compat
-golden-gate-metal-framebuffer
-golden-gate-code-identity
-hao-opencore
-metalold-selectors
+# golden-gate: macOS 27.0 (26A428) for MacBookPro9,2, compatibility fixes only (no dev services, no warm caches).
+# Selected by pipeline/assemblies/mbp92-golden-first.json. Run order is exactly this file's order: pipeline/golden-run
+# refuses a set that does not start with darwin27-kernel then golden-gate-userspace, any src/hook.sh, or a post entry
+# before an oclp-hook entry. Before the first entry the runner lays the fixed base layers (docs/building.md, "Layer
+# order"): Golden Gate System; Data, firmlinks, Preboot/Recovery/VM; Tahoe Extensions + KDK Intel kexts; the Darwin 27
+# kernel file; Tahoe native roots; Preboot/Recovery/ESP base files; OCLP's hardware overlay.
+#
+# oclp-hook entries (src/kc-hook.sh, System writable, before the snapshot):
+darwin27-kernel                   # Boot/System kernel collections around the 27 x86_64 kernel and the Intel kexts. First: everything after edits on top of them
+golden-gate-userspace             # combined OS cryptex (x86_64 dyld cache, Tahoe DriverKit, cache repairs), IO80211/WiFiPeerToPeer compat, display shim. Second, same reason
+darwin27-sandbox-disk-space       # 26A428's system.sb lacks the vfs.disk-space rule (27.2 has it): one Sandbox report per statfs without it
+hao-runtime                       # hao, plus an x86_64 launch slice in every arm64-only 27 program so it runs on Intel
+golden-gate-metal-libraries       # the build's own RenderBox/Tungsten/MPS/MetalFX/CoreRE metallibs repaired for the HD 4000 compiler; deliberately supersedes OCLP's Tahoe RenderBox/Tungsten copies
+golden-gate-hello                 # first-boot hello and Welcome to Mac: repaired hello shader, un-skip in OCLP's Metal wrapper
+golden-gate-windowserver-filter   # two WindowServer rendering paths (Siri bubble filter, backdrop clipping); loads through golden-gate-userspace's display shim
+golden-gate-corespotlight-compat  # the CoreSpotlight getter 27's corespotlightd/managedcorespotlightd call on every query
+metalold-selectors                # Metal selectors OCLP's MetalOld does not answer, via a weak dylib in the HD 4000 Metal driver; before metal-framebuffer (same binary)
+golden-gate-metal-framebuffer     # framebuffer reads for RenderBox symbols (Wi-Fi, Control Center), a second weak dylib in the same driver
+golden-gate-code-identity         # tccd/backgroundtaskmanagementd see the Apple identity of hao-translated programs; after hao-runtime, whose payload its map is built from
+# post entries (apply.sh, after the snapshot, System read-only):
+hao-opencore                      # OpenCore: kernel repairs bound to this image's BootKC, IntelCommpage, HaoExec, early display/Ethernet kexts, boot-args
