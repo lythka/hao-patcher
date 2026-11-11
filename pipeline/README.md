@@ -20,8 +20,9 @@ covers prerequisites, commands, output and validation.
 ## Patches and inputs
 
 ```sh
-python3.14 -I pipeline/patches.py plan pipeline/sets/golden-gate.txt \
-  pipeline/targets/mbp92.json 25G332
+python3.14 -I pipeline/patches.py plan pipeline/sets/golden-gate-26B131.txt \
+  pipeline/targets/mbp92.json 25G342 \
+  --locks pipeline/inputs/golden/26B131:pipeline/inputs/25G342:pipeline/inputs/common
 python3.14 -I pipeline/patches.py check
 ```
 
@@ -30,7 +31,8 @@ comment lines and `SHA256-or-- PATH`; a relative `PATH` is taken from the
 repository root (normally `store/...`). Build-specific rows take precedence over
 `common/`. See [Input rows](../docs/inputs.md#input-rows).
 
-The `golden-gate` set contains only compatibility fixes. `recovery` supplies the
+`golden-gate-26B131` is the 27.2.1 image's set; `dev-bs-test` adds dev-only recipes to it;
+`golden-gate` is the older 26A428 set. `recovery` supplies the
 offline installation recipes; `stock` is the patch set of the older Tahoe-first
 builder.
 
