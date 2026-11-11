@@ -14,7 +14,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-hello | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
 | golden-gate-icon-caches | r1 | post | experiment |  |  |  | **needs** | r1 2026-11-11 IconServices store and indexes harvested from 26B131 (bf10de4), with the 27 index checks. Root c |
 | golden-gate-metal-framebuffer | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
-| golden-gate-metal-libraries | r15 | oclp-hook | experiment | x |  |  | **needs** | r15 2026-11-11 README: runs in set order after golden-gate-userspace (which no longer replaces System); docume |
+| golden-gate-metal-libraries | r16 | oclp-hook | experiment | x |  |  | **needs** | r16 2026-11-11 26B131 artifact adds VectorKit, AlloyCommon and VFX (cache/metallib r54), superseding OCLP's 26 |
 | golden-gate-native-identities | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
 | golden-gate-shader-caches | r8 | post | experiment |  |  |  | **needs** | r8 2026-11-11 Restored for 26B131 with a pack harvested from 26B131 itself (cache/seeds), ancestors and owners |
 | golden-gate-user-seed | r4 | post | experiment |  |  |  | **needs** | r4 2026-11-11 Restored for 26B131 without payloads of its own: runtime and build gate only; fonts moved to gol |

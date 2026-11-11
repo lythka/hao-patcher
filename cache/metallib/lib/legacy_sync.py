@@ -17,7 +17,7 @@ import null_compare
 from texture_coords import param_type
 
 
-NAME = r'air\.(?:(?:wg|simdgroup)\.barrier|atomic\.(?:global|local)\.(?:load|store|exchange|cmpxchg\.(?:weak|strong)|(?:add|sub|and|or|xor|min|max)(?:\.[us])?)\.(?:i32|i64|f32))'
+NAME = r'air\.(?:(?:wg|simdgroup)\.barrier|atomic\.(?:global|local)\.(?:load|store|exchange|xchg|cmpxchg\.(?:weak|strong)|(?:add|sub|and|or|xor|min|max)(?:\.[us])?)\.(?:i32|i64|f32))'
 REFERENCE = re.compile(r'@("?' + NAME + r'"?)(?=[\s,(]|$)')
 
 

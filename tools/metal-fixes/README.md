@@ -30,7 +30,7 @@ python3.14 -I metal-fixes mps-apply --cache X86_DYLD_CACHE_DIRECTORY --output NE
 
 | Command | Output | Input row |
 |---|---|---|
-| `metallibs` | The six stock libraries listed in `cache/metallib/profiles/metallib-repairs-golden-gate.txt`, rewritten for the HD 4000 compiler (`cache/metallib/make`); `SOURCES` records the System library each was made from | `metallib_repairs_golden_gate` |
+| `metallibs` | The stock libraries listed in `cache/metallib/profiles/metallib-repairs-golden-gate.txt`, rewritten for the HD 4000 compiler (`cache/metallib/make`); `SOURCES` records the System library each was made from | `metallib_repairs_golden_gate` |
 | `hello` | SetupAssistantSupportUI's hello library (`profiles/hello-golden-gate.txt`), same layout | `hello_metallib_golden_gate` |
 | `runtime` | OCLP's Intel runtime bitcode with the added quad and collective helpers, and the repaired `iCBE.dylib` | `metal_quad_runtime_golden_gate` |
 | `compiler-runtime` | Optional compiler and client adapter dylibs | none |
