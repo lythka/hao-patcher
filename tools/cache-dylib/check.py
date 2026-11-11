@@ -2,7 +2,9 @@
 
     python3.14 -I check.py DYLIB REPORT_JSON
 
-Every RIP-relative operand of the disassembled code (llvm-objdump) must land inside one of the dylib's segments, and
+No instruction may need a newer CPU than Ivy Bridge (AVX2, BMI, FMA, MOVBE, LZCNT, TZCNT: a cache built for x86_64h
+may use them). Every RIP-relative operand of the disassembled code (llvm-objdump) must land inside one of the
+dylib's segments, and
 every one landing in the private GOT segment (__CACHE_GOT) on a slot the dylib binds or rebases (dyld_info -fixups).
 A target outside every segment is an error when it lies in the source cache's uniqued GOT region (a GOT slot the
 extraction missed); elsewhere it is a decoding artifact of data inside __text (absurd displacements such as
@@ -15,6 +17,11 @@ import subprocess
 import sys
 
 OPERAND = re.compile(r'^\s*([0-9a-f]+):\s+(\S+)\s.*\(%rip\).*## (0x[0-9a-f]+)')
+# Instructions Ivy Bridge (the HD 4000 Macs) lacks: AVX2, BMI1/2, FMA, MOVBE, LZCNT/TZCNT (which it would silently
+# run as BSR/BSF). A cache built for x86_64h may contain them; the extracted code must not.
+HASWELL = re.compile(r'^\s*[0-9a-f]+:\s+(?:(?:andn|bextr|blsi|blsr|blsmsk|bzhi|pdep|pext|rorx|sarx|shlx|shrx|mulx|'
+                     r'lzcnt|tzcnt|movbe)[wlq]?|vfn?m(?:add|sub)\w+|vpbroadcast\w|vperm[dq]|vpermp[sd]|vinserti128|'
+                     r'vextracti128|vpgather\w+|vgather\w+|vpmaskmov[dq]|vps[lr]lv[dq]|vpsravd)\s')
 FIXUP = re.compile(r'^\s+\S+\s+\S+\s+(0x[0-9A-Fa-f]+)\s+(bind|rebase)\b')
 
 
@@ -163,7 +170,10 @@ def check(path, report):
     got = next(((lo, hi) for name, lo, hi in segs if name == '__CACHE_GOT'), (0, 0))
     total = 0
     used, unbound, missed, artifacts = set(), set(), [], []
+    haswell = []
     for line in run('xcrun', 'llvm-objdump', '-d', '--no-show-raw-insn', path).splitlines():
+        if HASWELL.match(line):
+            haswell.append(line.strip())
         m = OPERAND.match(line)
         if not m:
             continue
@@ -177,6 +187,7 @@ def check(path, report):
             (missed if region[0] <= target < region[1] else artifacts).append(line.strip())
     errors = [f'GOT slot {t:#x} used by code is neither bound nor rebased' for t in sorted(unbound)]
     errors += [f'code uses a uniqued GOT slot outside the dylib: {line}' for line in missed]
+    errors += [f'instruction Ivy Bridge lacks: {line}' for line in haswell]
     swift_count, swift_errors = swift(Image(path), fixed)
     return dict(rip_operands=total, got_slots_used=len(used), fixups=len(fixed), swift_relative_pointers=swift_count,
                 decoding_artifacts=artifacts, errors=errors + swift_errors)

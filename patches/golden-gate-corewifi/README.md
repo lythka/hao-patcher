@@ -14,8 +14,9 @@ The comparison behind this choice (option B) is in the 26B131 evidence: `corewif
 ## Inputs
 - `corewifi_tahoe`: `CoreWiFiTahoe.dylib`, Tahoe 25G342's CoreWiFi cut from that build's
   `dyld_shared_cache_x86_64h` by [tools/cache-dylib](../../tools/cache-dylib/README.md). Its source cache is row
-  `tahoe_os_cache_x86_64h`. The Intel installer's OS cryptex has no generic x86_64 cache. This image uses
-  the generic code: no AVX2, BMI, FMA, MOVBE, LZCNT or TZCNT, which the Ivy Bridge CPU lacks.
+  `tahoe_os_cache_x86_64h`. The Intel installer's OS cryptex has no generic x86_64 cache. CoreWiFi's code there
+  is generic: tools/cache-dylib's check finds no AVX2, BMI, FMA, MOVBE, LZCNT or TZCNT instruction, none of which the
+  Ivy Bridge CPU has.
 - `corewifi_compat`: `CoreWiFi`, the compat library built from [build/corewifi_compat.m](build/corewifi_compat.m).
   It re-exports `CoreWiFiTahoe.dylib`.
 

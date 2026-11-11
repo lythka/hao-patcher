@@ -39,6 +39,8 @@ independent implementation. Where dsce leaves a cache address behind, this tool 
   table of the exports, and a new UUID. `MH_DYLIB_IN_CACHE` is cleared. The result is unsigned; sign it ad hoc.
 
 `check.py` verifies the result with the host's tools:
+- No instruction needs a CPU newer than Ivy Bridge: AVX2, BMI1/2, FMA, MOVBE, LZCNT or TZCNT. A cache built for
+  x86_64h may use them, and Ivy Bridge would fault on most of them and silently run LZCNT/TZCNT as BSR/BSF.
 - Every RIP-relative operand in the disassembly lands inside the dylib.
 - Every operand that lands in `__CACHE_GOT` uses a slot the dylib binds or rebases (`dyld_info -fixups`).
 - A target outside the dylib fails if it lies in the source cache's uniqued GOT region. Other such targets are listed
@@ -77,6 +79,6 @@ CACHE_DYLIB_TAHOE_CACHE=store/inputs/25G342/os-cryptex-x86_64h python3.14 -I -B 
 ```
 
 ## Revisions
-- r1 2026-11-11 First version: extracts Tahoe 25G342's CoreWiFi from the x86_64h cache. Verified by check.py: 720
-  GOT slots used by code, all bound; 3453 Swift relative pointers resolved. Under Rosetta on 27.2 its classes
+- r1 2026-11-11 First version: extracts Tahoe 25G342's CoreWiFi from the x86_64h cache. Verified by check.py: no
+  Haswell-only instruction; 720 GOT slots used by code, all bound; 3453 Swift relative pointers resolved. Under Rosetta on 27.2 its classes
   register and secure coding round-trips.

@@ -107,6 +107,13 @@ class CheckParsers(unittest.TestCase):
         fix = check.FIXUP.match('        __CACHE_GOT     __got            0x7FF8400460E8           bind  libMobileGestalt/_MGCopyAnswer [weak-import]')
         self.assertEqual((fix[1], fix[2]), ('0x7FF8400460E8', 'bind'))
 
+    def test_ivy_bridge_guard(self):
+        for insn, newer in (('tzcntq\t%rax, %rcx', True), ('lzcntl\t%eax, %ecx', True), ('shlxq\t%rax, %rbx, %rcx', True),
+                            ('vfmadd231sd\t%xmm0, %xmm1, %xmm2', True), ('vpbroadcastd\t%xmm0, %ymm1', True),
+                            ('movbel\t(%rdi), %eax', True), ('vaddpd\t%ymm0, %ymm1, %ymm2', False),
+                            ('roundsd\t$0x9, %xmm0, %xmm0', False), ('bsfq\t%rax, %rcx', False), ('andl\t%eax, %ecx', False)):
+            self.assertEqual(bool(check.HASWELL.match('7ff81f8efd27:  \t' + insn)), newer, insn)
+
 
 TAHOE_CACHE = os.environ.get('CACHE_DYLIB_TAHOE_CACHE')
 
