@@ -6,3 +6,6 @@ golden-gate System/Library/PrivateFrameworks/RenderBox.framework/Versions/A/Reso
 golden-gate System/Library/Frameworks/MetalFX.framework/Versions/A/Resources/default.metallib
 golden-gate System/Library/PrivateFrameworks/CoreRE.framework/Versions/A/Resources/default.metallib
 golden-gate System/Library/PrivateFrameworks/Tungsten.framework/Versions/A/Resources/default.metallib
+golden-gate System/Library/PrivateFrameworks/VectorKit.framework/Versions/A/Resources/default.metallib
+golden-gate System/Library/PrivateFrameworks/VectorKit.framework/Versions/A/Resources/metal_libraries/AlloyCommonLibrary.metallib
+golden-gate System/Library/PrivateFrameworks/VFX.framework/Versions/A/Resources/default.metallib

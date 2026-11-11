@@ -45,6 +45,23 @@ declare i32 @{name}({pointer}, i32*, i32, i32, i32, i32, i32, i1)
                         with self.assertRaisesRegex(ValueError, 'unrepresentable'):
                             legacy_sync.rewrite(source.replace('i32 0, i32 0, i32 2, i32 0', operands))
 
+    def test_exchange_drops_flags_and_keeps_order_scope_volatility(self):
+        # 27.2 VFX particle_fill_grid: the 26.0 form is (ptr, value, order, scope, volatile).
+        source = '''define i32 @probe(i32 addrspace(1)* %object, i32 %value) {
+  %old = tail call i32 @air.atomic.global.xchg.i32(i32 addrspace(1)* nocapture %object, i32 %value, i32 0, i32 2, i32 0, i1 false)
+  ret i32 %old
+}
+declare i32 @air.atomic.global.xchg.i32(i32 addrspace(1)* nocapture, i32, i32, i32, i32, i1)
+'''
+        fixed, report = legacy_sync.rewrite(source)
+        self.assertEqual(report['calls'], 1)
+        self.assertIn('(i32 addrspace(1)* nocapture %object, i32 %value, i32 0, i32 2, i1 false)', fixed)
+        self.assertIn('declare i32 @air.atomic.global.xchg.i32(i32 addrspace(1)* nocapture, i32, i32, i32, i1)', fixed)
+        self.assertEqual(legacy_sync.rewrite(fixed)[0], fixed)
+        legacy_sync.refuse_bad_state(fixed)
+        with self.assertRaisesRegex(ValueError, 'unrepresentable'):
+            legacy_sync.rewrite(source.replace('i32 0, i32 2, i32 0, i1 false)', 'i32 0, i32 2, i32 1, i1 false)'))
+
     def test_keeps_values_flags_scope_volatility_and_metadata(self):
         text, report = legacy_sync.rewrite(program())
         self.assertEqual(report['calls'], 5)

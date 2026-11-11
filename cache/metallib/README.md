@@ -147,5 +147,6 @@ Tests that need Apple binaries are skipped unless `METALLIB_RUNTIME` (a prepared
 
 ## Revisions
 
+- r54 2026-11-11 `metallib-repairs-golden-gate.txt` adds VectorKit (`default.metallib`, `metal_libraries/AlloyCommonLibrary.metallib`) and VFX, which OCLP otherwise leaves as its 26.0 copies (27.2 VectorKit asks for `Icon::shadow_vertex` and other functions they lack). `legacy_sync.py` also converts `air.atomic.*.xchg` (27.2 VFX `particle_fill_grid` crashed IGIL's uniform analysis).
 - r53 2026-11-11 Profiles name Golden Gate's libraries for any 27.x build (`metallib-repairs-golden-gate.txt`, new `hello-golden-gate.txt`); outputs record `SOURCES` and `system_build` so installers can refuse a library they were not made from; a listed library missing from SYSTEM stops the build.
 - r52 2026-11-10 Initial public release.
