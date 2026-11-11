@@ -14,10 +14,10 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-metal-framebuffer | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
 | golden-gate-metal-libraries | r15 | oclp-hook | experiment | x |  |  | **needs** | r15 2026-11-11 README: runs in set order after golden-gate-userspace (which no longer replaces System); docume |
 | golden-gate-native-identities | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
-| golden-gate-userspace | r48 | oclp-hook | experiment | x |  |  | **needs** | r48 2026-11-11 Code identity carrier: hao-runtime's `hao_codeid_decide` (row `codeid_carrier`, hao-runtime 53d |
+| golden-gate-userspace | r49 | oclp-hook | experiment | x |  |  | **needs** | r49 2026-11-11 Embed hao's stubs into the arm64-only programs of the App and OS cryptexes (Safari's agents, Sa |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
-| hao-opencore | r32 | post | experiment | x |  |  | **needs** | r32 2026-11-11 No longer copies OpenCore.efi and OpenRuntime.efi from `opencore_debug`: the base EFI build alr |
-| hao-runtime | r58 | oclp-hook | experiment | x |  |  | **needs** | r58 2026-11-11 Select the 26B131 payload with regenerated interface units and AOT; async provider and URLReque |
+| hao-opencore | r33 | post | experiment | x |  |  | **needs** | r33 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 7415a0b; HaoExec  |
+| hao-runtime | r59 | oclp-hook | experiment | x |  |  | **needs** | r59 2026-11-11 26B131 payload rebuilt with hao-runtime 7415a0b from a root that includes the App and OS crypte |
 | metalold-selectors | r3 | oclp-hook | product | x |  |  | **needs** | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
 | rec-audio | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-bluetooth-input | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
