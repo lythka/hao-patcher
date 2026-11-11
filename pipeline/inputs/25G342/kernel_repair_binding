@@ -1,2 +1,2 @@
-# Kernel repair binding (profile.json and KC member checks) made by tools/kernel-fixes.
-- store/artifacts/kernel-repair-binding-26A428-20261110-c8732c756e85
+# Kernel repair binding profile (schema 2: only members the repairs use must match), from tools/kernel-fixes inputs.
+- store/artifacts/kernel-repair-binding-26A428-20261110-schema2
