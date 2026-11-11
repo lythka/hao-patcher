@@ -12,12 +12,36 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 TOP=Path(__file__).resolve().parents[2]
 RUN=runpy.run_path(str(TOP/'pipeline/golden-run'))
 
 
 class GoldenRun(unittest.TestCase):
+    def test_capture_reads_stopped_workspace_readonly_and_detaches_on_failure(self):
+        state=dict(vm='/fixture/vm',guest_local='/Volumes/work/job',
+                   guest_workspace=dict(mount='/Volumes/work',image='/fixture/workspace.img'),
+                   recipe=dict(size_bytes=4))
+        calls=[]
+        def command(args,**kwargs):
+            calls.append(list(map(str,args)))
+            if args[:2]==['hdiutil','attach']:
+                root=Path(args[args.index('-mountpoint')+1]);(root/'job').mkdir()
+                (root/'job/target.img').write_bytes(b'test')
+        with mock.patch('runpy.run_path',return_value={'running':lambda vm:[]}):
+            with self.assertRaisesRegex(RuntimeError,'fixture capture failure'):
+                with RUN['readonly_workspace'](state,command) as image:
+                    self.assertEqual(image.read_bytes(),b'test')
+                    raise RuntimeError('fixture capture failure')
+        self.assertIn('-readonly',calls[0]);self.assertIn('-nobrowse',calls[0])
+        self.assertEqual(calls[-1][:2],['hdiutil','detach'])
+        calls.clear()
+        with mock.patch('runpy.run_path',return_value={'running':lambda vm:[123]}):
+            with self.assertRaisesRegex(RuntimeError,'must be stopped'):
+                with RUN['readonly_workspace'](state,command):pass
+        self.assertEqual(calls,[])
+
     def test_configuration_preserves_selected_hook_order_and_os_roles(self):
         with tempfile.TemporaryDirectory() as folder:
             share=Path(folder);(share/'kdk/KDK_25.kdk').mkdir(parents=True)

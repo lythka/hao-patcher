@@ -105,6 +105,8 @@ class GoldenImageTests(unittest.TestCase):
             role='preboot' if key=='boot' else key
             source=p/'payload'/role;source.mkdir(parents=True);(source/'fixture').write_text(key+' source')
         (self.root/'esp').mkdir();(self.root/'esp/boot.efi').write_text('authored ESP')
+        config=self.root/'esp/EFI/OC/config.plist';config.parent.mkdir(parents=True)
+        config.write_bytes(plistlib.dumps({'#Revision':{'Original-Model':'FixtureModel','Hardware-Probe':b'private probe'}}))
         self.config=c;self.fake=FakeCommands(c)
 
     def commands(self):return [row['command'] for row in self.fake.entries]
@@ -138,6 +140,14 @@ class GoldenImageTests(unittest.TestCase):
         self.assertEqual(post['environment']['PATCH_OUTPUT_DIR'],str(work/'post/esp'))
         self.assertTrue(json.loads((work/'post/esp/fixture-producer.json').read_text())['generated'])
         self.assertEqual((work/'BootKernelExtensions.kc').read_bytes(),b'authored collection')
+        efi=json.loads((work/'boot-efi/manifest.json').read_text())
+        self.assertEqual(efi['model'],'FixtureModel')
+        self.assertEqual(efi['os_build'],'26A428')
+        self.assertNotIn('Hardware-Probe',efi['opencore_revision'])
+        self.assertFalse(efi['kernel_repairs_applied'])
+        self.assertEqual((work/'boot-efi/payload/boot.efi').read_text(),'authored ESP')
+        self.assertEqual(efi['files']['boot.efi'],__import__('hashlib').sha256(b'authored ESP').hexdigest())
+
         self.assertEqual((core/'.root_uuid').read_text(),'DATA-UUID')
         self.assertEqual(plistlib.loads((core/'SystemVersion.plist').read_bytes())['ProductVersion'],'27.0')
         self.assertFalse((work/'mnt/system/System/Library/CoreServices/.disk_label').exists())

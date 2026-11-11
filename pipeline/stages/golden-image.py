@@ -266,6 +266,33 @@ class Image:
         self.run('rm','-rf',self.mounts['data']/'.Spotlight-V100')
         self.run('sync')
 
+    def export_efi(self):
+        """Deliver the final ESP separately for installation after OS restoration."""
+        destination = self.work/'boot-efi'
+        destination.mkdir(mode=0o755)
+        self.run('ditto',self.mounts['esp'],destination/'payload')
+        config = plistlib.loads((destination/'payload/EFI/OC/config.plist').read_bytes())
+        system = self.mounts['system']
+        version = plistlib.loads((system/'System/Library/CoreServices/SystemVersion.plist').read_bytes())
+        collection = system/'System/Library/KernelCollections/BootKernelExtensions.kc'
+        files = {}
+        for path in sorted((destination/'payload').rglob('*')):
+            if path.is_symlink():
+                raise ValueError('unexpected symlink in FAT EFI payload: '+str(path))
+            if path.is_file():
+                files[str(path.relative_to(destination/'payload'))] = hashlib.sha256(path.read_bytes()).hexdigest()
+        manifest = dict(schema=1,kind='hao-prepared-efi',os_build=version['ProductBuildVersion'],
+                        model=config.get('#Revision',{}).get('Original-Model'),
+                        kernel_collection_sha256=hashlib.sha256(collection.read_bytes()).hexdigest(),
+                        opencore_revision=config.get('#Revision',{}),
+                        kernel_repairs_applied=any(p['name']=='hao-opencore' for p in self.config['posts']),
+                        files=files,
+                        installation='Install this complete payload after restoring its matching OS image. Do not regenerate a stock OCLP EFI over it.')
+        # Some upstream configs embed binary hardware probes; keep provenance JSON-safe.
+        manifest['opencore_revision'] = {k:v for k,v in manifest['opencore_revision'].items()
+                                         if isinstance(v,(str,int,bool))}
+        (destination/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+
     def close(self):
         errors = []
         for name in list(reversed(self.mounted)):
@@ -299,7 +326,7 @@ def _assemble(config, commands=None):
                              ('boot-and-esp',image.bootstrap),('hardware',image.hardware),
                              ('pre-kernel-hooks',image.pre_hooks),('darwin27-kernel-kc',image.kernel),
                              ('prepared-userspace',image.userspace),('remaining-kc-hooks',image.kc_hooks),
-                             ('snapshot',image.snapshot),('posts',image.posts)]:
+                             ('snapshot',image.snapshot),('posts',image.posts),('efi-bundle',image.export_efi)]:
             image.step(name,action)
         record['status'] = 'assembled'
     except BaseException as caught:

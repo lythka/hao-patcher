@@ -64,8 +64,23 @@ The build runs these steps inside a fresh builder VM clone
 10. Run the `post` patches against the read-only System, such as the OpenCore
     configuration (`hao-opencore`).
 
-The host then exports the raw image and commits it to an image repository with
-[`ssdimg`](../tools/ssdimg).
+The guest detaches the completed image and flushes its workspace. After the VM
+stops, the host mounts that workspace **read-only** and captures the image directly
+with [`ssdimg`](../tools/ssdimg). This avoids copying an 80 GiB raw disk through
+the VM shared folder. Formatting, kernel collections and all writes to APFS
+volumes remain inside the builder VM.
+
+A full build also creates `boot-efi.zip` beside `image.json`. It contains the
+prepared ESP payload plus a manifest identifying the model, OS build, kernel
+collection and every EFI file. This is the final EFI after our OpenCore additions,
+for installation after restoring the matching OS image. Installing it does not
+require rerunning OCLP root patching. Regenerating a stock OCLP EFI would discard
+our additions. Intermediate builds without `hao-opencore` do not publish this
+installation archive.
+
+If assembly completed but export/capture was interrupted, stop that builder and
+resume capture with `python3.14 -I pipeline/golden-run --capture-record RECORD`.
+The command requires the successful assembly record and refuses a running VM.
 
 ## 3. Check the output
 
