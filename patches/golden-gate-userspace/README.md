@@ -288,6 +288,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r55 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 746f1ec (12685dd + the native-call cache signal/fork fix) with the 26B131 async contract provider. No recipe change.
 - r54 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 12685dd (5651d79 + x86-64-v2 build and a startup CPU-feature check). No recipe change.
 - r53 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 5651d79 (native-call cache, JIT vector FP and LD1/ST1, scalar FP and conversions, round-to-odd FP32 FMA; u3 units + the optional-data contract). No recipe change.
 - r52 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtils va_list rows for rapportd, Optional-witness fix for Control Center, u3 interface units for Weather and Photos); its stubs, stub-identities and AOT come from it. No recipe change. The va_list and Control Center fixes were confirmed by a live swap on image 4d1c48c; image build and boot pending.
