@@ -57,8 +57,10 @@ Tested with macOS 27.2.1 (26B131), 2026-11-11.
   Debug Kit, OCLP support files and a hao-runtime payload.
   [Build inputs](docs/inputs.md) lists downloads and checksums (being updated for 27.2.1).
 
-This repository contains no Apple software. You supply every Apple input, and the
-builder writes its images to your machine. There is no end-user installer yet.
+Apple's macOS inputs (IPSW, installer, Kernel Debug Kit) are not included: you supply
+them, and the builder writes its images to your machine. The repository does carry some
+Apple open-source code under the APSL 2.0 and third-party headers under their own
+licenses; [NOTICE.md](NOTICE.md) lists them. There is no end-user installer yet.
 
 ## Building
 
@@ -140,6 +142,9 @@ Built on [OpenCore Legacy Patcher](https://github.com/dortania/OpenCore-Legacy-P
 [MetallibSupportPkg](https://github.com/dortania/MetallibSupportPkg),
 [Apple's XNU sources](https://github.com/apple-oss-distributions/xnu) and
 [QEMU](https://www.qemu.org/). Each tool's NOTICE.md lists the third-party source it carries.
+
+This product includes software developed by Dortania and the OpenCore Legacy
+Patcher contributors.
 
 ## License
 

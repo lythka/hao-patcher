@@ -50,6 +50,18 @@ class GoldenRun(unittest.TestCase):
             (path/('apply.sh' if stage=='post' else 'hook.sh' if name in hook_sh else 'kc-hook.sh')).touch()
         return share
 
+    def test_boot_efi_archive_carries_opencore_and_oclp_licenses(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as folder:
+            prepared=Path(folder)/'boot-efi';(prepared/'payload/EFI/OC').mkdir(parents=True)
+            (prepared/'payload/EFI/OC/OpenCore.efi').write_bytes(b'oc');(prepared/'manifest.json').write_text('{}')
+            archive=RUN['boot_efi_archive'](prepared,Path(folder))
+            with zipfile.ZipFile(archive) as bundle:
+                names=set(bundle.namelist())
+                self.assertIn('payload/EFI/OC/OpenCore.efi',names);self.assertIn('manifest.json',names)
+                self.assertIn('Redistribution and use',bundle.read('LICENSES/OpenCorePkg-LICENSE.txt').decode())
+                self.assertIn('Dortania',bundle.read('LICENSES/OpenCore-Legacy-Patcher-LICENSE.txt').decode())
+
     def test_configuration_runs_every_recipe_in_set_order(self):
         rows=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace'),
               ('oclp-hook','later-fix'),('oclp-hook','selectors'),('post','post-one'),('post','post-two')]

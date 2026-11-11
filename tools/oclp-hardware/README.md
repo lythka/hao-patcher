@@ -57,4 +57,4 @@ python3.14 -I -B -m unittest discover -s tools/oclp-hardware/tests
 The fixtures cover input hashes, file semantics, application order and use of the
 standalone installer.
 
-OCLP is BSD 3-Clause licensed; see [LICENSE.txt](LICENSE.txt).
+OCLP is BSD 4-Clause licensed; see [LICENSE.txt](LICENSE.txt).

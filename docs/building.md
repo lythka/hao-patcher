@@ -94,9 +94,9 @@ what it adds and why.
 The guest detaches the image. The host mounts the stopped VM's workspace read-only and commits
 the image with [`ssdimg`](../tools/ssdimg), with no copy through the shared folder.
 
-With `hao-opencore` in the set, `boot-efi.zip` sits beside `image.json`. It holds the final ESP
-and a manifest of model, OS build, KC and every EFI file. Install it after restoring the
-matching image. Don't regenerate a stock OCLP EFI instead: it drops the OpenCore additions.
+With `hao-opencore` in the set, `boot-efi.zip` sits beside `image.json`. It holds the final ESP,
+a manifest of model, OS build, KC and every EFI file, and the OpenCorePkg and OCLP license texts
+(`LICENSES/`). Install it after restoring the matching image. Don't regenerate a stock OCLP EFI instead: it drops the OpenCore additions.
 
 If export was interrupted, resume with `golden-run --capture-record RECORD`. This needs a
 successful assembly record and a stopped VM.

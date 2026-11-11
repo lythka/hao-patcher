@@ -16,6 +16,7 @@ import sys
 import time
 import tempfile
 import uuid
+import zipfile
 
 TOP = Path(__file__).resolve().parent.parent
 GUEST = '/private/var/ssdshare'
@@ -344,6 +345,19 @@ def readonly_workspace(state, command):
             if attached:command(['hdiutil','detach',mount],capture_output=True)
 
 
+# The exported EFI redistributes OpenCore and OCLP-generated files: their license texts go with it.
+EFI_LICENSES={'LICENSES/OpenCorePkg-LICENSE.txt':TOP/'pipeline/licenses/OpenCorePkg-LICENSE.txt',
+              'LICENSES/OpenCore-Legacy-Patcher-LICENSE.txt':TOP/'tools/oclp-integration/LICENSE.txt'}
+
+
+def boot_efi_archive(prepared,repository):
+    """boot-efi.zip from the guest's prepared EFI (payload/, manifest.json) plus EFI_LICENSES."""
+    archive=shutil.make_archive(str(Path(repository)/'boot-efi'),'zip',root_dir=prepared)
+    with zipfile.ZipFile(archive,'a',zipfile.ZIP_DEFLATED) as bundle:
+        for name,source in EFI_LICENSES.items():bundle.write(source,name)
+    return archive
+
+
 def capture_workspace(state,output,command):
     assembled(output)
     repository=Path(state['repository'])
@@ -355,7 +369,7 @@ def capture_workspace(state,output,command):
         command([ssdimg,'-C',repository,'commit','-m','Golden Gate '+state['recipe']['golden_build']+'; '+state['commit']])
     prepared=output/'guest/boot-efi'
     if prepared.exists() and json.loads((prepared/'manifest.json').read_text())['kernel_repairs_applied']:
-        archive=shutil.make_archive(str(repository/'boot-efi'),'zip',root_dir=prepared)
+        archive=boot_efi_archive(prepared,repository)
         state['boot_efi']=dict(path=archive,sha256=digest(archive),manifest=json.loads((prepared/'manifest.json').read_text()))
     state.update(status='committed',capture_source='read-only stopped builder workspace',capture_tool_sha256=digest(Path(__file__)))
 
