@@ -15,28 +15,29 @@ ARM-only programs on the Intel CPU.
 
 ## Status
 
-Experimental. MacBookPro9,2 is the only supported model. The results below come
-from images built with an earlier version of this pipeline, which started from Tahoe.
-The current pipeline starts from Golden Gate. Its images have booted to a working
-system but have not yet been tested end to end.
+Experimental. MacBookPro9,2 is the only supported model.
 
-The 26B131 build is a development assembly. So far it has only been tested by booting
-it on the laptop. The first image hung in Setup Assistant because a sandbox profile was rejected.
-With that fixed, the second image boots to the Language Chooser with `apsd` stable.
-Setup Assistant progress and the desktop are still being checked;
-[the 26B131 repair review](docs/repair-review-26B131.md) records the evidence.
+The table below is from the 26B131 (macOS 27.2.1) development image built from this
+pipeline on 2026-11-11 and tested on the laptop: Setup Assistant, a new account, the
+desktop and the apps listed. [The 26B131 repair review](docs/repair-review-26B131.md)
+records earlier evidence.
 
 | Area | State |
 |---|---|
-| Startup | Setup Assistant, account creation and Finder work. |
-| Graphics | Accelerated HD 4000 desktop; newer Metal features are incomplete. |
-| Hardware | Wi-Fi, speakers, brightness, keyboard and trackpad work. |
-| Safari | Works natively on Intel. |
-| Control Center | Panels open and reopen. |
-| Maps | Rendering, search, zoom and pan work. |
-| Photos | Opens; Live Text inside Photos does not work yet. |
+| Startup | Boots to Setup Assistant in about 80 s. Setup and account creation work. After creating the account, Setup's automatic login hangs; restart and log in (fix in progress). |
+| Desktop | Menu bar, Dock, Finder, Liquid Glass and the lock screen draw correctly. The first boot is slow while shaders and icons are built. |
+| Graphics | Accelerated HD 4000 desktop. Video decoding uses the HD 4000's hardware decoder: YouTube plays 1080p H.264 with no dropped frames. Newer Metal features are incomplete. |
+| Wi-Fi | Networks are listed and can be joined. Setup's own join dialog is fixed on `main` (`golden-gate-userspace` r46) but not yet tested in an image; joining a remembered network automatically still crashes the Wi-Fi daemon (fix in progress). |
+| Hardware | Speakers, brightness, keyboard, trackpad and Bluetooth work; AirPlay displays are discovered. |
+| Safari | Works, including YouTube. |
+| Control Center | Opens; Wi-Fi, Bluetooth, AirDrop, Now Playing, Display and Sound work. |
+| Maps | Map tiles, search, place cards and current location work. Pin shadows are missing (VectorKit shaders, fix in progress). |
+| Photos | Import, thumbnails and full-size view work. Live Text does not: OCLP blocks the analysis service on this GPU. |
+| Calendar, Terminal, System Settings | Work. |
+| Notification Center, widgets | Notification Center restarts in a loop and some widgets crash; fixed in hao-runtime, not yet in an image. |
+| Spotlight | Crashes on 26B131 because of broken references in Apple's Intel shared cache; repair in progress. |
 | Other apps | Varies by app; Weather does not work yet. |
-| Sleep and updates | Not yet tested. |
+| Sleep and updates | Not yet tested on 26B131. |
 
 ## Requirements
 
@@ -71,7 +72,30 @@ The 26B131 development build uses `pipeline/assemblies/dev-26B131.json`. Its set
 (`dev-bs-test`) is the `golden-gate` recipes without `darwin27-sandbox-disk-space`
 (26B131 already has that rule) plus `dev-access`, which enables root SSH for testing,
 so it is not for general use. Every set file says, entry by entry, what each recipe
-adds and why, in run order ([layer order](docs/building.md#layer-order)).
+adds and why, in run order ([layer order](docs/building.md#layer-order)). The build
+refuses a set that breaks that order.
+
+## What's new
+
+- **Clear layer order** (2026-11-11): the build runs every recipe once, in set-file
+  order, after a fixed list of base layers, and duplicate steps are gone.
+  [Building an image](docs/building.md) lists the order.
+- **Wi-Fi:** the Wi-Fi daemon accepts macOS 27 programs (`golden-gate-code-identity` r7),
+  so networks can be joined. WiFiAgent now starts in user sessions (`golden-gate-userspace`
+  r46), which Setup's own join dialog needs. A new build check catches methods that
+  macOS 27 programs call but the OCLP Wi-Fi libraries lack.
+- **Audio and sharing:** audio, AirPlay, Control Center and `sharingd` no longer crash at
+  boot (`golden-gate-userspace` r43–r44).
+
+In progress, not yet on `main`:
+- one code-identity check built into Security.framework for every program, replacing
+  the per-daemon `golden-gate-code-identity` list;
+- repair of Apple's broken Swift references in the Intel shared cache (Spotlight);
+- hao stubs for Safari's helpers in the App and OS cryptexes;
+- preloaded shader, icon and font caches;
+- Tahoe's CoreWiFi for the Wi-Fi daemon;
+- VectorKit and VFX shader repairs;
+- Live Text.
 
 ## Fixes
 
