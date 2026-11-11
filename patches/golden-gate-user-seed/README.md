@@ -34,7 +34,8 @@ account: `/private/var/log/peruser-seed.log` shows the icon index, the Metal tre
 the new uid before its desktop started.
 
 ## Validation
-NEEDS VALIDATION: r4 is built only on the host fixture; no image with it has booted. On 26A428 images r2/r3's runtime
+Laptop 2026-11-11, image 4d1c48c (26B131): seed.zsh saw the new account 2.3 s after creation and placed the icon index, font registry and 17 Metal trees before its first login. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Earlier: r4 is built only on the host fixture; no image with it has booted. On 26A428 images r2/r3's runtime
 placed trees (owner sessions 2026-11-06), not re-checked on 26B131.
 
 ## Revisions

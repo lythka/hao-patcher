@@ -4,5 +4,5 @@
   "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
   "inputs": ["windowserver_filter_shim"],
   "status": "experiment",
-  "validated": false
+  "validated": true
 }

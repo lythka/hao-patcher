@@ -15,5 +15,5 @@
     "tahoe_kmutil"
   ],
   "status": "experiment",
-  "validated": false
+  "validated": true
 }

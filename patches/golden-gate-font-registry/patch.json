@@ -4,5 +4,5 @@
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G342"]},
  "inputs": ["font_registry_golden_gate"],
  "status": "experiment",
- "validated": false
+ "validated": true
 }

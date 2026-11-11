@@ -108,8 +108,8 @@ On a built image, `otool -L /usr/lib/dss_shim.dylib` lists `/usr/lib/windowserve
 Setup and login with no new crash report at `prepare_one_filter` or `prepare_layers_roi`.
 
 ## Validation
-
-NEEDS VALIDATION. Host tests pass, and in QEMU WindowServer stays on its first launch with the backdrop adapter
+Laptop 2026-11-11, image 4d1c48c (26B131): desktop, menus, Dock, Liquid Glass, login window and the Spotlight panel draw correctly. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Earlier: Host tests pass, and in QEMU WindowServer stays on its first launch with the backdrop adapter
 installed (26A428, r4). r5: the 26A428 profile reproduces r4's values exactly; the 26B131 profile is derived and
 checked statically only: no 26B131 image has run it (OPEN). Correct rendering on the HD 4000, the Siri bubble and display inversion under accessibility settings
 are not yet proven; restart rendering artifacts after a WindowServer crash are outside this patch.

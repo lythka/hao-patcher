@@ -6,23 +6,23 @@ VALIDATION), ok = a boot test proved the current revision.
 
 | Patch | Rev | Stage | Status | golden-gate | recovery | stock | Validation | Newest revision |
 |---|---|---|---|---|---|---|---|---|
-| darwin27-kernel | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
+| darwin27-kernel | r5 | oclp-hook | experiment | x |  |  | ok | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
 | darwin27-sandbox-disk-space | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
 | dev-access | r3 | post | dev |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
-| golden-gate-corespotlight-compat | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
-| golden-gate-font-registry | r1 | post | experiment |  |  |  | **needs** | r1 2026-11-11 Setup and per-user font registries harvested from 26B131 (bf10de4). Root cause: a54ec244 removed |
+| golden-gate-corespotlight-compat | r4 | oclp-hook | experiment | x |  |  | ok | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
+| golden-gate-font-registry | r1 | post | experiment |  |  |  | ok | r1 2026-11-11 Setup and per-user font registries harvested from 26B131 (bf10de4). Root cause: a54ec244 removed |
 | golden-gate-hello | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
-| golden-gate-icon-caches | r1 | post | experiment |  |  |  | **needs** | r1 2026-11-11 IconServices store and indexes harvested from 26B131 (bf10de4), with the 27 index checks. Root c |
+| golden-gate-icon-caches | r1 | post | experiment |  |  |  | ok | r1 2026-11-11 IconServices store and indexes harvested from 26B131 (bf10de4), with the 27 index checks. Root c |
 | golden-gate-metal-framebuffer | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
 | golden-gate-metal-libraries | r16 | oclp-hook | experiment | x |  |  | **needs** | r16 2026-11-11 26B131 artifact adds VectorKit, AlloyCommon and VFX (cache/metallib r54), superseding OCLP's 26 |
-| golden-gate-native-identities | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
-| golden-gate-shader-caches | r8 | post | experiment |  |  |  | **needs** | r8 2026-11-11 Restored for 26B131 with a pack harvested from 26B131 itself (cache/seeds), ancestors and owners |
-| golden-gate-user-seed | r4 | post | experiment |  |  |  | **needs** | r4 2026-11-11 Restored for 26B131 without payloads of its own: runtime and build gate only; fonts moved to gol |
-| golden-gate-userspace | r52 | oclp-hook | experiment | x |  |  | **needs** | r52 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
-| golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
-| hao-opencore | r34 | post | experiment | x |  |  | **needs** | r34 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d; HaoExec  |
-| hao-runtime | r59 | oclp-hook | experiment | x |  |  | **needs** | r59 2026-11-11 26B131 payload rebuilt with hao-runtime 7415a0b from a root that includes the App and OS crypte |
-| metalold-selectors | r3 | oclp-hook | product | x |  |  | **needs** | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
+| golden-gate-native-identities | r1 | oclp-hook | experiment | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
+| golden-gate-shader-caches | r8 | post | experiment |  |  |  | ok | r8 2026-11-11 Restored for 26B131 with a pack harvested from 26B131 itself (cache/seeds), ancestors and owners |
+| golden-gate-user-seed | r4 | post | experiment |  |  |  | ok | r4 2026-11-11 Restored for 26B131 without payloads of its own: runtime and build gate only; fonts moved to gol |
+| golden-gate-userspace | r52 | oclp-hook | experiment | x |  |  | ok | r52 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
+| golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | ok | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
+| hao-opencore | r34 | post | experiment | x |  |  | ok | r34 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d; HaoExec  |
+| hao-runtime | r60 | oclp-hook | experiment | x |  |  | ok | r60 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtil |
+| metalold-selectors | r3 | oclp-hook | product | x |  |  | ok | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
 | rec-audio | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-bluetooth-input | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-brightness-keys | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |

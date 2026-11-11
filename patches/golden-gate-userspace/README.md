@@ -264,7 +264,8 @@ creation logs in automatically (authd accepts loginwindow's `FUSAutologinDataKey
 unlisted ad hoc one.
 
 ## Validation
-NEEDS VALIDATION: host tests cover the current recipe (r48's carrier runs against this Mac's x86_64 cache; no image
+Laptop 2026-11-11, image 4d1c48c (26B131): r46 Setup's own Wi-Fi join, r47 Spotlight without the Swift SIGBUS, r48 automatic login, r49 Safari; r51's Tahoe CoreWiFi auto-joins live and at boot; r52's hao 790720d fixes rapportd and Control Center live. Not yet exercised: the u3 units' Weather/Photos cases, SearchHelper's own identity. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Earlier: host tests cover the current recipe (r48's carrier runs against this Mac's x86_64 cache; no image
 with it has been built or booted), and a Golden Gate-first image assembled with it reached SSH;
 loading of HID and serial DriverKit extensions with the added DriverKit cache, and a full application pass, are open.
 The WiFiPeerToPeer library (r43) was swapped live onto a running 26B131 image on the laptop: AirPlayXPCHelper then

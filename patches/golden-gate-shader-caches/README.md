@@ -38,7 +38,8 @@ trees with their owners (0, 88, 248, 92). On the laptop: MTLCompilerService CPU 
 against bf10de4 (4:21, 476); then `make compare` on a new harvest.
 
 ## Validation
-NEEDS VALIDATION: r8 is built and chain-tested on the host only; no image with it has booted.
+Laptop 2026-11-11, image 4d1c48c (26B131): MTLCompilerService was not among the busiest processes during first boot (bf10de4 without the seed: 4:21 CPU at 9 min). Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Earlier: r8 is built and chain-tested on the host only; no image with it has booted.
 
 ## Revisions
 - r8 2026-11-11 Restored for 26B131 with a pack harvested from 26B131 itself (cache/seeds), ancestors and owners from the harvest instead of src/folders.tsv. Root cause: a54ec244 removed the patch, and the 26A428 pack cannot serve 26B131 (every function hash changed) (this commit).

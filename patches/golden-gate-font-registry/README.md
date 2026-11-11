@@ -23,7 +23,8 @@ Host: `patches/golden-gate-user-seed/tests` (the seed chain). On the laptop: `pe
 registry placed" for the new account; fontd's scan count at Setup and first login.
 
 ## Validation
-NEEDS VALIDATION: built and chain-tested on the host only; no image with it has booted. OPEN (carried from
+Laptop 2026-11-11, image 4d1c48c (26B131): the user seed placed fontd's registry in the new account before its first login; text renders in Setup and apps. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Earlier: built and chain-tested on the host only; no image with it has booted. OPEN (carried from
 mac-image): that fontd adopts a seeded registry without a full rescan.
 
 ## Revisions

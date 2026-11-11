@@ -17,29 +17,32 @@ ARM-only programs on the Intel CPU.
 
 Experimental. MacBookPro9,2 is the only supported model.
 
-The table below is from the 26B131 (macOS 27.2.1) development image built from this
-pipeline on 2026-11-11 (image 4d1c48c) and tested on the laptop: Setup Assistant, a new
-account, the desktop and the apps listed. Fixes tested on the laptop by replacing files
-on the running system, but not yet in a built image, are marked *live-tested*.
+Tested on the laptop with the 26B131 (macOS 27.2.1) development build, 2026-11-11.
 [The 26B131 repair review](docs/repair-review-26B131.md) records earlier evidence.
 
-| Area | State |
-|---|---|
-| Startup | The screen comes on about 65 s after the kernel starts. Setup, account creation and Setup's automatic login after creating the account work. |
-| Desktop | Menu bar, Dock, Finder, Liquid Glass, the lock screen and the login window draw correctly. The first login of a new account is slow for about 10 minutes while macOS sets up the account's app containers (fix in progress). |
-| Graphics | Accelerated HD 4000 desktop. Video decoding uses the HD 4000's hardware decoder: YouTube plays 1080p H.264 with no dropped frames. Newer Metal features are incomplete. |
-| Wi-Fi | Networks are listed and can be joined, including from Setup's own join dialog. Joining remembered networks automatically, also at startup, works with Tahoe's CoreWiFi (on `main`, *live-tested*); with macOS 27's own CoreWiFi it never happens. |
-| Hardware | Speakers, brightness, keyboard, trackpad and Bluetooth work; AirPlay displays are discovered. |
-| Safari | Works, including YouTube. |
-| Control Center | Opens; Wi-Fi, Bluetooth, AirDrop, Now Playing, Display and Sound work. |
-| Maps | Map tiles, search, place cards and current location work. Pin shadows are missing in this image; the VectorKit shader repair is on `main` and not yet checked. |
-| Photos | Import, thumbnails and full-size view work. Live Text: the analysis service now starts and runs text recognition (branch, *live-tested*), but has not yet returned a result. |
-| Calendar, Terminal, System Settings | Work. |
-| Notification Center, widgets | Work: no crash loop. |
-| Spotlight | Opens and searches without crashing, but lists web results instead of local apps: its ranking data never downloads (fix planned). |
-| Background services | A crash loop of `rapportd` and one in Control Center under a newer hao build are fixed in hao-runtime 790720d (*live-tested*; next image). |
-| Other apps | Varies by app. Weather's crash is fixed in hao-runtime and hao-research's interface units; not yet tested. |
-| Sleep and updates | Not yet tested on 26B131. |
+**Working**
+- Startup to Setup Assistant (screen on about 65 s after the kernel starts); Setup, account
+  creation and the automatic login after it.
+- Desktop: menu bar, Dock, Finder, Liquid Glass, lock screen, login window.
+- Accelerated HD 4000 graphics; hardware video decoding (YouTube 1080p H.264, no dropped frames).
+- Wi-Fi: joining from Setup or Settings, and automatic joining of remembered networks,
+  also at startup.
+- Speakers, brightness, keyboard, trackpad, Bluetooth; AirPlay displays are discovered.
+- Safari (including YouTube), Calendar, Terminal, System Settings, Preview.
+- Control Center (Wi-Fi, Bluetooth, AirDrop, Now Playing, Display, Sound).
+- Notification Center and widgets.
+- Maps: tiles, search, place cards, current location.
+- Photos: import, thumbnails, full-size view.
+- Spotlight opens and searches.
+
+**Not working yet**
+- Spotlight lists web results instead of local apps (its ranking data never downloads).
+- Live Text: the analysis service runs text recognition but has not returned a result yet.
+- Maps pin shadows (shader repair built, not yet checked).
+- The first login of a new account is slow for about 10 minutes (account template in progress).
+- ARM programs run translated: general code at roughly 1/2 to 1/3 of native speed, vector and
+  floating-point heavy code much slower (Geekbench ARM run in progress).
+- Weather and other apps vary; sleep and updates are untested on 26B131.
 
 ## Requirements
 

@@ -35,7 +35,8 @@ the Mac, `uname -v` reports the build's Darwin 27 version and `kmutil showloaded
 drivers.
 
 ## Validation
-NEEDS VALIDATION: the collection recipe reproduces BootKC 6494d8e3 (26A428) and c8ae8b05 (26B131 bootstrap), and the
+Laptop 2026-11-11, image 4d1c48c (26B131): boots to Setup, the desktop and apps over three boots. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Earlier: the collection recipe reproduces BootKC 6494d8e3 (26A428) and c8ae8b05 (26B131 bootstrap), and the
 26A428 kernel has booted Tahoe userspace to SSH on a MacBookPro9,2 and Golden Gate userspace to launchd in QEMU; r5
 (kernel file no longer copied by the hook) has not been built.
 

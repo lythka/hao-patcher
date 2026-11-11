@@ -11,7 +11,7 @@
     ]
   },
   "status": "experiment",
-  "validated": false,
+  "validated": true,
   "inputs": [
     "golden_gate_userspace",
     "display_state_shim",

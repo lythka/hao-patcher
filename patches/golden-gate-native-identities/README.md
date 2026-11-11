@@ -62,8 +62,8 @@ passes on the image (codesign checks through the image's Security.framework, so 
 same file fails on any other Mac.
 
 ## Validation
-
-NEEDS VALIDATION. Host tests pass and a host simulation of the 26B131 WindowServer and `corespotlightd` edits gives
+Laptop 2026-11-11, image 4d1c48c (26B131): Setup's automatic login after account creation is authorized in 16 s (system.login.console with the auto-login mechanism). Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Earlier: Host tests pass and a host simulation of the 26B131 WindowServer and `corespotlightd` edits gives
 their rows. No image has been built with this recipe.
 
 ## Revisions

@@ -1,5 +1,5 @@
 {
-  "revision": 59,
+  "revision": 60,
   "stage": "oclp-hook",
   "applies": {
     "models": [
@@ -14,5 +14,5 @@
     "hao_runtime"
   ],
   "status": "experiment",
-  "validated": false
+  "validated": true
 }

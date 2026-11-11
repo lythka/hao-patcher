@@ -31,7 +31,8 @@ against bf10de4 (1:24 Setup, 2:13 benchtest at 08:22); `log show --predicate 'su
 with private data shows records served, not generated.
 
 ## Validation
-NEEDS VALIDATION: built and chain-tested on the host only; no image with it has booted.
+Laptop 2026-11-11, image 4d1c48c (26B131): iconservicesagent was not among the busiest processes during first boot (bf10de4 without the seed: 1:24 CPU at 9 min). Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Earlier: built and chain-tested on the host only; no image with it has booted.
 
 ## Revisions
 - r1 2026-11-11 IconServices store and indexes harvested from 26B131 (bf10de4), with the 27 index checks. Root cause: a54ec244 removed Tahoe's icon-caches and no 27 artifact existed, so every account rendered every icon in the translated agent (this commit).

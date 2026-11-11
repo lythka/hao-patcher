@@ -55,8 +55,8 @@ that only the x86_64 slice changes. On the target, the unified log has `corespot
 daemons keep their PIDs with no new crash reports.
 
 ## Validation
-
-NEEDS VALIDATION. The host getter and donor Mach-O tests pass and the dylib builds with `-Werror`; installation in
+Laptop 2026-11-11, image 4d1c48c (26B131): Spotlight queries run through corespotlightd and mds and return results. Evidence: hao-research store/evidence/claude-26B131-4d1c48c/findings.md.
+Earlier: The host getter and donor Mach-O tests pass and the dylib builds with `-Werror`; installation in
 a built image and stable daemons on the MacBookPro9,2 are not yet proven.
 
 ## Revisions
