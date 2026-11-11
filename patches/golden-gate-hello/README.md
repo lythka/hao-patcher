@@ -1,7 +1,7 @@
 # golden-gate-hello
 
 Plays the first-boot cursive **hello** (Language Chooser) and **Welcome to Mac** (Setup Assistant) on the Intel HD 4000
-under macOS 27.0 (Golden Gate).
+under macOS 27 (Golden Gate; 26A428 and 26B131).
 
 ## Why
 - OCLP's Metal wrapper skips hello deliberately: `_helloSetup` swizzles `+[LCAUtilities shouldSkipHello]` to return
@@ -16,7 +16,7 @@ under macOS 27.0 (Golden Gate).
 
 | File on System | Change | Source |
 |---|---|---|
-| `System/Library/PrivateFrameworks/SetupAssistantSupportUI.framework/Versions/A/Resources/default.metallib` | 27.0's library rewritten by [cache/metallib](../../cache/metallib/README.md) so `textFragment` compiles; Apple's own shader, not a substitute | row `hello_metallib_golden_gate` |
+| `System/Library/PrivateFrameworks/SetupAssistantSupportUI.framework/Versions/A/Resources/default.metallib` | the build's own library rewritten by [cache/metallib](../../cache/metallib/README.md) (`profiles/hello-golden-gate.txt`) so `textFragment` compiles; Apple's own shader, not a substitute. Installed only when the System's copy has the sha256 the row's `SOURCES` names, otherwise the hook stops with `MISSING/unsupported` | row `hello_metallib_golden_gate` (System-rooted folder) |
 | `System/Library/Frameworks/Metal.framework/Versions/A/Metal` (OCLP's wrapper) | `src/edit-metal.py`: `shouldSkipHello` returns NO, Setup Assistant is not swizzled, `LC_LOAD_WEAK_DYLIB /usr/lib/libhelloblur.dylib`; re-signed ad hoc | made in the hook |
 | `usr/lib/libhelloblur.dylib` (new) | blur cache and Continue-button warm-up | row `libhelloblur` |
 
@@ -33,4 +33,5 @@ NEEDS VALIDATION: on a MacBookPro9,2 the Language Chooser played hello and MTLCo
 without a crash; frame rate on the HD 4000 and `textFragment_watchPreview` are untested.
 
 ## Revisions
+- r2 2026-11-11 The hello library row is a System-rooted folder with `SOURCES`; the hook refuses a System library the rewrite was not made from. 26B131 library (the rewrite touches the same eight functions as 26A428's).
 - r1 2026-11-10 Initial public release.

@@ -1,7 +1,7 @@
 # cache/metallib: Metal shader repairs for the HD 4000
 
 Produces the shader inputs that let OCLP's legacy Intel Metal stack (MetalOld, the 31001 AIR downgrader and the
-MTLCompiler 3802 backend) compile the Golden Gate (26A428) system shader libraries on the HD 4000:
+MTLCompiler 3802 backend) compile the Golden Gate (macOS 27) system shader libraries on the HD 4000:
 
 - **Repaired metallibs**: Apple's own libraries, rewritten module by module so the old compiler accepts them. Every
   exported Apple function is kept. Input row `metallib_repairs_golden_gate`.
@@ -20,11 +20,14 @@ Repaired libraries, from the read-only mounted Golden Gate System (the `golden_g
 
 ```sh
 python3.14 -I cache/metallib/make SYSTEM NEW_OUTPUT --work NEW_WORK \
-  --paths cache/metallib/profiles/metallib-repairs-26A428.txt
+  --paths cache/metallib/profiles/metallib-repairs-golden-gate.txt
 ```
 
-`NEW_OUTPUT` is System-rooted and holds `SHA256SUMS` and `build.json` (revision, commit, every input's sha256 and
-recipe). `--overlay DIR` (repeatable) takes a library from an existing System-rooted artifact instead of `SYSTEM`; the
+`profiles/hello-golden-gate.txt` selects the first-boot hello library (row `hello_metallib_golden_gate`) the same way.
+
+`NEW_OUTPUT` is System-rooted and holds `SHA256SUMS`, `SOURCES` (the sha256 of SYSTEM's own copy of each library,
+which the output replaces) and `build.json` (revision, commit, SYSTEM's `ProductBuildVersion` as `system_build`,
+every input's sha256 and recipe). A listed library missing from SYSTEM stops the build (`MISSING/unsupported`). `--overlay DIR` (repeatable) takes a library from an existing System-rooted artifact instead of `SYSTEM`; the
 last overlay holding the path wins. `--air-lowerer DIR` names a checkout of the
 [MetallibSupportPkg](https://github.com/dortania/MetallibSupportPkg) fork with AIR 2.8 support, needed only for the
 `lower` step.
@@ -42,12 +45,12 @@ inputs give identical runtime bytes.
 
 ### Profile format
 
-`profiles/metallib-repairs-26A428.txt` lists one library per line as `RECIPE PATH` (PATH relative to the System
+A profile lists one library per line as `RECIPE PATH` (PATH relative to the System
 root). RECIPE is one or more steps joined by `+`, at most one of them a rewrite:
 
 | Step | What runs |
 |---|---|
-| `golden-gate` | The compatibility suite plus the synchronization ABI repair, assembled with `metal-as` so repaired intrinsic signatures survive. Used for every 26A428 library. |
+| `golden-gate` | The compatibility suite plus the synchronization ABI repair, assembled with `metal-as` so repaired intrinsic signatures survive. Used for every Golden Gate library. |
 | `rewrite` | The compatibility suite (`lib/compatibility.py`) for Tahoe (AIR 2.8) libraries. |
 | `half-vector` | Only the half-vector integer pass (`lib/mkfix_half_vec_int.py`). |
 | `reads` | Only the sampler-form read repair (`lib/sampler_reads.py`). |
@@ -144,4 +147,5 @@ Tests that need Apple binaries are skipped unless `METALLIB_RUNTIME` (a prepared
 
 ## Revisions
 
+- r53 2026-11-11 Profiles name Golden Gate's libraries for any 27.x build (`metallib-repairs-golden-gate.txt`, new `hello-golden-gate.txt`); outputs record `SOURCES` and `system_build` so installers can refuse a library they were not made from; a listed library missing from SYSTEM stops the build.
 - r52 2026-11-10 Initial public release.

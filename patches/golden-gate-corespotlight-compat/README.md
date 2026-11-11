@@ -14,6 +14,11 @@ aborting cleanly. Each crash also starts a ReportCrashService that costs about 2
 loop keeps the machine busy. Both slices have the `_compiledRankingFactsConfiguration` ivar and
 `-rankingFactsConfiguration`; x86_64 `_CSRankingModelConfiguration` has no `-compile`.
 
+26B131 (27.2.1) is the same: its x86_64 CoreSpotlight 2465.1.9 (UUID `534B9EB3-36F4-3D46-9640-3E5181279147`) still
+lacks the getter and has the `NSDictionary` ivar `_compiledRankingFactsConfiguration`, `_CSRankingModelConfiguration`
+still has no `-compile`, and the x86_64 SpotlightDaemon still references the selector. The library looks the class
+and ivar up by name, so the same artifact serves both builds.
+
 ## How it works
 
 `src/corespotlight_compat.m` builds `corespotlight_compat.dylib` (x86_64, links Foundation and CoreSpotlight). At
@@ -55,4 +60,5 @@ NEEDS VALIDATION. The host getter and donor Mach-O tests pass and the dylib buil
 a built image and stable daemons on the MacBookPro9,2 are not yet proven.
 
 ## Revisions
+- r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact serves it unchanged.
 - r3 2026-11-10 Initial public release.

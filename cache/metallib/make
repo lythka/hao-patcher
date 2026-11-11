@@ -6,6 +6,7 @@ import hashlib
 import importlib
 import json
 from pathlib import Path
+import plistlib
 import re
 import shutil
 import subprocess
@@ -181,7 +182,7 @@ def main():
     args.output.mkdir(parents=True)
     converter = lowerer(args.air_lowerer.resolve()) if args.air_lowerer else None
     inputs = [dict(path=str(args.paths), sha256=sha256(args.paths))]
-    outputs = []
+    outputs, originals = [], []
     for number, line in enumerate(args.paths.read_text().splitlines()):
         if not line or line.startswith('#'):
             continue
@@ -195,7 +196,11 @@ def main():
         if '..' in relative.parts:
             raise ValueError('library path escapes System: ' + line)
         source = next((o / relative for o in reversed(args.overlay) if (o / relative).is_file()), args.system / relative)
+        if not (args.system / relative).is_file():
+            sys.exit('MISSING/unsupported: %s is not in %s (profile line %d)' % (relative, args.system, number + 1))
         inputs.append(dict(path=str(source), sha256=sha256(source), recipe=recipe))
+        # SYSTEM's own library, which the output replaces (an overlay's copy may already be repaired).
+        originals.append((sha256(args.system / relative), relative))
         work = args.work / str(number)
         work.mkdir()
         if 'lower' in steps:
@@ -213,9 +218,13 @@ def main():
         shutil.copyfile(source, destination)
         outputs.append(relative)
     (args.output / 'SHA256SUMS').write_text(''.join('%s  %s\n' % (sha256(args.output / r), r) for r in outputs))
+    # The library each output was made from: installers refuse a System whose library differs.
+    (args.output / 'SOURCES').write_text(''.join('%s  %s\n' % entry for entry in originals))
+    version = args.system / 'System/Library/CoreServices/SystemVersion.plist'
+    system_build = plistlib.loads(version.read_bytes())['ProductBuildVersion'] if version.is_file() else None
     git = lambda *a: subprocess.run(['git', '-C', str(HERE), *a], capture_output=True, text=True).stdout.strip()
     (args.output / 'build.json').write_text(json.dumps(dict(
-        schema=1, unit='cache/metallib', revision=revision(), commit=git('rev-parse', 'HEAD'),
+        schema=1, unit='cache/metallib', revision=revision(), commit=git('rev-parse', 'HEAD'), system_build=system_build,
         dirty=bool(git('status', '--porcelain', '--', str(HERE))), inputs=inputs,
         air_lowerer=str(args.air_lowerer.resolve()) if args.air_lowerer else None,
         date=datetime.datetime.now(datetime.timezone.utc).isoformat()), indent=1, sort_keys=True) + '\n')

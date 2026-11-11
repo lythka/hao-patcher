@@ -21,8 +21,8 @@ Metal stack understands, and its frameworks expect those exact libraries:
   exports (Tahoe's has 82) and moves `_shader_state` bits; Tungsten 27.0 inserts
   `color_conversion_available` at function-constant index 3, shifting the later
   constants. With the Tahoe libraries, pipelines compile but draw wrong results
-  (for example NaN color in Photos thumbnails). This patch installs the matching
-  26A428 libraries.
+  (for example NaN color in Photos thumbnails). This patch installs the libraries of
+  the build being made (26A428 or 26B131).
 - **Visible-function references.** The 31001 downgrader resolves
   `air.visible_function_references` before removing RenderBox's unused
   custom-blend path, so ordinary pipelines fail with `unresolved visible function
@@ -45,7 +45,12 @@ Recipes, source and limits are in [cache/metallib/README.md](../../cache/metalli
 ## Inputs
 
 - `metallib_repairs_golden_gate`: a System-rooted tree of repaired `*.metallib`
-  files, made by `cache/metallib/make` with `profiles/metallib-repairs-26A428.txt`.
+  files, made from the build's own System by `cache/metallib/make` with
+  `profiles/metallib-repairs-golden-gate.txt`. Its `SOURCES` lists the sha256 of each
+  System library a repair was made from, `build.json` the build (`system_build`).
+  `src/install_libraries.py` replaces a library only when the System's copy matches
+  `SOURCES`, or, for a copy OCLP installed (RenderBox, Tungsten), when the System is
+  that build; otherwise it stops with `MISSING/unsupported` before writing anything.
 - `metal_quad_runtime_golden_gate`: the extended `runtime.igil64.split` and
   `iCBE.dylib`, made by `cache/metallib/make runtime-build`.
 
@@ -62,7 +67,8 @@ floating association and GPU performance are not measured.
 
 ## Verify
 
-- `python3.14 -I pipeline/patches.py check` and the `cache/metallib` host tests.
+- `python3.14 -I pipeline/patches.py check`, the `cache/metallib` host tests and
+  `python3.14 -I -m unittest discover -s patches/golden-gate-metal-libraries/tests`.
 - Compare the installed files with the input artifacts' `SHA256SUMS`, and the export
   lists with the original libraries.
 - On an Apple GPU: `python3.14 -I cache/metallib/make winograd-check NEW_OUTPUT` and
@@ -79,5 +85,6 @@ matching Tungsten library. A complete image with every library, shader-cache
 re-keying and full-workload performance remain open.
 
 ## Revisions
+- r14 2026-11-11 Installs a repaired library only over the System library it was made from (`SOURCES`), or over OCLP's copy on the build it was made from; 26B131 libraries.
 
 - r13 2026-11-10 Initial public release.

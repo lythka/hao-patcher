@@ -1,6 +1,6 @@
 # metal-fixes
 
-One command for the Golden Gate (26A428) Metal repairs on MacBookPro9,2 (Intel HD
+One command for the Golden Gate (macOS 27) Metal repairs on MacBookPro9,2 (Intel HD
 4000): it builds the artifacts that the Metal input rows select, installs them into
 an offline System, and runs their tests. The repairs themselves live in
 [`cache/metallib`](../../cache/metallib/README.md),
@@ -18,6 +18,8 @@ folder:
 ```sh
 python3.14 -I metal-fixes metallibs --system APPLE_SYSTEM_ROOT \
   --output NEW_LIBRARIES --work NEW_WORK
+python3.14 -I metal-fixes hello --system APPLE_SYSTEM_ROOT \
+  --output NEW_HELLO --work NEW_WORK
 python3.14 -I metal-fixes runtime --input ORIGINAL_RUNTIME_SPLIT \
   --llvm MATCHING_3802_LIBLLVM --compiler ORIGINAL_ICBE --output NEW_RUNTIME
 python3.14 -I metal-fixes compiler-runtime --output NEW_COMPILER_ADAPTERS [--llvm LIBLLVM]
@@ -28,7 +30,8 @@ python3.14 -I metal-fixes mps-apply --cache X86_DYLD_CACHE_DIRECTORY --output NE
 
 | Command | Output | Input row |
 |---|---|---|
-| `metallibs` | The six stock libraries listed in `cache/metallib/profiles/metallib-repairs-26A428.txt`, rewritten for the HD 4000 compiler (`cache/metallib/make`) | `metallib_repairs_golden_gate` |
+| `metallibs` | The six stock libraries listed in `cache/metallib/profiles/metallib-repairs-golden-gate.txt`, rewritten for the HD 4000 compiler (`cache/metallib/make`); `SOURCES` records the System library each was made from | `metallib_repairs_golden_gate` |
+| `hello` | SetupAssistantSupportUI's hello library (`profiles/hello-golden-gate.txt`), same layout | `hello_metallib_golden_gate` |
 | `runtime` | OCLP's Intel runtime bitcode with the added quad and collective helpers, and the repaired `iCBE.dylib` | `metal_quad_runtime_golden_gate` |
 | `compiler-runtime` | Optional compiler and client adapter dylibs | none |
 | `framebuffer` | `libmetal-framebuffer.dylib` and its regression fixtures (not run) | `metal_framebuffer` |
@@ -83,8 +86,13 @@ environment.
 
 ## Limitations
 
-The repairs match only the 26A428 binaries named in each patch. Rebuilt artifacts
+The MPS initializer repair matches only the binaries named above; the library installers refuse a System library
+other than the one an artifact's `SOURCES` names. Rebuilt artifacts
 reproduce the selected runtime and framebuffer bytes, but acceptance on hardware
 is per patch; see each patch's Validation section.
 
 Licensing: see [NOTICE.md](NOTICE.md).
+
+## Revisions
+
+- r1 2026-11-11 `metallibs` uses the Golden Gate profile for any 27.x System; `hello` added.
