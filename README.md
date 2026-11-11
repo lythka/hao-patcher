@@ -12,6 +12,26 @@ ARM-only programs on the Intel CPU.
 
 ![macOS 27 desktop and Control Center on an Intel Mac](docs/images/desktop-intel.jpg)
 
+## Risks
+
+Use hao-patcher only on a **dedicated test Mac** whose contents you can lose.
+
+- Installing an image (`ssdimg push`, or restoring it any other way) overwrites the
+  whole target disk.
+- The image weakens macOS security on purpose: AMFI is off (`amfi_get_out_of_my_way=1`);
+  SIP is lowered and authenticated root is off (`csr-active-config` 0x803) with Secure
+  Boot disabled; `ic_csr_internal=1` makes the kernel report the Apple-internal SIP flag;
+  System programs are re-signed ad hoc; OpenCore loads third-party kexts, including
+  HaoExec and IntelCommpage.
+- hao-runtime changes System files in place and has no uninstaller; see its
+  [Read first](https://github.com/lythka/hao-runtime#read-first). Its binary
+  translation is experimental and can crash programs or damage their data.
+- To recover: hold Option at startup and boot another disk, or Internet Recovery
+  (Command-Option-R); reset NVRAM (Command-Option-P-R); then erase the disk, which removes
+  the OpenCore EFI, and reinstall a supported macOS or restore a backup. hao is part of
+  the image's System snapshot and cannot be removed on its own: deleting its files breaks
+  launchd.
+
 ## Status
 
 Experimental. Development and testing happen on a 2012 13-inch MacBook Pro
