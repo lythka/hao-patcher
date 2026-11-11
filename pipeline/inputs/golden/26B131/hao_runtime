@@ -1,7 +1,7 @@
-# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 5651d79).
+# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 12685dd).
 # Built from a root that includes the App and OS cryptexes (their 26 programs are embedded by golden-gate-userspace).
 # Interface units u3 + the optional-data (URLRequest.httpBody nil) contract: 1,895 units, 3 thunk libraries, matched
 # 1895/1895 against the x86_64 cache 262FA161 (units-match.txt); stub-identities; AOT for 969 paths bound to libhao
-# 56560552. No async provider. Adds since 790720d: native-call cache, JIT vector FP/shifts/LD1-ST1, scalar FP and
+# 75cfde87. No async provider. Adds since 790720d: CPU-profile check (x86-64-v2; refuses a CPU lacking SSE4.2/POPCNT/CX16/AVX), native-call cache, JIT vector FP/shifts/LD1-ST1, scalar FP and
 # conversions, round-to-odd FP32 FMA (indexed FMLA included).
-- store/artifacts/hao-runtime-26B131-20261111-5651d795d09c/payload
+- store/artifacts/hao-runtime-26B131-20261111-12685dde7136/payload

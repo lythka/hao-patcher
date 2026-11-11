@@ -31,6 +31,7 @@ Earlier: earlier payloads booted Golden Gate through translated launchd to the d
 Gate-first image reached SSH; the current profile needs a fresh image and application pass.
 
 ## Revisions
+- r62 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 12685dd (5651d79 + x86-64-v2 build and a startup CPU-feature check). No recipe change.
 - r61 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 5651d79 (native-call cache, JIT vector FP and LD1/ST1, scalar FP and conversions, round-to-odd FP32 FMA; u3 units + the optional-data contract). No recipe change.
 - r60 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 790720d (CoreUtils va_list rows, Optional-witness fix, u3 interface units). No recipe change.
 - r59 2026-11-11 26B131 payload rebuilt with hao-runtime 7415a0b from a root that includes the App and OS cryptexes: 963 programs embedded (937 before; the 26 new ones are in the cryptexes, embedded by golden-gate-userspace r49), and `usr/lib/hao/stub-identities` (hao-runtime 53d26c3). Boot validation pending.
