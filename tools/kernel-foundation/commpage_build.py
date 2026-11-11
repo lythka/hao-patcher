@@ -123,13 +123,23 @@ def csr_layout(code, address, pe_state):
     return bootargs, csr
 
 
+def dyld_cache_uuid(path):
+    with open(path, 'rb') as f:
+        header = f.read(0x68)
+    if not header.startswith(b'dyld_v1') or b'x86_64' not in header[:16]:
+        raise ValueError(f'{path}: not an x86_64 dyld shared cache')
+    return header[0x58:0x68].hex()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('kernel', 'boot-kc', 'donor-kernel', 'donor-source', 'lilu', 'sdk', 'donor-amfi', 'amfi-layout', 'exec-entry', 'fixed-entry', 'donor-sandbox', 'rename-layout', 'donor-endpoint', 'port-policy-layout', 'sandbox-op-layout', 'iosurface-layout', 'out'):
+    for name in ('kernel', 'boot-kc', 'donor-source', 'lilu', 'sdk', 'donor-amfi', 'amfi-layout', 'exec-entry', 'fixed-entry', 'donor-sandbox', 'rename-layout', 'donor-endpoint', 'port-policy-layout', 'sandbox-op-layout', 'iosurface-layout', 'out'):
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--fixed-beyond-max', type=lambda s:int(s,0), required=True,
                         help='Target ABI kernel VM flags, verified against target binary')
     parser.add_argument('--map-jit-flag', type=lambda s:int(s,0), required=True)
+    parser.add_argument('--dyld-cache', type=Path, required=True,
+                        help='main file of the target x86_64 dyld shared cache the Sandbox layout must describe')
     args = parser.parse_args()
     out = args.out.resolve(); out.mkdir(parents=True, exist_ok=False)
     build = out/'build'; build.mkdir()
@@ -154,10 +164,7 @@ def main():
                 return kc[off+va-base:off+va-base+size]
         raise ValueError('Hook outside KC segments')
     names = symbols(kernel)
-    donor_names = symbols(args.donor_kernel.read_bytes())
     hooks = ['_vm_commpage_init','_vm_commpage_text_init','_vm_commpage_enter']
-    for hook in hooks:
-        if hook not in donor_names: raise ValueError('Donor lacks '+hook)
     hooks.append('_amfi_interface_register')
     exec_entry = json.loads(args.exec_entry.read_text())
     if exec_entry['kernel_sha256'] != hashlib.sha256(kernel).hexdigest():
@@ -241,6 +248,10 @@ def main():
     op_layout = json.loads(args.sandbox_op_layout.read_text())
     if op_layout['donor_sha256'] != hashlib.sha256(sandbox).hexdigest():
         raise ValueError('Sandbox operation layout belongs to another donor')
+    target_cache = dyld_cache_uuid(args.dyld_cache)
+    if op_layout['target']['cache_uuid'] != target_cache:
+        raise ValueError(f'Sandbox operation layout was made for dyld cache {op_layout["target"]["cache_uuid"]}, '
+                         f'--dyld-cache is {target_cache}')
     drop = op_layout['drop']
     if (op_layout['target_operation_count']-len(drop) != op_layout['donor_operation_count']
             or drop != sorted(set(drop)) or any(i >= op_layout['target_operation_count'] for i in drop)):
@@ -413,7 +424,7 @@ _IntelCommpage_iosurface_set_value_original:
     run('codesign','--force','--sign','-',contents.parent)
     shutil.copy2(args.donor_source/'APPLE_LICENSE',out/'APPLE_LICENSE')
     inputs = {n:dict(path=str(getattr(args,n).resolve()),sha256=hashlib.sha256(getattr(args,n).read_bytes()).hexdigest())
-              for n in ('kernel','boot_kc','donor_kernel','donor_amfi','amfi_layout','exec_entry','fixed_entry','donor_sandbox','rename_layout','donor_endpoint','port_policy_layout','sandbox_op_layout','iosurface_layout')}
+              for n in ('kernel','boot_kc','donor_amfi','amfi_layout','exec_entry','fixed_entry','donor_sandbox','rename_layout','donor_endpoint','port_policy_layout','sandbox_op_layout','iosurface_layout')}
     source = args.donor_source/'osfmk/vm/vm_shared_region.c'
     inputs['donor_source'] = dict(path=str(args.donor_source.resolve()),
         identity=json.loads((args.donor_source/'source.json').read_text()),
@@ -423,7 +434,7 @@ _IntelCommpage_iosurface_set_value_original:
         commit=subprocess.check_output(['git','-C',str(here),'rev-parse','HEAD'],text=True).strip(),
         dirty=bool(subprocess.check_output(['git','-C',str(here),'status','--porcelain'],text=True)),
         dependencies={n:dependency_identity(getattr(args,n)) for n in ('lilu','sdk')},
-        inputs=inputs,fixed_beyond_max=hex(args.fixed_beyond_max),map_jit_flag=hex(args.map_jit_flag),
+        inputs=inputs,dyld_cache=dict(path=str(args.dyld_cache.resolve()),uuid=target_cache),fixed_beyond_max=hex(args.fixed_beyond_max),map_jit_flag=hex(args.map_jit_flag),
         files={str(p.relative_to(out)):hashlib.sha256(p.read_bytes()).hexdigest() for p in out.rglob('*') if p.is_file()})
     (out/'build.json').write_text(json.dumps(record,indent=2)+'\n'); print(out)
 

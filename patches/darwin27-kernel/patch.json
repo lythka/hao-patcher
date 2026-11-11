@@ -1,12 +1,14 @@
 {
-  "revision": 3,
+  "revision": 4,
   "stage": "oclp-hook",
   "applies": {
     "models": [
       "MacBookPro9,2"
     ],
     "builds": [
-      "25G332", "25G342"]
+      "25G332",
+      "25G342"
+    ]
   },
   "inputs": [
     "darwin27_kernel",

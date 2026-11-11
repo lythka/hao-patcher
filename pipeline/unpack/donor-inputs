@@ -151,6 +151,15 @@ def main():
     zname, z = inplace.open_zip(a.installer); members = set(z.namelist())
     rules = layout_rules(os.path.join(req_dir, req['boot_layout']))
     optional = set(req.get('optional_roots', []))
+    sys.path.insert(0, os.path.join(HERE, '../../tools/tahoe-donors'))
+    from selection import target_supplied
+    cache_images = [l.strip() for l in open(a.target_cache_images) if l.strip()] if a.target_cache_images else []
+    choices = target_supplied(req, a.target_system, cache_images) if a.target_system else []
+    supplied = {r for r, _, _ in choices}
+    req = dict(req, system_roots=[r for r in req['system_roots'] if r not in supplied],
+               legacy_framework_base_roots=[r for r in req['legacy_framework_base_roots'] if r not in supplied])
+    for root, _, reason in choices:
+        note('target native path', root, True, True, reason+'; omitted from installer extraction')
     roots = req['system_roots'] + req['build_tools'] + req['extensions_roots']
     tree_srcs = [s[5:] for _, _, s in rules if s.startswith('tree/')]
     include = set(roots + tree_srcs + ['System/Library/CoreServices/SystemVersion.plist'])
@@ -261,6 +270,9 @@ def main():
             finally:
                 subprocess.run(['/usr/bin/hdiutil', 'detach', mnt], capture_output=True)
             os.remove(img); os.rmdir(mnt)
+            wanted = dk['required_families'] + dk.get('optional_families', [])
+            if all(family in found for family in wanted):
+                break  # Do not reconstruct another cryptex once every requested family is present.
         open(os.path.join(dst, 'metadata.tsv'), 'w').write(''.join(dk_meta))
         owners = sorted({int(l.split('\t')[2]) for l in dk_meta})
         if 'owner_uid' in dk:
@@ -325,7 +337,6 @@ def main():
         note('Kernel Debug Kit', 'KDK for %s' % build, ok, True,
              'KDK %s' % kdk.get('build') if 'build' in kdk else kdk.get('error', ''))
 
-    choices = []
     if a.target_system:
         keep = set(req.get('keep_donor_roots', []))
         cache_images = [l.strip() for l in open(a.target_cache_images) if l.strip()] if a.target_cache_images else None
@@ -403,7 +414,7 @@ def main():
     if choices:
         lines.append('Target-first: %d roots from the target, %d from the donor.' % (
             sum(c[1] == 'target' for c in choices), sum(c[1] == 'donor' for c in choices)))
-        lines += ['  %-6s %s (%s)' % ('27.0' if src == 'target' else 'Tahoe', r, why) for r, src, why in choices]
+        lines += ['  %-6s %s (%s)' % ('target' if src == 'target' else 'Tahoe', r, why) for r, src, why in choices]
     if kdk:
         lines.append('KDK: %s' % (kdk.get('build') or kdk.get('error')))
     lines.append('Found %d, missing %d required, %d optional.' % (sum(r['status'] == 'found' for r in report), len(missing), len(optional_missing)))

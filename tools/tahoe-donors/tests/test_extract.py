@@ -27,7 +27,7 @@ class Donors(unittest.TestCase):
         self.meta=self.root/'sys.tsv';self.meta.write_text('System/Donor\tD\t0\t0\t755\t0\t12\t34\t-\nSystem/Donor/file\tF\t0\t80\t755\t20\t12\t34\tcom.example.test=6162\nSystem/Donor/link\tL\t0\t0\t755\t0\t12\t34\t-\nusr/bin/kmutil\tF\t0\t0\t755\t0\t12\t34\t-\n')
 
     def args(self,command,**kw):
-        return argparse.Namespace(command=command,recipe=self.recipe,output=self.root/'out',tree=self.tree,metadata=self.meta,links=self.links,**kw)
+        return argparse.Namespace(command=command,recipe=self.recipe,output=self.root/'out',tree=self.tree,metadata=None if command=='driverkit' else self.meta,links=self.links,**kw)
 
     def test_native_hash_links_and_authoritative_metadata_without_kernel(self):
         p=self.tree/'System/Donor';p.mkdir(parents=True);(p/'file').write_bytes(b'donor');(p/'link').symlink_to('file')

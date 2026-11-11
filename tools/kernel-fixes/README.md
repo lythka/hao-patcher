@@ -1,9 +1,9 @@
 # kernel-fixes
 
-Kernel and platform repairs that let the Darwin 27 (macOS 27, 26A428) x86_64 kernel run on a
+Kernel and platform repairs that let the Darwin 27 (macOS 27) x86_64 kernel run on a
 MacBookPro9,2 with Tahoe's Intel kexts. The `kernel-fixes` command builds the IntelCommpage kext,
 generates the OpenCore kernel patches for early VM setup, binds both to a specific kernel
-collection and installs them into an offline ESP. Other models and Darwin builds are not supported.
+collection and installs them into an offline ESP. Other models require separate validation.
 
 ## How it works
 
@@ -43,7 +43,6 @@ Build IntelCommpage:
 ```sh
 python3 -I tools/kernel-fixes/kernel-fixes commpage-kext \
   --kernel /path/to/kernel-27.0 --boot-kc /path/to/BootKernelExtensions.kc \
-  --donor-kernel /path/to/kernel-26.5 \
   --donor-amfi /path/to/AppleMobileFileIntegrity \
   --donor-sandbox /path/to/Sandbox \
   --donor-endpoint /path/to/EndpointSecurity \
@@ -122,9 +121,30 @@ unless these variables name them: `DARWIN27_BOOT_KC`, `DARWIN27_TARGET_KERNEL`,
 
 ## Limitations
 
-- The definitions in `profiles/26A428/` fit only the 26A428 kernel and the 25G330 donor kexts.
-  Another build needs new definitions and fresh boot testing.
+- Kernel-only recipes are selected by kernel hash (26A428 and 26B131). A missing or ambiguous identity stops with `MISSING`. `complete-profile` finishes the recipe against the new Boot KC, target cache and Tahoe kexts; it does not need an older OS image. New kernels require a measured recipe and fresh boot testing.
 - Host tests do not show that a kext and repair combination boots; test it in QEMU
   ([`tools/qemu-vm`](../qemu-vm/README.md)) and then on hardware.
 
 Third-party terms: [NOTICE.md](NOTICE.md).
+
+## Completing a kernel recipe
+
+`port-profile` is a maintainer tool: it compares symbols and relocation-masked
+instruction sequences to derive a new kernel recipe. Its output records every
+comparison and marks collection-dependent definitions pending. It never installs
+an unfinished recipe. To build with an existing recipe:
+
+```sh
+python3.14 -I tools/kernel-fixes/kernel-fixes complete-profile \
+  --profile tools/kernel-fixes/profiles/26B131 --kernel KERNEL --boot-kc BOOT_KC \
+  --dyld-cache X86_CACHE --donor-sandbox SANDBOX --donor-iosurface IOSURFACE \
+  --out NEW_PROFILE
+```
+
+Pass `--profile NEW_PROFILE` and `--dyld-cache X86_CACHE` to `commpage-kext`.
+The commpage implementation comes from the vendored XNU source. A separate older
+kernel binary is not needed. The builder verifies the target kernel and Sandbox
+cache identity before compiling.
+
+## Revisions
+- r40 2026-11-11 Select kernel recipes by identity; derive 26B131 definitions from checked symbols/code; complete collection layouts from the current Boot KC and bind Sandbox to the actual userspace cache. Remove the unused older-kernel input. Host tests and static comparisons pass; 26B131 boot validation pending.

@@ -1,0 +1,44 @@
+{
+  "darwin": "27.2",
+  "userspace_build": "26B131",
+  "kernel": {
+    "uuid": "037e7b860ac83c67afb87c2c86435e9a",
+    "sha256": "3c9317518535791503970fbec322b9bba70e91f3a233536205ccd77b047ffc83",
+    "darwin_version": "27.2.0",
+    "xnu": "xnu-13432.41.4"
+  },
+  "officially_supported_models": [
+    "MacBookPro9,2"
+  ],
+  "fixed_beyond_max": "0x2000000001",
+  "map_jit_flag": "0x4000000000",
+  "ported_from": "26A428",
+  "definitions": {
+    "amfi-layout.json": {
+      "sha256": "bd70b8cb8113e04c03bd72d3a3ac1c287dd6581457a26bf1aa035003cd5d5205",
+      "source": "port-profile"
+    },
+    "commpage-exec-entry.json": {
+      "sha256": "3d828bdbd3a18f81d94b476be79a708e993ea7672e7e4ec11467c9a5dc031747",
+      "source": "port-profile"
+    },
+    "commpage-fixed-entry.json": {
+      "sha256": "d59929db45544ee64423b96c935f7a81aa7bc4e7457bfb7f9f1cb2815531f35e",
+      "source": "port-profile"
+    },
+    "endpoint-port-policy.json": {
+      "sha256": "38ed7db586e3d178954dac433fd391309701dae32895eb8f60ed45d359fb5580",
+      "source": "port-profile"
+    },
+    "sandbox-rename-layout.json": {
+      "sha256": "7dc5359e23a28916ef784f5fe010519f51ef356e11f9effadc2d3e52af326507",
+      "source": "port-profile"
+    }
+  },
+  "pending": {
+    "early-vm.json": "needs the new Boot KC: port-profile --new-boot-kc KC",
+    "vm-test-layout.json": "needs the new Boot KC: port-profile --new-boot-kc KC",
+    "sandbox-op-layout.json": "needs make sandbox-layout for the new userspace cache",
+    "iosurface-layout.json": "needs the new Boot KC: kernel-fixes iosurface-layout --boot-kc KC"
+  }
+}

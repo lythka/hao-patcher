@@ -24,4 +24,5 @@ NEEDS VALIDATION: earlier payloads booted Golden Gate through translated launchd
 Gate-first image reached SSH; the current profile needs a fresh image and application pass.
 
 ## Revisions
+- r58 2026-11-11 Select the 26B131 payload with regenerated interface units and AOT; async provider and URLRequest.httpBody adapter remain open. Boot validation pending.
 - r57 2026-11-10 Initial public release.

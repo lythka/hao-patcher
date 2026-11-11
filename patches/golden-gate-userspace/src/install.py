@@ -21,7 +21,7 @@ from legacy_trackpad import plan_cache_family, apply_edits
 from endpoint_security import plan_cache_family as endpoint_plan
 from core_routine import plan_cache_family as routine_plan
 def matrix_plan(cache):
-    package = Path(__file__).resolve().parent / 'inputs/metal_fix_source'
+    package = Path(__file__).resolve().parent / 'build/metal-fixes'
     result = subprocess.check_output([sys.executable, '-I', str(package/'metal-fixes'),
                                       'mps-plan', '--cache', str(cache)], text=True)
     return {Path(path): [(offset, bytes.fromhex(before), bytes.fromhex(after), reason)
@@ -30,7 +30,7 @@ def matrix_plan(cache):
 
 
 def audio_plan(cache):
-    package = Path(__file__).resolve().parent / 'inputs/audio_fix_source'
+    package = Path(__file__).resolve().parent / 'build/audiomxd-fix'
     result = subprocess.check_output([sys.executable, '-I', str(package/'audiomxd-fix'),
                                       'plan', '--cache', str(cache)], text=True)
     return {cache/name: [(offset, bytes.fromhex(before), bytes.fromhex(after), reason)

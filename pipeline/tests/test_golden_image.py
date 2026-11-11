@@ -70,6 +70,8 @@ class FakeCommands:
             artifact=Path(a[a.index('--artifact')+1]);target=Path(a[a.index('--destination')+1])
             assert target.name=='DATA-UUID'
             shutil.copytree(artifact/'payload'/role,target,dirs_exist_ok=True)
+        elif a[:3]==['sh','-eu',self.config['kernel_hook']]:
+            (Path(a[3])/'System/Library/KernelCollections/BootKernelExtensions.kc').write_bytes(b'authored collection')
         elif a[0]=='ditto':
             source,target=map(Path,a[-2:])
             if source.is_dir():shutil.copytree(source,target,dirs_exist_ok=True)
@@ -135,6 +137,7 @@ class GoldenImageTests(unittest.TestCase):
         work=Path(self.config['work']);core=work/'mnt/preboot/DATA-UUID/System/Library/CoreServices'
         self.assertEqual(post['environment']['PATCH_OUTPUT_DIR'],str(work/'post/esp'))
         self.assertTrue(json.loads((work/'post/esp/fixture-producer.json').read_text())['generated'])
+        self.assertEqual((work/'BootKernelExtensions.kc').read_bytes(),b'authored collection')
         self.assertEqual((core/'.root_uuid').read_text(),'DATA-UUID')
         self.assertEqual(plistlib.loads((core/'SystemVersion.plist').read_bytes())['ProductVersion'],'27.0')
         self.assertFalse((work/'mnt/system/System/Library/CoreServices/.disk_label').exists())

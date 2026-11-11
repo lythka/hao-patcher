@@ -209,6 +209,9 @@ class Image:
                           self.mounts['preboot']/self.group/'boot/System/Library/KernelCollections']:
             directory.mkdir(mode=0o755,parents=True,exist_ok=True)
         self.run('sh','-eu',self.config['kernel_hook'],self.mounts['system'])
+        # Kernel repairs are derived from this exact collection after the bootstrap build.
+        self.run('ditto',self.mounts['system']/'System/Library/KernelCollections/BootKernelExtensions.kc',
+                 self.work/'BootKernelExtensions.kc')
 
     def userspace(self):
         self.run('rm','-rf',self.mounts['system']/'.Spotlight-V100')

@@ -1,0 +1,3 @@
+# Build the collection before deriving its kernel repairs; this image is not bootable.
+darwin27-kernel
+golden-gate-userspace

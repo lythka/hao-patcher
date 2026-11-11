@@ -96,9 +96,7 @@
     "required_families": [
       "dyld_shared_cache_x86_64"
     ],
-    "optional_families": [
-      "dyld_shared_cache_x86_64h"
-    ],
+    "optional_families": [],
     "owner_uid": 0
   },
   "basesystem_arch": "x86_64",

@@ -72,7 +72,7 @@ class ReplaceTest(unittest.TestCase):
         self.assertEqual(result, {cache/'dyld_shared_cache_x86_64.01': [(32, b'\x00\xff', b'\xaa\xbb', 'repair')]})
         args = call.call_args.args[0]
         self.assertEqual(args[-3:], ['mps-plan', '--cache', str(cache)])
-        self.assertTrue(args[2].endswith('/inputs/metal_fix_source/metal-fixes'))
+        self.assertTrue(args[2].endswith('/build/metal-fixes/metal-fixes'))
 
     def test_external_audio_plan_resolves_subcache_and_binary_edit(self):
         cache = Path('/input/cache family')
@@ -82,7 +82,7 @@ class ReplaceTest(unittest.TestCase):
         self.assertEqual(result, {cache/'dyld_shared_cache_x86_64.03': [
             (563, bytes.fromhex('ff158738771e'), bytes.fromhex('660f1f440000'), 'no-console repair')]})
         args = call.call_args.args[0]
-        self.assertTrue(args[2].endswith('/inputs/audio_fix_source/audiomxd-fix'))
+        self.assertTrue(args[2].endswith('/build/audiomxd-fix/audiomxd-fix'))
         self.assertEqual(args[-3:], ['plan', '--cache', str(cache)])
 
     def test_replaces_data_contents_without_unlinking_firmlink_endpoint(self):

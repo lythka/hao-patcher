@@ -15,26 +15,20 @@ spec.loader.exec_module(pages)
 
 class TrackpadTest(unittest.TestCase):
     def family(self, root):
-        # Put the image table in main and the Mach-O/code in a subcache: virtual
-        # addresses must not be mistaken for file offsets or extracted offsets.
+        from compat_fixture import fixture, BASE
         main, sub = root/'dyld_shared_cache_x86_64', root/'dyld_shared_cache_x86_64.01'
-        base, image, image_file = 0x200000, 0x400000, 0x1000
-        a, b = bytearray(0x1000), bytearray(0x12000)
-        for data, address in [(a, base), (b, image-image_file)]:
-            data[:16] = b'dyld_v1  x86_64\0'
-            struct.pack_into('<II', data, 16, 512, 1)
-            struct.pack_into('<QQQII', data, 512, address, len(data), 0, 5, 5)
-        struct.pack_into('<II', a, 448, 600, 1)
-        struct.pack_into('<QQQII', a, 600, image, 0, 0, 700, 0)
-        a[700:700+len(module.IMAGE)+1] = module.IMAGE+b'\0'
-        struct.pack_into('<8I', b, image_file, 0xfeedfacf, 0x1000007, 3, 6, 2, 96, 0, 0)
-        struct.pack_into('<II16s', b, image_file+32, 0x1b, 24, module.UUID)
-        struct.pack_into('<II16sQQQQIIII', b, image_file+56, 0x19, 72,
-                         b'__TEXT', image, 0x11000, image_file, 0x11000, 5, 5, 0, 0)
-        for offset, old, _, _ in module.edits():
-            b[image_file+offset:image_file+offset+len(old)] = old
-        main.write_bytes(a); sub.write_bytes(b)
-        return main, sub, image_file
+        a=bytearray(0x1000); image, sites=fixture('MultitouchSupport')
+        b=bytearray(0x1000)+image
+        for data, address in [(a,0x200000),(b,BASE-0x1000)]:
+            data[:16]=b'dyld_v1  x86_64\0'
+            struct.pack_into('<II',data,16,512,1)
+            struct.pack_into('<QQQII',data,512,address,len(data),0,5,5)
+        struct.pack_into('<II',a,448,600,1)
+        struct.pack_into('<QQQII',a,600,BASE,0,0,700,0)
+        a[700:700+len(module.IMAGE)+1]=module.IMAGE+b'\0'
+        main.write_bytes(a);sub.write_bytes(b)
+        self.sites=sites
+        return main,sub,0x1000
 
     def test_resolves_subcache_and_changes_only_planned_instruction_ranges(self):
         with tempfile.TemporaryDirectory() as d:
@@ -45,20 +39,20 @@ class TrackpadTest(unittest.TestCase):
             self.assertEqual(set(plan), {sub})
             module.apply_edits(sub, plan[sub])
             expected = bytearray(before)
-            for relative, old, new, _ in module.edits():
-                expected[offset+relative:offset+relative+len(old)] = new
+            for relative, old, new, _ in plan[sub]:
+                expected[relative:relative+len(old)] = new
             self.assertEqual(sub.read_bytes(), expected)
             self.assertEqual(main.read_bytes(), main_before)
 
-    def test_refuses_wrong_uuid_and_each_changed_instruction_before_writing(self):
-        for changed in [40] + [relative for relative, _, _, _ in module.edits()]:
-            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as d:
-                root = Path(d)
-                _, sub, offset = self.family(root)
-                data = bytearray(sub.read_bytes()); data[offset+changed] ^= 1
+    def test_refuses_changed_opcode_before_writing(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            for index in range(6):
+                _,sub,offset=self.family(root)
+                data=bytearray(sub.read_bytes());data[offset+self.sites[index]]^=1
                 sub.write_bytes(data)
-                with self.assertRaises(ValueError): module.plan_cache_family(root)
-                self.assertEqual(sub.read_bytes(), data)
+                with self.assertRaises(ValueError):module.plan_cache_family(root)
+                self.assertEqual(sub.read_bytes(),data)
 
     def test_apply_does_not_write_first_edit_when_later_edit_changed(self):
         with tempfile.TemporaryDirectory() as d:

@@ -74,4 +74,5 @@ success and makes `BTMCodeSignInfo` classify Calendar, FaceTime and Find My as s
 attribution after ordinary registration and a full image with this revision are not yet proven.
 
 ## Revisions
+- r6 2026-11-11 Generate the identity map from the 26B131 System and matching hao payload. Boot validation pending.
 - r5 2026-11-10 Initial public release.

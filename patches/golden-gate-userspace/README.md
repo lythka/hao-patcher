@@ -65,5 +65,6 @@ NEEDS VALIDATION: host tests cover the current recipe, and a Golden Gate-first i
 loading of HID and serial DriverKit extensions with the added DriverKit cache, and a full application pass, are open.
 
 ## Revisions
+- r42 2026-11-11 Locate CoreRoutine, EndpointSecurity and trackpad repair sites by unique instruction shapes in the supplied cache; preserve relocated branch targets and refuse missing or ambiguous sites. Audio and Metal repair source now comes directly from this checkout. Host fixtures and both 26A428/26B131 caches checked; boot validation pending.
 - r41 2026-11-11 IO80211 compat for 26B131: adds `Apple80211Get20MhzChannelIndexBitmap` (bound by WiFiAnalytics in 26A428 and 26B131, absent from OCLP's wrapper) and 26B131's code 0xe0822410 -> -3998; `make` checks a build's clients against the library and OCLP's IO80211 and names the artifact after the build.
 - r40 2026-11-10 Initial public release.

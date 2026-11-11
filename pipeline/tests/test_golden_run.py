@@ -98,7 +98,7 @@ raise SystemExit(c['rc'])
         with tempfile.TemporaryDirectory() as folder:
             output=Path(folder);(output/'golden.log').write_text('RESULT rc=0\n')
             def complete():
-                time.sleep(0.05);(output/'result').write_text('9\n')
+                time.sleep(0.05);(output/'result.new').write_text('9\n'); (output/'result.new').replace(output/'result')
             thread=threading.Thread(target=complete);thread.start()
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(9,RUN['wait_job'](output,2,poll=0.005))

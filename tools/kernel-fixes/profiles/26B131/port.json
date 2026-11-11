@@ -1,0 +1,114 @@
+{
+  "source": "26A428",
+  "old_kernel": {
+    "uuid": "8f0fa4f88dc23768a7eb04e58c6d1b88",
+    "sha256": "ce09da26bf61813cee503e40872c3b901e2ed3f146ca50ced8a077d344b492e9",
+    "darwin": "27.0.0",
+    "xnu": "xnu-13432.1.9"
+  },
+  "new_kernel": {
+    "uuid": "037e7b860ac83c67afb87c2c86435e9a",
+    "sha256": "3c9317518535791503970fbec322b9bba70e91f3a233536205ccd77b047ffc83",
+    "darwin": "27.2.0",
+    "xnu": "xnu-13432.41.4"
+  },
+  "old_boot_kc": "6494d8e386e072fc2509bf500bbe83e0990554046fe11fda0df6e146738adaf0",
+  "new_boot_kc": null,
+  "evidence": {
+    "amfi-layout.json": {
+      "method": "every function reading the _amfi interface uses the same slots",
+      "functions": 109,
+      "slots": [
+        "call 0x120",
+        "call 0x128",
+        "call 0x138",
+        "call 0x178",
+        "call 0x18",
+        "call 0x1a8",
+        "call 0x1c8",
+        "call 0x1d8",
+        "call 0x1e8",
+        "call 0x20",
+        "call 0x8",
+        "load 0x198"
+      ]
+    },
+    "commpage-exec-entry.json": {
+      "method": "same function code; replayed prologue identical",
+      "function": "_vm_map_exec",
+      "old": "0xffffff80003504b0",
+      "new": "0xffffff8000350e80",
+      "status": "same code",
+      "tolerated": [],
+      "differences": []
+    },
+    "commpage-fixed-entry.json": {
+      "method": "masked signature of the locator through its bound rejection",
+      "old": "0xffffff8000342b60",
+      "new": "0xffffff80003433a0",
+      "window": [
+        "0xffffff8000342b60",
+        "0xffffff8000342c12"
+      ]
+    },
+    "sandbox-rename-layout.json": {
+      "method": "same vn_rename and mac_policy_register code; sole vn_rename epilogue",
+      "_mac_policy_register": {
+        "function": "_mac_policy_register",
+        "old": "0xffffff8000ab4200",
+        "new": "0xffffff8000ab9a00",
+        "status": "same code",
+        "tolerated": [],
+        "differences": []
+      },
+      "_vn_rename": {
+        "function": "_vn_rename",
+        "old": "0xffffff80004c51a0",
+        "new": "0xffffff80004c6930",
+        "status": "same code",
+        "tolerated": [
+          "+0xcc7 mov edx, 0x11f1 -> mov edx, 0x1204 (panic line number)"
+        ],
+        "differences": []
+      },
+      "old_return": "0xffffff80004c5a78",
+      "new_return": "0xffffff80004c7208"
+    },
+    "endpoint-port-policy.json": {
+      "method": "same function code; reads the policy ops slot",
+      "function": "_mac_proc_check_service_port_derive",
+      "old": "0xffffff8000ab9090",
+      "new": "0xffffff8000abe890",
+      "status": "same code",
+      "tolerated": [],
+      "differences": []
+    },
+    "profile.json": {
+      "method": "vm_map_enter_impl and vm_map_enter_mem_object same code (flag masks may differ only where these values give the same result); map_jit_flag tested in vm_map_enter_impl",
+      "_vm_map_enter_impl": {
+        "function": "_vm_map_enter_impl",
+        "old": "0xffffff8000341a90",
+        "new": "0xffffff80003422d0",
+        "status": "same code",
+        "tolerated": [
+          "+0x108c push 0x12da -> push 0x12d7 (panic line number)",
+          "+0x10ae mov r9d, 0x12e2 -> mov r9d, 0x12df (panic line number)",
+          "+0x1b4e mov edx, 0x29af -> mov edx, 0x29ae (panic line number)"
+        ],
+        "differences": []
+      },
+      "_vm_map_enter_mem_object": {
+        "function": "_vm_map_enter_mem_object",
+        "old": "0xffffff80003437c0",
+        "new": "0xffffff8000344000",
+        "status": "same code",
+        "tolerated": [
+          "+0xd0d test edx, 0x4030fe -> test edx, 0x4031fe (immediate without effect on the profile values)",
+          "+0x14cf mov edx, 0x1994 -> mov edx, 0x1991 (panic line number)",
+          "+0x14ec mov ecx, 0x1987 -> mov ecx, 0x1984 (panic line number)"
+        ],
+        "differences": []
+      }
+    }
+  }
+}

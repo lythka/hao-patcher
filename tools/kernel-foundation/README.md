@@ -50,3 +50,6 @@ do not load a kext or boot a VM.
 `tests/bootstrap_pv_vm.py`, `tests/startup_trace_vm.py` and `tests/ssealign_oracle.py` are not
 part of unit discovery: they drive a paused QEMU guest over GDB, or build a test binary to run
 inside a guest, and need a VM you supply.
+
+## Revisions
+- r40 2026-11-11 Bind the Sandbox operation layout to the supplied userspace cache UUID. Use vendored commpage source without requiring an unused older kernel binary. Kernel collection and hardware validation remain separate from host tests.

@@ -6,18 +6,18 @@ VALIDATION), ok = a boot test proved the current revision.
 
 | Patch | Rev | Stage | Status | golden-gate | recovery | stock | Validation | Newest revision |
 |---|---|---|---|---|---|---|---|---|
-| darwin27-kernel | r3 | oclp-hook | experiment | x |  |  | **needs** | r3 2026-11-10 Initial public release. |
+| darwin27-kernel | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Use the measured 26B131 Intel kernel with the 25G342 Tahoe donor kexts. Boot validation pending. |
 | darwin27-sandbox-disk-space | r1 | oclp-hook | experiment | x |  |  | **needs** | r1 2026-11-10 Initial public release. |
 | dev-access | r3 | post | dev |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
-| golden-gate-code-identity | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-10 Initial public release. |
+| golden-gate-code-identity | r6 | oclp-hook | experiment | x |  |  | **needs** | r6 2026-11-11 Generate the identity map from the 26B131 System and matching hao payload. Boot validation pendi |
 | golden-gate-corespotlight-compat | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
 | golden-gate-hello | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-11 The hello library row is a System-rooted folder with `SOURCES`; the hook refuses a System librar |
 | golden-gate-metal-framebuffer | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
 | golden-gate-metal-libraries | r14 | oclp-hook | experiment | x |  |  | **needs** | r14 2026-11-11 Installs a repaired library only over the System library it was made from (`SOURCES`), or over  |
-| golden-gate-userspace | r41 | oclp-hook | experiment | x |  |  | **needs** | r41 2026-11-11 IO80211 compat for 26B131: adds `Apple80211Get20MhzChannelIndexBitmap` (bound by WiFiAnalytics  |
+| golden-gate-userspace | r42 | oclp-hook | experiment | x |  |  | **needs** | r42 2026-11-11 Locate CoreRoutine, EndpointSecurity and trackpad repair sites by unique instruction shapes in  |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
-| hao-opencore | r29 | post | experiment | x |  |  | **needs** | r29 2026-11-10 Initial public release. |
-| hao-runtime | r57 | oclp-hook | experiment | x |  |  | **needs** | r57 2026-11-10 Initial public release. |
+| hao-opencore | r30 | post | experiment | x |  |  | **needs** | r30 2026-11-11 Bind 26B131 kernel repairs and IntelCommpage to the freshly linked collection, and stamp HaoExe |
+| hao-runtime | r58 | oclp-hook | experiment | x |  |  | **needs** | r58 2026-11-11 Select the 26B131 payload with regenerated interface units and AOT; async provider and URLReque |
 | metalold-selectors | r2 | oclp-hook | product | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
 | rec-audio | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-bluetooth-input | r1 | recovery | product |  | x |  | **needs** | r1 2026-11-10 Initial public release. |

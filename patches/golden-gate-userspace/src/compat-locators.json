@@ -1,0 +1,242 @@
+{
+  "libEndpointSecurity.dylib": [
+    {
+      "pattern": "48 85 ff 74 ?? 8b 3f 48 8d 55 80 b9 48 00 00 00 be 0c 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 16,
+      "length": 5,
+      "reason": "12"
+    },
+    {
+      "pattern": "48 85 ff 74 ?? 8b 3f 48 8d 55 80 b9 48 00 00 00 be 0d 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 16,
+      "length": 5,
+      "reason": "13"
+    },
+    {
+      "pattern": "48 c7 45 e8 03 00 00 00 48 85 ff 74 ?? 8b 3f 48 8d 55 b0 b9 48 00 00 00 be 0c 00 00 00 45 31 c0",
+      "offset": 24,
+      "length": 5,
+      "reason": "12"
+    },
+    {
+      "pattern": "48 c7 45 e8 03 00 00 00 48 85 ff 74 ?? 8b 3f 48 8d 55 b0 b9 48 00 00 00 be 0d 00 00 00 45 31 c0",
+      "offset": 24,
+      "length": 5,
+      "reason": "13"
+    },
+    {
+      "pattern": "be 0d 00 00 00 83 de 00 8b 38 48 8d 95 70 ff ff ff b9 48 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 0,
+      "length": 5,
+      "reason": "13"
+    },
+    {
+      "pattern": "48 8d 45 c0 48 89 44 24 18 48 8d 45 b8 48 89 44 24 10 0f 57 c0 0f 11 04 24 be 05 00 00 00 31 d2",
+      "offset": 25,
+      "length": 5,
+      "reason": "5"
+    },
+    {
+      "pattern": "48 c7 45 a0 fd ff ff ff 48 c7 45 80 00 00 00 00 8b 3f 4c 8d 45 80 4c 8d 75 a0 be 0e 00 00 00 31 d2",
+      "offset": 26,
+      "length": 5,
+      "reason": "14"
+    },
+    {
+      "pattern": "49 83 7c 24 18 00 0f 84 ?? ?? ?? ?? 48 8b 45 b0 8b 38 45 31 ed be 09 00 00 00 4c 89 e2 48 8b 4d b8",
+      "offset": 21,
+      "length": 5,
+      "reason": "9"
+    },
+    {
+      "pattern": "be 0a 00 00 00 31 d2 31 c9 45 31 c0 45 31 c9 e8 ?? ?? ?? ?? 85 c0 74 ?? 41 89 c6 48 8d 05 ?? ?? ?? ??",
+      "offset": 0,
+      "length": 5,
+      "reason": "10"
+    },
+    {
+      "pattern": "be 12 00 00 00 31 d2 31 c9 45 31 c0 45 31 c9 e8 ?? ?? ?? ?? 85 c0 74 ?? 41 89 c6 48 8d 05 ?? ?? ?? ??",
+      "offset": 0,
+      "length": 5,
+      "reason": "18"
+    },
+    {
+      "pattern": "c7 45 bc 01 00 00 00 48 c7 45 b0 00 00 00 00 8b 3f 4c 8d 45 b0 4c 8d 4d bc be 0b 00 00 00 31 d2",
+      "offset": 25,
+      "length": 5,
+      "reason": "11"
+    },
+    {
+      "pattern": "c7 45 dc 01 00 00 00 48 c7 45 d0 00 00 00 00 8b 3f 4c 8d 45 d0 4c 8d 4d dc be 1b 00 00 00 31 d2",
+      "offset": 25,
+      "length": 5,
+      "reason": "27"
+    },
+    {
+      "pattern": "48 c7 45 f8 01 00 00 00 8b 3f 48 8d 55 f8 be 0f 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 14,
+      "length": 5,
+      "reason": "15"
+    },
+    {
+      "pattern": "48 89 45 f8 8b 3f 48 8d 55 f8 be 0f 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ?? 89 c1",
+      "offset": 10,
+      "length": 5,
+      "reason": "15"
+    },
+    {
+      "pattern": "e8 ?? ?? ?? ?? 49 89 c6 48 85 c0 74 ?? 8b 3b 48 8d 45 d0 4c 8d 55 cc 4c 8d 5d c0 31 db be 06 00 00 00",
+      "offset": 29,
+      "length": 5,
+      "reason": "6"
+    },
+    {
+      "pattern": "e9 ?? ?? ?? ?? 48 8d 55 10 8b 3b b9 18 02 00 00 be 08 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 16,
+      "length": 5,
+      "reason": "8"
+    },
+    {
+      "pattern": "48 c7 45 f8 01 00 00 00 8b 3f 48 8d 55 f8 be 11 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 14,
+      "length": 5,
+      "reason": "17"
+    },
+    {
+      "pattern": "48 c7 45 f8 00 00 00 00 8b 3f 48 8d 55 f8 be 11 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 14,
+      "length": 5,
+      "reason": "17"
+    },
+    {
+      "pattern": "be 10 00 00 00 b9 01 00 00 00 e8 ?? ?? ?? ?? 85 c0 75 ?? 83 7d f4 01 75 ?? 48 8b 45 e8 48 83 f8 02",
+      "offset": 0,
+      "length": 5,
+      "reason": "16"
+    },
+    {
+      "pattern": "48 c7 45 f8 01 00 00 00 8b 3f 48 8d 55 f8 be 13 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 14,
+      "length": 5,
+      "reason": "19"
+    },
+    {
+      "pattern": "48 c7 45 f8 00 00 00 00 8b 3f 48 8d 55 f8 be 13 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 14,
+      "length": 5,
+      "reason": "19"
+    },
+    {
+      "pattern": "48 89 45 f8 8b 3f 48 8d 55 f8 be 14 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ?? 89 c1",
+      "offset": 10,
+      "length": 5,
+      "reason": "20"
+    },
+    {
+      "pattern": "48 c7 45 e8 00 00 00 00 c7 45 f4 01 00 00 00 8b 3f 4c 8d 45 e8 4c 8d 4d f4 be 15 00 00 00 31 d2",
+      "offset": 25,
+      "length": 5,
+      "reason": "21"
+    },
+    {
+      "pattern": "0f 11 44 24 10 0f 11 04 24 48 8d 55 f8 be 16 00 00 00 b9 01 00 00 00 e8 ?? ?? ?? ?? 89 c1 31 c0",
+      "offset": 13,
+      "length": 5,
+      "reason": "22"
+    },
+    {
+      "pattern": "48 c7 45 e0 00 00 00 00 c7 45 ec 01 00 00 00 8b 3f 48 8d 55 d8 4c 8d 45 e0 4c 8d 4d ec be 17 00 00 00",
+      "offset": 29,
+      "length": 5,
+      "reason": "23"
+    },
+    {
+      "pattern": "0f 11 44 24 10 0f 11 04 24 48 8d 55 f8 be 19 00 00 00 b9 01 00 00 00 e8 ?? ?? ?? ?? 89 c1 31 c0",
+      "offset": 13,
+      "length": 5,
+      "reason": "25"
+    },
+    {
+      "pattern": "48 c7 45 e0 00 00 00 00 c7 45 ec 01 00 00 00 8b 3f 48 8d 55 d8 4c 8d 45 e0 4c 8d 4d ec be 1a 00 00 00",
+      "offset": 29,
+      "length": 5,
+      "reason": "26"
+    },
+    {
+      "pattern": "48 c7 45 f8 01 00 00 00 8b 3f 48 8d 55 f8 be 14 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 14,
+      "length": 5,
+      "reason": "20"
+    },
+    {
+      "pattern": "48 c7 45 f8 00 00 00 00 8b 3f 48 8d 55 f8 be 14 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ??",
+      "offset": 14,
+      "length": 5,
+      "reason": "20"
+    },
+    {
+      "pattern": "be 18 00 00 00 b9 01 00 00 00 45 31 c0 45 31 c9 e8 ?? ?? ?? ?? 85 c0 74 ?? 41 89 c6 48 8d 05 ?? ?? ?? ??",
+      "offset": 0,
+      "length": 5,
+      "reason": "24"
+    },
+    {
+      "pattern": "c7 45 f4 01 00 00 00 4c 8d 45 e8 4c 8d 4d f4 89 f7 be 07 00 00 00 31 d2 31 c9 e8 ?? ?? ?? ?? 85 c0",
+      "offset": 17,
+      "length": 5,
+      "reason": "7"
+    }
+  ],
+  "MultitouchSupport": [
+    {
+      "pattern": "e9 ?? ?? ?? ?? 83 f9 73 75 ?? 48 8d 3d ?? ?? ?? ?? e8 ?? ?? ?? ?? 84 c0 74 ?? 4c 89 e7 44 89 f6",
+      "offset": 5,
+      "length": 21,
+      "reason": "dispatch V3 reports 0x73 and 0x74"
+    },
+    {
+      "pattern": "48 8d 3d ?? ?? ?? ?? e8 ?? ?? ?? ?? 84 c0 0f 84 ?? ?? ?? ?? 4d 85 f6 0f 94 c1 41 83 ff 08 0f 9c c2",
+      "offset": 14,
+      "length": 6,
+      "reason": "allow the V3 frame header on public OS variants"
+    },
+    {
+      "pattern": "48 8d 3d ?? ?? ?? ?? e8 ?? ?? ?? ?? 84 c0 0f 84 ?? ?? ?? ?? 4c 89 ff 44 89 ee 4c 89 f2 48 89 d9",
+      "offset": 14,
+      "length": 6,
+      "reason": "allow V3 contact decoding on public OS variants"
+    },
+    {
+      "pattern": "41 0f b6 47 08 83 c0 d8 83 f8 1c 0f 87 ?? ?? ?? ?? b9 03 06 00 10 0f a3 c1 0f 83 ?? ?? ?? ?? 48 8b 93 a8 00 00 00 49 8b 0f 48 89 df",
+      "offset": 0,
+      "length": 31,
+      "reason": "send decoded 0x74 frames to contact processing"
+    },
+    {
+      "pattern": "74 ?? 49 83 c6 50 48 8d 7d d0 4c 89 f6 e8 ?? ?? ?? ?? f6 83 1c 08 00 00 02 74 ?? 80 8b 08 09 00 00 02",
+      "offset": 0,
+      "length": 2,
+      "reason": "deliver legacy V3 frame header callbacks"
+    },
+    {
+      "pattern": "0f 28 05 ?? ?? ?? ?? 0f 11 47 0c 0f 11 07 48 8d 3d ?? ?? ?? ?? e8 ?? ?? ?? ?? 84 c0 74 ?? 49 8b 06",
+      "offset": 28,
+      "length": 2,
+      "reason": "convert legacy V3 headers for callbacks"
+    }
+  ],
+  "CoreRoutine": [
+    {
+      "pattern": "48 8d 75 c4 31 ff 31 d2 e8 ?? ?? ?? ?? 48 89 c7 ff 15 ?? ?? ?? ?? 48 8b 3d ?? ?? ?? ?? be 01 00 00 00",
+      "offset": 0,
+      "length": 13,
+      "reason": "console lookup"
+    },
+    {
+      "pattern": "4c 8b 25 ?? ?? ?? ?? ff d3 4c 89 ff ff 15 ?? ?? ?? ?? 4c 8b 3d ?? ?? ?? ?? 83 7d c4 00 74 ?? 4c 89 ef",
+      "offset": 25,
+      "length": 6,
+      "reason": "console UID check"
+    }
+  ]
+}

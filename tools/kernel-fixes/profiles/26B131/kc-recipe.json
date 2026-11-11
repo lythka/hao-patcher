@@ -1,0 +1,373 @@
+{
+  "kernel_uuid": "037e7b860ac83c67afb87c2c86435e9a",
+  "kernel_sha256": "3c9317518535791503970fbec322b9bba70e91f3a233536205ccd77b047ffc83",
+  "definitions": {
+    "early-vm.json": {
+      "site": {
+        "segment": "__TEXT",
+        "offset": "0x8ffa02",
+        "kernel_address": "0xffffff8000affa02",
+        "signature": [
+          "0xffffff8000afa5f2",
+          "0xffffff8000afa65a"
+        ],
+        "length": 104
+      },
+      "range_call": {
+        "segment": "__TEXT",
+        "offset": "0x8fe504",
+        "kernel_address": "0xffffff8000afe504",
+        "signature": [
+          "0xffffff8000af90f4",
+          "0xffffff8000af910f"
+        ],
+        "length": 11
+      },
+      "pv_hook": {
+        "segment": "__TEXT",
+        "offset": "0x8fbc36",
+        "kernel_address": "0xffffff8000afbc36",
+        "signature": [
+          "0xffffff8000af67e6",
+          "0xffffff8000af6801"
+        ],
+        "length": 24
+      },
+      "pv_cave": {
+        "segment": "__TEXT",
+        "offset": "0x1c00",
+        "kernel_address": "0xffffff8000201c00",
+        "capacity": 1024,
+        "tail": 32
+      },
+      "pv_addresses": {
+        "pv_zone": {
+          "segment": "__DATA_CONST",
+          "offset": "0x111a0",
+          "kernel_address": "0xffffff80010f41a0",
+          "symbol": "_pv_hashed_list_zone"
+        },
+        "zalloc_flags": {
+          "segment": "__TEXT",
+          "offset": "0xf7690",
+          "kernel_address": "0xffffff80002f7690",
+          "symbol": "_zalloc_flags"
+        },
+        "pv_hash_mask": {
+          "segment": "__DATA",
+          "offset": "0xd6d00",
+          "kernel_address": "0xffffff8000ed6d00",
+          "symbol": "_npvhashmask"
+        },
+        "pv_hash_table": {
+          "segment": "__DATA",
+          "offset": "0xd6cf8",
+          "kernel_address": "0xffffff8000ed6cf8",
+          "symbol": "_pv_hash_table"
+        },
+        "kernel_pmap": {
+          "segment": "__DATA",
+          "offset": "0xd6b40",
+          "kernel_address": "0xffffff8000ed6b40",
+          "symbol": "_kernel_pmap_store"
+        },
+        "avail_start": {
+          "segment": "__DATA",
+          "offset": "0x1f7c40",
+          "kernel_address": "0xffffff8000ff7c40",
+          "symbol": "_avail_start"
+        },
+        "pmap_find_pa": {
+          "segment": "__TEXT",
+          "offset": "0x1daa30",
+          "kernel_address": "0xffffff80003daa30",
+          "symbol": "_pmap_find_pa"
+        },
+        "last_managed_page": {
+          "segment": "__DATA",
+          "offset": "0x1f7d08",
+          "kernel_address": "0xffffff8000ff7d08",
+          "symbol": "_last_managed_page"
+        },
+        "phys_attributes": {
+          "segment": "__DATA",
+          "offset": "0x1f7d10",
+          "kernel_address": "0xffffff8000ff7d10",
+          "symbol": "_pmap_phys_attributes"
+        },
+        "pv_head_table": {
+          "segment": "__DATA",
+          "offset": "0xd7088",
+          "kernel_address": "0xffffff8000ed7088",
+          "symbol": "_pv_head_table"
+        },
+        "pmap_query_pagesize": {
+          "segment": "__TEXT",
+          "offset": "0x1d5910",
+          "kernel_address": "0xffffff80003d5910",
+          "symbol": "_pmap_query_pagesize"
+        },
+        "virtual_avail": {
+          "segment": "__DATA",
+          "offset": "0x1f7c58",
+          "kernel_address": "0xffffff8000ff7c58",
+          "symbol": "_virtual_avail"
+        },
+        "vm_pages_end": {
+          "segment": "__DATA",
+          "offset": "0xd6cd8",
+          "kernel_address": "0xffffff8000ed6cd8",
+          "symbol": "_vm_pages_end"
+        },
+        "pmap_remove_options": {
+          "segment": "__TEXT",
+          "offset": "0x1de6e0",
+          "kernel_address": "0xffffff80003de6e0",
+          "symbol": "_pmap_remove_options"
+        }
+      },
+      "addresses": {
+        "pmap_virtual_space": {
+          "segment": "__TEXT",
+          "offset": "0x1d5580",
+          "kernel_address": "0xffffff80003d5580",
+          "symbol": "_pmap_virtual_space"
+        },
+        "virtual_space_start": {
+          "segment": "__DATA",
+          "offset": "0xd6600",
+          "kernel_address": "0xffffff8000ed6600",
+          "symbol": "_virtual_space_start"
+        },
+        "virtual_space_end": {
+          "segment": "__DATA",
+          "offset": "0xd6608",
+          "kernel_address": "0xffffff8000ed6608",
+          "symbol": "_virtual_space_end"
+        },
+        "map_stolen_data": {
+          "segment": "__KLDDATA",
+          "offset": "0xae80",
+          "kernel_address": "0xffffff80011c9e80",
+          "referenced_by_matched_code": "0xffffff80011c8e80"
+        },
+        "map_data_size": {
+          "segment": "__KLDDATA",
+          "offset": "0xae88",
+          "kernel_address": "0xffffff80011c9e88",
+          "referenced_by_matched_code": "0xffffff80011c8e88"
+        },
+        "kentry_data_size": {
+          "segment": "__KLDDATA",
+          "offset": "0xae90",
+          "kernel_address": "0xffffff80011c9e90",
+          "referenced_by_matched_code": "0xffffff80011c8e90"
+        },
+        "map_nodes_data_size": {
+          "segment": "__KLDDATA",
+          "offset": "0xae98",
+          "kernel_address": "0xffffff80011c9e98",
+          "referenced_by_matched_code": "0xffffff80011c8e98"
+        }
+      }
+    },
+    "vm-test-layout.json": {
+      "_kernel_pmap_store": {
+        "segment": "__DATA",
+        "offset": "0xd6b40",
+        "kernel_address": "0xffffff8000ed6b40",
+        "symbol": "_kernel_pmap_store"
+      },
+      "_physmap_base": {
+        "segment": "__DATA",
+        "offset": "0x22f1c8",
+        "kernel_address": "0xffffff800102f1c8",
+        "symbol": "_physmap_base"
+      },
+      "_vm_pages": {
+        "segment": "__DATA_CONST",
+        "offset": "0x11068",
+        "kernel_address": "0xffffff80010f4068",
+        "symbol": "_vm_pages"
+      },
+      "_vm_page_buckets": {
+        "segment": "__DATA_CONST",
+        "offset": "0xf050",
+        "kernel_address": "0xffffff80010f2050",
+        "symbol": "_vm_page_buckets"
+      },
+      "_pv_head_table": {
+        "segment": "__DATA",
+        "offset": "0xd7088",
+        "kernel_address": "0xffffff8000ed7088",
+        "symbol": "_pv_head_table"
+      },
+      "_virtual_avail": {
+        "segment": "__DATA",
+        "offset": "0x1f7c58",
+        "kernel_address": "0xffffff8000ff7c58",
+        "symbol": "_virtual_avail"
+      },
+      "_vm_kernel_base_page": {
+        "segment": "__DATA",
+        "offset": "0x1f7acc",
+        "kernel_address": "0xffffff8000ff7acc",
+        "symbol": "_vm_kernel_base_page"
+      },
+      "_pmap_memory_regions": {
+        "segment": "__DATA",
+        "offset": "0x1faa20",
+        "kernel_address": "0xffffff8000ffaa20",
+        "symbol": "_pmap_memory_regions"
+      },
+      "_pmap_memory_region_count": {
+        "segment": "__DATA",
+        "offset": "0x1fbe20",
+        "kernel_address": "0xffffff8000ffbe20",
+        "symbol": "_pmap_memory_region_count"
+      },
+      "_pmap_flush_tlbs": {
+        "segment": "__TEXT",
+        "offset": "0x1d6fd0",
+        "kernel_address": "0xffffff80003d6fd0",
+        "symbol": "_pmap_flush_tlbs"
+      },
+      "_panic": {
+        "segment": "__TEXT",
+        "offset": "0x8f441c",
+        "kernel_address": "0xffffff8000af441c",
+        "symbol": "_panic"
+      },
+      "_pv_hash_table": {
+        "segment": "__DATA",
+        "offset": "0xd6cf8",
+        "kernel_address": "0xffffff8000ed6cf8",
+        "symbol": "_pv_hash_table"
+      },
+      "_npvhashmask": {
+        "segment": "__DATA",
+        "offset": "0xd6d00",
+        "kernel_address": "0xffffff8000ed6d00",
+        "symbol": "_npvhashmask"
+      },
+      "before_bootstrap": {
+        "segment": "__TEXT",
+        "offset": "0x90245a",
+        "kernel_address": "0xffffff8000b0245a",
+        "signature": [
+          "0xffffff8000afcf93",
+          "0xffffff8000afcfab"
+        ],
+        "length": 0
+      },
+      "after_bootstrap": {
+        "segment": "__TEXT",
+        "offset": "0x9025e4",
+        "kernel_address": "0xffffff8000b025e4",
+        "signature": [
+          "0xffffff8000afd124",
+          "0xffffff8000afd13f"
+        ],
+        "length": 0
+      },
+      "before_unmap": {
+        "segment": "__TEXT",
+        "offset": "0x1d6236",
+        "kernel_address": "0xffffff80003d6236",
+        "signature": [
+          "0xffffff80003d4cf6",
+          "0xffffff80003d4d10"
+        ],
+        "length": 0
+      },
+      "after_unmap": {
+        "segment": "__TEXT",
+        "offset": "0x1d623b",
+        "kernel_address": "0xffffff80003d623b",
+        "signature": [
+          "0xffffff80003d4cfb",
+          "0xffffff80003d4d13"
+        ],
+        "length": 0
+      },
+      "failure": {
+        "segment": "__TEXT",
+        "offset": "0x1de599",
+        "kernel_address": "0xffffff80003de599",
+        "signature": [
+          "0xffffff80003dd054",
+          "0xffffff80003dd06c"
+        ],
+        "length": 0
+      }
+    }
+  },
+  "early_vm_template": {
+    "kernel_uuid": "8f0fa4f88dc23768a7eb04e58c6d1b88",
+    "collection_sha256": "6494d8e386e072fc2509bf500bbe83e0990554046fe11fda0df6e146738adaf0",
+    "darwin_version": "27.0.0",
+    "site_address": "0xffffff8000be65f2",
+    "site_offset": "0x9e65f2",
+    "original": "48c7058b7889000040000048c705887889000020000048c7058578890000100000b8ff0f000048030521ff6700721b482500f0ffff4889055278890048050070000048890505ff6700c3554889e5488d3d60bc1300488d3572bc1300badd01000031c0e88249ffff",
+    "addresses": {
+      "pmap_virtual_space": "0xffffff80004c0040",
+      "virtual_space_start": "0xffffff8001266540",
+      "virtual_space_end": "0xffffff8001266548",
+      "map_stolen_data": "0xffffff800147de80",
+      "map_data_size": "0xffffff800147de88",
+      "kentry_data_size": "0xffffff800147de90",
+      "map_nodes_data_size": "0xffffff800147de98"
+    },
+    "reservations": {
+      "map_data_size": 16384,
+      "kentry_data_size": 8192,
+      "map_nodes_data_size": 4096
+    },
+    "evidence": {
+      "initial_map_stolen_data": "0x0",
+      "virtual_avail": "0xffffff8025666000",
+      "virtual_end": "0xffffffffffffefff",
+      "slide": "0x20200000",
+      "source": "QMP reads of hybrid-trace after pmap_expand null-address panic; addresses mapped from standalone kernel and BootKC segments"
+    },
+    "range_call": {
+      "offset": "0x9e50f4",
+      "address": "0xffffff8000be50f4",
+      "original": "4889de4c89f2e8816386ff",
+      "lower": "r14",
+      "upper": "rbx",
+      "evidence": "kmem_init passes (map_start, VM_MIN_KERNEL_AND_KEXT_ADDRESS) to helper that stores rsi at entry+0x10 and rdx at entry+0x18. vm_map insertion asserts start < end at standalone 0xffffff800035f351; first VM repair reaches this assertion."
+    },
+    "pv_aliases": {
+      "cave": {
+        "address": "0xffffff80002edc00",
+        "offset": "0xedc00",
+        "capacity": 1024,
+        "original": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000554889e553415441554156415756514883ec084829cc49c7c0000000004a8b04"
+      },
+      "hook": {
+        "address": "0xffffff8000be27e6",
+        "offset": "0x9e27e6",
+        "original": "e8b5698eff4c8d2d4e6383004c89efe8a60887ff4c8b05ff",
+        "overwrite_size": 5
+      },
+      "addresses": {
+        "pv_zone": "0xffffff8000221050",
+        "zalloc_flags": "0xffffff80003e3500",
+        "pv_hash_mask": "0xffffff8001266c40",
+        "pv_hash_table": "0xffffff8001266c38",
+        "kernel_pmap": "0xffffff8001266a80",
+        "avail_start": "0xffffff8001387b80",
+        "pmap_find_pa": "0xffffff80004c54f0",
+        "last_managed_page": "0xffffff8001387c48",
+        "phys_attributes": "0xffffff8001387c50",
+        "pv_head_table": "0xffffff8001266fc8",
+        "pmap_query_pagesize": "0xffffff80004c03d0",
+        "virtual_avail": "0xffffff8001387b98",
+        "vm_pages_end": "0xffffff8001266c18",
+        "pmap_remove_options": "0xffffff80004c91a0"
+      },
+      "evidence": "Physical 0151828: PFN3 identity mapping VA ffffff8000003000 remains, but root VA ffffff8012000000 is in the expanded early-allocation range. Controlled VM allocation at low PFN0x4000 reproduces the same empty-hash branch and lowmem_finalize return offset without editing PV records. Normal zalloc fails before zone metadata initialization; defer alias-aware registration until immediately before zone metadata relocation unmaps the old early range. Keep original pmap_init vm_pages-only range."
+    }
+  }
+}

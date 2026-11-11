@@ -9,66 +9,80 @@ and other packet handlers remain Apple's code.
 The caller must re-sign changed cache files before sealing the cryptex.
 """
 import struct
-import uuid
 from pathlib import Path
 
 IMAGE = b'/System/Library/PrivateFrameworks/MultitouchSupport.framework/Versions/A/MultitouchSupport'
-UUID = uuid.UUID('C3AA1BE3-C6A4-3A3B-ACDE-EFF9F71E2CA9').bytes
+def image_layout(read, base):
+    """Read executable sections from the supplied cache image, without a build allowlist."""
+    header = read(base, 32)
+    if len(header) != 32 or struct.unpack_from('<II', header) != (0xfeedfacf, 0x1000007):
+        raise ValueError('MISSING/unsupported: native x86_64 Mach-O')
+    count, size = struct.unpack_from('<II', header, 16)
+    commands = read(base+32, size)
+    at, text, sections = 0, None, {}
+    for _ in range(count):
+        if at+8 > len(commands):
+            raise ValueError('MISSING/unsupported: truncated load commands')
+        command, length = struct.unpack_from('<II', commands, at)
+        if length < 8 or at+length > len(commands):
+            raise ValueError('MISSING/unsupported: invalid load command')
+        if command == 0x19 and commands[at+8:at+24].rstrip(b'\0') == b'__TEXT':
+            text = struct.unpack_from('<Q', commands, at+24)[0]
+            for i in range(struct.unpack_from('<I', commands, at+64)[0]):
+                row = at+72+i*80
+                if row+80 > at+length:
+                    raise ValueError('MISSING/unsupported: invalid section table')
+                sections[commands[row:row+16].rstrip(b'\0')] = struct.unpack_from('<QQ', commands, row+32)
+        at += length
+    if text != base or b'__text' not in sections:
+        raise ValueError('MISSING/unsupported: __TEXT/__text layout')
+    return size+32, sections
 
 
-def edits():
-    """(TEXT-relative offset, original instructions, replacement, reason)."""
-    # lea -0x73(%rcx),%edx; cmp $1,%edx; ja other_packet; nop to V3 call.
-    # The following original instructions set every argument for the V3 parser.
-    dispatch = bytes.fromhex('8d518d 83fa01 7727') + b'\x90' * 13
-    # The downstream selector lost Tahoe's explicit 0x74 contact-frame case.
-    # Fit it in the original block using short branches to its path/fallback
-    # exits. AL subtraction is safe: range checking rejects wrapped values.
-    # movzbl 8(r15),eax; cmp al,0x74; je path; sub al,0x28; cmp al,0x1c;
-    # ja fallback; mov ecx,0x10000603; bt ecx,eax; jc path; jmp other; nop.
-    route = bytes.fromhex('410fb64708 3c74 7416 2c28 3c1c 770a b903060010 0fa3c1 7206 e9')
-    route += struct.pack('<i', 0xd227 - (0xd090 + 30)) + b'\x90'
-    return [
-        (0xceca, bytes.fromhex('83f973752a488d3dca280100e8655b030084c07416'),
-         dispatch, 'dispatch V3 reports 0x73 and 0x74'),
-        (0xf37b, bytes.fromhex('0f8422010000'), b'\x90' * 6,
-         'allow the V3 frame header on public OS variants'),
-        (0xf56a, bytes.fromhex('0f849e020000'), b'\x90' * 6,
-         'allow V3 contact decoding on public OS variants'),
-        (0xd090, bytes.fromhex('410fb6470883c0d883f81c0f8786010000b9030600100fa3c10f8378010000'),
-         route, 'send decoded 0x74 frames to contact processing'),
-        (0xdca4, bytes.fromhex('7475'), b'\x90' * 2,
-         'deliver legacy V3 frame header callbacks'),
-        (0x10ddb, bytes.fromhex('7461'), b'\x90' * 2,
-         'convert legacy V3 headers for callbacks'),
-    ]
+def code_sites(read, base, image):
+    """Require one match for every instruction recipe before returning any edits.
+
+    Relocated branch and RIP-relative operands are wildcards; opcodes, register
+    choices and selector/packet constants remain exact. Recipes are shared by
+    26A428 and 26B131. An absent or ambiguous shape rejects the whole image.
+    """
+    import json
+    import re
+    _, sections = image_layout(read, base)
+    start, size = sections[b'__text']
+    code = read(start, size)
+    recipes = json.loads(Path(__file__).with_name('compat-locators.json').read_text())[image]
+    found = []
+    for recipe in recipes:
+        pattern = b''.join(b'.' if token == '??' else re.escape(bytes.fromhex(token))
+                           for token in recipe['pattern'].split())
+        hits = list(re.finditer(b'(?=('+pattern+b'))', code, re.S))
+        if len(hits) != 1:
+            raise ValueError('MISSING/unsupported: %s %s: expected one code shape, found %d'
+                             % (image, recipe['reason'], len(hits)))
+        address = start+hits[0].start()+recipe['offset']
+        found.append((address, read(address, recipe['length']), recipe['reason']))
+    return found
 
 
 def checked_edits(read, image_address):
-    """Validate identity and every instruction before returning any writes."""
-    header = read(image_address, 32)
-    magic, cpu = struct.unpack_from('<II', header)
-    if (magic, cpu) != (0xfeedfacf, 0x1000007):
-        raise ValueError('legacy trackpad: expected x86_64 Mach-O')
-    count, size = struct.unpack_from('<II', header, 16)
-    commands = read(image_address + 32, size)
-    at, identity, text = 0, None, None
-    for _ in range(count):
-        command, length = struct.unpack_from('<II', commands, at)
-        if length < 8 or at + length > len(commands):
-            raise ValueError('legacy trackpad: invalid load command')
-        if command == 0x1b:
-            identity = commands[at + 8:at + 24]
-        if command == 0x19 and commands[at + 8:at + 24].rstrip(b'\0') == b'__TEXT':
-            text = struct.unpack_from('<Q', commands, at + 24)[0]
-        at += length
-    if identity != UUID or text != image_address:
-        raise ValueError('legacy trackpad: unsupported MultitouchSupport UUID/layout')
+    sites = code_sites(read, image_address, 'MultitouchSupport')
     result = []
-    for offset, original, replacement, reason in edits():
-        address = text + offset
-        if read(address, len(original)) != original:
-            raise ValueError(f'legacy trackpad: instructions differ at TEXT+{offset:#x}')
+    for i, (address, original, reason) in enumerate(sites):
+        if i == 0:
+            # Preserve the original other-packet destination when adding report 0x74.
+            target = address+5+struct.unpack('b', original[4:5])[0]
+            displacement = target-(address+8)
+            replacement = bytes.fromhex('8d518d83fa0177')+struct.pack('b', displacement)+b'\x90'*13
+        elif i == 3:
+            # Both original range/bit-test failures must reach the same fallback.
+            fallback = address+17+struct.unpack('<i', original[13:17])[0]
+            if fallback != address+31+struct.unpack('<i', original[27:31])[0]:
+                raise ValueError('MISSING/unsupported: trackpad contact fallback paths differ')
+            replacement = bytes.fromhex('410fb647083c7474162c283c1c770ab9030600100fa3c17206e9')
+            replacement += struct.pack('<i', fallback-(address+30))+b'\x90'
+        else:
+            replacement = b'\x90'*len(original)
         result.append((address, original, replacement, reason))
     return result
 

@@ -43,3 +43,14 @@ python3.14 -I -B -m unittest discover -s tools/tahoe-donors/tests
 
 Tests use authored filesystem fixtures for extraction, metadata, hardlinks,
 exclusions and installer ordering. They do not mount or modify an OS image.
+
+## Selection before extraction
+
+`selection.py` checks the target's native code and cache image list before Tahoe
+payload extraction. Target roots with Intel code are omitted from the extraction
+list. Mixed-architecture, missing and resource-only roots remain candidates;
+`keep_donor_roots` always takes precedence. The disk-image services remain paired
+with Tahoe's IOHDIXController, as established by the 27-first laptop test.
+
+## Revisions
+- r10 2026-11-11 Select positively identified native target roots before extracting the Tahoe payload; support fat64 Mach-O headers. DriverKit fixture metadata now follows the actual optional metadata argument.

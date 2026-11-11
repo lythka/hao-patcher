@@ -13,7 +13,7 @@ import stat
 import subprocess
 
 UNIT = Path(__file__).resolve().parent
-REVISION = 9
+REVISION = 10
 
 
 def sha(path):

@@ -62,8 +62,8 @@ while read -r stage name ins; do
     i=$((i + 1))
     recipe=$(python3 -I $TOP/pipeline/patches.py path $name)
     if [[ $stage == oclp-hook ]]; then d=$SHARE/hooks/$(printf %02d $i)-$name; ditto $recipe/src $d
-    else d=$SHARE/post/$(printf %02d $i)-$name; ditto $recipe $d
-        [[ ! -f $d/make.sh ]] || sh $recipe/make.sh $d/build; fi   # host build of the patch's binaries, as pipeline/recovery
+    else d=$SHARE/post/$(printf %02d $i)-$name; ditto $recipe $d; fi
+    [[ ! -f $recipe/make.sh ]] || sh $recipe/make.sh $d/build   # host build of the patch's binaries, as pipeline/recovery
     mkdir -p $d/inputs
     # Bundle mtimes participate in IconServices identities. Preserve the artifact's
     # metadata when cloning it into the share, so its generated indexes stay valid.

@@ -30,4 +30,5 @@ on a MacBookPro9,2 and Golden Gate userspace to launchd in QEMU; a hardware boot
 the current revision is open.
 
 ## Revisions
+- r4 2026-11-11 Use the measured 26B131 Intel kernel with the 25G342 Tahoe donor kexts. Boot validation pending.
 - r3 2026-11-10 Initial public release.

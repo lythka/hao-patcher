@@ -67,3 +67,20 @@ never copy `tree/` as it is.
 
 The installer is only read; it is attached `-readonly -nobrowse` and detached
 again. None of Apple's code is included here.
+
+## Minimal Intel donor extraction
+
+`donor-inputs INSTALLER OUT --requirements tools/tahoe-donors/recipes/intel-donors.json
+--kdk TAHOE_KDK --target-system GOLDEN_SYSTEM --target-cache-images IMAGE_LIST`
+reads the package in place and extracts only required donor roots. Native target
+roots are removed from the payload selection before extraction. The generic
+x86_64 DriverKit cache is required; the Haswell-only cache is not selected for
+MacBookPro9,2. Cryptex reconstruction stops once the requested cache families exist.
+
+Measured with Tahoe 25G342 and Golden Gate 26B131: 8 roots stay native and 42
+come from Tahoe. The payload archive shrank from 1,942,322,740 to 1,476,002,843
+bytes. DriverKit cache bytes shrank from 59,511,923 to 29,755,960, with one
+cryptex reconstruction instead of two. Native and extension manifests match the
+previous extraction exactly; boot and Recovery file contents match (extraction
+timestamps differ). The disk-image services stay pinned to Tahoe after the earlier
+27-first laptop test found they must match IOHDIXController.

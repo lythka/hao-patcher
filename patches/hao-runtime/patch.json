@@ -1,12 +1,14 @@
 {
-  "revision": 57,
+  "revision": 58,
   "stage": "oclp-hook",
   "applies": {
     "models": [
       "MacBookPro9,2"
     ],
     "builds": [
-      "25G332", "25G342"]
+      "25G332",
+      "25G342"
+    ]
   },
   "inputs": [
     "hao_runtime"

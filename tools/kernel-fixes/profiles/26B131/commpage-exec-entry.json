@@ -1,0 +1,9 @@
+{
+  "kernel_sha256": "3c9317518535791503970fbec322b9bba70e91f3a233536205ccd77b047ffc83",
+  "symbol": "_vm_map_exec",
+  "prefix_hex": "554889e54157415641554154534883ec18",
+  "evidence": {
+    "26A428": "Target vm_map_exec at 0xffffff80003504b0 preserves map/task/is64bit as the first three arguments, but contains no vm_commpage_enter call; the empty callee was eliminated. Replay the first 17 bytes, all stack operations without RIP-relative operands, after restoring argument registers. Remaining stack arguments pass through unchanged.",
+    "port": "kernel-fixes port-profile: see port.json \"commpage-exec-entry.json\""
+  }
+}

@@ -1,12 +1,14 @@
 {
-  "revision": 41,
+  "revision": 42,
   "stage": "oclp-hook",
   "applies": {
     "models": [
       "MacBookPro9,2"
     ],
     "builds": [
-      "25G332", "25G342"]
+      "25G332",
+      "25G342"
+    ]
   },
   "status": "experiment",
   "validated": false,
@@ -14,8 +16,6 @@
     "golden_gate_userspace",
     "display_state_shim",
     "io80211_compat",
-    "display_install_helper",
-    "metal_fix_source",
-    "audio_fix_source"
+    "display_install_helper"
   ]
 }

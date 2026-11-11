@@ -14,8 +14,8 @@ import sys
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parents[1]  # repository root: patches/, cache/, tools/
 UNIT = REPO/'tools/kernel-foundation'
-PROFILE = ROOT/'profiles/26A428'
-REVISION = 39
+PROFILES = ROOT/'profiles'
+REVISION = 40
 SCRIPTS = {'repair-binding': REPO/'patches/hao-opencore/src/repair_binding.py',
            'commpage-kext': UNIT/'commpage_build.py',
            'iosurface-layout': UNIT/'iosurface_layout.py',
@@ -28,11 +28,124 @@ SCRIPTS = {'repair-binding': REPO/'patches/hao-opencore/src/repair_binding.py',
 def module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
     result = importlib.util.module_from_spec(spec)
+    sys.modules[name] = result
     spec.loader.exec_module(result)
     return result
 
 
+def profile_identity(folder):
+    """(kernel sha256s, kernel UUIDs) a profile is bound to: profile.json `kernel`, or for an older profile the
+    kernel_sha256/kernel_uuid fields of its definitions."""
+    profile = json.loads((folder/'profile.json').read_text())
+    if 'kernel' in profile:
+        return {profile['kernel']['sha256']}, {profile['kernel']['uuid']}
+    shas, uuids = set(), set()
+    for name in profile['definitions']:
+        definition = json.loads((folder/name).read_text())
+        if 'kernel_sha256' in definition:
+            shas.add(definition['kernel_sha256'])
+        if 'kernel_uuid' in definition:
+            uuids.add(definition['kernel_uuid'])
+    return shas, uuids
+
+
+def select_profile(sha256=None, uuid=None, needs=()):
+    """The one profile bound to this kernel (by sha256, or by UUID for a Boot KC), with `needs` present and
+    matching the sha256 recorded in its profile.json."""
+    found = []
+    for folder in sorted(p for p in PROFILES.iterdir() if (p/'profile.json').exists()):
+        shas, uuids = profile_identity(folder)
+        if (sha256 or uuid) and (not sha256 or sha256 in shas) and (not uuid or uuid in uuids):
+            found.append(folder)
+    what = f'kernel {sha256 or uuid}'
+    if len(found) != 1:
+        raise ValueError(f'MISSING: kernel-fixes profile for {what} ({len(found)} profiles match); '
+                         'make one with kernel-fixes port-profile' if not found else f'{what}: profiles {found} all match')
+    folder = found[0]
+    profile = json.loads((folder/'profile.json').read_text())
+    for name in needs:
+        if name in profile.get('pending', {}):
+            raise ValueError(f'MISSING: {folder.name}/{name}: {profile["pending"][name]}')
+        expected = profile['definitions'].get(name, {}).get('sha256')
+        if expected != hashlib.sha256((folder/name).read_bytes()).hexdigest():
+            raise ValueError(f'{folder.name}/{name} does not match the sha256 in its profile.json')
+    return folder
+
+
+def argument(args, flag):
+    for i, value in enumerate(args):
+        if value == flag and i+1 < len(args):
+            return args[i+1]
+        if value.startswith(flag+'='):
+            return value.split('=', 1)[1]
+    return None
+
+
+COMMPAGE_DEFINITIONS = {'--amfi-layout': 'amfi-layout.json', '--exec-entry': 'commpage-exec-entry.json',
+                        '--fixed-entry': 'commpage-fixed-entry.json', '--rename-layout': 'sandbox-rename-layout.json',
+                        '--port-policy-layout': 'endpoint-port-policy.json',
+                        '--sandbox-op-layout': 'sandbox-op-layout.json', '--iosurface-layout': 'iosurface-layout.json'}
+
+
+def commpage_arguments(args):
+    """commpage-kext arguments with the definitions of the profile bound to --kernel filled in."""
+    args = list(args)
+    folder = argument(args, '--profile')
+    kernel = argument(args, '--kernel')
+    if kernel is None:
+        raise ValueError('commpage-kext needs --kernel')
+    needs = [n for flag, n in COMMPAGE_DEFINITIONS.items() if argument(args, flag) is None]
+    if folder:
+        i = args.index('--profile') if '--profile' in args else next(i for i, a in enumerate(args) if a.startswith('--profile='))
+        del args[i:i+(2 if args[i] == '--profile' else 1)]
+        folder = Path(folder)
+        shas, _ = profile_identity(folder)
+        if hashlib.sha256(Path(kernel).read_bytes()).hexdigest() not in shas:
+            raise ValueError('MISSING/unsupported: profile belongs to another kernel')
+        profile = json.loads((folder/'profile.json').read_text())
+        for name in needs:
+            expected = profile['definitions'].get(name, {}).get('sha256')
+            if not (folder/name).is_file() or expected != hashlib.sha256((folder/name).read_bytes()).hexdigest():
+                raise ValueError('MISSING/unsupported: profile definition '+name)
+    else:
+        kernel = argument(args, '--kernel')
+        if kernel is None:
+            raise ValueError('commpage-kext needs --kernel')
+        folder = select_profile(hashlib.sha256(Path(kernel).read_bytes()).hexdigest(), needs=needs)
+    values = json.loads((folder/'profile.json').read_text())
+    defaults = {'--donor-source': ROOT/'vendor/XNU', '--lilu': ROOT/'vendor/Lilu', '--sdk': ROOT/'vendor/MacKernelSDK',
+                **{flag: folder/name for flag, name in COMMPAGE_DEFINITIONS.items()},
+                '--fixed-beyond-max': values['fixed_beyond_max'], '--map-jit-flag': values['map_jit_flag']}
+    for flag, value in defaults.items():
+        if argument(args, flag) is None:
+            args += [flag, str(value)]
+    return args
+
+
+def collection_kernel_uuid(path):
+    return module('port_profile', ROOT/'port_profile.py').Collection(path).kernel_uuid
+
+
+def port_profile(args):
+    port = module('port_profile', ROOT/'port_profile.py')
+    generators = []
+    if args.dyld_cache and args.donor_sandbox:
+        generators.append(('sandbox-op-layout.json', [sys.executable, '-I', SCRIPTS['sandbox-layout'],
+                           '--dyld-cache', args.dyld_cache, '--sandbox-kext', args.donor_sandbox,
+                           *(['--boot-kc', args.new_boot_kc] if args.new_boot_kc else [])]))
+    if args.new_boot_kc and args.donor_iosurface:
+        generators.append(('iosurface-layout.json', [sys.executable, '-I', SCRIPTS['iosurface-layout'],
+                           '--donor-iosurface', args.donor_iosurface, '--boot-kc', args.new_boot_kc]))
+    pending = port.port(args.source, args.old_kernel, args.old_boot_kc, args.new_kernel, args.build, args.out,
+                        args.new_boot_kc, generators)
+    for name, reason in pending.items():
+        print(f'PENDING: {name}: {reason}')
+    print(args.out)
+
+
 def build_repairs(capture, collection, commpage, output):
+    if capture is None:
+        capture = select_profile(uuid=collection_kernel_uuid(collection), needs=['early-vm.json'])/'early-vm.json'
     patches, repair = module('early_vm_recipe', UNIT/'early_vm.py').generate(capture, collection)
     output.mkdir(parents=True, exist_ok=False)
     config = dict(Kernel=dict(Patch=patches, Add=[dict(
@@ -60,25 +173,15 @@ def main(argv=None):
     if argv and argv[0] in SCRIPTS:
         name, args = argv[0], argv[1:]
         if name == 'commpage-kext' and '--help' not in args:
-            values = json.loads((PROFILE/'profile.json').read_text())
-            defaults = {'--donor-source': ROOT/'vendor/XNU', '--lilu': ROOT/'vendor/Lilu',
-                        '--sdk': ROOT/'vendor/MacKernelSDK',
-                        '--amfi-layout': PROFILE/'amfi-layout.json',
-                        '--exec-entry': PROFILE/'commpage-exec-entry.json',
-                        '--fixed-entry': PROFILE/'commpage-fixed-entry.json',
-                        '--rename-layout': PROFILE/'sandbox-rename-layout.json',
-                        '--port-policy-layout': PROFILE/'endpoint-port-policy.json',
-                        '--sandbox-op-layout': PROFILE/'sandbox-op-layout.json',
-                        '--iosurface-layout': PROFILE/'iosurface-layout.json',
-                        '--fixed-beyond-max': values['fixed_beyond_max'], '--map-jit-flag': values['map_jit_flag']}
-            for flag, value in defaults.items():
-                if flag not in args:
-                    args += [flag, str(value)]
+            try:
+                args = commpage_arguments(args)
+            except (OSError, ValueError) as error:
+                raise SystemExit(f'kernel-fixes: {error}')
         return subprocess.run([sys.executable, '-I', str(SCRIPTS[name]), *args]).returncode
     parser = argparse.ArgumentParser(description=__doc__, epilog='Additional recipes: '+', '.join(SCRIPTS))
     sub = parser.add_subparsers(dest='command')
     build = sub.add_parser('build-repairs', help='emit OpenCore repair definitions and the built IntelCommpage bundle')
-    build.add_argument('--capture', type=Path, default=PROFILE/'early-vm.json')
+    build.add_argument('--capture', type=Path, help='early-vm capture (default: the profile of the KC kernel)')
     build.add_argument('--boot-kc', type=Path, required=True)
     build.add_argument('--commpage-artifact', type=Path, required=True)
     build.add_argument('--output', type=Path, required=True)
@@ -86,11 +189,37 @@ def main(argv=None):
     install.add_argument('--esp-root', type=Path, required=True)
     install.add_argument('--boot-kc', type=Path, required=True)
     install.add_argument('--artifact', type=Path, required=True)
+    ported = sub.add_parser('port-profile', help='derive a profile for another kernel from an existing one')
+    ported.add_argument('--from', dest='source', type=Path, required=True, help='source profile folder')
+    ported.add_argument('--old-kernel', type=Path, required=True, help='kernel the source profile is bound to')
+    ported.add_argument('--old-boot-kc', type=Path, required=True, help='Boot KC of the source early-vm capture')
+    ported.add_argument('--new-kernel', type=Path, required=True)
+    ported.add_argument('--build', required=True, help='userspace build the new profile is for, e.g. 26B131')
+    ported.add_argument('--new-boot-kc', type=Path, help='Boot KC built with the new kernel (completes the KC definitions)')
+    ported.add_argument('--donor-iosurface', type=Path, help='IOSurface donor (with --new-boot-kc: iosurface-layout)')
+    ported.add_argument('--dyld-cache', type=Path, help='new x86_64 dyld cache (with --donor-sandbox: sandbox-op-layout)')
+    ported.add_argument('--donor-sandbox', type=Path)
+    ported.add_argument('--out', type=Path, required=True, help='new profile folder')
+    finished = sub.add_parser('complete-profile', help='finish a kernel recipe with this build’s Boot KC and Tahoe kexts')
+    for flag in ('profile', 'kernel', 'boot-kc', 'dyld-cache', 'donor-sandbox', 'donor-iosurface', 'out'):
+        finished.add_argument('--'+flag, type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == 'build-repairs':
             build_repairs(args.capture, args.boot_kc, args.commpage_artifact, args.output)
             print(args.output)
+        elif args.command == 'port-profile':
+            port_profile(args)
+        elif args.command == 'complete-profile':
+            generators = [('sandbox-op-layout.json', [sys.executable, '-I', SCRIPTS['sandbox-layout'],
+                          '--dyld-cache', args.dyld_cache, '--sandbox-kext', args.donor_sandbox, '--boot-kc', args.boot_kc]),
+                          ('iosurface-layout.json', [sys.executable, '-I', SCRIPTS['iosurface-layout'],
+                          '--donor-iosurface', args.donor_iosurface, '--boot-kc', args.boot_kc])]
+            pending = module('port_profile', ROOT/'port_profile.py').complete(
+                args.profile, args.kernel, args.boot_kc, args.out, generators)
+            if pending:
+                raise ValueError('MISSING/unsupported: unfinished definitions '+', '.join(pending))
+            print(args.out)
         elif args.command == 'install-kernel':
             apply = module('kernel_repair_install', REPO/'patches/hao-opencore/src/repairs.py').apply
             apply(args.esp_root/'EFI/OC/config.plist', args.artifact, args.boot_kc)
