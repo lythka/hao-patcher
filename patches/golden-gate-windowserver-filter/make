@@ -4,6 +4,7 @@ import datetime
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,15 @@ TOP = HERE.parents[1]
 
 def run(*args):
     return subprocess.check_output(list(map(str, args)), cwd=TOP, text=True).strip()
+
+def profiles():
+    """The builds and image UUIDs src/profiles.h supports, in table order."""
+    found = {}
+    for line in (HERE/'src/profiles.h').read_text().splitlines():
+        match = re.match(r'(SKYLIGHT|QUARTZCORE)_PROFILE\("([^"]+)".*// ([0-9A-F-]{36})$', line)
+        if match:
+            found.setdefault(match[2], {})[match[1].lower()] = match[3]
+    return found
 
 def main(root):
     root = Path(root).resolve()
@@ -27,7 +37,8 @@ def main(root):
         run('codesign', '-f', '-s', '-', binary)
         digest = hashlib.sha256(binary.read_bytes()).hexdigest()
         now = datetime.datetime.now(datetime.timezone.utc)
-        out = root/f'windowserver-filter-26A428-{now:%Y%m%d}-{digest[:12]}'
+        builds = profiles()
+        out = root/f'windowserver-filter-{list(builds)[-1]}-{now:%Y%m%d}-{digest[:12]}'
         out.mkdir()
         (out/binary.name).write_bytes(binary.read_bytes())
         (out/binary.name).chmod(0o755)
@@ -36,7 +47,7 @@ def main(root):
             'revision': json.loads((HERE/'patch.json').read_text())['revision'],
             'commit': run('git', 'rev-parse', 'HEAD'),
             'dirty': bool(run('git', 'status', '--porcelain')),
-            'date': now.isoformat(), 'inputs': sources,
+            'date': now.isoformat(), 'inputs': sources, 'profiles': builds,
             'compiler': run('xcrun', 'clang', '--version'),
             'sha256': digest,
         }, indent=2)+'\n')

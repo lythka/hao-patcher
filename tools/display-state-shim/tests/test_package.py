@@ -27,6 +27,12 @@ class PackageTests(unittest.TestCase):
             result = subprocess.check_output([str(converter)], text=True)
             self.assertIn('PASS: 0 failures', result)
             self.assertEqual(result.count('ok   '), 14)
+            gate = root / 'test_gate'
+            subprocess.run(['xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O1',
+                            '-Wall', '-Wextra', '-Werror', '-o', str(gate), 'tests/test_gate.c',
+                            'src/dss_convert.c'], cwd=HERE, check=True)
+            subprocess.run(['codesign', '-s', '-', '-f', str(gate)], check=True)
+            self.assertIn('PASS: build table and gate', subprocess.check_output([str(gate)], text=True))
             artifact = root / 'artifact'
             module.build(artifact)
             record = json.loads((artifact / 'build.json').read_text())
