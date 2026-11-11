@@ -269,20 +269,23 @@ with it has been built or booted), and a Golden Gate-first image assembled with 
 loading of HID and serial DriverKit extensions with the added DriverKit cache, and a full application pass, are open.
 The WiFiPeerToPeer library (r43) was swapped live onto a running 26B131 image on the laptop: AirPlayXPCHelper then
 started without the libobjc abort. An image built with r43, and coreaudiod starting on it, are not yet tested.
-r46 (stand-in methods) is host-tested only: an x86_64 probe sends WiFiAgent's `-activate`/`-invalidate` under
-Rosetta. Not yet shown on an image: WiFiAgent logging "XPCListener started." in a user session, its
-`com.apple.wifi.WiFiAgent` endpoint `active = 1`, and Setup's own join reaching the password sheet.
-The Swift conformance repair (r47) is checked on host copies of the 26B131 cache only (verifier 47 -> 0 bad
-references); an image built with it, and Siri AI.app launching from Cmd-Space, are not yet tested. None of r46,
-r47, r48 (code identity carrier) and r49 (cryptex stubs) has been validated on an image.
-r49 (cryptex stubs) is host-tested only (fixtures, and the real 26B131 payload's App stubs embedded into copies of
-AppOS's programs). Not yet shown: an image whose cryptexes graft with the rebuilt App image, and SearchHelper and the
-WebKit XPC services running under their own identity (process path the helper's, not `/usr/libexec/hao`).
+Laptop, image 4d1c48c (26B131, built from adfd15a0 = r49), 2026-11-11 (evidence
+hao-research store/evidence/claude-26B131-4d1c48c/findings.md):
+- r46: Setup's own Wi-Fi join shows WiFiAgent's password sheet; airportd receives `BEGIN REQ [ASSOC]` from WiFiAgent
+  and joins (bf10de4 hung at "Connecting..."). Confirmed.
+- r47: Cmd-Space opens the Spotlight panel in Siri AI.app without the SIGBUS (bf10de4 crashed every launch).
+  Confirmed. (Its local app results are missing for an unrelated reason: Spotlight's ranking assets never download
+  because ic_csr_internal makes the build look internal.)
+- r48: after Setup creates the account, authd authorizes `system.login.console` with the auto-login mechanism in 16 s
+  and Setup continues in the user session (bf10de4 hung: "client is not allowed to supply FUSAutologinDataKey").
+  Confirmed.
+- r49: Safari opens and loads pages; SearchHelper and the WebKit services' own identity not separately checked.
 r50's live swap on the laptop crashed airportd at start-up (Tahoe CoreWiFi's categories not attached; fixed in r51).
-r51 (Tahoe CoreWiFi + compat) is host-tested only: under Rosetta the compat library re-exports an authored stand-in
-and, on a macOS 27 host, the real Tahoe CoreWiFi in front of the cached 27.x CoreWLAN, with no duplicate classes.
-Not yet shown on the laptop: airportd surviving auto-join, `networksetup -setairportnetwork` joining, auto-join after a
-reboot, no airportd `.ips`.
+r51 (Tahoe CoreWiFi + compat) on the laptop (4d1c48c, files swapped live, then persisted into the System snapshot):
+airportd starts and maps CoreWiFi + CoreWiFiTahoe.dylib; Wi-Fi off/on auto-joins the remembered network in 14-27 s
+with no airportd `.ips`; control on the same laptop with the cached 27.x CoreWiFi never auto-joins ("All scan results
+are filtered out ... Known network is found nearby but not joined"); after a reboot with the files persisted, Wi-Fi
+auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
 - r51 2026-11-11 The live test of r50 crashed airportd at start-up: `-[NSString redactedForWiFi]` (a Tahoe CoreWiFi category) unrecognized, because the cut-out library still claimed dyld-attached categories and libobjc skips those at launch (tools/cache-dylib r3 clears the flag; check.py refuses it). New Artifact test links CoreWiFi at launch and checks its categories attach. Row tahoe_native_donors re-cut; corewifi_compat unchanged.
