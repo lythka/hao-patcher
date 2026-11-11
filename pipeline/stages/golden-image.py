@@ -7,7 +7,7 @@ new regular image, a new work directory, size_bytes, name, python, layout_helper
 pristine_script, kdk_preparer, payload (filesystem/os/app/rosetta.dmg), kernel, kdk, fl,
 donor_tool, donors {native,extensions,boot,driverkit,recovery}, esp (tree),
 hardware {tool,artifact}, kernel_hook (staged kc-hook.sh), userspace
-{install,shim,io80211}, hooks [{name,hook,kc_hook}], posts
+{install,shim,io80211,wifip2p}, hooks [{name,hook,kc_hook}], posts
 [{name,script,folder}], and environment. Absent per-hook scripts are explicit
 null values. Staged hook folders already contain their declared input files.
 The host runner owns input selection/staging and source identities.
@@ -217,7 +217,7 @@ class Image:
         self.run('rm','-rf',self.mounts['system']/'.Spotlight-V100')
         c = self.config
         self.run(c['python'],'-I',c['userspace']['install'],self.mounts['system'],c['payload'],
-                 c['userspace']['shim'],c['userspace']['io80211'],'--prepared-system',
+                 c['userspace']['shim'],c['userspace']['io80211'],c['userspace']['wifip2p'],'--prepared-system',
                  '--driverkit-artifact',c['donors']['driverkit'],'--donor-tool',c['donor_tool'])
 
     def kc_hooks(self):

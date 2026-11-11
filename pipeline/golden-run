@@ -74,7 +74,8 @@ def guest_config(recipe, share, local):
                 donors={role:GUEST+'/assembly-inputs/'+role for role in ('native','extensions','boot','driverkit','recovery')},
                 esp=local+'/source/esp',hardware=dict(tool=local+'/source/hardware/apply',artifact=GUEST+'/assembly-inputs/hardware'),
                 kernel_hook=kernel+'/kc-hook.sh',
-                userspace=dict(install=userspace+'/install.py',shim=userspace+'/inputs/display_state_shim',io80211=userspace+'/inputs/io80211_compat'),
+                userspace=dict(install=userspace+'/install.py',shim=userspace+'/inputs/display_state_shim',io80211=userspace+'/inputs/io80211_compat',
+                              wifip2p=userspace+'/inputs/wifip2p_compat'),
                 hooks=[dict(name=name,hook=local+'/hooks/'+folder+'/hook.sh' if (share/'hooks'/folder/'hook.sh').is_file() else None,
                             kc_hook=local+'/hooks/'+folder+'/kc-hook.sh' if (share/'hooks'/folder/'kc-hook.sh').is_file() else None)
                        for name,folder in hooks if name not in ('darwin27-kernel','golden-gate-userspace')],

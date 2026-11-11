@@ -38,8 +38,8 @@ class ReplaceTest(unittest.TestCase):
 
     def test_prepared_mode_cannot_inherit_a_tahoe_cryptex(self):
         with self.assertRaises(SystemExit):
-            module.arguments(['system', 'golden', 'shim', 'wifi', '--prepared-system'])
-        args = module.arguments(['system', 'golden', 'shim', 'wifi', '--prepared-system',
+            module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', '--prepared-system'])
+        args = module.arguments(['system', 'golden', 'shim', 'wifi', 'wifip2p', '--prepared-system',
                                  '--driverkit-artifact', 'donor', '--donor-tool', 'extractor'])
         self.assertEqual(args.driverkit_artifact, Path('donor'))
 

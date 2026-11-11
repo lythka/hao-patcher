@@ -11,6 +11,7 @@ for this Mac. In the Golden Gate-first build, System, Data and the Tahoe donors 
 - `display_state_shim`, `display_install_helper`: display adapters and their installer
   ([tools/display-fixes](../../tools/display-fixes)).
 - `io80211_compat`: the IO80211 compatibility library, built and checked for one build by `src/io80211/make`.
+- `wifip2p_compat`: the WiFiPeerToPeer compatibility library, built and checked for one build by `src/wifip2p/make`.
 - `metal_fix_source`, `audio_fix_source`: source of the native cache repairs.
 - The Golden Gate-first runner also passes a Tahoe DriverKit artifact.
 
@@ -26,6 +27,8 @@ collections. It:
 - gives Tahoe programs that serve 27.0 clients (WindowServer) the 27.0 program's Info.plist and entitlements;
 - installs the IO80211 compatibility library over OCLP's Modern Wireless wrapper, whose data exports 27.0's callers
   would otherwise call as code;
+- installs the WiFiPeerToPeer compatibility library over OCLP's WiFiPeerToPeer wrapper, which lacks the Wi-Fi Aware
+  classes 27.x's AirPlay stack extends;
 - disables jobs that cannot run on an Intel Mac (`hybridsearchd` exits on non-Apple silicon and would restart in a
   loop);
 - restores setuid/setgid modes after copying, and keeps the Tahoe framework bases beneath OCLP's replacements.
@@ -49,12 +52,30 @@ library, the wrapper or IO80211Old.dylib, and a symbol the build's IO80211 expor
 Otherwise it stops with `MISSING/unsupported` and makes no artifact. 26A428 and 26B131 bind the same 34 symbols in
 the cache and 57 from disk. `Apple80211GetBeaconCache`, also absent from the wrapper, is bound by no client of either.
 
+### WiFiPeerToPeer
+OCLP's Modern Wireless wrapper also replaces WiFiPeerToPeer (re-exporting WiFiPeerToPeerOld.dylib) and lacks 36
+Wi-Fi Aware classes that 26A428's and 26B131's x86_64 caches bind identically. dyld sets those class references to
+`0xbad4007`; libobjc then aborts every process that loads APTransport's category on `WiFiAwareDatapathInfo`. That
+covers coreaudiod (through the AirPlay HAL plug-in, so there is no audio server), AirPlayXPCHelper, ControlCenter and
+sharingd. `src/wifip2p/wifip2p_compat.m` defines the 36 as empty `NSObject` subclasses, which is their superclass in
+both builds; this Mac has no Wi-Fi Aware hardware. The library links only libobjc and re-exports the wrapper,
+renamed WiFiPeerToPeerOCLP.dylib.
+
+```sh
+python3.14 -I patches/golden-gate-userspace/src/wifip2p/make ARTIFACTS \
+  --system SYSTEM_ROOT --cache X86_64_DYLD_CACHE --oclp OCLP_WIFIP2P_DIR
+```
+
+`make` runs the same coverage check as IO80211 (`src/io80211/coverage.py`, given the library name). It skips the
+build's own `usr/libexec/wifip2pd`, which OCLP overwrites with its x86_64 program, and records that it did so.
+
 It refuses to inherit DriverKit from an earlier installed image. It installs OS libraries only; it does not generate
 Swift metadata, shader warm-up caches, icon indexes or account state.
 
 ## Verify
 ```sh
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests
+# optional: WIFIP2P_OCLP_DIR / IO80211_OCLP_DIR = OCLP's 13.7.2-25 framework folders
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/build/tests
 ```
 The fixtures cover prepared-System preservation, the DriverKit requirement, special modes, native cache repair plans
@@ -63,8 +84,11 @@ and adapter ordering. A built image must still pass filesystem, boot, native-ser
 ## Validation
 NEEDS VALIDATION: host tests cover the current recipe, and a Golden Gate-first image assembled with it reached SSH;
 loading of HID and serial DriverKit extensions with the added DriverKit cache, and a full application pass, are open.
+The WiFiPeerToPeer library (r43) was swapped live onto a running 26B131 image on the laptop: AirPlayXPCHelper then
+started without the libobjc abort. An image built with r43, and coreaudiod starting on it, are not yet tested.
 
 ## Revisions
+- r43 2026-11-11 WiFiPeerToPeer compat: defines the 36 Wi-Fi Aware classes OCLP's 13.7.2 wrapper lacks (26A428 and 26B131 bind the same set), which made coreaudiod, AirPlayXPCHelper, ControlCenter and sharingd abort in libobjc; new row `wifip2p_compat`. The IO80211 coverage check takes the library name and skips clients OCLP overwrites.
 - r42 2026-11-11 Locate CoreRoutine, EndpointSecurity and trackpad repair sites by unique instruction shapes in the supplied cache; preserve relocated branch targets and refuse missing or ambiguous sites. Audio and Metal repair source now comes directly from this checkout. Host fixtures and both 26A428/26B131 caches checked; boot validation pending.
 - r41 2026-11-11 IO80211 compat for 26B131: adds `Apple80211Get20MhzChannelIndexBitmap` (bound by WiFiAnalytics in 26A428 and 26B131, absent from OCLP's wrapper) and 26B131's code 0xe0822410 -> -3998; `make` checks a build's clients against the library and OCLP's IO80211 and names the artifact after the build.
 - r40 2026-11-10 Initial public release.

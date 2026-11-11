@@ -14,7 +14,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-hello | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-11 The hello library row is a System-rooted folder with `SOURCES`; the hook refuses a System librar |
 | golden-gate-metal-framebuffer | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
 | golden-gate-metal-libraries | r14 | oclp-hook | experiment | x |  |  | **needs** | r14 2026-11-11 Installs a repaired library only over the System library it was made from (`SOURCES`), or over  |
-| golden-gate-userspace | r42 | oclp-hook | experiment | x |  |  | **needs** | r42 2026-11-11 Locate CoreRoutine, EndpointSecurity and trackpad repair sites by unique instruction shapes in  |
+| golden-gate-userspace | r43 | oclp-hook | experiment | x |  |  | **needs** | r43 2026-11-11 WiFiPeerToPeer compat: defines the 36 Wi-Fi Aware classes OCLP's 13.7.2 wrapper lacks (26A428 a |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
 | hao-opencore | r31 | post | experiment | x |  |  | **needs** | r31 2026-11-11 Use the Sandbox operation adapter that prunes isolated unsupported roots from removed operation |
 | hao-runtime | r58 | oclp-hook | experiment | x |  |  | **needs** | r58 2026-11-11 Select the 26B131 payload with regenerated interface units and AOT; async provider and URLReque |

@@ -286,15 +286,31 @@ def install_file(source, target):
 # x86_64 IO80211 does and re-exports the wrapper, renamed IO80211OCLP.dylib, so every other name resolves as before
 # and the wrapper's initializers still run (it re-exports IO80211Old.dylib itself).
 IO80211 = 'System/Library/PrivateFrameworks/IO80211.framework/Versions/A/'
+# coreaudiod, AirPlayXPCHelper, ControlCenter and sharingd abort in libobjc without this: OCLP's Modern Wireless
+# WiFiPeerToPeer wrapper (13.7.2-25) lacks 36 Wi-Fi Aware classes 27.x's x86_64 cache binds, so dyld sets them to
+# 0xbad4007 and loading APTransport's category on WiFiAwareDatapathInfo is fatal. The compat library (row
+# wifip2p_compat, made and checked by src/wifip2p/make) defines them and re-exports the wrapper, renamed
+# WiFiPeerToPeerOCLP.dylib, in the same way.
+WIFIP2P = 'System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/'
 
 
 def install_io80211(system, compat, workspace):
-    wrapper, renamed = system/IO80211/'IO80211', system/IO80211/'IO80211OCLP.dylib'
+    install_wrapper_compat(system, compat, workspace, IO80211, 'IO80211')
+
+
+def install_wifip2p(system, compat, workspace):
+    install_wrapper_compat(system, compat, workspace, WIFIP2P, 'WiFiPeerToPeer')
+
+
+def install_wrapper_compat(system, compat, workspace, folder, leaf):
+    """Rename OCLP's wrapper SYSTEM/FOLDER/LEAF to LEAFOCLP.dylib (install name and file, re-signed with its
+    identifier) and install COMPAT, which re-exports it, as LEAF."""
+    wrapper, renamed = system/folder/leaf, system/folder/f'{leaf}OCLP.dylib'
     data = bytearray(wrapper.read_bytes())
-    set_install_name(data, ('/'+IO80211+'IO80211').encode(), ('/'+IO80211+'IO80211OCLP.dylib').encode())
+    set_install_name(data, ('/'+folder+leaf).encode(), ('/'+folder+f'{leaf}OCLP.dylib').encode())
     details = subprocess.run(['codesign', '-dv', str(wrapper)], check=True, capture_output=True, text=True).stderr
     identifier = next(l.split('=', 1)[1] for l in details.splitlines() if l.startswith('Identifier='))
-    staged = workspace/'IO80211OCLP.dylib'
+    staged = workspace/f'{leaf}OCLP.dylib'
     staged.write_bytes(data)
     run('codesign', '-f', '-s', '-', '-i', identifier, '--preserve-metadata=entitlements,flags,runtime', staged)
     flags = wrapper.stat().st_flags
@@ -302,7 +318,7 @@ def install_io80211(system, compat, workspace):
     for source, target in ((staged, renamed), (compat, wrapper)):
         install_file(source, target)
         os.chflags(target, flags)
-    print('IO80211: compat library re-exports OCLP\'s wrapper as', renamed.name, 'identifier', identifier, flush=True)
+    print(f'{leaf}: compat library re-exports OCLP\'s wrapper as', renamed.name, 'identifier', identifier, flush=True)
 
 
 def oclp_paths(record, volume):
@@ -495,7 +511,7 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
 
 def arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('system', 'payload', 'shim', 'io80211'):
+    for name in ('system', 'payload', 'shim', 'io80211', 'wifip2p'):
         parser.add_argument(name, type=Path)
     parser.add_argument('--prepared-system', action='store_true',
                         help='Golden Gate System/Data and donor overlays are already installed')
@@ -517,7 +533,7 @@ def install_base_trees(source, system, data, system_keep, data_keep, data_anchor
 
 def main():
     args = arguments()
-    system, payload, shim, io80211 = args.system, args.payload, args.shim, args.io80211
+    system, payload, shim, io80211, wifip2p = args.system, args.payload, args.shim, args.io80211, args.wifip2p
     display_installer = load_display_installer()
     group, preboot_device = os.environ['GRP'], os.environ['PBU']
     metadata = json.loads((payload/'userspace.json').read_text())
@@ -613,6 +629,7 @@ def main():
         disabled = disable_jobs(system)
         display_installer.install_library(system, shim, install_file)
         install_io80211(system, io80211, workspace)
+        install_wifip2p(system, wifip2p, workspace)
         display_installer.resign_clients(system, source, workspace, RESIGN_WITH_27_ENTITLEMENTS,
                                         resign_with_entitlements)
         counts = install_cryptex(payload, preboot, group, golden_os, rosetta, workspace,

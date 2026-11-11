@@ -1,5 +1,5 @@
 {
-  "revision": 42,
+  "revision": 43,
   "stage": "oclp-hook",
   "applies": {
     "models": [
@@ -16,6 +16,7 @@
     "golden_gate_userspace",
     "display_state_shim",
     "io80211_compat",
+    "wifip2p_compat",
     "display_install_helper"
   ]
 }

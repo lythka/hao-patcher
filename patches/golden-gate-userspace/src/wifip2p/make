@@ -1,0 +1,88 @@
+#!/opt/homebrew/bin/python3.14
+"""Build the WiFiPeerToPeer compat library (input row wifip2p_compat) into a new, recorded artifact and check it covers
+one 27.x build: make STORE_ARTIFACTS --system SYSTEM_ROOT --cache X86_64_DYLD_CACHE --oclp OCLP_WIFIP2P_DIR.
+SYSTEM_ROOT is the build's System volume (its SystemVersion.plist names the build and its programs are the on-disk
+clients), X86_64_DYLD_CACHE its RosettaOS dyld_shared_cache_x86_64, OCLP_WIFIP2P_DIR the folder holding OCLP's
+WiFiPeerToPeer and WiFiPeerToPeerOld.dylib. Any import nothing answers (../io80211/coverage.py) stops the build with
+MISSING/unsupported."""
+import argparse
+import datetime
+import hashlib
+import json
+from pathlib import Path
+import plistlib
+import subprocess
+import sys
+import tempfile
+
+HERE = Path(__file__).resolve().parent
+PATCH = HERE.parents[1]
+TOP = PATCH.parents[1]
+LEAF = 'WiFiPeerToPeer'
+FRAMEWORK = f'/System/Library/PrivateFrameworks/{LEAF}.framework/Versions/A'
+REEXPORTED = ('WiFiPeerToPeerOld.dylib',)
+# OCLP's Modern Wireless Common overwrites the build's wifip2pd with its own x86_64 one (Overwrite System Volume,
+# tools/oclp-hardware/profiles/mbp92.json), so the 27.x program's imports (two AWDLTrafficRegistrationService
+# constants the wrapper lacks) never reach the image.
+REPLACED = ('usr/libexec/wifip2pd',)
+NAME = 'wifip2p_compat.dylib'
+COVERAGE = HERE.parent/'io80211'/'coverage.py'
+
+
+def run(*args):
+    return subprocess.check_output(list(map(str, args)), cwd=TOP, text=True).strip()
+
+
+def build(out):
+    """Compile wifip2p_compat.m into OUT/wifip2p_compat.dylib (install name WiFiPeerToPeer, re-exporting
+    WiFiPeerToPeerOCLP.dylib, linking only libobjc), ad-hoc signed. Returns its path."""
+    binary = Path(out)/NAME
+    run('xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O2', '-Wall', '-Wextra', '-Werror',
+        '-dynamiclib', '-fvisibility=hidden', '-Wl,-not_for_dyld_shared_cache',
+        '-install_name', f'{FRAMEWORK}/{LEAF}', '-compatibility_version', '1.0.0', '-current_version', '1.0.0',
+        f'-Wl,-reexport_library,{HERE/"WiFiPeerToPeerOCLP.tbd"}', '-lobjc', HERE/'wifip2p_compat.m', '-o', binary)
+    run('codesign', '-f', '-s', '-', binary)
+    return binary
+
+
+def main(root, system, cache, oclp):
+    sys.path.insert(0, str(COVERAGE.parent))
+    import coverage
+    root = Path(root).resolve()
+    macos_build = plistlib.loads((Path(system)/'System/Library/CoreServices/SystemVersion.plist').read_bytes())['ProductBuildVersion']
+    sources = {str(p.relative_to(TOP)): hashlib.sha256(p.read_bytes()).hexdigest()
+               for p in sorted(HERE.iterdir()) if p.is_file()}
+    sources[str(COVERAGE.relative_to(TOP))] = hashlib.sha256(COVERAGE.read_bytes()).hexdigest()
+    with tempfile.TemporaryDirectory(prefix='wifip2p-compat-') as tmp:
+        binary = build(tmp)
+        record = coverage.check(cache, system, oclp, binary, LEAF, REEXPORTED, REPLACED)
+        if record['errors']:
+            sys.exit('\n'.join(record['errors']))
+        digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        out = root/f'wifip2p-compat-{macos_build}-{now:%Y%m%d}-{digest[:12]}'
+        out.mkdir()
+        (out/NAME).write_bytes(binary.read_bytes())
+        (out/NAME).chmod(0o755)
+        (out/'build.json').write_text(json.dumps({
+            'unit': 'patches/golden-gate-userspace/src/wifip2p',
+            'revision': json.loads((PATCH/'patch.json').read_text())['revision'],
+            'commit': run('git', 'rev-parse', 'HEAD'),
+            'dirty': bool(run('git', 'status', '--porcelain', '--', PATCH)),
+            'date': now.isoformat(), 'inputs': sources,
+            'compiler': run('xcrun', 'clang', '--version'),
+            'sha256': digest,
+            'coverage': dict(build=macos_build, cache=str(Path(cache).resolve()),
+                             oclp={name: hashlib.sha256((Path(oclp)/name).read_bytes()).hexdigest()
+                                   for name in (LEAF,) + REEXPORTED}, **record),
+        }, indent=2)+'\n')
+        print(out)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('artifacts', type=Path)
+    for option in ('system', 'cache', 'oclp'):
+        parser.add_argument('--'+option, type=Path, required=True)
+    args = parser.parse_args()
+    main(args.artifacts, args.system, args.cache, args.oclp)
