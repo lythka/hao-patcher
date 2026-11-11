@@ -52,7 +52,7 @@ collections; the runner calls it like every other recipe. It:
 - restores setuid/setgid modes after copying.
 
 Which framework sits beneath OCLP's replacements is decided by the base layers, not here. With the 26B131 donor
-artifact (`minimal-native-25G342-26B131-corewifi`) Metal, OpenCL, AppleGVA, AppleGVACore, GPUCompiler, MTLCompiler, IO80211
+artifact (`minimal-native-25G342-26B131-corewifi-r3`) Metal, OpenCL, AppleGVA, AppleGVACore, GPUCompiler, MTLCompiler, IO80211
 and WiFiPeerToPeer are the 27.x build's own, with OCLP's overlay on top. The older 26A428 artifact still installs
 Tahoe's copies of those frameworks first.
 
