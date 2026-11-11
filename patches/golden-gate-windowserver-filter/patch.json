@@ -1,5 +1,5 @@
 {
-  "revision": 4,
+  "revision": 5,
   "stage": "oclp-hook",
   "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
   "inputs": ["windowserver_filter_shim"],

@@ -4,8 +4,8 @@ The two calls remain on either side of IO80211 installation in the userspace
 recipe. This keeps the existing file, Info.plist, load-command and signing order.
 """
 
-# The exact 26A428 native server omits the flag byte its clients require.
-# The dylib gates the repair on the captured SkyLight/CoreDisplay identities.
+# The Golden Gate x86_64 native server omits the flag byte its clients require.
+# The dylib gates the repair on the SkyLight/CoreDisplay UUIDs listed in its dss_builds.h.
 DISPLAY_STATE_SHIM = 'usr/lib/dss_shim.dylib'
 DISPLAY_STATE_CLIENTS = (
     'System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer',

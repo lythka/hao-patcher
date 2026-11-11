@@ -1,13 +1,13 @@
 # display-fixes
 
 Builds, prepares and installs the two native display repairs for Golden Gate
-(26A428) on MacBookPro9,2, outside the image build:
+(26A428, 26B131) on MacBookPro9,2, outside the image build:
 
 - the display-state adapter, [`tools/display-state-shim`](../display-state-shim/README.md);
 - the WindowServer display-inversion and deferred software-backdrop filter,
   [`patches/golden-gate-windowserver-filter`](../../patches/golden-gate-windowserver-filter).
 
-Each repair keeps its own framework UUID and process checks. The image build
+Each repair keeps its own per-build framework UUID table and process checks. The image build
 installs the same libraries through `patches/golden-gate-userspace`; this tool is
 for building the libraries and for installing them into an offline System by
 hand.
@@ -23,7 +23,7 @@ python3 -I display-fixes build --out /path/to/new-artifact
 python3 -I display-fixes prepare \
   --artifact /path/to/new-artifact \
   --windowserver /path/to/kept-native-WindowServer \
-  --golden-windowserver /path/to/original-26A428-WindowServer \
+  --golden-windowserver /path/to/original-Golden-Gate-WindowServer \
   --out /path/to/new-prepared-payload
 sudo python3 -I display-fixes install \
   --prepared /path/to/new-prepared-payload --system /Volumes/OfflineSystem
@@ -35,7 +35,7 @@ python3 -I display-fixes test
   hashes. It needs no Apple binary: the CoreDisplay link stub is in the source,
   and headers and libraries come from the SDK.
 - `prepare` makes a signed payload from two Apple launchers you supply: the
-  native Intel WindowServer kept by the image, and the original 26A428 launcher,
+  native Intel WindowServer kept by the image, and the original Golden Gate launcher,
   whose embedded Info.plist, identifier and entitlements it adopts. It adds a
   load command for `/usr/lib/dss_shim.dylib` to a copy of the native launcher
   and makes `dss_shim.dylib` load the filter. The inputs are not modified.

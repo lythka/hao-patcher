@@ -1,21 +1,32 @@
 #!/usr/bin/env python3
-"""Build the 26A428 Intel display-state adapter into a new artifact directory."""
+"""Build the Golden Gate Intel display-state adapter into a new artifact directory."""
 import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 
 HERE = Path(__file__).resolve().parent
 UNIT = 'tools/display-state-shim'
-REVISION = 3
-INPUTS = ('src/dss_shim.c', 'src/dss_convert.c', 'src/dss_convert.h',
+REVISION = 4
+INPUTS = ('src/dss_shim.c', 'src/dss_builds.h', 'src/dss_convert.c', 'src/dss_convert.h',
           'stubs/CoreDisplay.tbd')
 
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def builds():
+    """The SkyLight and CoreDisplay UUIDs src/dss_builds.h lists, by build, in table order."""
+    found = {}
+    for line in (HERE / 'src/dss_builds.h').read_text().splitlines():
+        match = re.match(r'(SKYLIGHT|COREDISPLAY)_BUILD\("([^"]+)".*// ([0-9A-F-]{36})$', line)
+        if match:
+            found.setdefault(match[2], {})[match[1].lower() + '_uuid'] = match[3]
+    return found
 
 
 def report(*args):
@@ -41,9 +52,7 @@ def build(output):
                   compiler=report('xcrun', 'clang', '--version'),
                   sdk=report('xcrun', '--show-sdk-version'),
                   command=command,
-                  applicability=dict(build='26A428', architecture='x86_64',
-                                     skylight_uuid='02A9A202-2F39-3204-86DE-A09EA6AE8DEE',
-                                     coredisplay_uuid='61C82C50-C91D-3028-933E-FC20D2AB40FA'),
+                  applicability=dict(architecture='x86_64', builds=builds()),
                   outputs={'dss_shim.dylib': digest(dylib)})
     (output / 'build.json').write_text(json.dumps(record, indent=2) + '\n')
     print(dylib)

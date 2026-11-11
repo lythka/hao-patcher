@@ -15,7 +15,7 @@ VALIDATION), ok = a boot test proved the current revision.
 | golden-gate-metal-framebuffer | r2 | oclp-hook | experiment | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
 | golden-gate-metal-libraries | r13 | oclp-hook | experiment | x |  |  | **needs** | r13 2026-11-10 Initial public release. |
 | golden-gate-userspace | r40 | oclp-hook | experiment | x |  |  | **needs** | r40 2026-11-10 Initial public release. |
-| golden-gate-windowserver-filter | r4 | oclp-hook | experiment | x |  |  | **needs** | r4 2026-11-10 Initial public release. |
+| golden-gate-windowserver-filter | r5 | oclp-hook | experiment | x |  |  | **needs** | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
 | hao-opencore | r29 | post | experiment | x |  |  | **needs** | r29 2026-11-10 Initial public release. |
 | hao-runtime | r57 | oclp-hook | experiment | x |  |  | **needs** | r57 2026-11-10 Initial public release. |
 | metalold-selectors | r2 | oclp-hook | product | x |  |  | **needs** | r2 2026-11-10 Initial public release. |
