@@ -23,8 +23,26 @@ inputs list.
 
 ```sh
 python3.14 -I pipeline/patches.py plan pipeline/sets/golden-gate.txt pipeline/targets/mbp92.json 25G332
-python3.14 -I pipeline/patches.py plan pipeline/sets/dev-bs-test.txt pipeline/targets/mbp92.json 25G342  # 26B131
+python3.14 -I pipeline/patches.py plan pipeline/sets/dev-bs-test.txt pipeline/targets/mbp92.json 25G342 \
+  --locks pipeline/inputs/golden/26B131:pipeline/inputs/25G342:pipeline/inputs/common   # 26B131, as golden-run looks up rows
 ```
+
+### Optional cache recipes
+
+`golden-gate-shader-caches`, `golden-gate-icon-caches` and `golden-gate-font-registry` install
+caches made by [`cache/seeds`](../cache/seeds/README.md) from a harvest of a running laptop;
+`golden-gate-user-seed` copies their per-user parts into new accounts. Their patch.json has
+`"optional": "caches"`. Without these files the image still builds; first boot and each new
+account's first login are slower.
+
+- A cache recipe whose input row is missing, or whose `store/` path is not there, is skipped
+  with one line naming the recipe and the row. A row that is there but fails its SHA256 stops
+  the build.
+- `golden-gate-user-seed` (`"needs_any": "caches"`) is skipped when no cache recipe runs.
+- To leave them out even when the files exist: `golden-run --skip-optional caches`, or
+  `"skip_optional": ["caches"]` in the assembly.
+- `store/runs/<job>/optional.json` (and `optional` in `build.json`) lists which ran and which
+  were skipped, and why.
 
 ## 2. Build
 
@@ -86,7 +104,7 @@ successful assembly record and a stopped VM.
 | Location | Contents |
 |---|---|
 | `--repo` | Image repository |
-| `store/runs/` | Build record: inputs, plan, source identities, logs |
+| `store/runs/` | Build record: inputs, plan, optional recipes run/skipped, source identities, logs |
 | `store/tmp/` | Workspace and intermediate disks |
 
 Boot the image in [QEMU](../tools/qemu-vm/README.md) before installing it on hardware.

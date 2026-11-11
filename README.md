@@ -88,7 +88,8 @@ refuses a set that breaks that order.
 - **Spotlight:** no longer crashes.
 - **Background services:** `rapportd` and Control Center crash loops fixed (hao-runtime
   790720d; live-tested, next image).
-- **Faster first boot:** preloaded shader, icon and font caches.
+- **Faster first boot:** preloaded shader, icon and font caches (optional: builds without them skip them, see
+  [optional cache recipes](docs/building.md#optional-cache-recipes)).
 - **Build:** recipes run once, in set-file order ([layer order](docs/building.md#layer-order)).
 
 In progress: Live Text, a fast first login for new accounts, Spotlight's local results,

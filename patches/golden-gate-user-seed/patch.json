@@ -1,8 +1,10 @@
 {
- "revision": 4,
+ "revision": 5,
  "stage": "post",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G342"]},
  "inputs": [],
  "status": "experiment",
- "validated": true
+ "validated": true,
+ "optional": "caches",
+ "needs_any": "caches"
 }
