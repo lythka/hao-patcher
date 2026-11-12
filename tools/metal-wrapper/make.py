@@ -13,7 +13,8 @@ generated from the SDK's own Metal headers (clang's syntax tree), so signatures 
   functions  the header's prototype, returning zero
   data       NSString constants hold their own name; other types are zero
 Names the SDK headers don't declare (private API) must come from an --extra source; build refuses otherwise.
-Names MetalOld already exports are skipped, so no class is defined twice.
+Names MetalOld already exports are skipped, so no class is defined twice. src/runtime.m is always built in: the
+per-process workarounds (Moraea's, minus the hello skip), each switchable with HAO_METAL_DISABLE.
 """
 import json
 import os
@@ -165,7 +166,7 @@ def generate(spec, sdk=None, metalold=None, scratch=None):
     return '\n'.join(parts) + '\n', report
 
 
-def build(spec, metalold, out, sdk=None, extra=()):
+def build(spec, metalold, out, sdk=None, extra=(), defines=()):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     source, report = generate(spec, sdk, metalold, scratch=str(out))
@@ -176,10 +177,11 @@ def build(spec, metalold, out, sdk=None, extra=()):
     (out / 'stubs.m').write_text(source)
     (out / 'report.json').write_text(json.dumps(report, indent=1) + '\n')
     cmd = ['xcrun', 'clang', '-arch', 'x86_64', '-isysroot', sdk_path(sdk), '-mmacosx-version-min=27.0',
-           '-dynamiclib', '-fno-objc-arc', '-O1', '-Wall', '-Wno-unused-parameter',
+           '-dynamiclib', '-fno-objc-arc', '-O1', '-Wall', '-Wno-unused-parameter', *['-D' + d for d in defines],
            '-install_name', INSTALL_NAME, '-compatibility_version', COMPAT, '-current_version', CURRENT,
            '-framework', 'Foundation', '-lobjc', '-Wl,-reexport_library,' + str(metalold),
-           str(out / 'stubs.m'), *map(str, extra), '-o', str(out / 'Metal')]
+           str(out / 'stubs.m'), str(Path(__file__).resolve().parent / 'src' / 'runtime.m'), *map(str, extra),
+           '-o', str(out / 'Metal')]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode:
         raise SystemExit('make.py: clang failed:\n' + r.stderr[-4000:])

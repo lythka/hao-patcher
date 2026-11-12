@@ -31,14 +31,33 @@ python3.14 -I tools/metal-wrapper/make.py build SPEC.json --metalold PATH/MetalO
 python3.14 -I tools/metal-wrapper/make.py generate SPEC.json OUT.m [--metalold PATH]
 ```
 
+### Load-time workarounds (`src/runtime.m`)
+
+These match what OCLP's Moraea wrapper does in today's images, from a read-only analysis of its PatcherSupportPkg
+2.0.5 build. That way the first laptop check compares like with like. Each one can be switched off for an A/B
+with `HAO_METAL_DISABLE=name,…`. Process checks are substrings of argv[0], as Moraea's are.
+
+| Name | Where | What |
+|---|---|---|
+| `addimp` | every process | 20 selectors newer clients send that MetalOld's `MTLHeapDescriptorInternal`, `MTLCompileOptionsInternal` and `NSProcessInfo` lack; they answer 0. Moraea's `requireThreadsPerThreadgroup` pair is not added, since no 27.2.1 code sends it |
+| `coreimage` | every process | `-[MTLCompiler validateLanguageAndAIRVersionForFunction:completionHandler:]` → YES; `-[MTLCompileOptionsInternal setLanguageVersion:]` → no-op |
+| `webgl` | WebKit | ANGLE refuses Metal on MacBookPro models below 13: `angle::IsMetalRendererAvailable()::queriedMachineModel` is pre-set; `supportsFamily:` answers YES for Mac2 (2002); `-[MTLIOAccelDevice registryID]` → 0 |
+| `glass`, `safari`, `wallpaper`, `photos` | those processes | validator skips Moraea applies; laptop A/B candidates |
+| `keynote`, `pixelmator` | those apps | third-party tweaks kept for parity; candidates to drop |
+
+Two differences from Moraea:
+
+- **No hello skip.** Setup Assistant plays hello.
+- **Constants are data.** Moraea exports the `NSDeviceCertification…` and `NSProcessPerformanceProfile…` constants
+  as small functions, so a reader gets instruction bytes. Ours come from the SDK headers as data.
+
 SPEC is `{"classes": [...], "functions": [...], "data": [...]}`. The full list for 26B131 comes from the gap
 analysis in `spec/`: what x86_64 code in 27.2.1 imports from Metal, minus what `MetalOld` exports.
 
 Next:
 
 - **The full 26B131 spec.**
-- **Which of Moraea's per-app workarounds to keep.** They are WebGL/ANGLE, CoreImage, Glass, Keynote and
-  Pixelmator. Hello's needs nothing: we simply don't skip it.
+- **Laptop A/B of the workarounds, then dropping what isn't needed.**
 - **libhelloblur:** a weak load of `libhelloblur`, as golden-gate-hello adds to OCLP's wrapper today.
 - **A recipe** that installs the wrapper in the `metal-3802` pack.
 - **A laptop check.**
@@ -49,7 +68,11 @@ Next:
 python3.14 -I -B -m unittest discover -s tools/metal-wrapper/tests
 ```
 
-These tests need Xcode with the macOS 27 SDK, and Rosetta. They build a wrapper from three header classes and
+These tests need Xcode with the macOS 27 SDK, and Rosetta. On a macOS 27 host every x86_64 process already has the
+system's Metal loaded (even CoreFoundation pulls it in). So the stub test takes our classes by symbol and asserts
+they come from our image. The load-time test builds `runtime.m` with `HAO_METAL_CLASS_PREFIX="Hao"` against
+stand-in classes; shipping builds use Apple's names, which the Moraea analysis found in both MetalOld and 27.2.1's
+Metal. The libANGLE lookup can only be proven on the laptop. They build a wrapper from three header classes and
 one constant against a stand-in `MetalOld`, with no Apple binary. They then load it in an x86_64 process under
 Rosetta: a property round-trip, `copy`, the subclass chain, a stub method call, the constant's value, and the
 `MetalOld` re-export. A separate test checks that names `MetalOld` already exports are skipped.
