@@ -1,0 +1,24 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/App",
+ "origin": {"kind": "apple", "name": "AppOS image (app.dmg) of the 26B131 IPSW", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "fresh-container",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "new-raw-image", "source": "patches/golden-gate-userspace/src/install.py:install_app_cryptex"},
+   "reason": "With stubs for the App cryptex in the hao payload, the image is rebuilt: a fresh raw APFS container with AppOS's files; with none, Apple's app.dmg is installed unchanged"
+  },
+  {
+   "id": "hao-stubs-app",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "embed-stubs", "row": "hao_runtime", "cryptex": "App", "source": "patches/golden-gate-userspace/src/cryptex_stubs.py", "files": 2},
+   "reason": "Safari's two arm64-only agents get hao's stubs; the per-file declarations are edits/embed-app-*.json"
+  },
+  {"id": "seal", "kind": "op", "op": "cryptex.build", "args": {"step": "apfs_prepare_cryptex"}, "reason": "The image is sealed so it grafts"}
+ ],
+ "sign": null
+}

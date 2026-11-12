@@ -1,0 +1,28 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/SafariServices.framework/Versions/A/XPCServices/com.apple.SafariServices.xpc/Contents/MacOS/com.apple.SafariServices",
+ "origin": {"kind": "apple", "name": "SystemOS program, arm64 only", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "hao-stub",
+   "kind": "op",
+   "op": "hao.embed-stub",
+   "args": {
+    "row": "hao_runtime",
+    "identifier": "com.apple.SafariServices",
+    "stub": "stubs/ece63f90f98c6134c4bf57e7.stub",
+    "stub_sha256": "21bcdd0539e9701e9a7331a3941de76b6f53cb3c158aa803aa2756d3b2ae5a97",
+    "source_sha256": "7ccefbca1801d818ceed092ec328546313a601197949c7e301cbb8bea4f67dea",
+    "result_sha256": "f32236335bb55557b294134fc3c033c5f20b40633d65f8c3f3ccf2e87e871445",
+    "bound": [
+     {"slot": -1, "sha256": "cff633bbadf6c7132e2ebaadff635d773c9cc7fe023d6930669ab3984711dd0a", "file": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/SafariServices.framework/Versions/A/XPCServices/com.apple.SafariServices.xpc/Contents/Info.plist"},
+     {"slot": -3, "sha256": "54c07b4c0c0587dc53fa4b37dec98526993eb4eae392938164f42157b4e90378", "file": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/SafariServices.framework/Versions/A/XPCServices/com.apple.SafariServices.xpc/Contents/_CodeSignature/CodeResources"}
+    ]
+   },
+   "reason": "This arm64-only program gets an x86_64 launcher slice that runs it through hao with its own identity (without it, launchd starts it through /usr/libexec/hao with hao's identity and its container and entitlement lookups fail)"
+  }
+ ],
+ "sign": null,
+ "expect": {"7ccefbca1801d818ceed092ec328546313a601197949c7e301cbb8bea4f67dea": "f32236335bb55557b294134fc3c033c5f20b40633d65f8c3f3ccf2e87e871445"}
+}

@@ -1,0 +1,56 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.04",
+ "origin": {"kind": "apple", "name": "RosettaOS x86_64 shared cache (26B131)", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "endpoint-security-selectors",
+   "kind": "matcher",
+   "resolved": {
+    "97749bf6a11619be23782e6e6f4c495d8079dbb5b52a6ae8a5632d9ddfb19f4b": [
+     {"at": 198928482, "before": "be0c000000", "after": "be0f000000", "reason": "EndpointSecurity selector 12 -> 15"},
+     {"at": 198928834, "before": "be0d000000", "after": "be10000000", "reason": "EndpointSecurity selector 13 -> 16"},
+     {"at": 198928991, "before": "be0c000000", "after": "be0f000000", "reason": "EndpointSecurity selector 12 -> 15"},
+     {"at": 198929119, "before": "be0d000000", "after": "be10000000", "reason": "EndpointSecurity selector 13 -> 16"},
+     {"at": 198929669, "before": "be0d000000", "after": "be10000000", "reason": "EndpointSecurity selector 13 -> 16"},
+     {"at": 198930044, "before": "be05000000", "after": "be07000000", "reason": "EndpointSecurity selector 5 -> 7"},
+     {"at": 198930661, "before": "be0e000000", "after": "be11000000", "reason": "EndpointSecurity selector 14 -> 17"},
+     {"at": 198932705, "before": "be09000000", "after": "be0c000000", "reason": "EndpointSecurity selector 9 -> 12"},
+     {"at": 198933844, "before": "be0a000000", "after": "be0d000000", "reason": "EndpointSecurity selector 10 -> 13"},
+     {"at": 198933988, "before": "be12000000", "after": "be15000000", "reason": "EndpointSecurity selector 18 -> 21"},
+     {"at": 198934855, "before": "be0b000000", "after": "be0e000000", "reason": "EndpointSecurity selector 11 -> 14"},
+     {"at": 198936352, "before": "be1b000000", "after": "be1e000000", "reason": "EndpointSecurity selector 27 -> 30"},
+     {"at": 198936667, "before": "be0f000000", "after": "be12000000", "reason": "EndpointSecurity selector 15 -> 18"},
+     {"at": 198936745, "before": "be0f000000", "after": "be12000000", "reason": "EndpointSecurity selector 15 -> 18"},
+     {"at": 198937843, "before": "be06000000", "after": "be09000000", "reason": "EndpointSecurity selector 6 -> 9"},
+     {"at": 198939655, "before": "be08000000", "after": "be0b000000", "reason": "EndpointSecurity selector 8 -> 11"},
+     {"at": 198941803, "before": "be11000000", "after": "be14000000", "reason": "EndpointSecurity selector 17 -> 20"},
+     {"at": 198941883, "before": "be11000000", "after": "be14000000", "reason": "EndpointSecurity selector 17 -> 20"},
+     {"at": 198941990, "before": "be10000000", "after": "be13000000", "reason": "EndpointSecurity selector 16 -> 19"},
+     {"at": 198942075, "before": "be13000000", "after": "be16000000", "reason": "EndpointSecurity selector 19 -> 22"},
+     {"at": 198942155, "before": "be13000000", "after": "be16000000", "reason": "EndpointSecurity selector 19 -> 22"},
+     {"at": 198942233, "before": "be14000000", "after": "be17000000", "reason": "EndpointSecurity selector 20 -> 23"},
+     {"at": 198942346, "before": "be15000000", "after": "be18000000", "reason": "EndpointSecurity selector 21 -> 24"},
+     {"at": 198942473, "before": "be16000000", "after": "be19000000", "reason": "EndpointSecurity selector 22 -> 25"},
+     {"at": 198942582, "before": "be17000000", "after": "be1a000000", "reason": "EndpointSecurity selector 23 -> 26"},
+     {"at": 198942697, "before": "be19000000", "after": "be1c000000", "reason": "EndpointSecurity selector 25 -> 28"},
+     {"at": 198942806, "before": "be1a000000", "after": "be1d000000", "reason": "EndpointSecurity selector 26 -> 29"},
+     {"at": 198942875, "before": "be14000000", "after": "be17000000", "reason": "EndpointSecurity selector 20 -> 23"},
+     {"at": 198942955, "before": "be14000000", "after": "be17000000", "reason": "EndpointSecurity selector 20 -> 23"},
+     {"at": 198943040, "before": "be18000000", "after": "be1b000000", "reason": "EndpointSecurity selector 24 -> 27"},
+     {"at": 198943517, "before": "be07000000", "after": "be0a000000", "reason": "EndpointSecurity selector 7 -> 10"}
+    ]
+   },
+   "reason": "Programs that use EndpointSecurity reach Tahoe's provider: the selector numbers in 27.x's libEndpointSecurity are renumbered to the provider's table"
+  },
+  {
+   "id": "resign-4k-pages",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "resign-cache-4k-pages", "source": "patches/golden-gate-userspace/src/cache_pages.py"},
+   "reason": "The x86_64 kernel registers only 4 KiB code-signature pages for the cache; RosettaOS signs it with 16 KiB pages for Apple silicon, so the signature is made again with 4 KiB pages after the edits"
+  }
+ ],
+ "sign": null
+}

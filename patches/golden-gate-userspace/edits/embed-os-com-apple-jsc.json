@@ -1,0 +1,25 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc",
+ "origin": {"kind": "apple", "name": "SystemOS program, arm64 only", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "hao-stub",
+   "kind": "op",
+   "op": "hao.embed-stub",
+   "args": {
+    "row": "hao_runtime",
+    "identifier": "com.apple.jsc",
+    "stub": "stubs/e5e954f0cd70d44412d01efa.stub",
+    "stub_sha256": "1f7cc49b5ff545082b3020b9a076667110bf8900c9cee39819b441a171d5e0d7",
+    "source_sha256": "cbf505bc4138b5350dcaba65f47b551054d256931f5fbb38f7a729f1b8faee73",
+    "result_sha256": "0b303a28c858b8b99548ad09fc9715f0ac68848ee0a8c0966ee7c95b4c46f0f1",
+    "bound": []
+   },
+   "reason": "This arm64-only program gets an x86_64 launcher slice that runs it through hao with its own identity (without it, launchd starts it through /usr/libexec/hao with hao's identity and its container and entitlement lookups fail)"
+  }
+ ],
+ "sign": null,
+ "expect": {"cbf505bc4138b5350dcaba65f47b551054d256931f5fbb38f7a729f1b8faee73": "0b303a28c858b8b99548ad09fc9715f0ac68848ee0a8c0966ee7c95b4c46f0f1"}
+}

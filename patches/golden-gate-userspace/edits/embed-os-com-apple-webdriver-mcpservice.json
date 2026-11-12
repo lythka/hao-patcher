@@ -1,0 +1,28 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/WebDriver.framework/Versions/A/XPCServices/com.apple.WebDriver.MCPService.xpc/Contents/MacOS/com.apple.WebDriver.MCPService",
+ "origin": {"kind": "apple", "name": "SystemOS program, arm64 only", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "hao-stub",
+   "kind": "op",
+   "op": "hao.embed-stub",
+   "args": {
+    "row": "hao_runtime",
+    "identifier": "com.apple.WebDriver.MCPService",
+    "stub": "stubs/5b6371e6511fefd5fcfa065a.stub",
+    "stub_sha256": "85f6cf1bbe7affafaa288062d1cea7c667fe2640f324d4e958d08c419ec7cd75",
+    "source_sha256": "a0949da99b44ee911252abe8da54ca9ce832a4f7d8d4a76d153eccf49ce8c3d0",
+    "result_sha256": "6f2f37cf0bbadbd9596caa26d0f9b99265b54c302db60d58c53b22d2ec413f4e",
+    "bound": [
+     {"slot": -1, "sha256": "1ce283527f55fbfc6a443bcc82cebddbd13a7b3e154c6d6d24138b2925e6cb53", "file": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/WebDriver.framework/Versions/A/XPCServices/com.apple.WebDriver.MCPService.xpc/Contents/Info.plist"},
+     {"slot": -3, "sha256": "54c07b4c0c0587dc53fa4b37dec98526993eb4eae392938164f42157b4e90378", "file": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/WebDriver.framework/Versions/A/XPCServices/com.apple.WebDriver.MCPService.xpc/Contents/_CodeSignature/CodeResources"}
+    ]
+   },
+   "reason": "This arm64-only program gets an x86_64 launcher slice that runs it through hao with its own identity (without it, launchd starts it through /usr/libexec/hao with hao's identity and its container and entitlement lookups fail)"
+  }
+ ],
+ "sign": null,
+ "expect": {"a0949da99b44ee911252abe8da54ca9ce832a4f7d8d4a76d153eccf49ce8c3d0": "6f2f37cf0bbadbd9596caa26d0f9b99265b54c302db60d58c53b22d2ec413f4e"}
+}

@@ -1,0 +1,25 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/App/usr/libexec/com.apple.Safari.History",
+ "origin": {"kind": "apple", "name": "AppOS program, arm64 only", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "hao-stub",
+   "kind": "op",
+   "op": "hao.embed-stub",
+   "args": {
+    "row": "hao_runtime",
+    "identifier": "com.apple.Safari.History",
+    "stub": "stubs/c952a44e30aa76cea6f23d7e.stub",
+    "stub_sha256": "7b47b8c7b07aba27177342a5d2720a4ae3a48f8e24df2745ecdf6c2ab85a2a78",
+    "source_sha256": "2b7fac62f8b753f761035356e2fbf4a07b68d2a433e5e02b4718dc9fb7bacf45",
+    "result_sha256": "4ebaf927d5e9b5d667c402b47356793fd847a92e1c5a0c320263d86217607330",
+    "bound": [{"slot": -1, "sha256": "e8b0062c5194f755b8dfc7558b28b2716c4601e9cb84d116924369c214f819a4", "section": "__TEXT,__info_plist"}]
+   },
+   "reason": "This arm64-only program gets an x86_64 launcher slice that runs it through hao with its own identity (without it, launchd starts it through /usr/libexec/hao with hao's identity and its container and entitlement lookups fail)"
+  }
+ ],
+ "sign": null,
+ "expect": {"2b7fac62f8b753f761035356e2fbf4a07b68d2a433e5e02b4718dc9fb7bacf45": "4ebaf927d5e9b5d667c402b47356793fd847a92e1c5a0c320263d86217607330"}
+}

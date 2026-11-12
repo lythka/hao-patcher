@@ -1,0 +1,28 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.CaptivePortal.xpc/Contents/MacOS/com.apple.WebKit.WebContent.CaptivePortal",
+ "origin": {"kind": "apple", "name": "SystemOS program, arm64 only", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "hao-stub",
+   "kind": "op",
+   "op": "hao.embed-stub",
+   "args": {
+    "row": "hao_runtime",
+    "identifier": "com.apple.WebKit.WebContent.CaptivePortal",
+    "stub": "stubs/6efa808ed174769dedce7871.stub",
+    "stub_sha256": "1c79cdb5bdc7a155eb59e3cdd5574bd35b66dc132cb2f396dc98a8fd1cf6b140",
+    "source_sha256": "a48ff0ed2f22778bad96310dc2e44e05a48453a36e44714b8a2281dc9c4bb256",
+    "result_sha256": "de05a04becd176abfb43db7a98f326a0c0d8ca344c237d4eadd62e6731b4a4ca",
+    "bound": [
+     {"slot": -1, "sha256": "d04f181bc73e1f7506597a2dd05ed5decb03b0f592eff69b0bab1938919d7fcb", "file": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.CaptivePortal.xpc/Contents/Info.plist"},
+     {"slot": -3, "sha256": "54c07b4c0c0587dc53fa4b37dec98526993eb4eae392938164f42157b4e90378", "file": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.CaptivePortal.xpc/Contents/_CodeSignature/CodeResources"}
+    ]
+   },
+   "reason": "This arm64-only program gets an x86_64 launcher slice that runs it through hao with its own identity (without it, launchd starts it through /usr/libexec/hao with hao's identity and its container and entitlement lookups fail)"
+  }
+ ],
+ "sign": null,
+ "expect": {"a48ff0ed2f22778bad96310dc2e44e05a48453a36e44714b8a2281dc9c4bb256": "de05a04becd176abfb43db7a98f326a0c0d8ca344c237d4eadd62e6731b4a4ca"}
+}

@@ -1,0 +1,51 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS",
+ "origin": {"kind": "apple", "name": "SystemOS image (os.dmg) of the 26B131 IPSW", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "fresh-container",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "new-raw-image", "source": "patches/golden-gate-userspace/src/install.py:install_cryptex"},
+   "reason": "A fresh raw APFS container (sized for SystemOS and RosettaOS) holds the combined image; an existing container is never resized"
+  },
+  {
+   "id": "golden-os-files",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "copy-tree", "from": "golden_gate_userspace: os.dmg"},
+   "reason": "Golden Gate's SystemOS files, copied whole with owners and flags"
+  },
+  {
+   "id": "hao-stubs-os",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "embed-stubs", "row": "hao_runtime", "cryptex": "OS", "source": "patches/golden-gate-userspace/src/cryptex_stubs.py", "files": 24},
+   "reason": "The arm64-only programs in SystemOS (Safari's and WebKit's XPC services) get hao's stubs before sealing; the per-file declarations are edits/embed-os-*.json"
+  },
+  {
+   "id": "rosetta-x86-64-cache",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "merge-rosetta", "from": "golden_gate_userspace: rosetta.dmg"},
+   "reason": "RosettaOS's native Intel dyld cache and its x86_64 slices are merged in, so 27.x runs natively on Intel; the cache files are repaired in cache-*.json"
+  },
+  {
+   "id": "tahoe-driverkit-cache",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "install-driverkit", "row": "tahoe_driverkit_donors", "tool": "tools/tahoe-donors/make"},
+   "reason": "Tahoe's generic x86_64 DriverKit cache is added: 27.x ships DriverKit only for arm64e"
+  },
+  {
+   "id": "seal",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "apfs_prepare_cryptex"},
+   "reason": "The image is sealed, because 27.0's launchd refuses to graft an unsealed one"
+  }
+ ],
+ "sign": null
+}

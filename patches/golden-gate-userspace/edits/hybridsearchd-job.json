@@ -1,0 +1,17 @@
+{
+ "format": 1,
+ "path": "System/Library/LaunchAgents/com.apple.hybridsearchd.plist",
+ "origin": {"kind": "apple", "name": "Golden Gate System volume"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "hybridsearchd-disabled",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["Disabled"], "value": true},
+   "reason": "hybridsearchd stops itself on any Mac without Apple silicon and launchd restarts it in a loop, so the job ships disabled (Disabled is Apple's own key for a job it does not start; Apple's feature-flag condition becomes the plain boolean)"
+  }
+ ],
+ "sign": null,
+ "expect": {"7f927c4acd1a75c483a6cecfa4ffca4cc964032ee27176c4a216cfdbca909d3c": "22df80bd32c11a683be0a4a659d60e31d78fc95efc7449132bd8d5b83c05020a"}
+}

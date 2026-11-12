@@ -1,0 +1,50 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.01",
+ "origin": {"kind": "apple", "name": "RosettaOS x86_64 shared cache (26B131)", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "legacy-trackpad-v3",
+   "kind": "matcher",
+   "resolved": {
+    "2992c56ec67804a411c973c715dd86984bde657f52e5aa07dfefec69fa5bd9d5": [
+     {"at": 196771530, "before": "83f973752a488d3dca280100e8655b030084c07416", "after": "8d518d83fa01772790909090909090909090909090", "reason": "dispatch V3 reports 0x73 and 0x74"},
+     {"at": 196780923, "before": "0f8422010000", "after": "909090909090", "reason": "allow the V3 frame header on public OS variants"},
+     {"at": 196781418, "before": "0f849e020000", "after": "909090909090", "reason": "allow V3 contact decoding on public OS variants"},
+     {"at": 196771984, "before": "410fb6470883c0d883f81c0f8786010000b9030600100fa3c10f8378010000", "after": "410fb647083c7474162c283c1c770ab9030600100fa3c17206e97901000090", "reason": "send decoded 0x74 frames to contact processing"},
+     {"at": 196775076, "before": "7475", "after": "9090", "reason": "deliver legacy V3 frame header callbacks"},
+     {"at": 196787675, "before": "7461", "after": "9090", "reason": "convert legacy V3 headers for callbacks"}
+    ]
+   },
+   "reason": "The built-in trackpad works: restores the V3 touch report path (0x73 and 0x74) that Tahoe's USB multitouch driver sends and 27.x's MultitouchSupport dropped or limited to internal OS variants"
+  },
+  {
+   "id": "core-routine-console-uid",
+   "kind": "matcher",
+   "resolved": {
+    "2992c56ec67804a411c973c715dd86984bde657f52e5aa07dfefec69fa5bd9d5": [
+     {"at": 354349496, "before": "0000000000000000000000", "after": "c70600000000e92d030900", "reason": "initialize local console UID before lookup"},
+     {"at": 354405864, "before": "e803270800", "after": "e8cb23ffff", "reason": "route console lookup through local-output initializer"}
+    ]
+   },
+   "reason": "CoreRoutine no longer reads an uninitialised console user ID when no user is logged in"
+  },
+  {
+   "id": "audio-no-console-notification",
+   "kind": "matcher",
+   "resolved": {
+    "2992c56ec67804a411c973c715dd86984bde657f52e5aa07dfefec69fa5bd9d5": [{"at": 571995499, "before": "ff15cf6ff11d", "after": "660f1f440000", "reason": "do not broadcast server death when no console user exists"}]
+   },
+   "reason": "Audio stops retrying with configd before login: no false server-death notification is sent when no console user exists (tools/audiomxd-fix)"
+  },
+  {
+   "id": "resign-4k-pages",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "resign-cache-4k-pages", "source": "patches/golden-gate-userspace/src/cache_pages.py"},
+   "reason": "The x86_64 kernel registers only 4 KiB code-signature pages for the cache; RosettaOS signs it with 16 KiB pages for Apple silicon, so the signature is made again with 4 KiB pages after the edits"
+  }
+ ],
+ "sign": null
+}
