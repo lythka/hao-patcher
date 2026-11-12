@@ -1,0 +1,3 @@
+# tahoe-dev: macOS 26 Tahoe (Tahoe-first runner, pipeline/run) for laptop testing = stock OCLP + root SSH (dev-access).
+# No hao: Tahoe runs Intel natively. Build: pipeline/run mbp92 25G342-tahoe fd83bda09 tahoe-dev
+dev-access

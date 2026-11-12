@@ -8,7 +8,7 @@
   data-symlinks.tsv = path<TAB>target for the host-side symlink step.
 Format: path typ uid gid mode(octal) flags(hex) sec nsec xattrs(name=hex,...|-)"""
 import os, re, struct, sys
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "unpack"))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # pipeline/unpack (yaa.py)
 import yaa  # noqa: E402  (pipeline/unpack/yaa.py)
 
 out, dst = sys.argv[1], sys.argv[2]

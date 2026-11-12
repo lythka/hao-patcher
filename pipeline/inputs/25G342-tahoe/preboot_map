@@ -1,0 +1,3 @@
+# Preboot/Recovery map for 25G342: the 25G332 map rebased onto the full unpack (select-inputs rebase_map, plus
+# product-number matches across the -038 -> -042 revision change); 291 matched, 302 no-source, as 25G332.
+b8c839c99525594559813560b02e4345139c03e5d21e69c6399f8c1610522bc7 store/inputs/25G342/unpack-full/preboot-recovery-map.tsv

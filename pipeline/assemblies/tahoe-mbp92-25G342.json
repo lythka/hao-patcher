@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "runner": "tahoe",
+  "target": "mbp92",
+  "os_build": "25G342-tahoe",
+  "oclp": "fd83bda09",
+  "patch_set": "tahoe-dev",
+  "repo": "store/images/mbp92-25G342-tahoe-dev"
+}
