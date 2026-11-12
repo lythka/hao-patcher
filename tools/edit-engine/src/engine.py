@@ -147,6 +147,21 @@ def _op(e, data):
         except (KeyError, IndexError, TypeError) as x:
             raise ValueError('no such key path %s (%s)' % (args['key'], x))
         return out, [], {'found': 1, 'key': args['key'], 'old': old if isinstance(old, (str, int, bool, float)) else None}
+    if op == 'text.insert':
+        try:
+            text = data.decode('utf-8')
+        except UnicodeDecodeError:
+            raise ValueError('text.insert needs a UTF-8 text file')
+        if args.get('unless_present') and args['unless_present'] in text:
+            return data, [], {'found': 0, 'count': 0, 'where': [], 'skipped': 'already present in this file'}
+        n = text.count(args['after'])
+        if n != 1:
+            raise ValueError('the anchor occurs %d times, expected once' % n)
+        at_char = text.index(args['after']) + len(args['after'])
+        out = (text[:at_char] + args['text'] + text[at_char:]).encode('utf-8')
+        at = len(text[:at_char].encode('utf-8'))
+        inserted = args['text'].encode('utf-8')
+        return out, [(at, b'', inserted)], {'found': 1, 'count': 1, 'where': ['%#x' % at]}
     raise ValueError('unknown op %s' % op)
 
 

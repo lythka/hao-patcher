@@ -1,7 +1,8 @@
 {
- "revision": 2,
+ "revision": 3,
  "stage": "oclp-hook",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
  "status": "experiment",
- "validated": false
+ "validated": false,
+ "files": [{"path": "System/Library/Sandbox/Profiles/system.sb", "edits": "edits/system-sb.json"}]
 }

@@ -16,6 +16,7 @@ OPS = {
     'macho.add-dylib': ({'path': str, 'weak': bool, 'timestamp': int, 'current_version': int, 'compat_version': int},
                         {'path'}),
     'plist.set': ({'key': list, 'value': object}, {'key', 'value'}),
+    'text.insert': ({'after': str, 'text': str, 'unless_present': str}, {'after', 'text'}),
 }
 # Ops that are declared here but carried out by their own tool; the engine refuses to apply them.
 EXTERNAL_OPS = {
@@ -244,6 +245,8 @@ def _op_problems(e):
             bad.append('%s: unknown arg %s' % (op, k))
         elif types[k] is not object and (not isinstance(v, types[k]) or (types[k] is int and isinstance(v, bool))):
             bad.append('%s: %s must be %s' % (op, k, types[k].__name__))
+    if op == 'text.insert' and (not args.get('after') or not args.get('text')):
+        bad.append('text.insert: after and text must not be empty')
     if op == 'macho.add-dylib' and isinstance(args.get('path'), str) and not args['path'].startswith('/'):
         bad.append('macho.add-dylib: path must be absolute')
     if op == 'plist.set' and isinstance(args.get('key'), list) and (
@@ -286,6 +289,10 @@ def edit_summary(e):
         return '%s %s %s' % (op, 'LC_LOAD_WEAK_DYLIB' if args.get('weak') else 'LC_LOAD_DYLIB', args['path'])
     if op == 'plist.set':
         return '%s %s = %s' % (op, ':'.join(str(k) for k in args['key']), json.dumps(args['value']))
+    if op == 'text.insert':
+        first = args['after'].strip().splitlines()[0] if args['after'].strip() else args['after']
+        return '%s %d line%s after "%s"%s' % (op, args['text'].count('\n'), '' if args['text'].count('\n') == 1 else 's',
+                                             first[:40], ', unless already present' if args.get('unless_present') else '')
     if op in EXTERNAL_OPS:
         return '%s (applied by %s)' % (op, EXTERNAL_OPS[op])
     return op

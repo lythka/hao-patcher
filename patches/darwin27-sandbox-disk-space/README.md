@@ -36,5 +36,6 @@ exact counts with the rule; the report count on a booted image with this patch h
 do not import `system.sb` keep reporting.
 
 ## Revisions
+- r3 2026-11-12 Declare the system.sb rule in `edits/system-sb.json` (edit-engine text.insert, unless already present); the hook is unchanged.
 - r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed from the 26B131 set `dev-bs-test` (26B131's file has the rule; the build log said "rule already present"). Kept in `golden-gate` (26A428). README: 26A428 only. Build validation pending.
 - r1 2026-11-10 Initial public release.

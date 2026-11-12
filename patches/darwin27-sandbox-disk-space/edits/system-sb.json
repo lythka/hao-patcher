@@ -1,0 +1,27 @@
+{
+ "format": 1,
+ "path": "System/Library/Sandbox/Profiles/system.sb",
+ "origin": {
+  "kind": "apple",
+  "note": "Golden Gate 27.0 (26A428) and Tahoe lack the rule; 27.2 (26B123) and later have it"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "disk-space-rule",
+   "kind": "op",
+   "op": "text.insert",
+   "args": {
+    "after": ";;; libmalloc requirements\n(allow syscall-mig\n       (kernel-mig-routine mach_vm_reallocate\n                           vm_reallocate))\n",
+    "text": "\n;;; Disk space reporting ({,f}statfs(), getattrlist() ATTR_VOL_SPACE*)\n(allow system-info\n       (info-type \"vfs.disk-space\"))\n",
+    "unless_present": "(info-type \"vfs.disk-space\")"
+   },
+   "reason": "the Darwin 27 kernel asks the Sandbox about disk-space info; without macOS 27.2's rule every (deny default) profile that imports system.sb denies and reports each statfs/getattrlist call",
+   "evidence": "26B123's system.sb is 26A428's plus exactly this block (src/disk_space_rule.py)"
+  }
+ ],
+ "sign": null,
+ "expect": {
+  "1b2c4487f32fba48f29ba871bd1fec4f8d74af9543074c8805c3bc7094b9846f": "2f00069564b5ec2fdd99f3c8f1172ec85949045ce59efb861cbcf88c5fd5ec36"
+ }
+}

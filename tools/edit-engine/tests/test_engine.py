@@ -239,6 +239,29 @@ class Plist(unittest.TestCase):
             engine.apply(self.ps(self.op('a', ['NVRAM'], {}), self.op('b', ['NVRAM', 'boot-args'], 'x')), data)
 
 
+class TextInsert(unittest.TestCase):
+    ANCHOR = ';;; libmalloc\n(allow x)\n'
+    RULE = '\n;;; disk space\n(allow y)\n'
+
+    def ts(self, **args):
+        a = {'after': self.ANCHOR, 'text': self.RULE, 'unless_present': '(allow y)'}
+        a.update(args)
+        return {'format': 1, 'path': 'System/Library/Sandbox/Profiles/system.sb', 'origin': {'kind': 'apple'},
+                'edits': [{'id': 'disk-space', 'kind': 'op', 'op': 'text.insert', 'args': a, 'reason': 'x'}]}
+
+    def test_insert_skip_and_refuse(self):
+        src = ('(version 1)\n' + self.ANCHOR + '(deny z)\n').encode()
+        out, rec = engine.apply(self.ts(), src)
+        self.assertEqual(out.decode(), '(version 1)\n' + self.ANCHOR + self.RULE + '(deny z)\n')
+        same, rec = engine.apply(self.ts(), out)                    # a file that already has it: unchanged
+        self.assertEqual((same, rec['edits'][0]['skipped']), (out, 'already present in this file'))
+        with self.assertRaisesRegex(engine.EditError, 'anchor occurs 0 times'):
+            engine.apply(self.ts(), b'(version 1)\n')
+        with self.assertRaisesRegex(engine.EditError, 'anchor occurs 2 times'):
+            engine.apply(self.ts(), (self.ANCHOR * 2).encode())
+        self.assertTrue(any('must not be empty' in p for p in S.validate(self.ts(text=''))))
+
+
 class Results(unittest.TestCase):
     def test_external_op_refused(self):
         e = {'id': 'rw', 'kind': 'op', 'op': 'metallib.rewrite', 'args': {'profile': 'x'}, 'reason': 'x'}

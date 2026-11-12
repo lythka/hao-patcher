@@ -9,7 +9,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | Patch | Rev | Stage | Status | Optional | golden-gate-26B131 | golden-gate | recovery | stock | Validation | Newest revision |
 |---|---|---|---|---|---|---|---|---|---|---|
 | darwin27-kernel | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
-| darwin27-sandbox-disk-space | r2 | oclp-hook | experiment |  |  | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
+| darwin27-sandbox-disk-space | r3 | oclp-hook | experiment |  |  | x |  |  | **needs** | r3 2026-11-12 Declare the system.sb rule in `edits/system-sb.json` (edit-engine text.insert, unless already pr |
 | dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
 | golden-gate-corespotlight-compat | r5 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files |
 | golden-gate-font-registry | r3 | post | experiment | caches | x |  |  |  | ok | r3 2026-11-11 Row `font_registry_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest. No  |
