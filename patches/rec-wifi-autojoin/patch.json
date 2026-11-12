@@ -1,5 +1,5 @@
 {
- "revision": 1,
+ "revision": 2,
  "stage": "recovery",
  "applies": {
   "models": [
@@ -7,5 +7,28 @@
   ]
  },
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "usr/local/ssdtools/wifijoin.dylib",
+   "origin": {
+    "kind": "hao",
+    "note": "new file built by make.sh from src/wifijoin.m (x86_64, ad hoc signed)"
+   }
+  },
+  {
+   "path": "usr/local/ssdtools/wifijoin.sh",
+   "origin": {
+    "kind": "hao",
+    "note": "new file, copied from src/wifijoin.sh: restarts airportd with the dylib inserted"
+   }
+  },
+  {
+   "path": "System/Library/LaunchDaemons/local.wifijoin.plist",
+   "origin": {
+    "kind": "hao",
+    "note": "new file, copied from src/local.wifijoin.plist: runs wifijoin.sh once at boot"
+   }
+  }
+ ]
 }

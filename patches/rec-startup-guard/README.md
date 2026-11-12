@@ -16,13 +16,17 @@ variable routing is off) at macOS's own `boot.efi`. This Mac cannot start that w
 [rec-reinstall](../rec-reinstall/README.md) uses `internal-esp` and `bootguard` to set the startup disk after an
 install.
 
+The four installed files are new and declared in `patch.json` `files`, with paths in the Recovery BaseSystem root (`usr/local/ssdtools/bootguard`, `bootguard.sh`, `internal-esp` and `System/Library/LaunchDaemons/local.bootguard.plist`); `tests/test_files.py` checks them against `apply.sh` and `make.sh`.
+
 ## Verify
 In the Recovery choose Startup Disk, select the internal macOS and restart: OpenCore starts (no prohibited sign), and
 `/var/log/bootguard.log` shows the rewrite.
+`python3.14 -I -B -m unittest discover -s patches/rec-startup-guard/tests` checks the declared files against `apply.sh`.
 
 ## Validation
 NEEDS VALIDATION: `bootguard` builds and installs in every Recovery build; the redirect has not been tested in a
 booted Recovery built from this repository.
 
 ## Revisions
+- r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is unchanged.
 - r1 2026-11-10 Initial public release.
