@@ -9,3 +9,5 @@ golden-gate System/Library/PrivateFrameworks/Tungsten.framework/Versions/A/Resou
 golden-gate System/Library/PrivateFrameworks/VectorKit.framework/Versions/A/Resources/default.metallib
 golden-gate System/Library/PrivateFrameworks/VectorKit.framework/Versions/A/Resources/metal_libraries/AlloyCommonLibrary.metallib
 golden-gate System/Library/PrivateFrameworks/VFX.framework/Versions/A/Resources/default.metallib
+golden-gate System/Library/Frameworks/SceneKit.framework/Versions/A/Resources/default.metallib
+golden-gate System/iOSSupport/System/Library/Frameworks/SceneKit.framework/Versions/A/Resources/default.metallib
