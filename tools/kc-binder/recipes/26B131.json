@@ -1,0 +1,500 @@
+{
+ "format": 1,
+ "about": "Masks, masked-byte hashes and relocation targets for kc-recipe.json; made by tools/kc-binder make-recipe; no Apple bytes",
+ "kc_recipe": {
+  "path": "tools/kernel-fixes/profiles/26B131/kc-recipe.json",
+  "sha256": "a9f88213b421fa3fb7ec63e2046f598cd6dfdb620d1e4019556a587c754c9cab"
+ },
+ "pv_blob": {
+  "path": "tools/kc-binder/blobs/pv-alias.json",
+  "sha256": "ffc3be26ca877e2b4b598ffb011173e7e936595b483915dcec3b301e64a640bc"
+ },
+ "kernel": {
+  "uuid": "037e7b860ac83c67afb87c2c86435e9a",
+  "sha256": "3c9317518535791503970fbec322b9bba70e91f3a233536205ccd77b047ffc83"
+ },
+ "darwin_version": "27.2.0",
+ "code": {
+  "site": {
+   "length": 104,
+   "mask": "ffffff00000000ffffffffffffff00000000ffffffffffffff00000000ffffffffffffffffffffffff00000000ffffffffffffffffffffff00000000ffffffffffffffffff00000000ffffffffffffffff00000000ffffff00000000ffffffffffffffff00000000",
+   "masked_sha256": "27e585b07149f30e66f54aeb9b3a2fb5a5abc994e2fe576eb2c41b0bbaa31a9c",
+   "fields": [
+    {
+     "at": 3,
+     "end": 11,
+     "target": {
+      "segment": "__KLDDATA",
+      "offset": "0xae88"
+     },
+     "name": "map_data_size"
+    },
+    {
+     "at": 14,
+     "end": 22,
+     "target": {
+      "segment": "__KLDDATA",
+      "offset": "0xae90"
+     },
+     "name": "kentry_data_size"
+    },
+    {
+     "at": 25,
+     "end": 33,
+     "target": {
+      "segment": "__KLDDATA",
+      "offset": "0xae98"
+     },
+     "name": "map_nodes_data_size"
+    },
+    {
+     "at": 41,
+     "end": 45,
+     "target": {
+      "segment": "__DATA",
+      "offset": "0xd6600"
+     },
+     "name": "virtual_space_start"
+    },
+    {
+     "at": 56,
+     "end": 60,
+     "target": {
+      "segment": "__KLDDATA",
+      "offset": "0xae80"
+     },
+     "name": "map_stolen_data"
+    },
+    {
+     "at": 69,
+     "end": 73,
+     "target": {
+      "segment": "__DATA",
+      "offset": "0xd6600"
+     },
+     "name": "virtual_space_start"
+    },
+    {
+     "at": 81,
+     "end": 85,
+     "target": {
+      "segment": "__TEXT",
+      "offset": "0xa3c257"
+     },
+     "name": null
+    },
+    {
+     "at": 88,
+     "end": 92,
+     "target": {
+      "segment": "__TEXT",
+      "offset": "0xa3c270"
+     },
+     "name": null
+    },
+    {
+     "at": 100,
+     "end": 104,
+     "target": {
+      "segment": "__TEXT",
+      "offset": "0x8f441c"
+     },
+     "name": "_panic"
+    }
+   ]
+  },
+  "range_call": {
+   "length": 11,
+   "mask": "ffffffffffffff00000000",
+   "masked_sha256": "c3665d18c59177b740ea7d772480928a9f4d9187ed83835f4687b93262264dbd",
+   "fields": [
+    {
+     "at": 7,
+     "end": 11,
+     "target": {
+      "segment": "__TEXT",
+      "offset": "0x15fe90"
+     },
+     "name": null
+    }
+   ]
+  },
+  "pv_hook": {
+   "length": 24,
+   "mask": "ff00000000ffffff00000000ffffffff00000000ffffff00",
+   "masked_sha256": "b7b0bb351a19129ae963d2ffb716dffc65f780730273233a337b725b6008f1b6",
+   "fields": [
+    {
+     "at": 1,
+     "end": 5,
+     "target": {
+      "segment": "__TEXT",
+      "offset": "0x1de6e0"
+     },
+     "name": "pmap_remove_options"
+    },
+    {
+     "at": 8,
+     "end": 12,
+     "target": {
+      "segment": "__DATA",
+      "offset": "0x288b80"
+     },
+     "name": null
+    },
+    {
+     "at": 16,
+     "end": 20,
+     "target": {
+      "segment": "__TEXT",
+      "offset": "0x167ab0"
+     },
+     "name": "_vm_object_lock"
+    },
+    {
+     "at": 23,
+     "end": 27,
+     "target": {
+      "segment": "__KLDDATA",
+      "offset": "0xa000"
+     },
+     "name": null
+    }
+   ]
+  },
+  "pv_cave_tail": {
+   "length": 32,
+   "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+   "masked_sha256": "c7fd7b1133bf2bb918b54d65069003458c7f557b8c3d172b1c2b37e983e837f3",
+   "fields": []
+  }
+ },
+ "commpage": {
+  "required": [
+   "_printf",
+   "_pmap_create_options",
+   "_vm_map_create_options",
+   "_commpage_populate",
+   "_commpage_text_populate",
+   "_random",
+   "_commpage_text32_location",
+   "_commpage_text64_location",
+   "_mach_make_memory_entry",
+   "_vm_map_enter_mem_object",
+   "_kernel_map",
+   "_vm_protect",
+   "_amfi",
+   "_copyin",
+   "_copyinstr",
+   "_vfs_context_current",
+   "_vnode_getfromfd",
+   "_mac_vnop_getxattr",
+   "_vnode_put",
+   "_PE_state",
+   "_PE_parse_boot_argn",
+   "_copyout",
+   "_ml_set_interrupts_enabled",
+   "_current_thread",
+   "_user_trap",
+   "_machine_thread_get_state",
+   "_fpu_get_fxstate",
+   "_fpu_set_fxstate"
+  ],
+  "alias_slots": [
+   "_commPagePtr32",
+   "_commPagePtr64",
+   "_commPageTextPtr32",
+   "_commPageTextPtr64"
+  ],
+  "map_slots": [
+   "_commpage32_map",
+   "_commpage64_map",
+   "_commpage_text32_map",
+   "_commpage_text64_map"
+  ],
+  "symbols": {
+   "_printf": {
+    "segment": "__TEXT",
+    "offset": "0x99590"
+   },
+   "_pmap_create_options": {
+    "segment": "__TEXT",
+    "offset": "0x1d4410"
+   },
+   "_vm_map_create_options": {
+    "segment": "__TEXT",
+    "offset": "0x1416f0"
+   },
+   "_commpage_populate": {
+    "segment": "__TEXT",
+    "offset": "0x202040"
+   },
+   "_commpage_text_populate": {
+    "segment": "__TEXT",
+    "offset": "0x202ad0"
+   },
+   "_random": {
+    "segment": "__TEXT",
+    "offset": "0x25cdb0"
+   },
+   "_commpage_text32_location": {
+    "segment": "__DATA_CONST",
+    "offset": "0x2a1e8"
+   },
+   "_commpage_text64_location": {
+    "segment": "__DATA_CONST",
+    "offset": "0x2a1e0"
+   },
+   "_mach_make_memory_entry": {
+    "segment": "__TEXT",
+    "offset": "0x1633f0"
+   },
+   "_vm_map_enter_mem_object": {
+    "segment": "__TEXT",
+    "offset": "0x144000"
+   },
+   "_kernel_map": {
+    "segment": "__DATA_CONST",
+    "offset": "0x9e648"
+   },
+   "_vm_protect": {
+    "segment": "__TEXT",
+    "offset": "0x1a2be0"
+   },
+   "_amfi": {
+    "segment": "__DATA_CONST",
+    "offset": "0x9a1d8"
+   },
+   "_copyin": {
+    "segment": "__TEXT",
+    "offset": "0x1f32c0"
+   },
+   "_copyinstr": {
+    "segment": "__TEXT",
+    "offset": "0x1f3420"
+   },
+   "_vfs_context_current": {
+    "segment": "__TEXT",
+    "offset": "0x2c1db0"
+   },
+   "_vnode_getfromfd": {
+    "segment": "__TEXT",
+    "offset": "0x29e270"
+   },
+   "_mac_vnop_getxattr": {
+    "segment": "__TEXT",
+    "offset": "0x8d7e00"
+   },
+   "_vnode_put": {
+    "segment": "__TEXT",
+    "offset": "0x28b600"
+   },
+   "_PE_state": {
+    "segment": "__DATA",
+    "offset": "0x25b8c0"
+   },
+   "_PE_parse_boot_argn": {
+    "segment": "__TEXT",
+    "offset": "0x8b4a70"
+   },
+   "_copyout": {
+    "segment": "__TEXT",
+    "offset": "0x1f3470"
+   },
+   "_ml_set_interrupts_enabled": {
+    "segment": "__TEXT",
+    "offset": "0x1f6140"
+   },
+   "_current_thread": {
+    "segment": "__TEXT",
+    "offset": "0x1f6910"
+   },
+   "_user_trap": {
+    "segment": "__TEXT",
+    "offset": "0x1fe480"
+   },
+   "_machine_thread_get_state": {
+    "segment": "__TEXT",
+    "offset": "0x1f9220"
+   },
+   "_fpu_get_fxstate": {
+    "segment": "__TEXT",
+    "offset": "0x1ed290"
+   },
+   "_fpu_set_fxstate": {
+    "segment": "__TEXT",
+    "offset": "0x1eb990"
+   },
+   "_commPagePtr32": {
+    "segment": "__DATA",
+    "offset": "0x1f7f88"
+   },
+   "_commPagePtr64": {
+    "segment": "__DATA",
+    "offset": "0x1f7f90"
+   },
+   "_commPageTextPtr32": {
+    "segment": "__DATA",
+    "offset": "0x1f7f98"
+   },
+   "_commPageTextPtr64": {
+    "segment": "__DATA",
+    "offset": "0x1f7fa0"
+   },
+   "_commpage32_map": {
+    "segment": "__DATA_CONST",
+    "offset": "0x11eb8"
+   },
+   "_commpage64_map": {
+    "segment": "__DATA_CONST",
+    "offset": "0x11ec0"
+   },
+   "_commpage_text32_map": {
+    "segment": "__DATA_CONST",
+    "offset": "0x11ec8"
+   },
+   "_commpage_text64_map": {
+    "segment": "__DATA_CONST",
+    "offset": "0x11ed0"
+   },
+   "_csr_get_active_config": {
+    "segment": "__TEXT",
+    "offset": "0x5b9380"
+   }
+  },
+  "hooks": [
+   {
+    "name": "_vm_commpage_init",
+    "segment": "__TEXT",
+    "offset": "0x19c290",
+    "length": 14,
+    "mask": "ffffffffffff00000000ffffffff",
+    "masked_sha256": "f8cf3f471ac87dd1290fed24b218c9db467d9890293f3e6dee40739b14c736b2",
+    "fields": [
+     {
+      "at": 6,
+      "end": 11,
+      "target": {
+       "segment": "__DATA",
+       "offset": "0x91e78"
+      },
+      "name": "_shared_region_trace_level"
+     }
+    ]
+   },
+   {
+    "name": "_vm_commpage_text_init",
+    "segment": "__TEXT",
+    "offset": "0x19c1f0",
+    "length": 14,
+    "mask": "ffffffffffff00000000ffffffff",
+    "masked_sha256": "f8cf3f471ac87dd1290fed24b218c9db467d9890293f3e6dee40739b14c736b2",
+    "fields": [
+     {
+      "at": 6,
+      "end": 11,
+      "target": {
+       "segment": "__DATA",
+       "offset": "0x91e78"
+      },
+      "name": "_shared_region_trace_level"
+     }
+    ]
+   },
+   {
+    "name": "_vm_commpage_enter",
+    "segment": "__TEXT",
+    "offset": "0x19c330",
+    "length": 14,
+    "mask": "ffffffffffffffffffffffffffff",
+    "masked_sha256": "440ffa8eba35a7de67e48dafb8f88aecc9592add44f1e3e3f9deeabca9abaf7b",
+    "fields": []
+   },
+   {
+    "name": "_amfi_interface_register",
+    "segment": "__TEXT",
+    "offset": "0x7b11b0",
+    "length": 14,
+    "mask": "ffffff00000000ffffffffffff00",
+    "masked_sha256": "1f63ba9daf9d8e4f168d2f852d8d6346776bbeb3f6b0705d6811e1c549a026e8",
+    "fields": [
+     {
+      "at": 3,
+      "end": 8,
+      "target": {
+       "segment": "__DATA_CONST",
+       "offset": "0x9a1d8"
+      },
+      "name": "_amfi"
+     },
+     {
+      "at": 13,
+      "end": 17,
+      "target": {
+       "segment": "__DATA_CONST",
+       "offset": "0x9a1d8"
+      },
+      "name": "_amfi"
+     }
+    ]
+   },
+   {
+    "name": "_vm_map_exec",
+    "segment": "__TEXT",
+    "offset": "0x150e80",
+    "length": 14,
+    "mask": "ffffffffffffffffffffffffffff",
+    "masked_sha256": "25561fb82a04e5cf53c4b1b7198a3db66484887d361746da58cfc761eb11400a",
+    "fields": []
+   },
+   {
+    "name": "fixed_locator",
+    "segment": "__TEXT",
+    "offset": "0x1433a0",
+    "length": 14,
+    "mask": "ffffffffffffffffffffffffffff",
+    "masked_sha256": "25561fb82a04e5cf53c4b1b7198a3db66484887d361746da58cfc761eb11400a",
+    "fields": []
+   },
+   {
+    "name": "_mac_policy_register",
+    "segment": "__TEXT",
+    "offset": "0x8b9a00",
+    "length": 14,
+    "mask": "ffffffffffffffffffffffffffff",
+    "masked_sha256": "25561fb82a04e5cf53c4b1b7198a3db66484887d361746da58cfc761eb11400a",
+    "fields": []
+   },
+   {
+    "name": "vn_rename_return",
+    "segment": "__TEXT",
+    "offset": "0x2c7208",
+    "length": 14,
+    "mask": "ffffffffffffffffffffffffffff",
+    "masked_sha256": "e0af5845f4bedc8649699dc127bc3a7c7a667888fac9c1f76985c9b5cca4dcc0",
+    "fields": []
+   }
+  ],
+  "reads": {
+   "user_trap": {
+    "symbol": "_user_trap",
+    "length": 112
+   },
+   "csr_get_active_config": {
+    "symbol": "_csr_get_active_config",
+    "length": 32
+   }
+  },
+  "iosurface": {
+   "member": "com.apple.iokit.IOSurface",
+   "entry": {
+    "segment": "__TEXT",
+    "offset": "0x1a0d6",
+    "length": 14,
+    "mask": "ffffffffffffffffffffffffffff",
+    "masked_sha256": "71b237fe56182d46b2a45fb39e2ad56bb87605e2b4be184d7c88bc8a0e3efaf0",
+    "fields": []
+   }
+  }
+ }
+}
