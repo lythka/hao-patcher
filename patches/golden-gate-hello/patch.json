@@ -1,8 +1,16 @@
 {
- "revision": 3,
+ "revision": 4,
  "stage": "oclp-hook",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
  "inputs": ["hello_metallib_golden_gate", "libhelloblur"],
  "status": "experiment",
- "validated": false
+ "validated": false,
+ "files": [
+  {"path": "System/Library/Frameworks/Metal.framework/Versions/A/Metal", "edits": "edits/metal.json"},
+  {"path": "System/Library/PrivateFrameworks/SetupAssistantSupportUI.framework/Versions/A/Resources/default.metallib",
+   "origin": {"kind": "hao", "row": "hello_metallib_golden_gate",
+              "note": "the build's own library rewritten by cache/metallib (profiles/hello-golden-gate.txt)"}},
+  {"path": "usr/lib/libhelloblur.dylib",
+   "origin": {"kind": "hao", "row": "libhelloblur", "note": "new file: blur cache and Continue-button warm-up"}}
+ ]
 }

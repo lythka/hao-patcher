@@ -13,7 +13,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | dev-access | r3 | post | dev |  |  |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
 | golden-gate-corespotlight-compat | r4 | oclp-hook | experiment |  | x | x |  |  | ok | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
 | golden-gate-font-registry | r3 | post | experiment | caches | x |  |  |  | ok | r3 2026-11-11 Row `font_registry_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest. No  |
-| golden-gate-hello | r3 | oclp-hook | experiment |  | x | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
+| golden-gate-hello | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the Metal wrapper edits in `edits/metal.json` and the three files in `patch.json` `files |
 | golden-gate-icon-caches | r3 | post | experiment | caches | x |  |  |  | ok | r3 2026-11-11 Row `icon_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (668 s |
 | golden-gate-live-text-service | r2 | post | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Checks the runtime in System (/usr/lib/hao-live-text/LiveText.dylib) on the read-only System ins |
 | golden-gate-live-text-shared | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Runtime in System (/usr/lib/hao-live-text, umbrella LiveText.dylib: the load command must fit li |

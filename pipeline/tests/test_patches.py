@@ -154,6 +154,11 @@ class Repo(unittest.TestCase):
             self.assertIn('\n- r%d ' % p['revision'], '\n' + rev, d.name)
 
 
+    def test_catalog_is_current(self):
+        # docs/PATCHES.md is generated; regenerate with `python3.14 -I pipeline/patches.py catalog`
+        import patches
+        self.assertEqual((TOP / 'docs/PATCHES.md').read_text(), patches.catalog(), 'docs/PATCHES.md is stale')
+
     def test_tracker_is_current(self):
         # patches/TRACKER.md is generated; regenerate with `python3 -I pipeline/patches.py tracker`
         import patches
@@ -199,6 +204,38 @@ class Format(unittest.TestCase):
         self.assertNotIn('opt:', got); self.assertNotIn('cons:', got)
         self.assertIn('badgroup: optional must be a group name', got)
         self.assertIn('loose: needs_any without optional', got)
+
+    def edits(self, name, spec_name, spec):
+        d = self.d / 'patches' / name / 'edits'; d.mkdir(exist_ok=True)
+        (d / spec_name).write_text(json.dumps(spec))
+
+    SPEC = {'format': 1, 'path': 'usr/lib/libx.dylib', 'origin': {'kind': 'apple'},
+            'edits': [{'id': 'e', 'kind': 'literal', 'at': 16, 'find': '01', 'replace': '00', 'reason': 'why'}]}
+
+    def test_declared_files(self):
+        self.patch('good', inputs=['row_a'], files=[{'path': 'usr/lib/libx.dylib', 'edits': 'edits/x.json'},
+                                                    {'path': 'usr/lib/new', 'origin': {'kind': 'hao', 'row': 'row_a'}}])
+        self.edits('good', 'x.json', self.SPEC)
+        self.assertEqual(self.check(), [])
+        self.assertIn('1. e  literal at 0x10', patches.explain('libx.dylib', root=self.d / 'patches'))
+        self.assertIn('origin   hao (row row_a)', patches.explain('good', root=self.d / 'patches'))
+
+    def test_declared_file_rules(self):
+        self.patch('both', files=[{'path': 'a', 'edits': 'edits/a.json', 'origin': {'kind': 'hao'}}])
+        self.patch('abs', files=[{'path': '/abs', 'origin': {'kind': 'hao'}}])
+        self.patch('norow', files=[{'path': 'a', 'origin': {'kind': 'hao', 'row': 'missing'}}])
+        self.patch('kind', files=[{'path': 'a', 'origin': {'kind': 'mystery'}}])
+        self.patch('otherpath', files=[{'path': 'usr/lib/other', 'edits': 'edits/x.json'}])
+        self.edits('otherpath', 'x.json', self.SPEC)
+        self.patch('badspec', files=[{'path': 'usr/lib/libx.dylib', 'edits': 'edits/x.json'}])
+        self.edits('badspec', 'x.json', dict(self.SPEC, edits=[dict(self.SPEC['edits'][0], reason='')]))
+        self.patch('stray')
+        self.edits('stray', 'loose.json', self.SPEC)
+        got = '\n'.join(self.check())
+        for want in ('both: files: each entry is', 'abs: files: path must be relative', 'norow: files: a: origin row missing',
+                     'kind: files: a: origin is', 'otherpath: edits/x.json: names usr/lib/libx.dylib',
+                     'badspec: edits/x.json: e: reason is required', 'stray: edits/loose.json is not declared'):
+            self.assertIn(want, got)
 
     def test_repo_patches_follow_the_format(self):
         self.assertEqual(patches.check(), [])

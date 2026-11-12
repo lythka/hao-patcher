@@ -1,0 +1,24 @@
+{
+ "format": 1,
+ "path": "System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+ "arch": "x86_64",
+ "origin": {"kind": "oclp", "name": "Metal 3802 Common", "note": "OCLP's legacy Metal wrapper (PatcherSupportPkg 2.0.5)"},
+ "applied_by": "installer",
+ "edits": [
+  {"id": "hello-not-skipped", "kind": "literal",
+   "base": "_fake_LCAUtilities_shouldSkipHello", "limit": 64,
+   "find": "B0 01 0F BE C0 48 83 C4 10 5D C3", "replace": "B0 00 0F BE C0 48 83 C4 10 5D C3",
+   "asm": {"before": "mov al,1", "after": "mov al,0"},
+   "reason": "Language Chooser plays the hello animation: the wrapper's +[LCAUtilities shouldSkipHello] stub answers NO"},
+  {"id": "setup-not-swizzled", "kind": "literal",
+   "base": "_helloSetup", "limit": 64,
+   "find": "3C 00 74 48 48 8D 3D", "replace": "3C 00 EB 48 48 8D 3D",
+   "asm": {"before": "cmp al,0; je +0x48", "after": "cmp al,0; jmp +0x48"},
+   "reason": "Setup Assistant is not swizzled, so Apple's own hello and Welcome to Mac logic runs"},
+  {"id": "weak-load-libhelloblur", "kind": "op", "op": "macho.add-dylib",
+   "args": {"path": "/usr/lib/libhelloblur.dylib", "weak": true, "timestamp": 2},
+   "reason": "loads the blur cache and Continue-button warm-up; weak, so Metal still loads without the library"}
+ ],
+ "sign": {"mode": "adhoc", "identifier": "Metal"},
+ "expect": {"9841dc3d5c5062ea1bfa404f3fef3f2c178fda3322892249283c61e04ee1f230": "780af59c91311ab7fbaa626578e7259a1e2b6ca8e0b1aac9277b063becd35eff"}
+}

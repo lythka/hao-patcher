@@ -10,6 +10,9 @@
   patches.py tracker [OUT]           the patch tracker (patches/TRACKER.md): every patch, revision, sets, validation
 
   patches.py check                   every patch against the patch format below; one line per problem, exit 1 if any
+  patches.py explain [NAME | PATH]   what each declared file comes from and every edit to it, with reasons (one patch,
+                                     or every file whose path is or ends with /PATH); no argument: every patch
+  patches.py catalog [OUT]           the patch catalog (docs/PATCHES.md): explain for every patch, as Markdown
 
 patches/NAME/patch.json: {"revision": N, "stage": "oclp-hook" | "post" | "recovery", "applies": "any" | {"models":
 [...], "builds": [...]}, "inputs": [inputs-lock row names], "status": STATUS, "validated": true | false}. revision counts
@@ -27,6 +30,11 @@ running laptop). plan skips one, with a note on stderr, when one of its rows is 
 there, or when its GROUP is passed to --skip-optional. A row that is there but fails its sha256 stops: a corrupted
 input is never skipped. "needs_any": GROUP skips a patch unless a patch of GROUP without needs_any runs (a consumer
 with nothing to consume). Rows of patches that are not optional are not looked at here; staging stops on a missing one.
+
+"files" (optional) declares every file the patch adds or changes on the installed system, for patches.py explain, the
+catalog and (later) the ledger: [{"path": RELATIVE, "edits": "edits/FILE.json"} | {"path": RELATIVE, "origin": {"kind":
+apple|tahoe|oclp|hao, "row": INPUT_ROW, "name": ..., "note": ...}}]. An edits file is an edit spec for
+tools/edit-engine (format in its README) and must name the same path; every patches/NAME/edits/*.json must be declared.
 """
 import json, os, re, sys
 
@@ -189,9 +197,11 @@ def check(root=os.path.join(TOP, 'patches'), sets_dir=os.path.join(TOP, 'pipelin
                 bad.append('%s: %s must be a group name (lower-case letters, digits, -)' % (name, key))
         if 'needs_any' in p and 'optional' not in p:
             bad.append('%s: needs_any without optional (a patch that can be skipped must be optional)' % name)
-        unknown = set(p) - {'revision', 'stage', 'applies', 'inputs', 'status', 'validated', 'optional', 'needs_any'}
+        unknown = set(p) - {'revision', 'stage', 'applies', 'inputs', 'status', 'validated', 'optional', 'needs_any',
+                            'files'}
         if unknown:
             bad.append('%s: unknown patch.json keys %s' % (name, ', '.join(sorted(unknown))))
+        bad += ['%s: %s' % (name, problem) for problem in file_problems(d, p)]
         text = open(os.path.join(d, 'README.md')).read() if os.path.isfile(os.path.join(d, 'README.md')) else ''
         heads = re.findall(r'^## (.+?)\s*$', text, re.M)
         for h in ('Verify', 'Validation', 'Revisions'):
@@ -211,6 +221,135 @@ def check(root=os.path.join(TOP, 'patches'), sets_dir=os.path.join(TOP, 'pipelin
                 bad.append('%s: status %s, but set %s ships to people (product patches only)' % (name, p.get('status'), s))
     return bad
 
+def edit_spec():
+    """tools/edit-engine/src/spec.py as a module dict (runpy: python -I puts no tool folder on sys.path)."""
+    import runpy
+    return runpy.run_path(os.path.join(TOP, 'tools', 'edit-engine', 'src', 'spec.py'))
+
+
+def file_problems(d, p):
+    """Problems with patch.json "files" in patch folder D, and edits/*.json files it does not declare."""
+    files = p.get('files')
+    declared, bad = set(), []
+    if files is not None:
+        S = edit_spec()
+        if not isinstance(files, list) or not files:
+            return ['files must be a non-empty list']
+        paths = set()
+        for f in files:
+            if not isinstance(f, dict) or set(f) - {'path', 'edits', 'origin'} or ('edits' in f) == ('origin' in f):
+                bad.append('files: each entry is {"path", "edits"} or {"path", "origin"}: %s' % json.dumps(f))
+                continue
+            path = f.get('path')
+            if not (isinstance(path, str) and path and not path.startswith('/') and '..' not in path.split('/')):
+                bad.append('files: path must be relative to the installed system: %r' % (path,))
+                continue
+            if path in paths:
+                bad.append('files: %s declared twice' % path)
+            paths.add(path)
+            if 'origin' in f:
+                o = f['origin']
+                if not isinstance(o, dict) or o.get('kind') not in S['ORIGINS'] or set(o) - {'kind', 'name', 'row', 'note'}:
+                    bad.append('files: %s: origin is {"kind": %s, "row", "name", "note"}' % (path, '|'.join(S['ORIGINS'])))
+                elif 'row' in o and o['row'] not in p.get('inputs', []):
+                    bad.append('files: %s: origin row %s is not one of the patch inputs' % (path, o['row']))
+                continue
+            rel = f['edits']
+            if not (isinstance(rel, str) and rel.startswith('edits/') and rel.endswith('.json') and '..' not in rel):
+                bad.append('files: %s: edits must be "edits/NAME.json"' % path)
+                continue
+            declared.add(rel)
+            try:
+                spec = S['load'](os.path.join(d, rel))
+            except (OSError, ValueError) as e:
+                bad.append('%s: %s' % (rel, e))
+                continue
+            bad += ['%s: %s' % (rel, problem) for problem in S['validate'](spec)]
+            if spec.get('path') != path:
+                bad.append('%s: names %s, patch.json files says %s' % (rel, spec.get('path'), path))
+    folder = os.path.join(d, 'edits')
+    for n in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
+        if n.endswith('.json') and 'edits/' + n not in declared:
+            bad.append('edits/%s is not declared in patch.json files' % n)
+    return bad
+
+
+def declared_files(root=os.path.join(TOP, 'patches')):
+    """[(patch, revision, status, path, origin or None, spec or None)] for every declared file, in patch order."""
+    S = edit_spec()
+    out = []
+    for name in patch_names(root):
+        pj = os.path.join(directory(name, root), 'patch.json')
+        if not os.path.isfile(pj):
+            continue
+        p = json.load(open(pj))
+        for f in p.get('files', []):
+            spec = S['load'](os.path.join(directory(name, root), f['edits'])) if 'edits' in f else None
+            out.append((name, p.get('revision'), p.get('status'), f['path'], f.get('origin'), spec))
+    return out
+
+
+def explain(what=None, root=os.path.join(TOP, 'patches')):
+    """Plain text: every declared file of patch WHAT, or every file whose path is or ends with /WHAT (all: None)."""
+    S = edit_spec()
+    rows = [r for r in declared_files(root)
+            if what is None or r[0] == what or r[3] == what or r[3].endswith('/' + what.lstrip('/'))]
+    if not rows:
+        raise ValueError('no declared file or patch matches %r (patches declare files in patch.json "files")' % what)
+    out = []
+    for name, rev, _, path, origin, spec in rows:
+        if out:
+            out.append('')
+        if spec:
+            out += S['describe'](spec)
+        else:
+            out += [path, '  origin   %s' % S['origin_text'](origin)]
+            if origin.get('note'):
+                out.append('  note     %s' % origin['note'])
+        out.append('  recipe   %s r%s' % (name, rev))
+    return '\n'.join(out)
+
+
+def sentence(text):
+    text = text.strip()
+    return text[:1].upper() + text[1:] + ('' if text.endswith('.') else '.')
+
+
+def catalog(root=os.path.join(TOP, 'patches')):
+    """docs/PATCHES.md: every declared file, its origin and each edit with its reason. Generated; never edited."""
+    S = edit_spec()
+    rows = declared_files(root)
+    declaring = sorted({r[0] for r in rows})
+    others = [n for n in patch_names(root) if n not in declaring and os.path.isfile(os.path.join(root, n, 'patch.json'))]
+    md = ['# Patch catalog', '',
+          'Generated by `python3.14 -I pipeline/patches.py catalog` from each patch.json `files` and its `edits/*.json`',
+          '(edit specs for [tools/edit-engine](../tools/edit-engine/README.md)); the pipeline tests fail when it is stale.',
+          '`python3.14 -I pipeline/patches.py explain NAME|PATH` prints the same for one patch or file.', '',
+          '%d of %d patches declare their files so far.' % (len(declaring), len(declaring) + len(others)), '']
+    for name in declaring:
+        mine = [r for r in rows if r[0] == name]
+        md += ['## %s' % name, '', 'Revision r%s, status %s. [Recipe](../patches/%s/README.md)' % (mine[0][1], mine[0][2], name), '']
+        for _, _, _, path, origin, spec in mine:
+            if not spec:
+                md.append('- `%s`: whole file from %s.%s' % (path, S['origin_text'](origin),
+                                                              ' ' + sentence(origin['note']) if origin.get('note') else ''))
+                continue
+            sign = spec.get('sign')
+            md += ['- `%s`: from %s; %d edit%s, applied by the %s%s' % (
+                path, S['origin_text'](spec['origin']), len(spec['edits']), '' if len(spec['edits']) == 1 else 's',
+                spec.get('applied_by', 'installer'), ', then signed ad hoc once' if sign else '')]
+            for n, e in enumerate(spec['edits'], 1):
+                line = '  %d. `%s`: %s' % (n, e['id'], S['edit_summary'](e).replace('|', '/'))
+                if e['kind'] == 'literal':
+                    line += ', `%s` → `%s`' % (S['spaced'](S['hexbytes'](e['find'])), S['spaced'](S['hexbytes'](e['replace'])))
+                if e.get('asm'):
+                    line += ' (`%s` → `%s`)' % (e['asm']['before'], e['asm']['after'])
+                md += [line + '.', '     ' + sentence(e['reason'])]
+        md.append('')
+    md += ['## Not declared yet', '', ', '.join(others) if others else 'None.', '']
+    return '\n'.join(md)
+
+
 if __name__ == '__main__':
     if sys.argv[1:2] == ['path'] and len(sys.argv) == 3:
         print(directory(sys.argv[2], os.path.join(TOP, 'patches')))
@@ -218,6 +357,16 @@ if __name__ == '__main__':
     if sys.argv[1:2] == ['tracker']:
         out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(TOP, 'patches', 'TRACKER.md')
         open(out, 'w').write(tracker())
+        sys.exit(0)
+    if sys.argv[1:2] == ['catalog']:
+        out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(TOP, 'docs', 'PATCHES.md')
+        open(out, 'w').write(catalog())
+        sys.exit(0)
+    if sys.argv[1:2] == ['explain'] and len(sys.argv) <= 3:
+        try:
+            print(explain(sys.argv[2] if len(sys.argv) == 3 else None))
+        except (ValueError, OSError) as e:
+            sys.exit('patches.py: %s' % e)
         sys.exit(0)
     if sys.argv[1:2] == ['check']:
         problems = check()
