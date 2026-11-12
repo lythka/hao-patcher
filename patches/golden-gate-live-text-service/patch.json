@@ -1,7 +1,10 @@
 {
- "revision": 2,
+ "revision": 3,
  "stage": "post",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
  "status": "experiment",
- "validated": false
+ "validated": false,
+ "files": [
+ {"path": "EFI/OC/config.plist", "edits": "edits/config.json"}
+ ]
 }
