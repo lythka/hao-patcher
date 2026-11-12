@@ -1,0 +1,35 @@
+@protocol CAMetalDrawable <MTLDrawable>
+@required
+@property (readonly) id<MTLTexture> texture;
+@end
+
+@interface CVRootThing {
+	/* instance variables */
+}
+@end
+
+@interface CVPassDescriptor : MTLRenderPassDescriptor <NSCopying> {
+	/* instance variables */
+	unsigned long long _x;
+}
+@end
+
+@interface CVOwnClass : NSObject
+@end
+
+@interface MTLTextureDescriptor (CVAdditions) <NSSecureCoding>
+- (void)cv_apply;
+@end
+
+@protocol refs
+0x7ff84107d820 => 0x7ff843d3e958: MTLDrawable
+
+@class refs
+0x7ff84107d900 => 0x7ff843d3e000: MTLSharedEventListener
+0x7ff84107d908 => 0x7ff843d3e010: NSArray
+
+@super refs
+0x7ff841093500 => 0x7ff843d3d340: CVPassDescriptor
+
+@selectors refs
+0x7ff84240ded8 => 0x7ff82192359f: objectForKeyedSubscript:

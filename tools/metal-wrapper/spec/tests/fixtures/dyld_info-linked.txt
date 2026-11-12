@@ -1,0 +1,6 @@
+/private/fixture/Metal [x86_64]:
+    -linked_dylibs:
+        attributes       load path
+        re-export        /System/Library/Frameworks/Metal.framework/Versions/A/MetalOld.dylib
+                         /usr/lib/libSystem.B.dylib
+                         /usr/lib/libobjc.A.dylib
