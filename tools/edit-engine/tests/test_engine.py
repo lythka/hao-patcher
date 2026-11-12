@@ -233,6 +233,16 @@ class Plist(unittest.TestCase):
             self.assertEqual((got['NVRAM']['boot-args'], got['Kernel']['Patch'][0]['Enabled']), ('-v keepsyms=1', True))
             self.assertEqual(rec['edits'][0]['old'], '-v')
 
+    def test_command_line_prints_plist_edits(self):
+        d = Path(tempfile.mkdtemp())
+        (d / 'in.plist').write_bytes(plistlib.dumps({'NVRAM': {'boot-args': '-v'}}))
+        (d / 's.json').write_text(json.dumps(self.ps(self.op('args', ['NVRAM', 'boot-args'], '-v x=1'))))
+        for level in ([], ['--show-edits']):
+            r = subprocess.run([sys.executable, '-I', str(HERE.parent / 'edit-engine'), 'apply', *level,
+                                str(d / 's.json'), str(d / 'in.plist'), str(d / 'out.plist')], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('NVRAM:boot-args', r.stdout)
+
     def test_same_key_twice_refused(self):
         data = plistlib.dumps({'NVRAM': {'boot-args': ''}})
         with self.assertRaisesRegex(engine.EditError, 'b: touches the same key as a'):

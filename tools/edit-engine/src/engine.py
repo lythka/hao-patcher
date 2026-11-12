@@ -146,7 +146,8 @@ def _op(e, data):
             out, old = _plist_set(data, args['key'], args['value'])
         except (KeyError, IndexError, TypeError) as x:
             raise ValueError('no such key path %s (%s)' % (args['key'], x))
-        return out, [], {'found': 1, 'key': args['key'], 'old': old if isinstance(old, (str, int, bool, float)) else None}
+        return out, [], {'found': 1, 'count': 1, 'where': [':'.join(str(k) for k in args['key'])], 'key': args['key'],
+                         'old': old if isinstance(old, (str, int, bool, float)) else None}
     if op == 'text.insert':
         try:
             text = data.decode('utf-8')
