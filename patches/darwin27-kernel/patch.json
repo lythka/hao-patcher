@@ -1,5 +1,5 @@
 {
-  "revision": 5,
+  "revision": 6,
   "stage": "oclp-hook",
   "applies": {
     "models": [
@@ -15,5 +15,69 @@
     "tahoe_kmutil"
   ],
   "status": "experiment",
-  "validated": true
+  "validated": true,
+  "validated_revision": 5,
+  "validated_digest": "b51d0041ccbfb6fa56747f0be5f80054d8608c83c580fdbf3c166969efbaf29b",
+  "files": [
+    {
+      "path": "System/Library/Kernels/kernel",
+      "origin": {
+        "kind": "apple",
+        "row": "darwin27_kernel",
+        "note": "Golden Gate's own x86_64 kernel from the IPSW, unchanged; installed once by the base layer (golden-pristine.sh finalize) and only checked by the kc-hook"
+      }
+    },
+    {
+      "path": "System/Library/KernelCollections/BootKernelExtensions.kc",
+      "edits": "edits/boot-kc.json",
+      "install": {
+        "mode": "0644",
+        "owner": "root:wheel"
+      }
+    },
+    {
+      "path": "System/Library/KernelCollections/BootKernelExtensions.kc.elides",
+      "origin": {
+        "kind": "hao",
+        "name": "Boot collection member list",
+        "note": "the bundle identifiers of the BootKC's fileset members except com.apple.kernel, one per line, written by src/members.py; the System collection elides them"
+      },
+      "install": {
+        "mode": "0644",
+        "owner": "root:wheel"
+      }
+    },
+    {
+      "path": "System/Library/KernelCollections/SystemKernelExtensions.kc",
+      "edits": "edits/system-kc.json",
+      "install": {
+        "mode": "0644",
+        "owner": "root:wheel"
+      }
+    },
+    {
+      "path": "Preboot/GROUP/boot/System/Library/KernelCollections/BootKernelExtensions.kc",
+      "origin": {
+        "kind": "hao",
+        "name": "Preboot copy of the BootKC",
+        "note": "on the Preboot volume, in the volume group's boot folder (GROUP is the group UUID); byte-identical to the BootKC in the System volume"
+      },
+      "install": {
+        "mode": "0644",
+        "owner": "root:wheel"
+      }
+    },
+    {
+      "path": "Preboot/GROUP/boot/System/Library/KernelCollections/BootKernelExtensions.kc.elides",
+      "origin": {
+        "kind": "hao",
+        "name": "Preboot copy of the member list",
+        "note": "on the Preboot volume next to the BootKC; byte-identical to the System volume's"
+      },
+      "install": {
+        "mode": "0644",
+        "owner": "root:wheel"
+      }
+    }
+  ]
 }

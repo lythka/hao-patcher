@@ -32,6 +32,12 @@ display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments
   and their dependencies, in OSBundleLibraries order, only when neither the Boot nor the System collection has them.
   Drivers already in the System collection stay there: injecting a second copy makes the kernel discard the
   collection's copy while other drivers still call into it.
+- `patch.json` `files` declares the config keys the script in `apply.sh` sets to fixed values (`Misc.Debug.Target`,
+  `Misc.Debug.DisplayLevel`, `boot-args`, the Delete list) as `plist.set` edits in [edits/config.json](edits/config.json),
+  and the two kext folders as whole-folder origins. Not declared yet: the four kernel repairs and the two `Kernel.Add`
+  entries (no append or data value in `plist.set`), the HaoExec identity stamp, and early Tahoe kexts (none on any
+  recorded build). The `boot-args` value is the one without the dev-only statistics arguments. `tests/test_edits.py`
+  proves the values against `apply.sh`.
 - The next OpenCore boot deletes the Apple boot-GUID `bootercfg` and `bootercfg-once` variables (firmware
   logging overrides independent of kernel boot-args); see the
   [OpenCore configuration reference](https://dortania.github.io/docs/latest/Configuration.html).
@@ -64,7 +70,8 @@ This patch has status `experiment` because of `amfi_get_out_of_my_way=1`; it is 
 
 ## Verify
 
-Host tests: `python3.14 -I -m unittest discover -s patches/hao-opencore/tests`.
+Host tests: `python3.14 -I -m unittest discover -s patches/hao-opencore/tests`. The `HAO_OPENCORE_*` variables named in
+`tests/test_edits.py` add the real-input checks.
 
 On the built ESP, `plutil -lint` passes and Kernel.Add has `IntelCommpage.kext` and `HaoExec.kext`. After a boot,
 the ESP's OpenCore log shows each repair and both kexts applied once. On the running system:
@@ -99,6 +106,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r41 2026-11-12 Declare the config keys with fixed values (edits/config.json) and the IntelCommpage and HaoExec kext folders in `patch.json` `files`; the recipe is unchanged.
 - r40 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804 + the Swift value walk passes values under 8 bytes, which aborted Weather, StocksWidget, NewsTag and NewsToday2 on 7d0b612). No recipe change.
 - r39 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 4e68804 (746f1ec + JIT TBL/EXT/integer and FRINT forms, native-call cache ownership fix, measured Swift value rules for the Stocks/News widgets and Weather, five review fixes); same async provider, units and AOT recipe. No recipe change.
 - r38 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 746f1ec (12685dd + the native-call cache signal/fork fix) with the 26B131 async contract provider. No recipe change.

@@ -1,5 +1,5 @@
 {
-  "revision": 40,
+  "revision": 41,
   "stage": "post",
   "applies": {
     "models": [
@@ -16,5 +16,33 @@
     "kernel_repair_binding"
   ],
   "status": "experiment",
-  "validated": true
+  "validated": true,
+  "validated_revision": 40,
+  "validated_digest": "9185bb8c03582cf01eeaedcce989e14b014a342ff068e48a271f3512706116cc",
+  "files": [
+    {
+      "path": "EFI/OC/config.plist",
+      "edits": "edits/config.json"
+    },
+    {
+      "path": "EFI/OC/Kexts/IntelCommpage.kext",
+      "tree": true,
+      "origin": {
+        "kind": "hao",
+        "row": "kernel_repair_efi",
+        "name": "IntelCommpage.kext",
+        "note": "EFI/OC/Kexts/IntelCommpage.kext of the row, copied with ditto from the artifact src/repair_binding.py binds to this image's BootKC; the binder refuses unless its files are the row's, byte for byte"
+      }
+    },
+    {
+      "path": "EFI/OC/Kexts/HaoExec.kext",
+      "tree": true,
+      "origin": {
+        "kind": "hao",
+        "row": "hao_runtime",
+        "name": "HaoExec.kext",
+        "note": "the row's HaoExec.kext, copied with ditto, then stamp_identity.py (also from the row) writes this image's BootKC identity into the executable's __DATA,__hao_identity section; that stamp is not declared yet"
+      }
+    }
+  ]
 }

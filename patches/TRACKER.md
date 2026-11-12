@@ -8,7 +8,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 
 | Patch | Rev | Stage | Status | Optional | golden-gate-26B131 | golden-gate | recovery | stock | Validation | Newest revision |
 |---|---|---|---|---|---|---|---|---|---|---|
-| darwin27-kernel | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
+| darwin27-kernel | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r6 2026-11-12 Declare the kernel, both kernel collections (kc.link) and their Preboot copies in `patch.json` ` |
 | darwin27-sandbox-disk-space | r3 | oclp-hook | experiment |  |  | x |  |  | **needs** | r3 2026-11-12 Declare the system.sb rule in `edits/system-sb.json` (edit-engine text.insert, unless already pr |
 | dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
 | golden-gate-corespotlight-compat | r5 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files |
@@ -24,7 +24,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
 | golden-gate-userspace | r58 | oclp-hook | experiment |  | x | x |  |  | ok | r58 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | golden-gate-windowserver-filter | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json a |
-| hao-opencore | r40 | post | experiment |  | x | x |  |  | ok | r40 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
+| hao-opencore | r41 | post | experiment |  | x | x |  |  | ok (r40) | r41 2026-11-12 Declare the config keys with fixed values (edits/config.json) and the IntelCommpage and HaoExec |
 | hao-runtime | r65 | oclp-hook | experiment |  | x | x |  |  | ok | r65 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
 | metalold-selectors | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
