@@ -3,7 +3,9 @@
 
 Usage: python3 -I golden-image.py CONFIG.json
 All image/APFS operations run in that guest, never on the host. CONFIG names a
-new regular image, a new work directory, size_bytes, name, python, layout_helper,
+target (see Target below: image, a new regular file, or disk, a whole disk that
+passes DiskTarget's checks, with confirm_disk), a new work directory, size_bytes
+(the image size, or a disk's minimum), name, python, layout_helper,
 pristine_script, kdk_preparer, payload (filesystem/os/app/rosetta.dmg), kernel, kdk, fl,
 donor_tool, donors {native,extensions,boot,driverkit,recovery}, esp (tree),
 hardware {tool,artifact}, hooks [{name,kc_hook}] in set order, posts
@@ -56,16 +58,206 @@ class Commands:
         return result.stdout
 
 
-class Image:
-    def __init__(self, config, commands):
+class Target:
+    """What the layers are written to: everything that differs between a raw image file and a whole disk.
+
+    The assembler never names a device or a mount point itself. It asks the target for the whole disk
+    (prepare), the GPT/APFS layout (partition), the ESP and APFS store partitions, the mount point of
+    each volume, the binding golden-layout.py checks each System mutation against (--image), and to give
+    the disk back afterwards (release). prepare, partition and release issue their commands through the
+    assembler's run/plist, so tests record them and nothing runs on the host."""
+    kind = None
+
+    def __init__(self, mount_root):
+        self.mount_root = Path(mount_root)
+        self.whole = None   # /dev/diskN once prepared
+
+    def mount_point(self, key):
+        return self.mount_root/key
+
+    def prepare(self, run, plist):
+        raise NotImplementedError
+
+    def partition(self, run, name):
+        # One GPT: s1 the ESP diskutil adds, s2 the APFS container with its first volume.
+        run('diskutil','partitionDisk',self.whole,'GPT','APFS',name,'100%')
+
+    def esp_device(self):
+        return self.whole+'s1'
+
+    def store(self):
+        return self.whole.removeprefix('/dev/')+'s2'
+
+    @property
+    def binding(self):
+        raise NotImplementedError
+
+    @property
+    def attached(self):
+        """A device the build attached and has not released (build.json attached_device)."""
+        return None
+
+    def release(self, run):
+        """Called once every volume is unmounted."""
+
+    def summary(self):
+        raise NotImplementedError
+
+    def record(self):
+        """Extra build.json fields; the image target adds none, so its record is unchanged."""
+        return {}
+
+
+class ImageTarget(Target):
+    """A new raw image file of size_bytes, attached without mounting; the development builder VM's target."""
+    kind = 'image'
+
+    def __init__(self, image, size_bytes, mount_root):
+        super().__init__(mount_root)
+        self.name = image   # as configured: main() reports it unchanged
+        self.image = Path(image)
+        self.size_bytes = size_bytes
+
+    def prepare(self, run, plist):
+        self.image.parent.mkdir(parents=True, exist_ok=True)
+        with self.image.open('xb') as stream:
+            stream.truncate(self.size_bytes)
+        attached = plist('hdiutil','attach','-imagekey','diskimage-class=CRawDiskImage','-nomount','-plist',self.image)
+        self.whole = next(row['dev-entry'] for row in attached['system-entities']
+                          if re.fullmatch(r'/dev/disk[0-9]+',row.get('dev-entry','')))
+
+    @property
+    def binding(self):
+        return self.image
+
+    @property
+    def attached(self):
+        return self.whole
+
+    def release(self, run):
+        run('hdiutil','detach',self.whole)
+        self.whole = None
+
+    def summary(self):
+        return dict(image=self.name)
+
+
+class DiskTarget(Target):
+    """A whole disk, erased, for the USB installer on the target Mac or a running Mac installing to another disk.
+
+    prepare() refuses the disk unless it passes the checks tools/ssdpush/ssdinstall.c makes before it erases a
+    disk (disk_check, path_on_disk, the typed confirmation, unmount_disk; the size check is agent.c's), in its
+    order. They use only diskutil, df and mount reads until the disk is accepted; then it unmounts everything on
+    the disk and fails if anything stays mounted. The container fills the disk, so size_bytes is a minimum."""
+    kind = 'disk'
+
+    def __init__(self, disk, minimum_bytes, mount_root, confirm=None, sources=()):
+        super().__init__(mount_root)
+        disk = str(disk)
+        self.name = disk[6:] if disk.startswith('/dev/r') else disk[5:] if disk.startswith('/dev/') else disk
+        self.minimum_bytes = minimum_bytes
+        self.confirm = confirm
+        self.sources = [str(path) for path in sources]
+
+    @staticmethod
+    def on(device, names):
+        """ssdinstall: a device is on NAME when it is NAME or one of its slices (NAMEsN...)."""
+        device = device.removeprefix('/dev/')
+        return any(device == name or device.startswith(name+'s') for name in names)
+
+    def containers(self, plist):
+        """ssdinstall containers_of: the APFS containers whose physical store is a partition of this disk."""
+        return [row['ContainerReference'] for row in plist('diskutil','apfs','list','-plist')['Containers']
+                if any(store['DeviceIdentifier'].startswith(self.name+'s') for store in row.get('PhysicalStores',[]))]
+
+    def refusal(self, run, plist):
+        """The first reason this disk may not be erased, or None (ssdinstall disk_check, then install's checks)."""
+        if not re.fullmatch(r'disk[0-9]+',self.name):
+            return 'not a whole disk name (diskN)'
+        try:
+            info = plist('diskutil','info','-plist',self.name)
+        except (subprocess.CalledProcessError, plistlib.InvalidFileException):
+            return 'diskutil info failed'
+        if not info.get('WholeDisk'):
+            return 'not a whole disk'
+        if not info.get('Internal'):
+            return 'not internal'
+        if info.get('VirtualOrPhysical') == 'Virtual':
+            return 'virtual (disk image / RAM disk)'
+        if info.get('Removable') or info.get('RemovableMedia') or info.get('Ejectable'):
+            return 'removable'
+        if info.get('BusProtocol') == 'USB':
+            return 'USB'
+        names = [self.name]+self.containers(plist)
+        if self.on(plist('diskutil','info','-plist','/').get('DeviceIdentifier',''),names):
+            return 'holds the running system'
+        size = info.get('TotalSize') or info.get('Size') or 0
+        if size < self.minimum_bytes:
+            return 'too small: %d bytes, the build needs %d' % (size, self.minimum_bytes)
+        if self.sources:
+            lines = run('df','-P',*self.sources,capture=True).decode().splitlines()[1:]
+            if any(self.on(line.split()[0],names) for line in lines if line.startswith('/dev/')):
+                return 'holds the build\'s own work folder or inputs, the disk it would erase'
+        if self.confirm != self.name:
+            return 'not confirmed: confirm_disk must be '+self.name
+        return None
+
+    def prepare(self, run, plist):
+        why = self.refusal(run, plist)
+        if why:
+            raise ValueError('/dev/%s: %s; refusing' % (self.name, why))
+        names = [self.name]+self.containers(plist)
+        # ssdinstall unmount_disk: the synthesized APFS disks first (unmountDisk of the store may not), then
+        # the disk; their status is not trusted, the mount table is.
+        for name in names[1:]+names[:1]:
+            try:
+                run('diskutil','unmountDisk',name)
+            except subprocess.CalledProcessError:
+                pass
+        for line in run('mount',capture=True).decode().splitlines():
+            device, _, rest = line.partition(' on ')
+            if self.on(device,names):
+                raise ValueError('%s is still mounted at %s' % (device, rest.rsplit(' (',1)[0]))
+        self.whole = '/dev/'+self.name
+
+    @property
+    def binding(self):
+        return self.whole
+
+    def summary(self):
+        return dict(disk='/dev/'+self.name)
+
+    def record(self):
+        return dict(target=dict(kind=self.kind, disk='/dev/'+self.name, minimum_bytes=self.minimum_bytes,
+                                accepted=self.whole is not None))
+
+
+def source_paths(config):
+    """Folders and files the build reads or writes outside the target: none may live on a disk it erases."""
+    paths = [config['work']]+[config[key] for key in ('python','payload','kernel','kdk','fl','esp','donor_tool')]
+    paths += list(config.get('donors',{}).values())+[config['hardware']['artifact']]
+    return list(dict.fromkeys(map(str,paths)))
+
+
+def target_for(config):
+    mounts = Path(config['work'])/'mnt'
+    if ('image' in config) == ('disk' in config):
+        raise ValueError('configuration must name exactly one target: image or disk')
+    if 'disk' in config:
+        return DiskTarget(config['disk'],config['size_bytes'],mounts,confirm=config.get('confirm_disk'),
+                          sources=source_paths(config))
+    return ImageTarget(config['image'],config['size_bytes'],mounts)
+
+
+class Assembler:
+    def __init__(self, config, commands, target):
         self.config = config
         self.commands = commands
+        self.target = target
         self.work = Path(config['work'])
-        self.image = Path(config['image'])
-        self.mounts = {name:self.work/'mnt'/name for name in ('system','data','preboot','recovery','esp')}
+        self.mounts = {name:target.mount_point(name) for name in ('system','data','preboot','recovery','esp')}
         self.devices = {}
         self.mounted = []
-        self.whole = None
         self.container = None
         self.group = None
         self.environment = dict(os.environ, **config['environment'])
@@ -88,7 +280,7 @@ class Image:
 
     def container_info(self):
         return next(row for row in self.plist('diskutil','apfs','list','-plist')['Containers']
-                    if any(store['DeviceIdentifier'] == self.whole.removeprefix('/dev/')+'s2'
+                    if any(store['DeviceIdentifier'] == self.target.store()
                            for store in row['PhysicalStores']))
 
     def add_volume(self, key, name, role):
@@ -127,13 +319,8 @@ class Image:
         self.mount(key)
 
     def create(self):
-        self.image.parent.mkdir(parents=True, exist_ok=True)
-        with self.image.open('xb') as stream:
-            stream.truncate(self.config['size_bytes'])
-        attached = self.plist('hdiutil','attach','-imagekey','diskimage-class=CRawDiskImage','-nomount','-plist',self.image)
-        self.whole = next(row['dev-entry'] for row in attached['system-entities']
-                          if re.fullmatch(r'/dev/disk[0-9]+',row.get('dev-entry','')))
-        self.run('diskutil','partitionDisk',self.whole,'GPT','APFS',self.config['name'],'100%')
+        self.target.prepare(self.run, self.plist)
+        self.target.partition(self.run, self.config['name'])
         info = self.container_info()
         self.container = info['ContainerReference']
         if len(info['Volumes']) != 1:
@@ -149,14 +336,14 @@ class Image:
     def system(self):
         c = self.config
         self.run('sh',c['pristine_script'],'system','--filesystem',Path(c['payload'])/'filesystem.dmg',
-                 '--system',self.mounts['system'],'--image',self.image,
+                 '--system',self.mounts['system'],'--image',self.target.binding,
                  '--layout-helper',c['layout_helper'],'--python',c['python'])
 
     def group_volumes(self):
         c = self.config
         self.add_volume('data',c['name']+' - Data','D')
         result = json.loads(self.run(c['python'],'-I',c['layout_helper'],'group',
-                                    '--image',self.image,'--system',self.mounts['system'],
+                                    '--image',self.target.binding,'--system',self.mounts['system'],
                                     '--data',self.devices['data'],capture=True))
         self.group = result['group_uuid']
         self.mount('data')
@@ -164,7 +351,7 @@ class Image:
             self.add_volume(key,name,role)
         for key in ('preboot','recovery'):
             self.mount(key)
-        self.devices['esp'] = self.whole+'s1'
+        self.devices['esp'] = self.target.esp_device()
         self.mount('esp')
         keys = dict(system='SYSU',data='DATU',preboot='PBU',recovery='RCU')
         for name, variable in keys.items():
@@ -295,18 +482,17 @@ class Image:
                 self.mounted.remove(name)
             except Exception as error:
                 errors.append(str(error))
-        if self.whole and not self.mounted:
+        if self.target.whole and not self.mounted:
             try:
-                self.run('hdiutil','detach',self.whole)
-                self.whole = None
+                self.target.release(self.run)
             except Exception as error:
                 errors.append(str(error))
         return errors
 
 
-# The fixed order of every Golden Gate image: (step, Image method, why).
+# The fixed order of every Golden Gate image: (step, Assembler method, why).
 LAYERS = [
-    ('layout', 'create', 'new raw image: GPT, one APFS container, its System volume'),
+    ('layout', 'create', 'the target (new raw image, or an eligible whole disk): GPT, one APFS container, its System volume'),
     ('golden-system', 'system', 'the macOS 27 System itself, copied from the build\'s filesystem.dmg while it is the only volume'),
     ('group-volumes', 'group_volumes', 'Data grouped with System, then Preboot, Recovery and VM volumes; the ESP mounted'),
     ('golden-finalize', 'finalize', 'Data template and firmlinks (27\'s own); Tahoe Extensions + KDK Intel kexts, because 27 '
@@ -321,10 +507,11 @@ LAYERS = [
 ]
 
 
-def _assemble(config, commands=None):
+def _assemble(config, commands=None, target=None):
+    target = target or target_for(config)
     work = Path(config['work']); work.mkdir(parents=True, exist_ok=False, mode=0o755)
     commands = commands or Commands(work)
-    image = Image(config,commands)
+    image = Assembler(config,commands,target)
     record = dict(unit='pipeline',revision=1,operation='golden-first-image',configuration=config,
                   date=datetime.now(timezone.utc).isoformat(),
                   configuration_sha256=hashlib.sha256(json.dumps(config,sort_keys=True).encode()).hexdigest(),
@@ -343,16 +530,16 @@ def _assemble(config, commands=None):
             record.update(status='failed',cleanup_errors=cleanup)
             if error is None: error=RuntimeError('; '.join(cleanup))
         record.update(volumes=image.devices,group_uuid=image.group,steps=image.steps,commands=commands.entries,
-                      attached_device=image.whole)
+                      attached_device=target.attached,**target.record())
         (work/'build.json').write_text(json.dumps(record,indent=2)+'\n')
     if error is not None: raise error
     return record
 
 
-def assemble(config, commands=None):
+def assemble(config, commands=None, target=None):
     old_umask=os.umask(0o022)
     try:
-        return _assemble(config,commands)
+        return _assemble(config,commands,target)
     finally:
         os.umask(old_umask)
 
@@ -362,14 +549,16 @@ def main():
     parser.add_argument('config',type=Path)
     args = parser.parse_args()
     try:
-        result = assemble(json.loads(args.config.read_text()))
+        config = json.loads(args.config.read_text())
+        target = target_for(config)
+        result = assemble(config,target=target)
     except BaseException as error:
         traceback.print_exc()
         code=getattr(error,'returncode',1)
         code=code if isinstance(code,int) and code>0 else 1
         print('RESULT rc='+str(code),flush=True)
         return code
-    print(json.dumps(dict(image=result['configuration']['image'],group_uuid=result['group_uuid'],status=result['status'])))
+    print(json.dumps(dict(target.summary(),group_uuid=result['group_uuid'],status=result['status'])))
     print('RESULT rc=0',flush=True)
     return 0
 
