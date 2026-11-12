@@ -43,7 +43,9 @@ make, build/, kexts.txt and the input rows' files are what it covers).
 "files" (optional) declares every file the patch adds or changes on the installed system, for patches.py explain, the
 catalog and (later) the ledger: [{"path": RELATIVE, "edits": "edits/FILE.json"} | {"path": RELATIVE, "origin": {"kind":
 apple|tahoe|oclp|hao, "row": INPUT_ROW, "name": ..., "note": ...}}], optionally "tree": true (an origin entry
-for a folder: every file under it) and "install": {"mode", "owner", "flags"}. An edits file is an edit spec for
+for a folder: every file under it), "install": {"mode", "owner", "flags"} and "source" (where the bytes are inside
+the origin row: a relative path, or "ARCHIVE!MEMBER" for a file in a tar; pipeline/materialize.py needs it when the row
+is a folder laid out differently from the install path). An edits file is an edit spec for
 tools/edit-engine (format in its README) and must name the same path; every patches/NAME/edits/*.json must be declared.
 """
 import hashlib, json, os, re, sys
@@ -360,11 +362,16 @@ def file_problems(d, p):
             return ['files must be a non-empty list']
         paths = set()
         for f in files:
-            if not isinstance(f, dict) or set(f) - {'path', 'edits', 'origin', 'tree', 'install'} \
+            if not isinstance(f, dict) or set(f) - {'path', 'edits', 'origin', 'tree', 'install', 'source'} \
                     or ('edits' in f) == ('origin' in f):
                 bad.append('files: each entry is {"path", "edits"} or {"path", "origin"} (+ "tree", "install"): %s'
                            % json.dumps(f))
                 continue
+            src = f.get('source')
+            if src is not None and (not isinstance(src, str) or 'origin' not in f or not f['origin'].get('row')
+                                    or src.startswith('/') or '..' in src.replace('!', '/').split('/')):
+                bad.append('files: %s: source is a relative path inside the origin row ("ARCHIVE!MEMBER" for a '
+                           'file in a tar), and needs an origin with a row' % f.get('path'))
             if 'tree' in f and (f['tree'] is not True or 'edits' in f):
                 bad.append('files: %s: "tree": true goes with an origin (every file under the folder)' % f.get('path'))
             inst = f.get('install')

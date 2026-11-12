@@ -88,10 +88,10 @@ def build(setfile, target, build_name, root=os.path.join(TOP, 'patches'), layer_
                 spec = spec_mod['load'](os.path.join(root, name, f['edits']))
                 e['writers'].append({'recipe': name, 'action': 'edits', 'spec': f['edits'],
                                      'edits': [x['id'] for x in spec['edits']], 'sign': bool(spec.get('sign')),
-                                     'origin_kind': spec['origin']['kind']})
+                                     'origin_kind': spec['origin']['kind'], 'install': f.get('install'), 'source': f.get('source')})
             else:
                 e['writers'].append({'recipe': name, 'action': 'origin', 'origin': f['origin'],
-                                     'tree': bool(f.get('tree'))})
+                                     'tree': bool(f.get('tree')), 'install': f.get('install'), 'source': f.get('source')})
     for e in ledger.values():
         classify(e, oclp)
     trees = [(p, w['recipe']) for p, e in ledger.items() for w in e['writers'] if w.get('tree')]
