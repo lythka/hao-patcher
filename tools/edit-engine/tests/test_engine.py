@@ -74,6 +74,19 @@ class Validation(unittest.TestCase):
         for s, want in cases:
             self.assertTrue(any(want in p for p in S.validate(s)), '%s not in %s' % (want, S.validate(s)))
 
+    def test_sign_forms(self):
+        keep = {'mode': 'adhoc', 'preserve': ['identifier', 'entitlements', 'flags', 'runtime']}
+        self.assertEqual(S.validate(spec(literal(), sign=keep)), [])
+        for bad in ({'mode': 'adhoc', 'identifier': 'x', 'preserve': ['identifier']},
+                    {'mode': 'adhoc', 'preserve': ['everything']}):
+            self.assertTrue(any('sign must be' in p for p in S.validate(spec(literal(), sign=bad))), bad)
+        self.assertEqual(S.codesign_args(keep, 'com.apple.x'),
+                         ['codesign', '-f', '-s', '-', '-i', 'com.apple.x', '--preserve-metadata=entitlements,flags,runtime'])
+        self.assertEqual(S.codesign_args({'mode': 'adhoc', 'identifier': 'Metal'}), ['codesign', '-f', '-s', '-', '-i', 'Metal'])
+        with self.assertRaisesRegex(ValueError, 'has none'):
+            S.codesign_args(keep, None)
+        self.assertIn("keeping the file's identifier", S.sign_text(keep))
+
     def test_hexbytes_and_offset(self):
         self.assertEqual(S.hexbytes('b0 01\n0F'), b'\xb0\x01\x0f')
         self.assertEqual(S.offset('0x1f'), 31)

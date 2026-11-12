@@ -9,6 +9,7 @@ import re
 FORMAT = 1
 ORIGINS = ('apple', 'tahoe', 'oclp', 'hao')
 APPLIED_BY = ('installer', 'opencore', 'kext:IntelCommpage')
+PRESERVE = {'identifier', 'entitlements', 'requirements', 'flags', 'runtime'}
 KINDS = ('literal', 'matcher', 'op')
 # Ops the engine applies, with their argument types and required arguments.
 OPS = {
@@ -92,9 +93,13 @@ def validate(spec):
         bad.append('applied_by must be one of %s' % ', '.join(APPLIED_BY))
     sign = spec.get('sign')
     if sign is not None and (not isinstance(sign, dict) or sign.get('mode') != 'adhoc'
-                             or set(sign) - {'mode', 'identifier'}
-                             or not isinstance(sign.get('identifier', ''), str)):
-        bad.append('sign must be null or {"mode": "adhoc", "identifier": NAME}')
+                             or set(sign) - {'mode', 'identifier', 'preserve'}
+                             or not isinstance(sign.get('identifier', ''), str)
+                             or not isinstance(sign.get('preserve', []), list)
+                             or set(sign.get('preserve', [])) - PRESERVE
+                             or ('identifier' in sign and 'identifier' in sign.get('preserve', []))):
+        bad.append('sign must be null or {"mode": "adhoc", "identifier": NAME | "preserve": [%s]} (not both an '
+                   'identifier and preserving it)' % ', '.join(sorted(PRESERVE)))
     expect = spec.get('expect', {})
     if not isinstance(expect, dict) or not all(SHA.match(k) and isinstance(v, str) and SHA.match(v)
                                                for k, v in expect.items()):
@@ -300,7 +305,31 @@ def describe(spec):
         lines.append('       why    %s' % e['reason'])
         if e.get('evidence'):
             lines.append('       proof  %s' % e['evidence'])
-    sign = spec.get('sign')
-    lines.append('  sign     %s' % ('ad hoc, once%s' % (' (identifier %s)' % sign['identifier']
-                                                         if sign.get('identifier') else '') if sign else 'not signed'))
+    lines.append('  sign     %s' % sign_text(spec.get('sign')))
     return lines
+
+
+def sign_text(sign):
+    if not sign:
+        return 'not signed'
+    out = 'ad hoc, once'
+    if sign.get('identifier'):
+        out += ', identifier %s' % sign['identifier']
+    if sign.get('preserve'):
+        out += ', keeping the file\'s %s' % ', '.join(sign['preserve'])
+    return out
+
+
+def codesign_args(sign, existing_identifier=None):
+    """codesign arguments for SIGN; EXISTING_IDENTIFIER is the input file's, when SIGN preserves it."""
+    args = ['codesign', '-f', '-s', '-']
+    preserve = [p for p in sign.get('preserve', []) if p != 'identifier']
+    if sign.get('identifier'):
+        args += ['-i', sign['identifier']]
+    elif 'identifier' in sign.get('preserve', []):
+        if not existing_identifier:
+            raise ValueError('sign preserves the identifier, but the input file has none')
+        args += ['-i', existing_identifier]
+    if preserve:
+        args.append('--preserve-metadata=' + ','.join(preserve))
+    return args

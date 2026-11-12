@@ -78,7 +78,7 @@ JSON log). A damaged object, or a changed spec, input, matcher or engine version
 | `origin` | who made the bytes this spec edits: `kind` `apple` (Golden Gate), `tahoe`, `oclp` or `hao`, with optional `name`, `row` (input row) and `note` |
 | `applied_by` | `installer` (default), `opencore` or `kext:IntelCommpage` |
 | `edits` | applied in order; each sees the result of the ones before |
-| `sign` | `null` or `{"mode": "adhoc", "identifier": …}`: signed once, after the last edit |
+| `sign` | `null`, or `{"mode": "adhoc"}` with `"identifier": NAME` or `"preserve": [identifier, entitlements, requirements, flags, runtime]` (keep those from the input file, as `codesign -i <its identifier> --preserve-metadata=…`): signed once, after the last edit |
 | `expect` | input SHA-256 → output SHA-256 recorded for that input. A different output is reported, not refused |
 
 Every edit has `id` (lower-case letters, digits, `-`), `kind`, `reason`, and optionally `evidence` and `asm`

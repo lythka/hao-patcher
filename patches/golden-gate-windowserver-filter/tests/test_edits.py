@@ -60,7 +60,8 @@ class Declaration(unittest.TestCase):
         if hashlib.sha256(data).hexdigest() in SPEC['expect']:
             self.assertEqual(record['expected'], 'match')
         ident = subprocess.run(['codesign', '-dv', str(path)], capture_output=True, text=True).stderr
-        self.assertIn('Identifier=' + SPEC['sign']['identifier'] + '\n', ident)
+        self.assertIn('identifier', SPEC['sign']['preserve'])          # kept from the shim, as kc-hook.sh does
+        self.assertRegex(ident, r'\nIdentifier=dss_shim-[0-9a-f]+\n')
 
 
 if __name__ == '__main__':

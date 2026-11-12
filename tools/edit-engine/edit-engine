@@ -91,12 +91,15 @@ def cmd_apply(a):
         if sys.platform != 'darwin':
             print('edit-engine: --sign needs macOS codesign', file=sys.stderr)
             return 1
-        ident = spec['sign'].get('identifier')
-        subprocess.run(['codesign', '-f', '-s', '-'] + (['-i', ident] if ident else []) + [a.output],
-                       check=True, capture_output=True)
-        record['signed'] = True
+        existing = None
+        if 'identifier' in spec['sign'].get('preserve', []):
+            shown = subprocess.run(['codesign', '-dv', a.input], capture_output=True, text=True)
+            existing = next((l.split('=', 1)[1] for l in shown.stderr.splitlines() if l.startswith('Identifier=')), None)
+        args = S.codesign_args(spec['sign'], existing)
+        subprocess.run(args + [a.output], check=True, capture_output=True)
+        record['signed'] = args
         if level in ('steps', 'edits'):
-            print('  sign     ad hoc%s  ok' % (' (%s)' % ident if ident else ''))
+            print('  sign     %s  ok' % ' '.join(args[4:]) if len(args) > 4 else '  sign     ad hoc  ok')
     if a.record:
         Path(a.record).write_text(json.dumps(record, indent=1) + '\n')
     return 0

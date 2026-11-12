@@ -459,7 +459,7 @@ def catalog(root=os.path.join(TOP, 'patches')):
             sign = spec.get('sign')
             md += ['- `%s`: from %s; %d edit%s, applied by the %s%s' % (
                 path, S['origin_text'](spec['origin']), len(spec['edits']), '' if len(spec['edits']) == 1 else 's',
-                spec.get('applied_by', 'installer'), ', then signed ad hoc once' if sign else '')]
+                spec.get('applied_by', 'installer'), ', then signed: ' + S['sign_text'](sign) if sign else '')]
             for n, e in enumerate(spec['edits'], 1):
                 line = '  %d. `%s`: %s' % (n, e['id'], S['edit_summary'](e).replace('|', '/'))
                 if e['kind'] == 'literal':

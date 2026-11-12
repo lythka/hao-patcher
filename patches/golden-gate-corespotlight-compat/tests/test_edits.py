@@ -42,7 +42,8 @@ class Declaration(unittest.TestCase):
             edit, = spec['edits']
             self.assertEqual((edit['op'], edit['args']), ('macho.add-dylib', {
                 'path': DYLIB, 'weak': False, 'timestamp': 2, 'current_version': 0x10000, 'compat_version': 0x10000}))
-            self.assertEqual(spec['sign'], {'mode': 'adhoc', 'identifier': 'com.apple.' + name})
+            # as kc-hook.sh: -i <the daemon's own identifier> --preserve-metadata=entitlements,flags,runtime
+            self.assertEqual(spec['sign'], {'mode': 'adhoc', 'preserve': ['identifier', 'entitlements', 'flags', 'runtime']})
         self.assertIn({'path': 'usr/lib/corespotlight_compat.dylib', 'origin': {
             'kind': 'hao', 'row': 'corespotlight_compat_shim', 'note': files[2]['origin']['note']}}, files)
 
@@ -72,7 +73,7 @@ class Real(unittest.TestCase):
         if hashlib.sha256(data).hexdigest() in spec['expect']:
             self.assertEqual(record['expected'], 'match')
         ident = subprocess.run(['codesign', '-dv', str(path)], capture_output=True, text=True).stderr
-        self.assertIn('Identifier=' + spec['sign']['identifier'] + '\n', ident)
+        self.assertIn('Identifier=com.apple.%s\n' % name, ident)        # the identifier the spec keeps
 
     def test_same_bytes_on_corespotlightd(self):
         self.check('corespotlightd')

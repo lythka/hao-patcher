@@ -22,10 +22,7 @@
    "reason": "Spotlight queries stop crashing the daemon: the compat library adds the CoreSpotlight getter 27.x's SpotlightDaemon calls and x86_64 CoreSpotlight lacks. Required (not weak) load; the x86_64 slice only"
   }
  ],
- "sign": {
-  "mode": "adhoc",
-  "identifier": "com.apple.managedcorespotlightd"
- },
+ "sign": {"mode": "adhoc", "preserve": ["identifier", "entitlements", "flags", "runtime"]},
  "expect": {
   "16b1e3339000b927ff87ed2408f5c719c0d9cf9f23b9dd7c09b56dcd7def5706": "a66bed0274409e9d2f4907ec58412dcdac8cdc476ed24eb61a2d37ab44637c10"
  }

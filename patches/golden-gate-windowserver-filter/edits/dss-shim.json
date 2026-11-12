@@ -23,10 +23,7 @@
    "reason": "WindowServer's launcher has no free load-command room, so the display-state shim it already loads depends on the filter adapter library; a required load, so the adapters (Siri filter inversion, backdrop clipping) come up with the display-state shim"
   }
  ],
- "sign": {
-  "mode": "adhoc",
-  "identifier": "dss_shim-555549447b833f261660332c8f3248ba30ff7711"
- },
+ "sign": {"mode": "adhoc", "preserve": ["identifier", "entitlements", "flags", "runtime"]},
  "expect": {
   "187c53cd08ac6ab27ece99fb1fdd8d154e7153b5d85f7e0dffdc0ba876c8d636": "4aaff013f45156a37e3408ae5f2d7f44a3deeebf587af8fc227274db37d2e719"
  }
