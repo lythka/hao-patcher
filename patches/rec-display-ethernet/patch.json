@@ -1,5 +1,5 @@
 {
- "revision": 1,
+ "revision": 2,
  "stage": "recovery",
  "applies": {
   "models": [
@@ -7,5 +7,27 @@
   ]
  },
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "System/Library/Extensions/AppleIntelFramebufferCapri.kext",
+   "origin": {
+    "kind": "oclp",
+    "name": "AppleIntelFramebufferCapri 11.7.10-23.4",
+    "note": "bundle copied whole from the root-patched System by apply.sh (ditto); OCLP's Ivy Bridge framebuffer"
+   }
+  },
+  {
+   "path": "System/Library/Extensions/AppleIntelHD4000Graphics.kext",
+   "origin": {
+    "kind": "oclp",
+    "name": "AppleIntelHD4000Graphics 11.7.10-23.4",
+    "note": "bundle copied whole from the root-patched System by apply.sh (ditto); OCLP's HD 4000 graphics kext"
+   }
+  },
+  {
+   "path": "System/Library/KernelCollections/BaseSystemKernelExtensions.kc",
+   "edits": "edits/kc.json"
+  }
+ ]
 }

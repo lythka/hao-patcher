@@ -28,12 +28,12 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | hao-runtime | r65 | oclp-hook | experiment |  | x | x |  |  | ok | r65 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
 | metalold-selectors | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
-| rec-audio | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-bluetooth-input | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-brightness-keys | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-display-ethernet | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-install-volume | r3 | post | product |  |  |  |  |  | **needs** | r3 2026-11-10 Initial public release. |
-| rec-language-list | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-audio | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three kext bundles and the kernel collection link in `patch.json` `files` and `edits |
+| rec-bluetooth-input | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the four kext bundles, btpower, its plist and the kernel collection link in `patch.json` |
+| rec-brightness-keys | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare brightkeys and its plist in `patch.json` `files`; the recipe is unchanged. |
+| rec-display-ethernet | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the two kext bundles and the kernel collection link in `patch.json` `files` and `edits/k |
+| rec-install-volume | r4 | post | product |  |  |  |  |  | **needs** | r4 2026-11-12 Declare the Recovery dmg and chunklist in `patch.json` `files`; the recipe is unchanged. |
+| rec-language-list | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three files in the Language Chooser's folder in `patch.json` `files`; the recipe is  |
 | rec-power | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
 | rec-progress-phase | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
 | rec-reinstall | r4 | recovery | product |  |  |  | x |  | **needs** | r4 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
