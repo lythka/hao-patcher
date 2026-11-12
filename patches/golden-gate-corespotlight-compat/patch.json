@@ -13,6 +13,8 @@
   ],
   "status": "experiment",
   "validated": true,
+  "validated_revision": 4,
+  "validated_digest": "fb6a8dd0c53b4dcbec458743f3d40840df9867e5186fc2f4a3669897583a68a5",
   "files": [
     {"path": "System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd",
      "edits": "edits/corespotlightd.json"},

@@ -237,6 +237,30 @@ class Format(unittest.TestCase):
                      'badspec: edits/x.json: e: reason is required', 'stray: edits/loose.json is not declared'):
             self.assertIn(want, got)
 
+    def test_validated_revision_keeps_proof_only_while_installed_bytes_are_unchanged(self):
+        self.patch('kept', revision=3)
+        d = self.d / 'patches' / 'kept'
+        (d / 'README.md').write_text(self.README.replace('- r1 ', '- r3 ') % 'In use.')
+        (d / 'src').mkdir(); (d / 'src' / 'kc-hook.sh').write_text('#!/bin/sh\ntrue\n')
+        digest = patches.recipe_digest('kept', root=self.d / 'patches')
+        pj = json.loads((d / 'patch.json').read_text())
+        (d / 'patch.json').write_text(json.dumps(dict(pj, validated_revision=2, validated_digest=digest)))
+        self.assertEqual(self.check(), [])
+        (d / 'edits').mkdir(); (d / 'tests').mkdir(); (d / 'tests' / 't.py').write_text('# declaration only\n')
+        self.assertEqual(patches.recipe_digest('kept', root=self.d / 'patches'), digest)
+        (d / 'src' / 'kc-hook.sh').write_text('#!/bin/sh\nfalse\n')
+        self.assertIn('kept: validated at r2, but what it installs changed since', '\n'.join(self.check()))
+
+    def test_validated_revision_rules(self):
+        self.patch('alone', validated_revision=1)
+        self.patch('same', revision=1, validated_revision=1, validated_digest='0' * 64)
+        self.patch('unproven', revision=2, validated=False, validated_revision=1, validated_digest='0' * 64,
+                   validation='NEEDS VALIDATION.')
+        got = '\n'.join(self.check())
+        for want in ('alone: validated_revision and validated_digest go together',
+                     'same: validated_revision must be an earlier revision', 'unproven: validated_revision without'):
+            self.assertIn(want, got)
+
     def test_repo_patches_follow_the_format(self):
         self.assertEqual(patches.check(), [])
 

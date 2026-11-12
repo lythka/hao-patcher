@@ -11,7 +11,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | darwin27-kernel | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
 | darwin27-sandbox-disk-space | r2 | oclp-hook | experiment |  |  | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
 | dev-access | r3 | post | dev |  |  |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
-| golden-gate-corespotlight-compat | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files |
+| golden-gate-corespotlight-compat | r5 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files |
 | golden-gate-font-registry | r3 | post | experiment | caches | x |  |  |  | ok | r3 2026-11-11 Row `font_registry_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest. No  |
 | golden-gate-hello | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the Metal wrapper edits in `edits/metal.json` and the three files in `patch.json` `files |
 | golden-gate-icon-caches | r3 | post | experiment | caches | x |  |  |  | ok | r3 2026-11-11 Row `icon_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (668 s |
@@ -23,11 +23,11 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-shader-caches | r11 | post | experiment | caches | x |  |  |  | **needs** | r11 2026-11-12 Row `shader_caches_golden_gate` (26B131): the same harvest made by cache/seeds r2, without the  |
 | golden-gate-user-seed | r6 | post | experiment | caches | x |  |  |  | **needs** | r6 2026-11-12 seed.zsh never places `com.apple.metalfe`: an older seed's clang module cache (Preview's `.pcm`) |
 | golden-gate-userspace | r58 | oclp-hook | experiment |  | x | x |  |  | ok | r58 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
-| golden-gate-windowserver-filter | r6 | oclp-hook | experiment |  | x | x |  |  | ok | r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json a |
+| golden-gate-windowserver-filter | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json a |
 | hao-opencore | r40 | post | experiment |  | x | x |  |  | ok | r40 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | hao-runtime | r65 | oclp-hook | experiment |  | x | x |  |  | ok | r65 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
-| metalold-selectors | r4 | oclp-hook | product |  | x | x |  |  | ok | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
+| metalold-selectors | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
 | rec-audio | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-bluetooth-input | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-brightness-keys | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |

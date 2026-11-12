@@ -10,6 +10,7 @@
   patches.py tracker [OUT]           the patch tracker (patches/TRACKER.md): every patch, revision, sets, validation
 
   patches.py check                   every patch against the patch format below; one line per problem, exit 1 if any
+  patches.py digest NAME             sha256 of everything that decides what NAME installs (for validated_digest)
   patches.py explain [NAME | PATH]   what each declared file comes from and every edit to it, with reasons (one patch,
                                      or every file whose path is or ends with /PATH); no argument: every patch
   patches.py catalog [OUT]           the patch catalog (docs/PATCHES.md): explain for every patch, as Markdown
@@ -31,12 +32,17 @@ there, or when its GROUP is passed to --skip-optional. A row that is there but f
 input is never skipped. "needs_any": GROUP skips a patch unless a patch of GROUP without needs_any runs (a consumer
 with nothing to consume). Rows of patches that are not optional are not looked at here; staging stops on a missing one.
 
+A revision that only changes the declaration (README, patch.json "files", edits/, tests/) keeps a boot test's proof:
+"validated_revision": N names the revision the test proved and "validated_digest" the `patches.py digest` taken
+then; check accepts validated true for a later revision only while the digest is unchanged (hooks, src/, apply.sh,
+make, build/, kexts.txt and the input rows' files are what it covers).
+
 "files" (optional) declares every file the patch adds or changes on the installed system, for patches.py explain, the
 catalog and (later) the ledger: [{"path": RELATIVE, "edits": "edits/FILE.json"} | {"path": RELATIVE, "origin": {"kind":
 apple|tahoe|oclp|hao, "row": INPUT_ROW, "name": ..., "note": ...}}]. An edits file is an edit spec for
 tools/edit-engine (format in its README) and must name the same path; every patches/NAME/edits/*.json must be declared.
 """
-import json, os, re, sys
+import hashlib, json, os, re, sys
 
 def directory(name, root):
     return os.path.join(root, name)
@@ -167,7 +173,8 @@ def tracker(root=os.path.join(TOP, 'patches')):
         newest = next((l[2:] for l in newest.splitlines() if l.startswith('- r')), '').replace('|', '/')
         rows.append('| %s | r%s | %s | %s | %s | %s | %s | %s |' % (name, p.get('revision', '?'), p.get('stage', '?'),
                     p.get('status', '?'), p.get('optional', ''), ' | '.join('x' if name in sets[s] else '' for s in TRACKED_SETS),
-                    'ok' if p.get('validated') else '**needs**', newest[:110]))
+                    ('ok (r%s)' % p['validated_revision'] if 'validated_revision' in p else 'ok')
+                    if p.get('validated') else '**needs**', newest[:110]))
     return '\n'.join(rows) + '\n'
 
 
@@ -198,7 +205,19 @@ def check(root=os.path.join(TOP, 'patches'), sets_dir=os.path.join(TOP, 'pipelin
         if 'needs_any' in p and 'optional' not in p:
             bad.append('%s: needs_any without optional (a patch that can be skipped must be optional)' % name)
         unknown = set(p) - {'revision', 'stage', 'applies', 'inputs', 'status', 'validated', 'optional', 'needs_any',
-                            'files'}
+                            'files', 'validated_revision', 'validated_digest'}
+        if ('validated_revision' in p) != ('validated_digest' in p):
+            bad.append('%s: validated_revision and validated_digest go together' % name)
+        elif 'validated_revision' in p:
+            vr = p['validated_revision']
+            if not p.get('validated'):
+                bad.append('%s: validated_revision without validated true' % name)
+            elif not isinstance(vr, int) or not 1 <= vr < (p.get('revision') or 0):
+                bad.append('%s: validated_revision must be an earlier revision (drop it when the current one is proven)'
+                           % name)
+            elif p['validated_digest'] != recipe_digest(name, root):
+                bad.append('%s: validated at r%s, but what it installs changed since (digest differs): set validated '
+                           'false and NEEDS VALIDATION, or validate again' % (name, vr))
         if unknown:
             bad.append('%s: unknown patch.json keys %s' % (name, ', '.join(sorted(unknown))))
         bad += ['%s: %s' % (name, problem) for problem in file_problems(d, p)]
@@ -220,6 +239,38 @@ def check(root=os.path.join(TOP, 'patches'), sets_dir=os.path.join(TOP, 'pipelin
             if name in members and p.get('status') != 'product':
                 bad.append('%s: status %s, but set %s ships to people (product patches only)' % (name, p.get('status'), s))
     return bad
+
+DIGEST_SKIP = {'README.md', 'patch.json', 'edits', 'tests'}
+
+
+def recipe_digest(name, root=os.path.join(TOP, 'patches'), inputs=os.path.join(TOP, 'pipeline', 'inputs')):
+    """sha256 over everything that decides what NAME installs: its files except DIGEST_SKIP (and caches and
+    patches/*/build/build output), and every input row file of its inputs under INPUTS."""
+    d = directory(name, root)
+    h = hashlib.sha256()
+    for dirpath, dirs, files in os.walk(d):
+        rel = os.path.relpath(dirpath, d)
+        dirs[:] = sorted(x for x in dirs if x != '__pycache__' and not (rel == '.' and x in DIGEST_SKIP)
+                         and not (rel == 'build' and x == 'build'))
+        for f in sorted(files):
+            if (rel == '.' and f in DIGEST_SKIP) or f.endswith('.pyc') or f == '.DS_Store':
+                continue
+            with open(os.path.join(dirpath, f), 'rb') as fh:
+                h.update(b'file\0%s\0%s\n' % (os.path.normpath(os.path.join(rel, f)).encode(),
+                                                hashlib.sha256(fh.read()).hexdigest().encode()))
+    with open(os.path.join(d, 'patch.json')) as fh:
+        p = json.load(fh)
+    rows = set(p.get('inputs', []))
+    for dirpath, dirs, files in sorted(os.walk(inputs)):
+        dirs.sort()
+        for f in sorted(files):
+            if f in rows:
+                with open(os.path.join(dirpath, f), 'rb') as fh:
+                    h.update(b'row\0%s\0%s\n' % (os.path.relpath(os.path.join(dirpath, f), inputs).encode(),
+                                                   hashlib.sha256(fh.read()).hexdigest().encode()))
+    h.update(b'stage\0%s\n' % str(p.get('stage')).encode())
+    return h.hexdigest()
+
 
 def edit_spec():
     """tools/edit-engine/src/spec.py as a module dict (runpy: python -I puts no tool folder on sys.path)."""
@@ -357,6 +408,9 @@ if __name__ == '__main__':
     if sys.argv[1:2] == ['tracker']:
         out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(TOP, 'patches', 'TRACKER.md')
         open(out, 'w').write(tracker())
+        sys.exit(0)
+    if sys.argv[1:2] == ['digest'] and len(sys.argv) == 3:
+        print(recipe_digest(sys.argv[2]))
         sys.exit(0)
     if sys.argv[1:2] == ['catalog']:
         out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(TOP, 'docs', 'PATCHES.md')

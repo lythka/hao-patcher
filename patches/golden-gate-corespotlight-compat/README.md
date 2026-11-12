@@ -66,6 +66,6 @@ Earlier: The host getter and donor Mach-O tests pass and the dylib builds with `
 a built image and stable daemons on the MacBookPro9,2 are not yet proven.
 
 ## Revisions
-- r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files; the hook is unchanged.
+- r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files; the hook is unchanged. Keeps r4's validation: what it installs is unchanged (validated_digest).
 - r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact serves it unchanged.
 - r3 2026-11-10 Initial public release.

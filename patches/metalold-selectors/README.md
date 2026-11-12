@@ -104,6 +104,6 @@ built image remain open, and nothing has been checked on 26B131.
 
 ## Revisions
 
-- r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json` `files`; the hook is unchanged.
+- r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json` `files`; the hook is unchanged. Keeps r3's validation: what it installs is unchanged (validated_digest).
 - r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe once, in set order; the sets list it before golden-gate-metal-framebuffer, the order it already had in effect. README: built for 26A428, not yet checked on 26B131. Build validation pending.
 - r2 2026-11-10 Initial public release.
