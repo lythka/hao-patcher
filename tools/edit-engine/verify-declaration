@@ -90,14 +90,16 @@ def main():
     git('worktree', 'add', '--detach', str(work), a.branch)
     try:
         env_names = set()
-        for name in sorted(recipes):
-            for t in (work / 'patches' / name / 'tests').glob('*.py'):
-                env_names |= set(re.findall(r"environ(?:\.get)?\(\s*['\"]([A-Z0-9_]+)['\"]", t.read_text()))
-                env_names |= set(re.findall(r"environ\[\s*['\"]([A-Z0-9_]+)['\"]", t.read_text()))
+        # real-input variables of the test files this branch adds or changes (older tests are not its claims)
+        for path in changed:
+            if re.match(r'patches/[^/]+/tests/[^/]+\.py\Z', path) and (work / path).is_file():
+                text = (work / path).read_text()
+                env_names |= set(re.findall(r"environ(?:\.get)?\(\s*['\"]([A-Z0-9_]+)['\"]", text))
+                env_names |= set(re.findall(r"environ\[\s*['\"]([A-Z0-9_]+)['\"]", text))
         for n in sorted(env_names):
             if n in env_given:
-                if not Path(env_given[n]).is_file():
-                    problems.append('--env %s: %s is not a file' % (n, env_given[n]))
+                if not Path(env_given[n]).exists():
+                    problems.append('--env %s: %s does not exist' % (n, env_given[n]))
             else:
                 notes.append('UNVERIFIED: no --env %s, so its real-input test was skipped' % n)
         clean = {k: v for k, v in os.environ.items() if k not in env_names}
@@ -117,9 +119,10 @@ def main():
             if r.returncode:
                 problems.append('%s failed:\n%s' % (label, (r.stdout + r.stderr)[-2000:]))
             if '(real inputs)' in label:
-                skipped = [l for l in r.stderr.splitlines() if 'skipped' in l]
-                for l in skipped:
-                    notes.append('UNVERIFIED: %s' % l.strip())
+                for l in r.stderr.splitlines():
+                    m = re.search(r"skipped '(.*)'", l)
+                    if m and any(n in m.group(1) for n in env_names):
+                        notes.append('UNVERIFIED: %s' % l.strip())
     finally:
         git('worktree', 'remove', '--force', str(work))
 
