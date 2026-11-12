@@ -48,7 +48,7 @@ def registry(path, home_fonts):
 class Fixture:
     """A harvest tar as collect.sh writes it."""
 
-    def __init__(self, d, build='26B131', user_index_build='26B131'):
+    def __init__(self, d, build='26B131', user_index_build='26B131', system_pcm_path=None):
         self.path = Path(d) / 'harvest.tar'
         self.folders = []
         members = []
@@ -82,6 +82,15 @@ class Fixture:
              {'0_0/functions.data': b'U' * 16, '0_0/functions.list': b'u'})
         add('%s/com.apple.controlcenter/com.apple.metalfe' % USER_C, uid=501, gid=20)
         self.folders.append('755 501 20 - %s/com.apple.controlcenter' % USER_C)
+        # clang module caches (*.pcm) record their own folder: the user's (Preview) and Setup's
+        fe = '%s/com.apple.Preview/com.apple.Preview/com.apple.metalfe/3BFB57ANS780' % USER_C
+        add(fe.rsplit('/', 1)[0], uid=501, gid=20); add(fe, uid=501, gid=20)
+        add(fe + '/monolithic_metal-4JF842TLW74.pcm', b'CPCH\0' + ('/' + fe.split('private/', 1)[1]).encode() + b'\0', 501, 20)
+        self.folders += ['755 501 20 - %s/com.apple.Preview' % USER_C, '755 501 20 - %s/com.apple.Preview/com.apple.Preview' % USER_C]
+        fe = '%s/com.apple.SetupAssistant/com.apple.metalfe/3BFB57ANS780' % SETUP_C
+        add(fe.rsplit('/', 1)[0], uid=248, gid=248); add(fe, uid=248, gid=248)
+        recorded = system_pcm_path or '/' + fe.split('private/', 1)[1]
+        add(fe + '/monolithic_metal-4JF842TLW74.pcm', b'CPCH\0' + recorded.encode() + b'\0', 248, 248)
         # icons
         add(STORE, uid=240, gid=80, mode=0o711)
         add(STORE + '/store-info.plist', plistlib.dumps({'language': 'en', 'version': 4}), 240, 80)
@@ -151,7 +160,11 @@ class MakeTest(unittest.TestCase):
         self.assertLess(names.index(SETUP_C), names.index(f.name))
         u = m[SEED + '/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data']
         self.assertEqual((u.uid, u.gid, u.mode), (0, 0, 0o644))
-        self.assertIn(SEED + '/metal/com.apple.controlcenter/com.apple.metalfe', m)
+        # the user's module caches stay out (path-bound); Setup's, recorded at their own path, ship
+        self.assertFalse([n for n in names if n.startswith(SEED) and 'com.apple.metalfe' in n])
+        self.assertIn(SETUP_C + '/com.apple.SetupAssistant/com.apple.metalfe/3BFB57ANS780/monolithic_metal-4JF842TLW74.pcm', m)
+        self.assertEqual(json.loads((self.made('shader-caches') / 'build.json').read_text())
+                         ['counts']['user_metalfe_skipped'], 1)
         self.assertFalse([n for n in names if n.startswith(USER_C)])
         self.assertFalse([n for n in names if 'iconservices/' in n or 'FontRegistry' in n])
         # icons
@@ -179,6 +192,11 @@ class MakeTest(unittest.TestCase):
             sums = (self.made(kind) / 'SHA256SUMS').read_text()
             self.assertIn('build.json', sums)
 
+    def test_system_module_cache_recorded_elsewhere_refused(self):
+        h, r = self.build(system_pcm_path='/var/folders/1w/kdhd3ny95wgcvpl9r1l1lv5h0000gn/C/com.apple.SetupAssistant/com.apple.metalfe/3BFB57ANS780')
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('records module cache path', r.stderr)
+
     def test_stale_icon_index_refused(self):
         _, r = self.build(user_index_build='26B123')
         self.assertNotEqual(r.returncode, 0)
@@ -190,7 +208,7 @@ class MakeTest(unittest.TestCase):
         pack = self.made('shader-caches') / 'data.tar'
         same = run('compare', pack, h.path)
         self.assertEqual(same.returncode, 0, same.stdout + same.stderr)
-        self.assertIn('0 of 5 harvested Metal files new or changed', same.stdout)
+        self.assertIn('0 of 6 harvested Metal files new or changed', same.stdout)
         # a later boot's harvest whose Setup functions.data grew is a miss in that tree
         grown = self.d / 'grown.tar'
         with tarfile.open(h.path) as src, tarfile.open(grown, 'w') as dst:

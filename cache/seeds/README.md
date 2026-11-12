@@ -35,8 +35,12 @@ each index header and `__cache_info__`), `hao.txt` (`/private/var/db/hao`), `ps.
 ## What `make` writes
 - shader-caches `data.tar`: the system accounts' (uid < 501) trees at their paths with their owners and modes, each
   ancestor folder from `folders.txt` before them (an image has no `C/<bundle>` folder for a system account until
-  that process runs, and tar would make a missing one root-owned); the user's trees under
-  `PerUserSeed/metal/<bundle path>/` (root, 755/644).
+  that process runs, and tar would make a missing one root-owned); the user's `com.apple.metal` trees under
+  `PerUserSeed/metal/<bundle path>/` (root, 755/644). The user's `com.apple.metalfe` trees are left out (counted as
+  `user_metalfe_skipped`): they are clang module caches whose `.pcm` records its own absolute cache folder, which a
+  new account's folder never matches, so the Metal front end refuses them and run-time shader compiles fail
+  (Preview's SceneKit drew magenta). A system tree's `.pcm` must record the folder it is installed at (system
+  accounts' folders are the same on every machine), or `make` stops.
 - icon-caches: `icon-caches.tar` (the shared store, root's and the other system accounts' index folders with their
   ancestors) and `user/` (the user's `store.index`, `__cache_info__`). Refuses an index that is not version 11 or
   whose heap is not a whole number of records, and any `__cache_info__` whose ProductBuildVersion is not the harvest's

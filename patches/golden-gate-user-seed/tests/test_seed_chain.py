@@ -102,6 +102,41 @@ class SeedChainTest(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn('after golden-gate-user-seed', r.stderr)
 
+    def test_place_chunk_leaves_out_metalfe(self):
+        """place_chunk run as written in seed.zsh: an old seed's com.apple.metalfe (path-bound clang module caches)
+        is not placed, com.apple.metal is, and an app's existing tree is kept."""
+        text = (TOP / 'patches/golden-gate-user-seed/src/seed.zsh').read_text()
+        start = text.index('place_chunk() {')
+        body = text[start:text.index('\n}\n', start) + 3]
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            seed, cache = d / 'seed', d / 'C'
+            for bundle in ('com.apple.Preview', 'com.apple.Maps'):
+                (seed / 'metal' / bundle / bundle / 'com.apple.metal/0_0').mkdir(parents=True)
+                (seed / 'metal' / bundle / bundle / 'com.apple.metal/0_0/functions.data').write_bytes(b'F')
+            fe = seed / 'metal/com.apple.Preview/com.apple.Preview/com.apple.metalfe/3BFB57ANS780'
+            fe.mkdir(parents=True)
+            (fe / 'monolithic_metal-4JF842TLW74.pcm').write_bytes(b'CPCH')
+            (seed / 'metal/com.apple.Preview/com.apple.metalfe').mkdir()
+            (cache / 'com.apple.Maps').mkdir(parents=True)          # the app made its own tree first
+            script = '\n'.join([
+                'setopt null_glob', 'zmodload zsh/datetime',
+                'zmodload -F zsh/files b:zf_mv b:zf_rm b:zf_mkdir b:zf_chown b:zf_chmod', 'zmodload -F zsh/stat b:zstat',
+                'log() { print -r -- "$*" }', 'ms() { REPLY=0 }', 'own() { return 0 }',
+                'SEED=%s; typeset -a KEPT; NB=0; NS=0' % seed, body,
+                'place_chunk benchtest 501 20 %s/ 0 com.apple.Preview com.apple.Maps' % cache,
+                'print "NB=$NB NS=$NS"'])
+            r = subprocess.run(['/bin/zsh', '-f', '-c', script], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn('left out 2 com.apple.metalfe tree(s)', r.stdout)
+            self.assertIn('NB=1 NS=1', r.stdout)
+            placed = cache / 'com.apple.Preview'
+            self.assertTrue((placed / 'com.apple.Preview/com.apple.metal/0_0/functions.data').is_file())
+            self.assertEqual(list(placed.rglob('com.apple.metalfe')), [])
+            self.assertEqual(list((cache / 'com.apple.Maps').iterdir()), [])
+            self.assertFalse((cache / '.peruser-seed.stage').exists())
+            self.assertTrue(fe.is_dir())                                  # the seed itself is untouched
+
     def test_seed_zsh_parses(self):
         subprocess.run(['zsh', '-n', str(TOP / 'patches/golden-gate-user-seed/src/seed.zsh')], check=True)
 

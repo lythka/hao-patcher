@@ -38,11 +38,14 @@ trees with their owners (0, 88, 248, 92). On the laptop: MTLCompilerService CPU 
 against bf10de4 (4:21, 476); then `make compare` on a new harvest.
 
 ## Validation
+NEEDS VALIDATION (r11): an image with this pack keeps the first-boot result below, and a new account's Preview
+compiles Metal source (SceneKit scenes shaded, no "PCH was compiled with module cache path" error). r10 on the laptop:
 Laptop 2026-11-11, image 4d1c48c (26B131): MTLCompilerService was not among the busiest processes during first boot (bf10de4 without the seed: 4:21 CPU at 9 min).
 Earlier: r8 is built and chain-tested on the host only; no image with it has booted.
 r9 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r8's, so the result above stands.
 
 ## Revisions
+- r11 2026-11-12 Row `shader_caches_golden_gate` (26B131): the same harvest made by cache/seeds r2, without the user's `com.apple.metalfe` trees. Preview's held a clang module cache recording the harvest account's cache folder, which the Metal front end refused in every new account (SceneKit drew magenta in Preview). Every other file is unchanged.
 - r10 2026-11-11 Row `shader_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (84 user trees, was 57: adds Maps/VectorKit, Safari and WebKit records, and the repaired VectorKit/VFX libraries). No recipe change.
 - r9 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch instead of stopping. apply.sh unchanged.
 - r8 2026-11-11 Restored for 26B131 with a pack harvested from 26B131 itself (cache/seeds), ancestors and owners from the harvest instead of src/folders.tsv. Root cause: a54ec244 removed the patch, and the 26A428 pack cannot serve 26B131 (every function hash changed).

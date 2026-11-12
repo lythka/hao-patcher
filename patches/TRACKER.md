@@ -20,8 +20,8 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-metal-framebuffer | r3 | oclp-hook | experiment |  | x | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
 | golden-gate-metal-libraries | r18 | oclp-hook | experiment |  | x | x |  |  | **needs** | r18 2026-11-12 26B131 artifact from cache/metallib r56: cube and 1D sampler-form reads converted, which change |
 | golden-gate-native-identities | r1 | oclp-hook | experiment |  | x | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
-| golden-gate-shader-caches | r10 | post | experiment | caches | x |  |  |  | ok | r10 2026-11-11 Row `shader_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (84 |
-| golden-gate-user-seed | r5 | post | experiment | caches | x |  |  |  | ok | r5 2026-11-11 Optional (group caches) with needs_any caches: skipped when no cache patch runs, since the copie |
+| golden-gate-shader-caches | r11 | post | experiment | caches | x |  |  |  | **needs** | r11 2026-11-12 Row `shader_caches_golden_gate` (26B131): the same harvest made by cache/seeds r2, without the  |
+| golden-gate-user-seed | r6 | post | experiment | caches | x |  |  |  | **needs** | r6 2026-11-12 seed.zsh never places `com.apple.metalfe`: an older seed's clang module cache (Preview's `.pcm`) |
 | golden-gate-userspace | r58 | oclp-hook | experiment |  | x | x |  |  | ok | r58 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | golden-gate-windowserver-filter | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
 | hao-opencore | r40 | post | experiment |  | x | x |  |  | ok | r40 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
