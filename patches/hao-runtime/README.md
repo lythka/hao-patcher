@@ -20,7 +20,22 @@ lists them with the rest.
 The `HaoExec` kext and the boot configuration are installed separately by [hao-opencore](../hao-opencore/README.md).
 Use a payload built without the optional AOT preseed caches for the default profile.
 
+## Declared files
+`patch.json` `files` lists what the installer writes: `usr/libexec/hao`, the three libraries and three data files
+under `usr/lib/hao`, the whole folders `usr/lib/hao/if` (interface units) and `usr/lib/hao/aot` (AOT caches), the fixed
+`usr/lib/dyld` and the `usr/lib/hao/install.json` record, each from row `hao_runtime` with the mode the installer gives
+it. The embedding into the 963 ARM64-only programs of the manifest is not declared one spec per file (hundreds of
+`hao.embed-stub` specs): `tests/test_edits.py` derives the list from the payload's `embed/manifest.json`, checks that
+the 26 cryptex programs are exactly golden-gate-userspace's `embed-*.json` specs and that no other recipe declares an
+embedded program, and runs the payload's own installer on a scratch copy of the programs to prove the declared files
+are exactly what it writes. Not declared: the empty `private/var/db/hao` folder it creates, and `HaoExec.kext`
+(hao-opencore installs it).
+
 ## Verify
+```sh
+python3.14 -I -B -m unittest discover -s patches/hao-runtime/tests
+# optional: HAO_RUNTIME_PAYLOAD = the hao_runtime row folder; HAO_RUNTIME_SYSTEM = a pristine 26B131 System volume
+```
 Check the payload's source and OS identities in its `build.json` and the installed `usr/lib/hao/install.json`, then
 boot the image in [QEMU](../../tools/qemu-vm/README.md) before installing it on hardware. hao's own unit tests live in
 hao-runtime and do not replace image boot and application checks.
@@ -32,6 +47,7 @@ Earlier: earlier payloads booted Golden Gate through translated launchd to the d
 Gate-first image reached SSH; the current profile needs a fresh image and application pass.
 
 ## Revisions
+- r66 2026-11-12 Declare the installed files and folders in patch.json and its test (the embedding stays a manifest-derived list); the hook and what it installs are unchanged.
 - r65 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804 + the Swift value walk passes values under 8 bytes, which aborted Weather, StocksWidget, NewsTag and NewsToday2 on 7d0b612). No recipe change.
 - r64 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 4e68804 (746f1ec + JIT TBL/EXT/integer and FRINT forms, native-call cache ownership fix, measured Swift value rules for the Stocks/News widgets and Weather, five review fixes); same async provider, units and AOT recipe. No recipe change.
 - r63 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 746f1ec (12685dd + the native-call cache signal/fork fix) with the 26B131 async contract provider. No recipe change.

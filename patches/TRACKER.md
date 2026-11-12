@@ -22,10 +22,10 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-native-identities | r2 | oclp-hook | experiment |  | x | x |  |  | ok (r1) | r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.jso |
 | golden-gate-shader-caches | r12 | post | experiment | caches | x |  |  |  | **needs** | r12 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them  |
 | golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
-| golden-gate-userspace | r58 | oclp-hook | experiment |  | x | x |  |  | ok | r58 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
+| golden-gate-userspace | r59 | oclp-hook | experiment |  | x | x |  |  | ok (r58) | r59 2026-11-12 Declare the files and edits in patch.json and edits/*.json (cache repairs, renamed wrappers, Wi |
 | golden-gate-windowserver-filter | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json a |
 | hao-opencore | r41 | post | experiment |  | x | x |  |  | ok (r40) | r41 2026-11-12 Declare the config keys with fixed values (edits/config.json) and the IntelCommpage and HaoExec |
-| hao-runtime | r65 | oclp-hook | experiment |  | x | x |  |  | ok | r65 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
+| hao-runtime | r66 | oclp-hook | experiment |  | x | x |  |  | ok (r65) | r66 2026-11-12 Declare the installed files and folders in patch.json and its test (the embedding stays a manif |
 | metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
 | metalold-selectors | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
 | rec-audio | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three kext bundles and the kernel collection link in `patch.json` `files` and `edits |

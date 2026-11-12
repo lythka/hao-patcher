@@ -1,0 +1,28 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/AuthenticationServices.framework/Versions/A/XPCServices/com.apple.AuthenticationServices.Helper.xpc/Contents/MacOS/com.apple.AuthenticationServices.Helper",
+ "origin": {"kind": "apple", "name": "SystemOS program, arm64 only", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "hao-stub",
+   "kind": "op",
+   "op": "hao.embed-stub",
+   "args": {
+    "row": "hao_runtime",
+    "identifier": "com.apple.AuthenticationServices.Helper",
+    "stub": "stubs/9b08c5f62e5bb555f357f2d3.stub",
+    "stub_sha256": "2e630e22a3c5c4d1872a6d0dd044252d4e0330f2a03f6cfcc700f22a3929ec13",
+    "source_sha256": "e6ee0d34bf13a46ac74c34b02584a9356d7f0a1b2ba545e5989af2368b32d87d",
+    "result_sha256": "4cbab2eb094926aad1e0f7ec05b5ae7b8ff35b30b358f9723c5448dc8958bce1",
+    "bound": [
+     {"slot": -1, "sha256": "03b17bb5baeb492fd4df114944b7f8144cf323b573e6dfbe1cc6d4c9b86dc79e", "file": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/AuthenticationServices.framework/Versions/A/XPCServices/com.apple.AuthenticationServices.Helper.xpc/Contents/Info.plist"},
+     {"slot": -3, "sha256": "54c07b4c0c0587dc53fa4b37dec98526993eb4eae392938164f42157b4e90378", "file": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/AuthenticationServices.framework/Versions/A/XPCServices/com.apple.AuthenticationServices.Helper.xpc/Contents/_CodeSignature/CodeResources"}
+    ]
+   },
+   "reason": "This arm64-only program gets an x86_64 launcher slice that runs it through hao with its own identity (without it, launchd starts it through /usr/libexec/hao with hao's identity and its container and entitlement lookups fail)"
+  }
+ ],
+ "sign": null,
+ "expect": {"e6ee0d34bf13a46ac74c34b02584a9356d7f0a1b2ba545e5989af2368b32d87d": "4cbab2eb094926aad1e0f7ec05b5ae7b8ff35b30b358f9723c5448dc8958bce1"}
+}

@@ -1,0 +1,55 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.06",
+ "origin": {"kind": "apple", "name": "RosettaOS x86_64 shared cache (26B131)", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "swift-conformance-types",
+   "kind": "matcher",
+   "resolved": {
+    "fcb3ac956b68df8107dc8adea2e3357c1477c6f2fa3c5d3c48abb23b54a758b7": [
+     {"at": 132545168, "before": "e0f9ffff", "after": "30f80000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: Swift.Equatable type reference"},
+     {"at": 132545208, "before": "b8f9ffff", "after": "08f80000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: Swift.Hashable type reference"},
+     {"at": 132545272, "before": "78f9ffff", "after": "c8f70000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: Swift.RawRepresentable type reference"},
+     {"at": 132545328, "before": "40f9ffff", "after": "90f70000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: AppIntents.AppUnionValueCasesProviding type reference"},
+     {"at": 132545384, "before": "08f9ffff", "after": "58f70000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: AppIntents.AppEnum type reference"},
+     {"at": 132545448, "before": "c8f8ffff", "after": "18f70000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: AppIntents.AppValue type reference"},
+     {"at": 132545504, "before": "90f8ffff", "after": "e0f60000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: AppIntents.StaticDisplayRepresentable type reference"},
+     {"at": 132545552, "before": "60f8ffff", "after": "b0f60000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: AppIntents.PersistentlyIdentifiable type reference"},
+     {"at": 132545592, "before": "38f8ffff", "after": "88f60000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: AppIntents.TypeDisplayRepresentable type reference"},
+     {"at": 132545632, "before": "10f8ffff", "after": "60f60000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: AppIntents._IntentValue type reference"},
+     {"at": 132545720, "before": "b8f7ffff", "after": "08f60000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: AppIntents.CaseDisplayRepresentable type reference"},
+     {"at": 132545784, "before": "78f7ffff", "after": "c8f50000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: Foundation.CustomLocalizedStringResourceConvertible type reference"},
+     {"at": 132545836, "before": "44f7ffff", "after": "94f50000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.PlaylistOwnerSiriUnion.PlaylistOwnerSiriUnionCases: Swift.CaseIterable type reference"},
+     {"at": 132554596, "before": "bcfeffff", "after": "78d30000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: Swift.Equatable type reference"},
+     {"at": 132554636, "before": "94feffff", "after": "50d30000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: Swift.Hashable type reference"},
+     {"at": 132554700, "before": "54feffff", "after": "10d30000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: Swift.RawRepresentable type reference"},
+     {"at": 132554756, "before": "1cfeffff", "after": "d8d20000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: AppIntents.AppUnionValueCasesProviding type reference"},
+     {"at": 132554812, "before": "e4fdffff", "after": "a0d20000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: AppIntents.AppEnum type reference"},
+     {"at": 132554876, "before": "a4fdffff", "after": "60d20000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: AppIntents.AppValue type reference"},
+     {"at": 132554932, "before": "6cfdffff", "after": "28d20000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: AppIntents.StaticDisplayRepresentable type reference"},
+     {"at": 132554980, "before": "3cfdffff", "after": "f8d10000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: AppIntents.PersistentlyIdentifiable type reference"},
+     {"at": 132555020, "before": "14fdffff", "after": "d0d10000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: AppIntents.TypeDisplayRepresentable type reference"},
+     {"at": 132555060, "before": "ecfcffff", "after": "a8d10000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: AppIntents._IntentValue type reference"},
+     {"at": 132555148, "before": "94fcffff", "after": "50d10000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: AppIntents.CaseDisplayRepresentable type reference"},
+     {"at": 132555212, "before": "54fcffff", "after": "10d10000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: Foundation.CustomLocalizedStringResourceConvertible type reference"},
+     {"at": 132555260, "before": "24fcffff", "after": "e0d00000", "reason": "_MusicKitInternal_AppIntents _MusicKitInternal_AppIntents.MusicItemSiriUnion.MusicItemSiriUnionCases: Swift.CaseIterable type reference"},
+     {"at": 265679196, "before": "04faffff", "after": "74380300", "reason": "PaperKit PaperKit.SharedCanvasElement.Tag: Swift.Hashable type reference"},
+     {"at": 265679260, "before": "c4f9ffff", "after": "34380300", "reason": "PaperKit PaperKit.SharedCanvasElement.Tag: Swift.Equatable type reference"},
+     {"at": 265703868, "before": "c4fcffff", "after": "30d80200", "reason": "PaperKit PaperKit.SharedPaperPage.Tag: Swift.Hashable type reference"},
+     {"at": 265703932, "before": "84fcffff", "after": "f0d70200", "reason": "PaperKit PaperKit.SharedPaperPage.Tag: Swift.Equatable type reference"}
+    ]
+   },
+   "reason": "Swift lookups by name no longer fault: Apple's broken direct conformance type references in the x86_64 cache (PaperKit, PhoneAppIntents, _MusicKitInternal_AppIntents) point at their type descriptors (src/swift_refs.py)"
+  },
+  {
+   "id": "resign-4k-pages",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "resign-cache-4k-pages", "source": "patches/golden-gate-userspace/src/cache_pages.py"},
+   "reason": "The x86_64 kernel registers only 4 KiB code-signature pages for the cache; RosettaOS signs it with 16 KiB pages for Apple silicon, so the signature is made again with 4 KiB pages after the edits"
+  }
+ ],
+ "sign": null
+}

@@ -1,0 +1,52 @@
+{
+ "format": 1,
+ "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.03",
+ "origin": {"kind": "apple", "name": "RosettaOS x86_64 shared cache (26B131)", "row": "golden_gate_userspace"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "mps-matrix-initializer",
+   "kind": "matcher",
+   "resolved": {
+    "632488d4a2c36e459c6da077ea0d2c412dc46da1b545fd32f9863d42e3e379c6": [
+     {"at": 141118995, "before": "4a8b043b8b80c005000083c0e683f8f77744488b3ddcd09837e8639c1f00488b35f08957380f57c00f110424f20f1005e9131a004889c74c89f231c94531c04531c90f28c8ff152a56a537488b0d335ba93b4889040b", "after": "4a8b043b8b80c005000083c0e783f8f87744488b3ddcd09837e8639c1f00488b35f08957380f57c00f110424f20f1005e9131a004889c74c89f231c94531c04531c90f28c8ff152a56a537488b0d335ba93b4889040b", "reason": "initialize native MPSMatrix fallback for Intel device family 25"}
+    ]
+   },
+   "reason": "MPSMatrix works on the HD 4000: the native fallback initializer is used for Intel device family 25 (src: tools/metal-fixes mps-plan)"
+  },
+  {
+   "id": "swift-conformance-types",
+   "kind": "matcher",
+   "resolved": {
+    "632488d4a2c36e459c6da077ea0d2c412dc46da1b545fd32f9863d42e3e379c6": [
+     {"at": 428368252, "before": "c4fcffff", "after": "fc870200", "reason": "PaperKit PaperKit.SharedPaperPage.Tag: Swift.Hashable type reference"},
+     {"at": 428368316, "before": "84fcffff", "after": "bc870200", "reason": "PaperKit PaperKit.SharedPaperPage.Tag: Swift.Equatable type reference"},
+     {"at": 428431372, "before": "04faffff", "after": "88910100", "reason": "PaperKit PaperKit.SharedCanvasElement.Tag: Swift.Hashable type reference"},
+     {"at": 428431436, "before": "c4f9ffff", "after": "48910100", "reason": "PaperKit PaperKit.SharedCanvasElement.Tag: Swift.Equatable type reference"},
+     {"at": 625620044, "before": "34ffffff", "after": "6c690000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: Swift.Equatable type reference"},
+     {"at": 625620084, "before": "0cffffff", "after": "44690000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: Swift.Hashable type reference"},
+     {"at": 625620148, "before": "ccfeffff", "after": "04690000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: Swift.RawRepresentable type reference"},
+     {"at": 625620204, "before": "94feffff", "after": "cc680000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: AppIntents.AppUnionValueCasesProviding type reference"},
+     {"at": 625620260, "before": "5cfeffff", "after": "94680000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: AppIntents.AppEnum type reference"},
+     {"at": 625620324, "before": "1cfeffff", "after": "54680000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: AppIntents.AppValue type reference"},
+     {"at": 625620380, "before": "e4fdffff", "after": "1c680000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: AppIntents.StaticDisplayRepresentable type reference"},
+     {"at": 625620428, "before": "b4fdffff", "after": "ec670000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: AppIntents.PersistentlyIdentifiable type reference"},
+     {"at": 625620468, "before": "8cfdffff", "after": "c4670000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: AppIntents.TypeDisplayRepresentable type reference"},
+     {"at": 625620508, "before": "64fdffff", "after": "9c670000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: AppIntents._IntentValue type reference"},
+     {"at": 625620596, "before": "0cfdffff", "after": "44670000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: AppIntents.CaseDisplayRepresentable type reference"},
+     {"at": 625620660, "before": "ccfcffff", "after": "04670000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: Foundation.CustomLocalizedStringResourceConvertible type reference"},
+     {"at": 625620708, "before": "9cfcffff", "after": "d4660000", "reason": "PhoneAppIntents PhoneAppIntents.CallDestination.CallDestinationCases: Swift.CaseIterable type reference"}
+    ]
+   },
+   "reason": "Swift lookups by name no longer fault: Apple's broken direct conformance type references in the x86_64 cache (PaperKit, PhoneAppIntents, _MusicKitInternal_AppIntents) point at their type descriptors (src/swift_refs.py)"
+  },
+  {
+   "id": "resign-4k-pages",
+   "kind": "op",
+   "op": "cryptex.build",
+   "args": {"step": "resign-cache-4k-pages", "source": "patches/golden-gate-userspace/src/cache_pages.py"},
+   "reason": "The x86_64 kernel registers only 4 KiB code-signature pages for the cache; RosettaOS signs it with 16 KiB pages for Apple silicon, so the signature is made again with 4 KiB pages after the edits"
+  }
+ ],
+ "sign": null
+}

@@ -56,6 +56,20 @@ artifact (`minimal-native-25G342-26B131-corewifi-r3`) Metal, OpenCL, AppleGVA, A
 and WiFiPeerToPeer are the 27.x build's own, with OCLP's overlay on top. The older 26A428 artifact still installs
 Tahoe's copies of those frameworks first.
 
+### Declared files
+`patch.json` `files` lists everything this recipe adds or changes on the installed system, and `edits/*.json` holds the
+edit specs ([tools/edit-engine](../../tools/edit-engine/README.md)); `patches.py explain golden-gate-userspace` prints
+them. The in-cache repairs are `matcher` specs with their sites resolved for the 26B131 cache (`cache-*.json`, in the
+OS cryptex where the running system grafts it: trackpad V3, EndpointSecurity selectors, CoreRoutine, the MPSMatrix
+initializer, audiomxd, the Swift conformance references and the code identity carrier), followed by the 4 KiB
+re-signing; the two cryptex images are `cryptex.build` specs (`cryptex-os.json`, `cryptex-app.json`) and each of the 26
+stubs is a `hao.embed-stub` spec (`embed-*.json`). `hybridsearchd-job.json` and `launchd-job-cache.json` are
+`plist.set`; the three renamed wrappers (`io80211-oclp.json`, `wifip2p-oclp.json`, `corewifi-tahoe.json`) and
+`windowserver-27-identity.json` are declared with their signing. Not expressible: WindowServer's entitlements come from
+the 27.x program, and the engine applies none of the external ops (cache re-signing, image builds, stub embedding), so
+`tests/test_edits.py` proves those through the recipe's and the payload's own code. The Preboot copies of
+SystemVersion.plist (under the build's group folder) are not declared.
+
 ### Swift conformance type references
 Apple's x86_64 cache (RosettaOS, untouched) has direct conformance type references that point at unrelated bytes
 instead of the type's descriptor: 21 in 26A428 and 47 in 26B131, in PaperKit (macOS and iOSSupport),
@@ -245,6 +259,10 @@ python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/build/tests
 # code identity carrier: HAO_RUNTIME = hao-runtime checkout (runs it); CODEID_CACHE = an image cache folder (plans it)
 HAO_RUNTIME=... CODEID_CACHE=.../System/Library/dyld python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests -k codeid
+# declarations (tests/test_edits.py): USERSPACE_X86_CACHE, USERSPACE_ARM_CACHE, USERSPACE_CODEID_CARRIER,
+#   USERSPACE_SYSTEM_ROOT, USERSPACE_OCLP_IO80211, USERSPACE_OCLP_WIFIP2P, USERSPACE_DONOR_COREWIFI,
+#   USERSPACE_DONOR_WINDOWSERVER, HAO_RUNTIME_PAYLOAD, GOLDEN_OS_CRYPTEX, GOLDEN_APP_CRYPTEX (each described in the file)
+python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests -k test_edits
 ```
 The fixtures cover the DriverKit requirement, the absence of any System-tree replacement, special modes, native cache repair plans (the Swift conformance repair and verifier on an authored two-architecture cache)
 and adapter ordering. A built image must still pass filesystem, boot, native-service and application checks.
@@ -289,6 +307,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r59 2026-11-12 Declare the files and edits in patch.json and edits/*.json (cache repairs, renamed wrappers, WindowServer, disabled job, cryptex builds, hao stubs); the hook and what it installs are unchanged.
 - r58 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804 + the Swift value walk passes values under 8 bytes, which aborted Weather, StocksWidget, NewsTag and NewsToday2 on 7d0b612). No recipe change.
 - r57 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 4e68804 (746f1ec + JIT TBL/EXT/integer and FRINT forms, native-call cache ownership fix, measured Swift value rules for the Stocks/News widgets and Weather, five review fixes); same async provider, units and AOT recipe. No recipe change.
 - r56 2026-11-11 `src/corewifi/make` takes `dsc.py` from hao-tools' `tools/cache-dylib` (its single copy; next to this repository or `CACHE_DYLIB`) and records that checkout's commit and dirty state in `build.json`. No recipe or output change.
