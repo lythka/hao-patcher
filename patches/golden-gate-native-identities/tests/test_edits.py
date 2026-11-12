@@ -1,0 +1,34 @@
+"""patch.json "files" declares what native_identities.py install writes: the list, the record and, for the three
+programs the README expects, the originals under usr/lib/hao/originals. The declared paths come from the script's own
+constants. The files are generated or copied whole, so there is no edit spec and no byte comparison.
+python3.14 -I -B -m unittest discover -s patches/golden-gate-native-identities/tests"""
+import json
+from pathlib import Path
+import runpy
+import unittest
+
+PATCH = Path(__file__).resolve().parents[1]
+SCRIPT = runpy.run_path(str(PATCH / 'src/native_identities.py'))
+FILES = {f['path']: f['origin'] for f in json.loads((PATCH / 'patch.json').read_text())['files']}
+SUPPORT = ('System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/'
+           'Versions/A/Support/')
+WINDOWSERVER = 'System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer'
+
+
+class Declaration(unittest.TestCase):
+    def test_list_and_record_are_the_scripts_paths(self):
+        self.assertEqual(FILES[SCRIPT['LIST']]['kind'], 'hao')
+        self.assertEqual(FILES[SCRIPT['RECORD']]['kind'], 'hao')
+
+    def test_originals_sit_where_the_script_puts_them(self):
+        o = SCRIPT['ORIGINALS'] + '/'
+        self.assertEqual({p for p in FILES if p.startswith(o)},
+                         {o + WINDOWSERVER, o + SUPPORT + 'corespotlightd', o + SUPPORT + 'managedcorespotlightd'})
+        self.assertEqual(FILES[o + WINDOWSERVER]['kind'], 'tahoe')
+        self.assertEqual(FILES[o + SUPPORT + 'corespotlightd']['kind'], 'apple')
+        self.assertEqual(FILES[o + SUPPORT + 'managedcorespotlightd']['kind'], 'apple')
+        self.assertEqual(len(FILES), 5)
+
+
+if __name__ == '__main__':
+    unittest.main()

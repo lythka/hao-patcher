@@ -43,6 +43,8 @@ to `/` and none is writable by group or others. The carrier gives a listed progr
 original gets; the program itself is the edited one (security trade-off: hao-runtime `docs/security-model.md`,
 "Apple identity for listed programs").
 
+Declared files: `patch.json` `files` lists `usr/lib/hao/native-identities`, the record, and the three originals the README expects (WindowServer from Tahoe, `corespotlightd` and `managedcorespotlightd` from 27.2.1). They are generated or copied whole, so no edit spec is needed; `tests/test_edits.py` checks the paths against the script.
+
 ## Verify
 
 ```sh
@@ -67,4 +69,5 @@ Earlier: Host tests pass and a host simulation of the 26B131 WindowServer and `c
 their rows. No image has been built with this recipe.
 
 ## Revisions
+- r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.json `files`; the hook is unchanged.
 - r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the native-identities list, replacing golden-gate-code-identity's map and per-daemon interposer.

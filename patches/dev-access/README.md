@@ -20,7 +20,11 @@ The root-SSH-key part of the earlier Tahoe test tooling's dev-access data; the k
 outside the repo). That tooling's testbench recorder, TCC rows and early capture are the `testbench` patch; its
 IconServices logging profile is `dev-telemetry`.
 
+Declared files: `patch.json` `files` lists the four files above with their origins (`tests/test_edits.py` checks them against `apply.sh`).
+
 ## Verify
+`python3.14 -I -B -m unittest discover -s patches/dev-access/tests`
+
 After a test boot: `ssh -i ~/.ssh/mbp92_test root@<laptop> sw_vers` answers with the image's build.
 
 
@@ -31,6 +35,7 @@ including the benched dev images (store/runs/bench-mbp92-25G332-dev-*) and the o
 ## Revisions
 Newest first: revision, date, change (commit). `revision` in patch.json is the newest; bump it
 and add a line here with every change to this patch or its input rows.
+- r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged.
 - r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging session (5a7d438)
 - r2 2026-10-28 PLAN 3c dev patches: dev-telemetry, testbench; boot-kc-trim experiment (dev-kctrim set) (259a8f5)
 - r1 2026-10-28 Patch mechanism (PLAN step 2) and the dev-access patch (badb51b)
