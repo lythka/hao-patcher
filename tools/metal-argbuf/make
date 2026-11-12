@@ -44,13 +44,13 @@ install_name_tool -change "$old" "$T/iCBE-real.dylib" "$out/iCBE.dylib" 2>/dev/n
 codesign -f -s - "$out/iCBE.dylib"
 
 clang "${X86[@]}" -fobjc-arc -O1 -Wall -Wextra -Wno-unused-parameter -Wno-protocol -Wno-mismatched-parameter-types \
-    -Wl,-no_warn_inits -dynamiclib "$src/device/argbuf.m" "$src/device/argbuf_tramp.s" \
-    -framework Foundation -framework Metal -install_name "$M/libargbuf.dylib" -o "$out/libargbuf.dylib"
+    -Wl,-no_warn_inits -dynamiclib "$src/device/argbuf.m" "$src/device/astc.m" "$src/device/argbuf_tramp.s" \
+    -framework Foundation -framework Metal -late -install_name "$M/libargbuf.dylib" -o "$out/libargbuf.dylib"
 codesign -f -s - "$out/libargbuf.dylib"
 
 for p in "$here"/probes/*.m; do
     n=$(basename "$p" .m)
-    clang "${X86[@]}" -fobjc-arc -O1 -Wall "$p" -framework Foundation -framework Metal -o "$out/probes/$n"
+    clang "${X86[@]}" -fobjc-arc -O1 -Wall "$p" -framework Foundation -framework Metal -late -o "$out/probes/$n"
     codesign -f -s - "$out/probes/$n"
 done
 

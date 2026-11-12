@@ -516,6 +516,7 @@ static void traceTextures(Class dev) {
     }));
 }
 
+void agb_astc_install(Class device, Class heap, Class blit, void (*log)(const char *, ...));
 void agb_install(void);
 void agb_install(void) {
     static dispatch_once_t once;
@@ -541,6 +542,7 @@ void agb_install(void) {
         hookStage(rce, 2, @"Fragment");
         hookDraws(cce, 0);
         hookDraws(rce, 1);
+        agb_astc_install(dev, NSClassFromString(@"MTLIGAccelHeap"), NSClassFromString(@"MTLIGAccelBlitCommandEncoder"), agb_log);
         if (getenv("AGB_TRACE_TEXTURES")) traceTextures(dev);
         agb_log("installed: textures %d..%d, buffers %d..%d (BTI %d), samplers %d..%d, %d draw/dispatch selectors",
                 AGB_TEX_SLOT, AGB_TEX_SLOT + AGB_TEX_COUNT - 1, AGB_BUF_SLOT, AGB_BUF_SLOT + AGB_BUF_COUNT - 1, AGB_BUF_BTI,
