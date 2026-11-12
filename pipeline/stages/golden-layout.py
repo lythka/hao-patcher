@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Seed protected Golden System metadata and group an explicit disk-image pair.
 
+--image is the build's target: a regular image file, or /dev/diskN for a whole-disk target
+(golden-image.py DiskTarget); either way every mutation is bound to a container on it.
+
 Run only in a disposable maintenance guest. This helper never creates, formats,
 mounts or deletes a volume. System must be the sole volume while seeding; group
 accepts only its existing ungrouped System/Data pair. Add Preboot/Recovery later.
@@ -35,8 +38,44 @@ def plist(*command):
     return plistlib.loads(subprocess.check_output(list(map(str, command))))
 
 
+def on_disk(device, disk):
+    """DEVICE is DISK or one of its slices (diskN, diskNsM, diskNsMsK)."""
+    device = device.removeprefix('/dev/')
+    return device == disk or device.startswith(disk + 's')
+
+
+def bound_disk(disk, container):
+    """Bind every mutating operation to a container on an explicit physical whole disk, never the running one.
+
+    golden-image.py's DiskTarget accepted the disk (ssdinstall's checks) before formatting it; this re-checks,
+    before each System mutation, that the container is on that disk and that the running system is not."""
+    disk = str(disk).removeprefix('/dev/')
+    require(re.fullmatch(r'disk[0-9]+', disk), 'target must be a whole disk (/dev/diskN)')
+    info = plist('diskutil', 'info', '-plist', disk)
+    require(info.get('WholeDisk') and info.get('VirtualOrPhysical') != 'Virtual',
+            'target disk must be a physical whole disk')
+    running = plist('diskutil', 'info', '-plist', '/')
+    require(container != running.get('APFSContainerReference'), 'refusing the maintenance container')
+    require(not on_disk(running.get('DeviceIdentifier', ''), disk), 'refusing the disk of the running system')
+    listing = plist('diskutil', 'apfs', 'list', '-plist', container)['Containers']
+    require(len(listing) == 1, 'ambiguous container')
+    listing = listing[0]
+    stores = listing['PhysicalStores']
+    require(len(stores) == 1, 'expected one physical store')
+    require(on_disk(stores[0]['DeviceIdentifier'], disk) and stores[0]['DeviceIdentifier'] != disk,
+            'container/store do not belong to the explicit disk')
+    if running.get('APFSContainerReference'):   # the running System's own stores, when it is APFS
+        for row in plist('diskutil', 'apfs', 'list', '-plist', running['APFSContainerReference'])['Containers']:
+            for store in row['PhysicalStores']:
+                require(not on_disk(store['DeviceIdentifier'], disk), 'refusing the disk of the running system')
+    return listing
+
+
 def bound_container(image, container):
-    """Bind every mutating operation to an attached regular image, never boot media."""
+    """Bind every mutating operation to an attached regular image, never boot media.
+    A target of the form /dev/diskN is a whole disk instead (golden-image.py DiskTarget): bound_disk."""
+    if re.fullmatch(r'/dev/disk[0-9]+', str(image)):
+        return bound_disk(image, container)
     image = Path(image).resolve()
     require(image.is_file(), 'image must be a regular file')
     running = plist('diskutil', 'info', '-plist', '/')
