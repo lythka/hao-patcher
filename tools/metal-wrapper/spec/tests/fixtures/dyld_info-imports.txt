@@ -1,0 +1,8 @@
+/private/fixture/usr/libexec/replayd [x86_64]:
+    -imports:
+      0x0000  __NSConcreteGlobalBlock  (from libSystem)
+      0x0002  __linkguard_init [weak-import] (from liblinkguard)
+      0x002A  _MTLCreateSystemDefaultDevice  (from Metal)
+      0x002B  _OBJC_CLASS_$_MTLComputePipelineDescriptor  (from Metal)
+      0x002C  _OBJC_CLASS_$_MTL4CompilerDescriptor [weak-import] (from Metal)
+      0x0030  _MTKTextureLoaderOptionSRGB  (from MetalKit)

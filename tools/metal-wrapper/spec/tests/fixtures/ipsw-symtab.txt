@@ -1,0 +1,18 @@
+Symtab
+------
+0x7ff8178c58cf:  (__TEXT,__text) private	__ZL29classInitialize_CVPixelBufferPv	
+0x7ff8178ccdcb:  (__TEXT,__text) non-external (was a private external)	_canRunMetal	
+0x7ff8178d0000:  (__TEXT,__text) private	-[CVFoo setBar:baz:]	
+0x7ff8178d2042:  (__TEXT,__text) external	_CVMTLTextureCreate	
+0x7ff8440b5f50:  (__DATA,__objc_data) external	_OBJC_CLASS_$_CVOwnClass	
+0x7ff842404e28:  (__DATA_CONST,__const) external	_kCVSomeKey	
+0x7ff842404e30:  (__TEXT,__const) weak external automatically hidden	__ZTS7Example	
+              (undefined) external	_CFArrayCreate	 (from CoreFoundation)
+              (undefined) external	_MTLCopyAllDevices	 (from Metal)
+              (undefined) external	_OBJC_CLASS_$_MTLTextureDescriptor	 (from Metal)
+              (undefined) weak external automatically hidden	_OBJC_CLASS_$_MTLResidencySetDescriptor	 (from Metal)
+              (undefined) external	_OBJC_METACLASS_$_MTLRenderPassDescriptor	 (from Metal)
+              (undefined) external	_MTLDeviceWasRemovedNotification	 (from Metal)
+              (undefined) external	_OBJC_CLASS_$_MPSKernel	 (from MetalPerformanceShaders)
+              (undefined) external	OBJC_IVAR_$__MTLCommandBuffer._queue	 (from Metal)
+0x7ff8440b15e8:  (__DATA,__objc_ivar) external	OBJC_IVAR_$_CVOwnClass._x	

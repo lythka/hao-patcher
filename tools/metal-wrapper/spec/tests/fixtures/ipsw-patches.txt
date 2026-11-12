@@ -1,0 +1,12 @@
+[PATCHES] /System/Library/Frameworks/Metal.framework/Versions/A/Metal	(4 symbols)
+0x7ff817627305: __mtlValidateMTLTextureSwizzleKey
+    0x7ff840020f60: GOT 
+    0x7ffd4001ed98: GOT 
+0x7ff8440b4998: _OBJC_CLASS_$__MTL4ArgumentTable
+    0x7ff8423ab9c8: PATCH  Metal
+    0x7ffc428c3cb0: PATCH  AGXMetal13_3
+    0x7ffc428cb9e0: PATCH  AGXMetalG13X
+0x7ff8440b5b20: _OBJC_CLASS_$_MTLSelfOnly
+    0x7ff8423ac3c0: PATCH  Metal
+0x7ff8440b15e8: OBJC_IVAR_$__MTLCommandBuffer._queue
+    0x7ffc428c3cb8: PATCH  IOGPU
