@@ -1,0 +1,117 @@
+#!/usr/bin/python3 -I
+"""latest: point an input row at the newest finished artifact of its family, and record the change.
+
+  pipeline/latest ROW BUILD [--dry-run]     e.g. pipeline/latest hao_runtime 26B131
+
+Families (ROW: where its artifacts are, what counts as finished):
+  hao_runtime   store/artifacts/hao-runtime-BUILD-*/payload, finished when the artifact's build.log ends with rc=0
+                and payload/build.json says hao_dirty false. Newest = latest payload/build.json modification time.
+
+The row file is found in pipeline/inputs/golden/BUILD, then pipeline/inputs/BUILD. When it already names the newest
+artifact nothing changes (exit 0). Otherwise: the row's path line is replaced and the commit and libhao tokens in its
+comment are refreshed; every patch whose patch.json inputs name the row gets revision + 1 and a "## Revisions" line;
+patches/TRACKER.md is regenerated. Nothing is committed: review, run `patches.py check` and the tests, then commit
+(CLAUDE.md). --dry-run prints the choice and the planned edits without writing.
+"""
+import datetime, glob, json, os, re, subprocess, sys
+
+TOP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def runtime_candidates(top, build):
+    out = []
+    for payload in glob.glob(os.path.join(top, 'store', 'artifacts', 'hao-runtime-%s-*' % build, 'payload')):
+        art = os.path.dirname(payload)
+        bj, log = os.path.join(payload, 'build.json'), os.path.join(art, 'build.log')
+        try:
+            meta = json.load(open(bj))
+            last = [l for l in open(log, errors='replace').read().splitlines() if l.strip()][-1:]
+        except (OSError, ValueError):
+            continue
+        if meta.get('hao_dirty') is not False or last != ['rc=0']:
+            continue
+        out.append((os.path.getmtime(bj), art, meta))
+    return sorted(out)
+
+
+def libhao_uuid8(payload):
+    lib = os.path.join(payload, 'root', 'usr', 'lib', 'hao', 'libhao.dylib')
+    try:
+        r = subprocess.run(['dwarfdump', '--uuid', lib], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    m = re.search(r'UUID: ([0-9A-F]{8})-', r.stdout)
+    return m.group(1).lower() if m else None
+
+
+def row_file(top, row, build):
+    for d in (os.path.join(top, 'pipeline', 'inputs', 'golden', build), os.path.join(top, 'pipeline', 'inputs', build)):
+        if os.path.isfile(os.path.join(d, row)):
+            return os.path.join(d, row)
+    sys.exit('latest: no row %s for %s' % (row, build))
+
+
+def users(top, row):
+    names = []
+    for pj in sorted(glob.glob(os.path.join(top, 'patches', '*', 'patch.json'))):
+        if row in json.load(open(pj)).get('inputs', []):
+            names.append(os.path.basename(os.path.dirname(pj)))
+    return names
+
+
+def bump(top, name, line, today):
+    pj = os.path.join(top, 'patches', name, 'patch.json')
+    text = open(pj).read()
+    n = int(re.search(r'"revision": (\d+)', text).group(1)) + 1
+    open(pj, 'w').write(re.sub(r'"revision": \d+', '"revision": %d' % n, text, count=1))
+    rd = os.path.join(top, 'patches', name, 'README.md')
+    text = open(rd).read()
+    if text.count('## Revisions\n') != 1:
+        sys.exit('latest: %s README has no single "## Revisions" heading' % name)
+    open(rd, 'w').write(text.replace('## Revisions\n', '## Revisions\n- r%d %s %s\n' % (n, today, line), 1))
+    return n
+
+
+def main(argv, top=TOP, today=None):
+    dry = '--dry-run' in argv
+    args = [a for a in argv if a != '--dry-run']
+    if len(args) != 2 or args[0] != 'hao_runtime':
+        sys.exit(__doc__)
+    row, build = args
+    today = today or datetime.date.today().isoformat()
+    cands = runtime_candidates(top, build)
+    if not cands:
+        sys.exit('latest: no finished hao-runtime-%s artifact (build.log rc=0, hao_dirty false) under store/artifacts' % build)
+    _, art, meta = cands[-1]
+    rel = os.path.relpath(os.path.join(art, 'payload'), top)
+    rf = row_file(top, row, build)
+    text = open(rf).read()
+    paths = [l for l in text.splitlines() if l and not l.startswith('#')]
+    if paths == ['- ' + rel]:
+        print('latest: %s (%s) already names %s (hao %s)' % (row, build, rel, meta['hao_commit']))
+        return 0
+    commit, uuid8 = meta['hao_commit'], libhao_uuid8(os.path.join(art, 'payload'))
+    lines = [l for l in text.splitlines() if l.startswith('#')]
+    lines = [re.sub(r'names its commit: [0-9a-f]+', 'names its commit: %s' % commit, l) for l in lines]
+    if uuid8:   # the token may wrap onto the next comment line ("bound to libhao\n# 239ea10b")
+        lines = re.sub(r'(bound to libhao(?:\n#)?\s+)[0-9a-f]{8}', r'\g<1>' + uuid8, '\n'.join(lines)).split('\n')
+    new = '\n'.join(lines + ['- ' + rel]) + '\n'
+    who = users(top, row)
+    line = ('Input row `%s` (%s) now names the payload built with hao-runtime %s (%s). No recipe change.'
+            % (row, build, commit, os.path.basename(art)))
+    print('latest: %s (%s): %s -> %s (hao %s, libhao %s)' % (row, build, paths[0] if paths else '-', rel, commit, uuid8 or '?'))
+    print('latest: revisions + 1 for %s' % ', '.join(who))
+    if dry:
+        return 0
+    open(rf, 'w').write(new)
+    for name in who:
+        print('latest: %s r%d' % (name, bump(top, name, line, today)))
+    tracker = os.path.join(top, 'pipeline', 'patches.py')
+    if os.path.isfile(tracker):
+        subprocess.run([sys.executable, '-I', tracker, 'tracker'], check=True)
+    print('latest: TRACKER regenerated; next: patches.py check, the pipeline tests, commit, then golden-run')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

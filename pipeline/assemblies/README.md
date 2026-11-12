@@ -1,4 +1,26 @@
-# Golden Gate assembly recipe
+# Assemblies
+
+An assembly is one buildable image: target model, OS build, donors, OCLP revision, patch set and image repository.
+Switch OS or model by building another assembly:
+
+```sh
+python3.14 -I pipeline/build dev-26B131 --latest     # macOS 27.2.1 + hao, newest finished hao payload
+python3.14 -I pipeline/build tahoe-mbp92-25G342      # macOS 26 Tahoe 25G342 + OCLP, no hao
+python3.14 -I pipeline/build NAME --dry-run          # print the command only
+```
+
+| Assembly | Runner | Image |
+|---|---|---|
+| `dev-26B131.json` | golden | 27.2.1 (26B131) for MacBookPro9,2, dev set (root SSH, hao statistics); the laptop images |
+| `mbp92-26B131.json` | golden | the same without dev recipes (not yet built) |
+| `tahoe-mbp92-25G342.json` | tahoe | Tahoe 25G342 for MacBookPro9,2 with stock OCLP and root SSH (set `tahoe-dev`), inputs `pipeline/inputs/25G342-tahoe` (full installer unpack) |
+
+`"runner": "golden"` (the default) runs `pipeline/golden-run`; `"runner": "tahoe"` runs the Tahoe-first
+`pipeline/run TARGET OS_BUILD OCLP PATCH_SET`. `"repo"` is the image repository, relative to the checkout
+(`--repo` overrides it). `--latest` first runs `pipeline/latest` (below) and stops if it moved the row, so the change
+is committed before the image is built.
+
+## Golden Gate assembly recipe
 
 `mbp92-26B131.json` selects macOS 27.2.1/26B131 for MacBookPro9,2 with Tahoe 25G342 as
 its donor source and the `golden-gate-26B131` set. `dev-26B131.json` is the same build
@@ -12,6 +34,16 @@ The laptop tests so far used `dev-26B131.json`; `mbp92-26B131.json` has not been
 python3.14 -I pipeline/golden-run pipeline/assemblies/mbp92-26B131.json \
   --repo /path/to/new-image-repository
 ```
+
+Before a build, take the newest finished hao payload (clean `build.json`, `build.log` ending `rc=0`):
+
+```sh
+python3.14 -I pipeline/latest hao_runtime 26B131 --dry-run   # what it would pick
+python3.14 -I pipeline/latest hao_runtime 26B131             # repoint the row, bump its patches, regenerate TRACKER
+```
+
+It changes nothing when the row already names the newest payload; otherwise check, test and commit as usual
+(CLAUDE.md) before running golden-run.
 
 | Field | Meaning |
 |---|---|

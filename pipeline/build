@@ -1,0 +1,76 @@
+#!/usr/bin/python3 -I
+"""build: build the image an assembly describes, with whichever runner it names. Flip OS or model by picking another
+assembly; every choice (target, OS build, donors, OCLP, set, image repository) lives in the assembly file.
+
+  pipeline/build ASSEMBLY [--latest] [--repo DIR] [--dry-run]
+
+ASSEMBLY is pipeline/assemblies/NAME.json or a path. Its "runner" picks the pipeline:
+  golden (default)  pipeline/golden-run ASSEMBLY --repo REPO: a Golden Gate (macOS 27) image with hao
+  tahoe             pipeline/run TARGET OS_BUILD OCLP PATCH_SET with REPO: a Tahoe image, OCLP only, no hao
+                    (keys: target, os_build = a pipeline/inputs folder, oclp, patch_set)
+REPO is --repo, else the assembly's "repo" (relative to the checkout, e.g. store/images/NAME).
+--latest (golden only): run `pipeline/latest hao_runtime GOLDEN_BUILD` first. When that changes the row, the build
+stops so the change can be checked and committed (CLAUDE.md); run again afterwards.
+--dry-run prints the command without running it.
+"""
+import json, os, subprocess, sys
+
+TOP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+P = os.path.join(TOP, 'pipeline')
+
+
+def load(name):
+    path = name if os.path.isfile(name) else os.path.join(P, 'assemblies', name + '.json')
+    if not os.path.isfile(path):
+        sys.exit('build: no assembly %s' % name)
+    return os.path.abspath(path), json.load(open(path))
+
+
+def command(path, a, repo):
+    runner = a.get('runner', 'golden')
+    if not repo:
+        sys.exit('build: no image repository (--repo, or "repo" in %s)' % os.path.basename(path))
+    repo = repo if os.path.isabs(repo) else os.path.join(TOP, repo)
+    if runner == 'tahoe':
+        for k in ('target', 'os_build', 'oclp', 'patch_set'):
+            if k not in a:
+                sys.exit('build: tahoe assembly %s has no "%s"' % (os.path.basename(path), k))
+        return ['zsh', os.path.join(P, 'run'), a['target'], a['os_build'], a['oclp'], a['patch_set']], {'REPO': repo}
+    if runner == 'golden':
+        return [sys.executable, '-I', os.path.join(P, 'golden-run'), path, '--repo', repo], {}
+    sys.exit('build: unknown runner %r in %s' % (runner, os.path.basename(path)))
+
+
+def main(argv):
+    flags = {a for a in argv if a in ('--latest', '--dry-run')}
+    rest = [a for a in argv if a not in flags]
+    repo = None
+    if '--repo' in rest:
+        i = rest.index('--repo')
+        repo = rest[i + 1] if i + 1 < len(rest) else sys.exit('build: --repo needs a folder')
+        del rest[i:i + 2]
+    if len(rest) != 1:
+        sys.exit(__doc__)
+    path, a = load(rest[0])
+    cmd, env = command(path, a, repo or a.get('repo'))
+    if '--latest' in flags:
+        if a.get('runner', 'golden') != 'golden':
+            sys.exit('build: --latest is for golden assemblies (a Tahoe image has no hao)')
+        latest = [sys.executable, '-I', os.path.join(P, 'latest'), 'hao_runtime', a['golden_build']]
+        if '--dry-run' in flags:
+            print(' '.join(latest + ['--dry-run']), flush=True)
+            subprocess.run(latest + ['--dry-run'], check=True)
+        else:
+            before = subprocess.run(['git', '-C', TOP, 'status', '--porcelain'], capture_output=True, text=True).stdout
+            subprocess.run(latest, check=True)
+            after = subprocess.run(['git', '-C', TOP, 'status', '--porcelain'], capture_output=True, text=True).stdout
+            if after != before:
+                sys.exit('build: the hao_runtime row moved to a newer payload; check, test and commit it, then build again')
+    print(' '.join('%s=%s' % kv for kv in env.items()) + (' ' if env else '') + ' '.join(cmd))
+    if '--dry-run' in flags:
+        return 0
+    return subprocess.run(cmd, env=dict(os.environ, **env)).returncode
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

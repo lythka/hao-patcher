@@ -15,5 +15,6 @@
     "recovery": "tahoe_recovery_donors",
     "hardware": "oclp_hardware"
   },
-  "workspace_size_bytes": 171798691840
+  "workspace_size_bytes": 171798691840,
+  "repo": "store/images/mbp92-26B131-tested"
 }

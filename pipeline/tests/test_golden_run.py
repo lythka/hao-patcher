@@ -132,6 +132,7 @@ class GoldenRun(unittest.TestCase):
         assembly=json.loads((TOP/'pipeline/assemblies/mbp92-26B131.json').read_text())
         developer=json.loads((TOP/'pipeline/assemblies/dev-26B131.json').read_text())
         self.assertEqual('golden-gate-26B131',assembly.pop('patch_set'));developer.pop('patch_set')
+        assembly.pop('repo',None);developer.pop('repo',None)   # each keeps its own image repository
         self.assertEqual(developer,assembly)
 
     def fixture_job(self, root, rc, workspace=None):
