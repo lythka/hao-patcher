@@ -1,7 +1,23 @@
 {
- "revision": 1,
+ "revision": 2,
  "stage": "recovery",
  "applies": "any",
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "usr/local/ssdtools/power.sh",
+   "origin": {
+    "kind": "hao",
+    "note": "new file, copied from src/power.sh: sets the sleep policy at every boot"
+   }
+  },
+  {
+   "path": "System/Library/LaunchDaemons/local.power.plist",
+   "origin": {
+    "kind": "hao",
+    "note": "new file, copied from src/local.power.plist: runs power.sh at load"
+   }
+  }
+ ]
 }

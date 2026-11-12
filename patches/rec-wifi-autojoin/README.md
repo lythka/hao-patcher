@@ -13,13 +13,17 @@ because the legacy Broadcom driver keeps reporting the last SSID while disassoci
   DYLD_INSERT_LIBRARIES=...` followed by `kickstart -k`. If `airportd` restarts later it runs unmodified.
 - `make.sh` builds the dylib for x86_64 and signs it ad hoc (the Recovery boots with `amfi=0x80`).
 
+The three installed files are new and declared in `patch.json` `files`, with paths in the Recovery BaseSystem root (`usr/local/ssdtools/wifijoin.dylib`, `wifijoin.sh` and `System/Library/LaunchDaemons/local.wifijoin.plist`); `tests/test_files.py` checks them against `apply.sh` and `make.sh`.
+
 ## Verify
 Join a network in the Recovery and reboot: it rejoins without asking for the password. `/var/log/wifijoin.log`
 records the hook.
+`python3.14 -I -B -m unittest discover -s patches/rec-wifi-autojoin/tests` checks the declared files against `apply.sh`.
 
 ## Validation
 NEEDS VALIDATION: the dylib builds and installs; the method checks were written against 25G241's `airportd`, and
 auto-join in a booted 25G332 Recovery has not been tested (on a mismatch the dylib changes nothing).
 
 ## Revisions
+- r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is unchanged.
 - r1 2026-11-10 Initial public release.

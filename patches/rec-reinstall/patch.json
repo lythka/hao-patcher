@@ -1,7 +1,37 @@
 {
- "revision": 3,
+ "revision": 4,
  "stage": "recovery",
  "applies": "any",
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "Install macOS Tahoe.app/Contents/MacOS/InstallAssistant",
+   "origin": {
+    "kind": "hao",
+    "note": "replaces Tahoe's whole InstallAssistant (the button's Path read from Utilities.plist; 25G332 shown), owner and mode kept; built by make.sh from src/Reinstall.m (x86_64, ad hoc signed)"
+   }
+  },
+  {
+   "path": "usr/local/ssdtools/ssdinstall",
+   "origin": {
+    "kind": "hao",
+    "note": "new file built by make.sh from tools/ssdpush/ssdinstall.c (x86_64, ad hoc signed)"
+   }
+  },
+  {
+   "path": "usr/local/ssdtools/startup-internal",
+   "origin": {
+    "kind": "hao",
+    "note": "new file, copied from src/startup-internal"
+   }
+  },
+  {
+   "path": "usr/local/ssdtools/bin/ssdpush-agent",
+   "origin": {
+    "kind": "hao",
+    "note": "new file built by make.sh through tools/ssdpush/build.sh (agent.c with zstd 1.5.7, x86_64)"
+   }
+  }
+ ]
 }

@@ -34,9 +34,9 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | rec-display-ethernet | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-install-volume | r3 | post | product |  |  |  |  |  | **needs** | r3 2026-11-10 Initial public release. |
 | rec-language-list | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-power | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-progress-phase | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-reinstall | r3 | recovery | product |  |  |  | x |  | **needs** | r3 2026-11-10 Initial public release. |
-| rec-startup-guard | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-wifi | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-wifi-autojoin | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| rec-power | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-progress-phase | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-reinstall | r4 | recovery | product |  |  |  | x |  | **needs** | r4 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-startup-guard | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-wifi | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-wifi-autojoin | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
