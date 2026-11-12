@@ -25,7 +25,7 @@ import tempfile
 REPO = Path(__file__).resolve().parents[2]
 ALLOWED = re.compile(r'patches/([^/]+)/(patch\.json|README\.md|edits/[^/]+\.json|tests/[^/]+\.py)\Z')
 GENERATED = {'patches/TRACKER.md', 'docs/PATCHES.md'}
-PRIVATE = re.compile(r'/Users/[A-Za-z]|/private/tmp/[A-Za-z]|hao-research/store|store/evidence')
+TMP = re.compile('/' r'private/tmp/[A-Za-z]')   # scratch folders; the other private patterns come from the repo's test
 PY = sys.executable
 
 
@@ -38,6 +38,12 @@ def show(ref, path):
         return git('show', '%s:%s' % (ref, path))
     except subprocess.CalledProcessError:
         return None
+
+
+def private_patterns():
+    import runpy
+    test = runpy.run_path(str(REPO / 'pipeline' / 'tests' / 'test_private_references.py'))
+    return test['PATTERNS'] + [('scratch folder', TMP)]
 
 
 def main():
@@ -81,9 +87,12 @@ def main():
             problems.append('%s: newest README Revisions line is not r%s' % (name, new.get('revision')))
 
     diff = git('diff', '-U0', '%s...%s' % (a.base, a.branch))
+    patterns = private_patterns()
     for line in diff.splitlines():
-        if line.startswith('+') and not line.startswith('+++') and PRIVATE.search(line):
-            problems.append('private path added: %s' % line[1:].strip()[:120])
+        if line.startswith('+') and not line.startswith('+++'):
+            for label, pattern in patterns:
+                if pattern.search(line):
+                    problems.append('%s added: %s' % (label, line[1:].strip()[:120]))
 
     tmp = Path(tempfile.mkdtemp(prefix='verify-declaration-'))
     work = tmp / 'tree'
