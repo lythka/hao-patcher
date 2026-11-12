@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""acquire: download every file a release pins, by URL, size and sha256 (workflow plan step 12).
+
+  acquire fetch MANIFEST --cache DIR [--only NAME ...] [--quiet | --log json]
+  acquire verify MANIFEST --cache DIR          every pinned file present and intact, nothing fetched
+  acquire path MANIFEST NAME --cache DIR       where NAME is (after fetch)
+
+MANIFEST is JSON: {"downloads": [{"name": NAME, "url": URL, "size": BYTES, "sha256": HEX, "mirrors": [URL, ...]}]}
+(the "downloads" part of a release.json). Files are kept content-addressed in DIR/sha256/<hex>. A file already
+there with the right hash is never fetched again. A partial download (DIR/partial/<hex>) resumes with an HTTP Range
+request. A file whose size or sha256 differs is refused and never moved into place; the next mirror is tried.
+Standard library only.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import sys
+import urllib.error
+import urllib.request
+
+CHUNK = 1 << 20
+
+
+class AcquireError(RuntimeError):
+    pass
+
+
+def load(manifest):
+    with open(manifest) as f:
+        m = json.load(f)
+    rows = m.get('downloads')
+    if not isinstance(rows, list) or not rows:
+        raise AcquireError('%s has no downloads' % manifest)
+    names = set()
+    for r in rows:
+        for k, t in (('name', str), ('url', str), ('size', int), ('sha256', str)):
+            if not isinstance(r.get(k), t):
+                raise AcquireError('%s: download %r needs %s' % (manifest, r.get('name'), k))
+        if r['name'] in names:
+            raise AcquireError('%s: %s listed twice' % (manifest, r['name']))
+        if len(r['sha256']) != 64 or r['size'] < 0:
+            raise AcquireError('%s: %s has a bad sha256 or size' % (manifest, r['name']))
+        names.add(r['name'])
+    return rows
+
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for block in iter(lambda: f.read(CHUNK), b''):
+            h.update(block)
+    return h.hexdigest()
+
+
+def final_path(cache, row):
+    return Path(cache) / 'sha256' / row['sha256']
+
+
+def intact(cache, row):
+    p = final_path(cache, row)
+    return p.is_file() and p.stat().st_size == row['size'] and sha256_file(p) == row['sha256']
+
+
+def _download(url, partial, size, emit, name):
+    have = partial.stat().st_size if partial.exists() else 0
+    if have > size:
+        partial.unlink()
+        have = 0
+    req = urllib.request.Request(url, headers={'User-Agent': 'hao-acquire/1'})
+    if have:
+        req.add_header('Range', 'bytes=%d-' % have)
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        status = getattr(resp, 'status', 200)
+        if have and status != 206:            # the server ignored the range: start again
+            have = 0
+        mode = 'ab' if have else 'wb'
+        with open(partial, mode) as out:
+            done = have
+            for block in iter(lambda: resp.read(CHUNK), b''):
+                out.write(block)
+                done += len(block)
+                if done > size:
+                    raise AcquireError('%s: more than the pinned %d bytes' % (name, size))
+                emit({'ev': 'progress', 'name': name, 'done': done, 'size': size})
+
+
+def fetch(rows, cache, *, only=None, on_event=None):
+    emit = on_event or (lambda e: None)
+    cache = Path(cache)
+    (cache / 'sha256').mkdir(parents=True, exist_ok=True)
+    (cache / 'partial').mkdir(parents=True, exist_ok=True)
+    results = {}
+    for row in rows:
+        if only and row['name'] not in only:
+            continue
+        if intact(cache, row):
+            emit({'ev': 'reused', 'name': row['name'], 'sha256': row['sha256']})
+            results[row['name']] = str(final_path(cache, row))
+            continue
+        partial = cache / 'partial' / row['sha256']
+        errors = []
+        for url in [row['url']] + list(row.get('mirrors', [])):
+            try:
+                emit({'ev': 'fetch', 'name': row['name'], 'url': url, 'size': row['size']})
+                _download(url, partial, row['size'], emit, row['name'])
+                size, digest = partial.stat().st_size, sha256_file(partial)
+                if size != row['size'] or digest != row['sha256']:
+                    partial.unlink()
+                    raise AcquireError('got %d bytes, sha256 %s; pinned %d, %s' % (size, digest, row['size'],
+                                                                                 row['sha256']))
+                os.replace(partial, final_path(cache, row))
+                emit({'ev': 'ok', 'name': row['name'], 'sha256': digest})
+                results[row['name']] = str(final_path(cache, row))
+                break
+            except (OSError, urllib.error.URLError, AcquireError) as x:
+                errors.append('%s: %s' % (url, x))
+                emit({'ev': 'mirror-failed', 'name': row['name'], 'url': url, 'error': str(x)})
+        else:
+            raise AcquireError('%s: no source gave the pinned file:\n  %s' % (row['name'], '\n  '.join(errors)))
+    return results
+
+
+def printer(level):
+    last = {}
+
+    def emit(ev):
+        if level == 'json':
+            print(json.dumps(ev), flush=True)
+            return
+        k = ev['ev']
+        if level == 'quiet' and k != 'mirror-failed':
+            return
+        if k == 'reused':
+            print('  %-40s already here, sha256 ok' % ev['name'])
+        elif k == 'fetch':
+            print('  %-40s %s' % (ev['name'], ev['url']))
+        elif k == 'progress':
+            pct = 100 * ev['done'] // max(ev['size'], 1)
+            if pct // 10 != last.get(ev['name']):
+                last[ev['name']] = pct // 10
+                print('    %3d%%  %d / %d bytes' % (pct, ev['done'], ev['size']))
+        elif k == 'ok':
+            print('  %-40s sha256 ok' % ev['name'])
+        elif k == 'mirror-failed':
+            print('  %-40s FAILED from %s: %s' % (ev['name'], ev['url'], ev['error']), file=sys.stderr)
+    return emit
+
+
+def main():
+    p = argparse.ArgumentParser(prog='acquire', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest='action', required=True)
+    for name in ('fetch', 'verify', 'path'):
+        q = sub.add_parser(name)
+        q.add_argument('manifest')
+        if name == 'path':
+            q.add_argument('name')
+        q.add_argument('--cache', required=True)
+        if name == 'fetch':
+            q.add_argument('--only', nargs='+')
+            g = q.add_mutually_exclusive_group()
+            g.add_argument('--quiet', action='store_true'); g.add_argument('--log', choices=['json'])
+    a = p.parse_args()
+    try:
+        rows = load(a.manifest)
+        if a.action == 'fetch':
+            level = 'json' if a.log == 'json' else 'quiet' if a.quiet else 'steps'
+            fetch(rows, a.cache, only=set(a.only or []), on_event=printer(level))
+        elif a.action == 'verify':
+            bad = [r['name'] for r in rows if not intact(a.cache, r)]
+            for n in bad:
+                print('missing or damaged: %s' % n)
+            if bad:
+                return 1
+            print('acquire: %d files present and intact' % len(rows))
+        else:
+            row = next((r for r in rows if r['name'] == a.name), None)
+            if row is None or not intact(a.cache, row):
+                print('acquire: %s is not here (run fetch)' % a.name, file=sys.stderr)
+                return 1
+            print(final_path(a.cache, row))
+    except AcquireError as x:
+        print('acquire: %s' % x, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
