@@ -1,5 +1,13 @@
 {
  "golden-gate-26B131": {
+  "EFI/OC/config.plist": {
+   "chain": "chain",
+   "writers": [
+    "oclp",
+    "hao-opencore",
+    "golden-gate-live-text-service"
+   ]
+  },
   "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver": {
    "chain": "chain",
    "writers": [
