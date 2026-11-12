@@ -33,6 +33,7 @@ clang -O1 -Wall -Wextra "$src/compiler/igil_rewrite.c" "$src/compiler/igil_tool.
 
 cp "$icbe" "$out/iCBE-real.dylib"
 clang "${X86[@]}" -O1 -Wall -dynamiclib "$src/compiler/icbe_wrap.c" "$src/compiler/igil_rewrite.c" \
+    "$src/compiler/air_hook.c" "$src/compiler/air_pass.c" \
     -Wl,-not_for_dyld_shared_cache -Wl,-reexport_library,"$out/iCBE-real.dylib" -install_name "$T/iCBE.dylib" -o "$out/iCBE.dylib"
 old=$(otool -l "$out/iCBE.dylib" | grep -A2 LC_REEXPORT_DYLIB | awk '/name/{print $2}')
 install_name_tool -change "$old" "$T/iCBE-real.dylib" "$out/iCBE.dylib" 2>/dev/null

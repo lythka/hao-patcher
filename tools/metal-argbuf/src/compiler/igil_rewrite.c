@@ -93,8 +93,7 @@ static int abt_index(const char *op, const char *abt, int temps) {
     int r = atoi(op + 3); return r >= 0 && r <= temps && abt[r];
 }
 
-char *igil_rewrite(const char *in, const igil_config *cfg, igil_stats *st) {
-    memset(st, 0, sizeof *st);
+static char *rewrite_resources(const char *in, const igil_config *cfg, igil_stats *st) {
     int nl; line *L = split(in, &nl);
     int temps = -1, tmax = -1, umax = -1, karg = -1, dcl_at = -1, temps_at = -1, ncb = 0, ntexdcl = 0;
     for (int i = 0; i < nl; i++) {
@@ -210,4 +209,104 @@ char *igil_rewrite(const char *in, const igil_config *cfg, igil_stats *st) {
     st->tex_base = tbase; st->buf_base = ufix; (void)ubase;
     free(taint); free(abt); free(L);
     return o.p;
+}
+
+// ---- graphics: pointer dereferences ----------------------------------------------------------------------------
+// Vertex/pixel programs (the IGIL target's 32-bit graphics lowering) read through a pointer loaded from an argument
+// buffer as `MOV rD, C-1[rI.x]` (constant pointer: rI = byte address >> 4, "C-1" = no buffer) or
+// `LD_RAW rD, rA.x, u0` (device pointer, u0 undeclared). Only the pointer's low word (byte offset) survives; its high
+// word, BUF_BTI + h, is still in .y of the LD_RAW that loaded the pointer (air_pass.c makes that a 64-bit load). Each
+// access becomes LD_RAW from a declared raw-UAV range indexed by h: u(ubase+h) at buffer slot BUF_SLOT+h.
+typedef struct { int ptr; int addr; } gdef;   // per register: LD_RAW register holding the pointer, byte-address register
+static int graphics(const char *in) { return strstr(in, "PIXELSHADER ") || strstr(in, "VERTEXSHADER "); }
+
+static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, igil_stats *st) {
+    int nl; line *L = split(in, &nl);
+    int temps = -1, temps_at = -1, umax = -1, karg = -1, dcl_at = -1;
+    for (int i = 0; i < nl; i++) {
+        char t[256]; size_t n = L[i].n < 255 ? L[i].n : 255; memcpy(t, L[i].s, n); t[n] = 0;
+        const char *d;
+        if ((d = strstr(t, "DCL_TEMPS r0..r"))) { temps = atoi(d + 15); temps_at = i; }
+        if ((d = strstr(t, "DCL_UAV")) && (d = strstr(d, " u")) && isdigit((unsigned char)d[2]) && atoi(d + 2) > umax) umax = atoi(d + 2);
+        if ((d = strstr(t, "KERNEL_ARGUMENT, ")) && atoi(d + 17) > karg) karg = atoi(d + 17);
+        if (dcl_at < 0 && (strstr(t, "\tDCL_INPUT") == t || strstr(t, "\tDCL_TEMPS") == t)) dcl_at = i;
+    }
+    if (temps < 0 || dcl_at < 0) { free(L); return NULL; }
+    gdef *g = malloc(((size_t)temps + 1) * sizeof *g);
+    for (int r = 0; r <= temps; r++) g[r] = (gdef){ -1, -1 };
+    insn x;
+    // pointer provenance, in program order (graphics programs here are straight-line apart from waterfall loops)
+    for (int i = temps_at + 1; i < nl; i++) {
+        if (!parse(L[i], &x) || x.na < 2) continue;
+        int d = reg(x.a[0]); if (d < 0 || d > temps) continue;
+        if (!strcmp(x.op, "LD_RAW") && x.na == 3 && (x.a[2][0] == 'C' || x.a[2][0] == 'u')) { g[d] = (gdef){ d, -1 }; continue; }
+        gdef v = { -1, -1 };
+        if (!strcmp(x.op, "SHR") && x.na == 3 && !strcmp(x.a[2], "4")) {   // byte address -> 16-byte register index
+            int s2 = reg(x.a[1]); if (s2 >= 0 && s2 <= temps && g[s2].ptr >= 0) v = (gdef){ g[s2].ptr, s2 };
+        } else if (!strcmp(x.op, "MOV") || !strcmp(x.op, "IADD") || !strcmp(x.op, "SHL")) {
+            for (int k = 1; k < x.na && v.ptr < 0; k++) { int s2 = reg(x.a[k]); if (s2 >= 0 && s2 <= temps && g[s2].ptr >= 0) v = (gdef){ g[s2].ptr, -1 }; }
+        }
+        g[d] = v;
+    }
+    int need = 0;
+    for (int i = temps_at + 1; i < nl; i++) {
+        if (!parse(L[i], &x)) continue;
+        for (int k = 0; k < x.na; k++) if (startswith(x.a[k], "C-1[")) need = 1;
+        if (!strcmp(x.op, "LD_RAW") && x.na == 3 && !strcmp(x.a[2], "u0") && umax < 0) need = 1;
+    }
+    if (!need) { free(g); free(L); return NULL; }
+    int ubase = umax + 1, T = temps + 1;   // scratch T (index), T+1 (address), T+2 (loaded register)
+    buf o = {0}; int fails = 0;
+    for (int i = 0; i < nl; i++) {
+        if (i == dcl_at) {
+            int ka = karg + 1;
+            for (int k = 0; k < cfg->buf_count; k++)
+                putf(&o, "\tDCL_UAVRAW u%d, TRUE =\n\t{\n\t  KERNEL_ARGUMENT, %d,\n\t  LOCATION_INDEX, %d, 0,\n"
+                         "\t  EMULATION_ARGUMENT, FALSE,\n\t  STRIDE, 4, 4\n\t};\n\n", ubase + k, ka++, cfg->buf_slot + k);
+        }
+        if (i == temps_at) { putf(&o, "\tDCL_TEMPS r0..r%d;\n", T + 2); continue; }
+        if (i > temps_at && parse(L[i], &x)) {
+            if (!strcmp(x.op, "LD_RAW") && x.na == 3 && !strcmp(x.a[2], "u0") && umax < 0) {   // device pointer
+                int a = reg(x.a[1]);
+                if (a >= 0 && a <= temps && g[a].ptr >= 0) {
+                    putf(&o, "\tIADD r%d.x, r%d.y, %d;\n\tLD_RAW %s, %s, u[r%d.x];\n", T, g[a].ptr, ubase - cfg->buf_bti, x.a[0], x.a[1], T);
+                    st->buffers++; continue;
+                }
+                fails++;
+            }
+            int ck = -1;
+            for (int k = 0; k < x.na; k++) if (startswith(x.a[k], "C-1[")) ck = k;
+            if (ck >= 0) {   // constant pointer: load the 16-byte register the operand names, keep its swizzle
+                int ri = reg(x.a[ck] + 4); const char *close = strchr(x.a[ck], ']');
+                if (ri >= 0 && ri <= temps && close && g[ri].ptr >= 0 && g[ri].addr >= 0) {
+                    putf(&o, "\tIADD r%d.x, r%d.y, %d;\n\tAND r%d.x, r%d.x, -16;\n\tLD_RAW r%d, r%d.x, u[r%d.x];\n\t%s ",
+                         T, g[ri].ptr, ubase - cfg->buf_bti, T + 1, g[ri].addr, T + 2, T + 1, T, x.op);
+                    for (int k = 0; k < x.na; k++) {
+                        if (k) put(&o, ", ", 2);
+                        if (k == ck) putf(&o, "r%d%s", T + 2, close + 1); else put(&o, x.a[k], strlen(x.a[k]));
+                    }
+                    put(&o, ";\n", 2); st->buffers++; continue;
+                }
+                fails++;
+            }
+        }
+        put(&o, L[i].s, L[i].n); put(&o, "\n", 1);
+    }
+    if (o.n && in[strlen(in) - 1] != '\n') o.p[--o.n] = 0;
+    if (fails) st->unresolved += fails;
+    st->buf_base = ubase;
+    free(g); free(L);
+    return o.p;
+}
+
+char *igil_rewrite(const char *in, const igil_config *cfg, igil_stats *st) {
+    memset(st, 0, sizeof *st);
+    char *r = rewrite_resources(in, cfg, st);
+    if (!graphics(in)) return r;
+    igil_stats gs; memset(&gs, 0, sizeof gs);
+    char *r2 = rewrite_graphics_buffers(r ? r : in, cfg, &gs);
+    if (!r2) return r;
+    free(r);
+    st->buffers += gs.buffers; st->buf_base = gs.buf_base; st->unresolved += gs.unresolved;
+    return r2;
 }
