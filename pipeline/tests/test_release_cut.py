@@ -31,5 +31,27 @@ class ReleaseCut(unittest.TestCase):
         self.assertEqual(r.returncode, 0 if classes <= {'download', 'reproducible'} else 1)
 
 
+class Write(unittest.TestCase):
+    @unittest.skipUnless((TOP / 'store/artifacts').is_dir(), 'needs the store')
+    def test_cut_refused_draft_written(self):
+        import tempfile
+        out = Path(tempfile.mkdtemp()) / 'release.json'
+        cmd = [sys.executable, '-I', str(TOP / 'pipeline/release-cut'), '--write', str(out),
+               str(TOP / 'pipeline/assemblies/mbp92-26B131.json')]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode == 0:                         # every row reproducible: a real cut
+            self.assertEqual(json.loads(out.read_text())['state'], 'cut')
+            return
+        self.assertIn('refused', r.stderr)
+        self.assertFalse(out.exists())
+        r = subprocess.run(cmd + ['--draft'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        rel = json.loads(out.read_text())
+        self.assertEqual(rel['state'], 'draft')
+        self.assertTrue(rel['refusals'])
+        self.assertIn('golden-gate-hello', rel['recipes'])
+        self.assertTrue(all(d['url'] is None for d in rel['downloads']))   # never guessed
+
+
 if __name__ == '__main__':
     unittest.main()

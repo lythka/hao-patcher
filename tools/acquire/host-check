@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""host-check: which steps of the hao builder this Mac can run, and why not (workflow plan step 12, host matrix).
+
+  host-check [--json] [--need-gb N]
+
+Each builder step lists what it needs; a check passes or names what is missing. Run it on each host the release
+claims to support (Monterey, Ventura, newer; Intel and Apple silicon) and keep the outputs as the host matrix.
+"""
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+
+
+def run(cmd):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        return r.returncode, (r.stdout + r.stderr).strip()
+    except (OSError, subprocess.TimeoutExpired) as x:
+        return 127, str(x)
+
+
+def facts(need_gb):
+    mac = platform.mac_ver()[0]
+    major = int(mac.split('.')[0]) if mac else 0
+    arch = platform.machine()
+    free_gb = shutil.disk_usage(os.path.expanduser('~')).free / 1e9
+    rosetta = arch == 'x86_64' or run(['arch', '-x86_64', '/usr/bin/true'])[0] == 0
+    xcrun_metal = run(['xcrun', '--find', 'metal-as'])[0] == 0
+    return {'macos': mac, 'macos_major': major, 'arch': arch, 'python': platform.python_version(),
+            'free_gb': round(free_gb, 1), 'need_gb': need_gb, 'rosetta': rosetta,
+            'codesign': bool(shutil.which('codesign')), 'hdiutil': bool(shutil.which('hdiutil')),
+            'pkgutil': bool(shutil.which('pkgutil')), 'aea': bool(shutil.which('aea')),
+            'ipsw': bool(shutil.which('ipsw')), 'xcrun_metal': xcrun_metal,
+            'llvm_bundle': bool(os.environ.get('HAO_LLVM_BUNDLE') and os.path.isdir(os.environ['HAO_LLVM_BUNDLE'])),
+            'root': os.geteuid() == 0}
+
+
+def steps(f):
+    """[(step, ok, why)] for each builder step, from the plan's host/installer split."""
+    out = []
+
+    def step(name, needs):
+        missing = [why for ok, why in needs if not ok]
+        out.append((name, not missing, '; '.join(missing) or 'ok'))
+
+    step('download and verify (tools/acquire)', [(sys.version_info >= (3, 9), 'Python 3.9 or later'),
+                                                 (f['free_gb'] >= f['need_gb'], 'free space %.0f GB < %d GB' % (f['free_gb'], f['need_gb']))])
+    step('unpack installers (pkgutil, hdiutil)', [(f['pkgutil'], 'pkgutil'), (f['hdiutil'], 'hdiutil')])
+    step('decode the macOS 27 IPSW (AEA)', [(f['aea'] or f['ipsw'], "the aea tool (macOS 13+) or the pinned ipsw binary")])
+    step('edit and sign files (edit engine, codesign)', [(f['codesign'], 'codesign')])
+    step('rebuild Metal libraries (legacy-Metal targets)',
+         [(f['xcrun_metal'] or f['llvm_bundle'], "Xcode's Metal toolchain (xcrun metal-as) or the bundled LLVM (HAO_LLVM_BUNDLE)")])
+    step('run x86_64 tools on Apple silicon', [(f['rosetta'], 'Rosetta')])
+    step('write the USB installer', [(f['root'], 'root (sudo)'), (f['hdiutil'], 'hdiutil')])
+    return out
+
+
+def main(argv):
+    need = int(argv[argv.index('--need-gb') + 1]) if '--need-gb' in argv else 60
+    f = facts(need)
+    s = steps(f)
+    if '--json' in argv:
+        print(json.dumps({'host': f, 'steps': [{'step': n, 'ok': ok, 'why': w} for n, ok, w in s]}, indent=1))
+    else:
+        print('host  macOS %s · %s · Python %s · %.0f GB free' % (f['macos'], f['arch'], f['python'], f['free_gb']))
+        for n, ok, w in s:
+            print('  %-48s %s' % (n, 'ok' if ok else 'NO: ' + w))
+    return 0 if all(ok for n, ok, _ in s if not n.startswith('write the USB')) else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

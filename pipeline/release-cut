@@ -1,7 +1,11 @@
 #!/usr/bin/python3 -I
 """release-cut: what a release of an assembly would ship, and whether each input could be made again.
 
-  release-cut --dry-run ASSEMBLY [--store DIR] [--json]     (ASSEMBLY = pipeline/assemblies/NAME.json)
+  release-cut --dry-run ASSEMBLY [--json]                   (ASSEMBLY = pipeline/assemblies/NAME.json)
+  release-cut --write OUT.json ASSEMBLY [--overlays DIR] [--draft]
+        the release.json a cut publishes: downloads (row, size, sha256; URL filled by the cut), our assets with
+        their producers, recipe revisions, packs, and each overlay file's expected sha256 (from materialize's
+        DIR). Refused while any row is not download/reproducible, unless --draft.
 
 Every input row the assembly's set and donors use is resolved (pipeline/inputs/golden/BUILD, then the donor build,
 then common) and classified, without changing anything:
@@ -92,7 +96,64 @@ def classify(row, hit):
     return 'reproducible', '%s: %s@%s' % (parts[2], repo, str(commit)[:10])
 
 
+def release_json(assembly, results, overlays=None):
+    """The release manifest a cut would publish (state "draft" while any row is not download/reproducible)."""
+    patches = runpy.run_path(str(TOP / 'pipeline' / 'patches.py'))
+    a = json.loads(Path(assembly).read_text())
+    import contextlib, io
+    with contextlib.redirect_stderr(io.StringIO()):
+        plan = patches['plan'](TOP / 'pipeline/sets' / (a['patch_set'] + '.txt'),
+                               TOP / 'pipeline/targets' / (a['target'] + '.json'), a['donor_build'], locks=None)
+    packs = patches['load_packs']()
+    refusals = ['%s: %s (%s)' % (row, c, d) for row, c, d, _ in results if c not in ('download', 'reproducible')]
+    downloads, assets = [], []
+    for row, c, detail, hit in results:
+        sha, path = hit[1] if hit else ('-', None)
+        size = os.path.getsize(path) if path and os.path.isfile(path) else None
+        item = {'row': row, 'sha256': sha, 'size': size}
+        if c == 'download':
+            downloads.append(dict(item, name=row, url=None))      # the URL is filled in by the cut, never guessed
+        else:
+            assets.append(dict(item, class_=c, producer=detail))
+    out = {'release_format': 1, 'state': 'draft' if refusals else 'cut', 'assembly': Path(assembly).stem,
+           'golden_build': a['golden_build'], 'donor_build': a['donor_build'], 'target': a['target'],
+           'patch_set': a['patch_set'],
+           'proven_on': sorted({m for p in packs.values() for m in p.get('proven_on', [])}),
+           'recipes': {name: patches['revision'](name) for _, name, _ in plan},
+           'packs': {n: {'phase': p['phase'], 'recipes': p.get('recipes', [])} for n, p in sorted(packs.items())},
+           'downloads': downloads, 'assets': [{k.rstrip('_'): v for k, v in x.items()} for x in assets],
+           'refusals': refusals}
+    if overlays:
+        expected = {}
+        for m in sorted(Path(overlays).glob('*/manifest.json')):
+            man = json.loads(m.read_text())
+            expected[man['pack']] = {p: f['sha256'] for p, f in sorted(man['files'].items())}
+        out['expected_outputs'] = expected    # compared after a build, not fatal: a difference is a note
+    return out
+
+
 def main(argv):
+    if '--write' in argv:
+        i = argv.index('--write')
+        out_path = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
+        overlays = None
+        if '--overlays' in argv:
+            j = argv.index('--overlays'); overlays = argv[j + 1]; argv = argv[:j] + argv[j + 2:]
+        assembly = next(a for a in argv if not a.startswith('--'))
+        pairs = rows_for(assembly)
+        results = [(row,) + classify(row, hit) + (hit,) for row, hit in pairs]
+        rel = release_json(assembly, results, overlays)
+        if rel['state'] != 'cut' and '--draft' not in argv:
+            print('release-cut: refused, %d rows are not reproducible or downloadable (use --draft to write a draft):'
+                  % len(rel['refusals']), file=sys.stderr)
+            for r in rel['refusals']:
+                print('  ' + r, file=sys.stderr)
+            return 1
+        Path(out_path).write_text(json.dumps(rel, indent=1) + '\n')
+        print('release-cut: wrote %s (%s; %d downloads, %d assets, %d refusals)' % (
+            out_path, rel['state'], len(rel['downloads']), len(rel['assets']), len(rel['refusals'])))
+        return 0
     if '--dry-run' not in argv or len([a for a in argv if not a.startswith('--')]) != 1:
         sys.exit(__doc__)
     assembly = next(a for a in argv if not a.startswith('--'))

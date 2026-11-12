@@ -32,10 +32,28 @@ Not done yet:
 - **The host matrix:** which steps work on macOS 12, 13 and 14 and later, on Intel and Apple silicon.
 - **Real URLs and hashes:** `release cut` writes them (step 13).
 
+## Host matrix
+
+```sh
+python3.14 -I tools/acquire/host-check [--json] [--need-gb N]
+```
+
+`host-check` lists each builder step and whether this Mac can run it, naming what is missing:
+
+- download and verify;
+- unpack the installers;
+- decode the macOS 27 IPSW (`aea` on macOS 13 and later, or the pinned `ipsw`);
+- edit and sign files;
+- rebuild Metal libraries (Xcode's Metal toolchain, or the bundled LLVM via `HAO_LLVM_BUNDLE`);
+- Rosetta on Apple silicon;
+- write the USB stick (root).
+
+Running it on each host the release supports gives the plan's host matrix.
+
 ## Verify
 
 ```sh
-python3.14 -I -B -m unittest discover -s tools/acquire/tests
+python3.14 -I -B -m unittest discover -s tools/acquire/tests      # includes host-check on synthetic hosts
 ```
 
 The tests serve files from a local HTTP server and never touch the network. They cover a fetch, then reuse
