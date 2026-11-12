@@ -26,6 +26,7 @@ boot the image in [QEMU](../../tools/qemu-vm/README.md) before installing it on 
 hao-runtime and do not replace image boot and application checks.
 
 ## Validation
+Laptop 2026-11-12, image d131d5b (26B131): hao d9ea9bd runs the image's ARM programs to a logged-in desktop; the 1-byte Swift enum that aborted Weather.app on 7d0b612 (hao 4e68804) now passes. Not working: Weather.app aborts at the Swift value boundary on `Optional<(Bool) -> ()>`.
 Laptop 2026-11-11, image 4d1c48c (26B131): the 7415a0b payload (r59) runs the image's ARM programs; hao 790720d (this revision's payload) swapped live fixes rapportd's and Control Center's crash loops, and its AOT caches load. Not yet exercised: the u3 units' Weather/Photos cases.
 Earlier: earlier payloads booted Golden Gate through translated launchd to the desktop, and a Golden
 Gate-first image reached SSH; the current profile needs a fresh image and application pass.

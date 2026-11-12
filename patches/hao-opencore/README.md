@@ -89,6 +89,7 @@ must still die with VM guard flavor 13 (status 137), which shows the fix leaves 
 has a 15-second alarm. Finally load a website in Safari and scroll, navigate and reload.
 
 ## Validation
+Laptop 2026-11-12, image d131d5b (26B131, dev build): boots with r40 (hao d9ea9bd's HaoExec and stamp_identity.py); image 7d0b612 booted with r39 on 2026-11-11.
 Laptop 2026-11-11, image 4d1c48c (26B131, dev build): boots with r33; r34's HaoExec.kext and stamp_identity.py are byte-identical to r33's.
 r35 writes the same config.plist as r34 in a dev build (host test and a direct comparison of the two scripts), so
 the result above stands for dev builds. A non-dev build (`mbp92-26B131.json`, without the two statistics
