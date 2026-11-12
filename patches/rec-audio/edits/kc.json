@@ -1,0 +1,33 @@
+{
+ "format": 1,
+ "path": "System/Library/KernelCollections/BaseSystemKernelExtensions.kc",
+ "origin": {
+  "kind": "tahoe",
+  "name": "BaseSystemKernelExtensions.kc",
+  "note": "the Recovery's own kernel collection, rebuilt around all recovery patches' kexts.txt by pipeline/stages/recovery.sh"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "link-audio",
+   "kind": "op",
+   "op": "kc.link",
+   "args": {
+    "tool": "kmutil",
+    "kexts": "kexts.txt",
+    "bundles": [
+     "com.apple.iokit.IOAudioFamily",
+     "com.apple.iokit.IOHDAFamily",
+     "com.apple.driver.AppleHDAController",
+     "com.apple.driver.DspFuncLib",
+     "com.apple.driver.AppleHDA",
+     "com.apple.driver.AppleHDAHardwareConfigDriver",
+     "com.apple.driver.AppleMikeyDriver",
+     "com.apple.driver.AppleGFXHDA"
+    ]
+   },
+   "reason": "puts the HDA chain (IOAudioFamily, IOHDAFamily, AppleHDAController, DspFuncLib, AppleHDA, AppleHDAHardwareConfigDriver, AppleMikeyDriver, AppleGFXHDA) in the Recovery kernel collection, so speakers, headphones and HDMI/DisplayPort audio work"
+  }
+ ],
+ "sign": null
+}

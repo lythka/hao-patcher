@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""hao: user commands of the hao builder (workflow plan step 9a and on).
+
+  hao patch OVERLAY... --root ROOT [--state DIR] [--installer] [--dry-run] [--quiet | --show | --log json]
+        apply pack overlays to ROOT: only files whose sha256 differs are written, each checked before and
+        after; replaced files are backed up and new ones recorded, so --revert undoes both. Without
+        --installer, packs whose phase is "installer" are not applied and are listed as needing Recovery.
+  hao patch --revert --root ROOT [--state DIR] [--id ID]      undo the newest (or the named) patch
+  hao patch --list [--state DIR]                              applied and reverted patches
+  hao explain [NAME | PATH]                                   what a declared file comes from and every edit
+  hao inspect STORE PATH                                      original and patched files side by side
+
+--state defaults to ROOT/private/var/db/hao. The live system backend (snapshot + bless) is not proven yet, so
+ROOT is a folder (a fixture, or a volume mounted read-write by the operator).
+"""
+import argparse
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
+sys.path.insert(0, str(HERE / 'src'))
+import livepatch as LP   # noqa: E402
+
+
+def printer(level):
+    def emit(ev):
+        k = ev['ev']
+        if level == 'json':
+            print(json.dumps(ev), flush=True)
+            return
+        if level == 'quiet' and k not in ('done', 'reverted'):
+            return
+        if k == 'plan':
+            print('%d to write, %d already current' % (ev['write'], ev['same']))
+            if ev['needs_recovery']:
+                print('needs Recovery (installer-only packs, not applied live): %s' % ', '.join(ev['needs_recovery']))
+        elif k == 'file.write':
+            print('  %-6s %-22s %s' % ('new' if ev['new'] else 'write', ev['pack'], ev['path']))
+            if level == 'show':
+                print('         %s -> %s' % ((ev['old_sha256'] or 'none')[:16], ev['sha256'][:16]))
+        elif k == 'file.revert':
+            print('  %-6s %s' % ('remove' if ev['removed'] else 'restore', ev['path']))
+        elif k == 'done':
+            print('applied %s: %d written, %d unchanged%s' % (ev['id'], ev['written'], ev['same'],
+                                                             ', snapshot ' + ev['snapshot'] if ev['snapshot'] else ''))
+            print('undo: hao patch --revert --root ROOT --id %s' % ev['id'])
+        elif k == 'reverted':
+            print('reverted %s: %d files' % (ev['id'], ev['files']))
+    return emit
+
+
+def cmd_patch(a):
+    root = Path(a.root) if a.root else None
+    state = Path(a.state) if a.state else (root / 'private/var/db/hao' if root else None)
+    level = 'json' if a.log == 'json' else 'quiet' if a.quiet else 'show' if a.show else 'steps'
+    try:
+        if a.list:
+            for r in LP.records(state):
+                print('%-22s %-9s %3d files  packs %s' % (r['id'], r['state'], len(r['files']), ', '.join(r['packs'])))
+            return 0
+        if root is None:
+            print('hao: --root is required', file=sys.stderr)
+            return 2
+        if a.revert:
+            LP.revert(root, state, patch_id=a.id, on_event=printer(level))
+            return 0
+        overlays = [LP.load_overlay(o) for o in a.overlays]
+        if a.dry_run:
+            p = LP.plan(overlays, root, 'installer' if a.installer else 'live')
+            printer(level)({'ev': 'plan', 'write': len(p['write']), 'same': len(p['same']),
+                            'needs_recovery': p['needs_recovery']})
+            for row in p['write']:
+                print('  %-6s %-22s %s' % ('new' if row['old_sha256'] is None else 'write', row['pack'], row['path']))
+            return 0
+        LP.apply(overlays, root, state, mode='installer' if a.installer else 'live', on_event=printer(level))
+        return 0
+    except LP.PatchError as x:
+        print('hao patch: %s' % x, file=sys.stderr)
+        return 1
+
+
+def main():
+    p = argparse.ArgumentParser(prog='hao', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest='action', required=True)
+    q = sub.add_parser('patch')
+    q.add_argument('overlays', nargs='*')
+    q.add_argument('--root'); q.add_argument('--state'); q.add_argument('--id')
+    q.add_argument('--installer', action='store_true'); q.add_argument('--dry-run', action='store_true')
+    q.add_argument('--revert', action='store_true'); q.add_argument('--list', action='store_true')
+    g = q.add_mutually_exclusive_group()
+    g.add_argument('--quiet', action='store_true'); g.add_argument('--show', action='store_true')
+    g.add_argument('--log', choices=['json'])
+    q.set_defaults(fn=cmd_patch)
+    q = sub.add_parser('explain'); q.add_argument('what', nargs='?')
+    q.set_defaults(fn=lambda a: subprocess.call([sys.executable, '-I', str(REPO / 'pipeline/patches.py'), 'explain']
+                                                + ([a.what] if a.what else [])))
+    q = sub.add_parser('inspect'); q.add_argument('store'); q.add_argument('path')
+    q.set_defaults(fn=lambda a: subprocess.call([sys.executable, '-I', str(REPO / 'tools/edit-engine/edit-engine'),
+                                                 'inspect', a.store, a.path]))
+    a = p.parse_args()
+    return a.fn(a)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

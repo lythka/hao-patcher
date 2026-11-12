@@ -37,6 +37,8 @@ x86_64 and signs them ad hoc, and builds `ssdpush-agent` with `tools/ssdpush/bui
 | `usr/local/ssdtools/startup-internal` | `src/startup-internal` |
 | `usr/local/ssdtools/bin/ssdpush-agent` | `tools/ssdpush/agent.c` with zstd 1.5.7 (BSD/GPLv2 dual license) |
 
+The installed files are declared in `patch.json` `files` as whole files (nothing is byte-edited), with paths in the Recovery BaseSystem root: the first is the replaced InstallAssistant, whose path `apply.sh` reads from `Utilities.plist` (declared as 25G332's `Install macOS Tahoe.app/Contents/MacOS/InstallAssistant`); `tests/test_files.py` checks them against `apply.sh` and `make.sh`.
+
 ## The USB disk
 Any FAT32, exFAT, APFS or HFS+ volume with a bundle folder at its top level (`/Volumes/<USB>/<bundle>/IMAGE`).
 Write one from an image repository:
@@ -62,6 +64,7 @@ A bundle holds `IMAGE` (key=value metadata and hashes), `index.bin` (64 bytes pe
   into a file in RAM with verify and delta passes, checks that the USB disk is refused, and prints the `bootguard`
   state and `efi-boot-device`.
 - Full test: Reinstall macOS with a real bundle; the internal disk boots the image to Setup Assistant.
+- Host: `python3.14 -I -B -m unittest discover -s patches/rec-reinstall/tests` checks the declared files against `apply.sh`.
 
 ## Safety
 Reinstall erases the internal disk the user picks and confirms. Only internal fixed whole disks are offered, the disk
@@ -75,4 +78,5 @@ NEEDS VALIDATION: `test.sh` passes on the build Mac and `apply.sh` finds and rep
 Reinstall from the Recovery menu on a MacBookPro9,2 has not been run.
 
 ## Revisions
+- r4 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is unchanged.
 - r3 2026-11-10 Initial public release.

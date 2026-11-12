@@ -1,0 +1,20 @@
+{
+ "format": 1,
+ "description": "Intel HD 4000 (Ivy Bridge): OCLP Ivy Bridge kexts and our driver fixes.",
+ "detect": {
+  "oclp_patchsets": [
+   "Intel Ivy Bridge"
+  ]
+ },
+ "oclp_patchsets": [
+  "Intel Ivy Bridge"
+ ],
+ "phase": "installer",
+ "proven_on": [
+  "MacBookPro9,2"
+ ],
+ "recipes": [
+  "metalold-selectors",
+  "golden-gate-metal-framebuffer"
+ ]
+}

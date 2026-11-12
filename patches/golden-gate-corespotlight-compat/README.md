@@ -29,7 +29,10 @@ ivar. If Apple ships the method, the library does nothing.
 `src/kc-hook.sh` (run after `golden-gate-userspace`) uses `src/add_load_dylib.py` to append
 `LC_LOAD_DYLIB /usr/lib/corespotlight_compat.dylib` to the x86_64 slice of both daemons (other slices unchanged),
 re-signs each ad hoc with its identifier, entitlements and flags (no hardened runtime, so no library validation),
-and installs the dylib.
+and installs the dylib. The two daemon edits (and the installed library) are declared in `edits/corespotlightd.json`,
+`edits/managedcorespotlightd.json` and `patch.json` `files`: one required `LC_LOAD_DYLIB` (timestamp 2, versions
+1.0.0) and an ad-hoc signature with each daemon's own identifier; `tests/test_edits.py` proves the engine writes the
+same bytes as `add_load_dylib.py`. The hook is unchanged.
 
 ## Build
 
@@ -46,6 +49,9 @@ the same build and an offline installer for use outside the image pipeline.
 ```sh
 CORESPOTLIGHT_SYSTEM=/path/to/26A428/SystemRoot \
   python3.14 -I -m unittest discover -s patches/golden-gate-corespotlight-compat/tests
+
+python3.14 -I -B -m unittest discover -s patches/golden-gate-corespotlight-compat/tests
+# CORESPOTLIGHT_CORESPOTLIGHTD / CORESPOTLIGHT_MANAGEDCORESPOTLIGHTD=PATH: edit specs also run on Golden Gate's own daemons
 ```
 
 The getter test runs the dylib under Rosetta on an Apple silicon Mac (whose x86_64 CoreSpotlight lacks the getter
@@ -60,5 +66,6 @@ Earlier: The host getter and donor Mach-O tests pass and the dylib builds with `
 a built image and stable daemons on the MacBookPro9,2 are not yet proven.
 
 ## Revisions
+- r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files; the hook is unchanged. Keeps r4's validation: what it installs is unchanged (validated_digest).
 - r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact serves it unchanged.
 - r3 2026-11-10 Initial public release.

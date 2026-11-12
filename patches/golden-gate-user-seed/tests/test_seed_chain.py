@@ -33,7 +33,7 @@ class SeedChainTest(unittest.TestCase):
         for name, text in SHIMS.items():
             (shims / name).write_text(text)
             (shims / name).chmod(0o755)
-        self.env = dict(os.environ, PATH='%s:%s' % (shims, os.environ['PATH']))
+        self.env = dict(os.environ, PATH='%s:%s' % (shims, os.environ.get('PATH', '/usr/bin:/bin:/usr/sbin:/sbin')))
 
     def tearDown(self):
         self.tmp.cleanup()

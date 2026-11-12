@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""edit-engine: apply, check and explain declared file edits (patches/NAME/edits/*.json).
+
+  edit-engine apply SPEC IN OUT [--record FILE] [--sign] [--quiet | --show-edits | --log json]
+        apply SPEC's edits to IN and write OUT (IN is never changed). Default output: one line per edit;
+        --show-edits adds bytes, instructions and reasons; --log json prints one JSON event per line.
+        --sign re-signs OUT ad hoc as the spec says (macOS only). --record writes the full record as JSON.
+        --store DIR keeps the original, the result and the record in an artifact store and reuses a stored
+        result when the spec, the input and the engine are unchanged and the stored output still hashes right.
+  edit-engine inspect STORE PATH    the original and patched files side by side: where they are, their sha256,
+                                    the changed byte ranges and the explanation
+  edit-engine check SPEC ...        validate specs; one line per problem, exit 1 if any
+  edit-engine explain SPEC ...      what each spec changes and why
+
+Exit status: 0 applied, 1 refused (the message names the edit), 2 usage.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE / 'src'))
+import engine   # noqa: E402
+import spec as S   # noqa: E402
+import store as ST   # noqa: E402
+
+REPO = HERE.parents[1]
+
+
+def printer(level):
+    def emit(ev):
+        kind = ev['ev']
+        if level == 'json':
+            print(json.dumps(ev, sort_keys=False), flush=True)
+            return
+        if level == 'quiet':
+            if kind == 'edit.fail':
+                print('%s  FAILED  %s' % (ev['id'], ev['error']), file=sys.stderr)
+            return
+        if kind == 'file.start':
+            print('%s\n  origin   %s   sha256 %s' % (ev['path'], S.origin_text(ev['origin']), ev['input_sha256'][:12]))
+        elif kind == 'edit.apply':
+            tag = 'edit %d/%d' % (ev['n'], ev['of'])
+            found = 'found %d of %d' % (ev['found'], ev.get('count', ev['found']))
+            what = ev['op'] if ev.get('op') else ev['kind']
+            place = ', '.join(ev['where'][:2]) + (' …' if len(ev['where']) > 2 else '')
+            print('  %-9s %-26s %-16s %-44s %s  ok' % (tag, ev['id'], what, place, found))
+            if level == 'edits':
+                for site in ev['sites']:
+                    if len(site['before']) <= 64:
+                        print('            at     %s' % site['at'])
+                        print('            bytes  %s' % S.spaced(bytes.fromhex(site['before'])))
+                        print('               ->  %s' % S.spaced(bytes.fromhex(site['after'])))
+                    else:
+                        print('            at     %s  (%d bytes written)' % (site['at'], len(site['after']) // 2))
+                if ev.get('asm'):
+                    print('            asm    %s  ->  %s' % (ev['asm']['before'], ev['asm']['after']))
+                print('            why    %s' % ev['reason'])
+        elif kind == 'edit.fail':
+            print('  edit %d/%d %-28s FAILED  %s' % (ev['n'], ev['of'], ev['id'], ev['error']))
+        elif kind == 'file.reused':
+            print('  reused   sha256 %s  stored result, %d edits not re-run' % (ev['output_sha256'][:12], ev['edits']))
+        elif kind == 'file.end':
+            note = {'match': 'matches the recorded output', 'differs': 'NOTE: differs from the recorded output',
+                    'unknown-input': 'input not recorded before'}[ev['expected']]
+            print('  result   sha256 %s  %s' % (ev['output_sha256'][:12], note))
+    return emit
+
+
+def cmd_apply(a):
+    spec = S.load(a.spec)
+    level = 'json' if a.log == 'json' else 'quiet' if a.quiet else 'edits' if a.show_edits else 'steps'
+    data = Path(a.input).read_bytes()
+    try:
+        if a.store:
+            out, record = engine.apply_stored(spec, data, ST.Store(a.store), repo=str(REPO), on_event=printer(level))
+        else:
+            out, record = engine.apply(spec, data, repo=str(REPO), on_event=printer(level))
+    except engine.EditError as x:
+        print('edit-engine: refused: %s' % x, file=sys.stderr)
+        return 1
+    tmp = a.output + '.edit-engine'
+    with open(tmp, 'wb') as f:
+        f.write(out)
+    os.chmod(tmp, os.stat(a.input).st_mode & 0o7777)
+    os.replace(tmp, a.output)
+    if a.sign and spec.get('sign'):
+        if sys.platform != 'darwin':
+            print('edit-engine: --sign needs macOS codesign', file=sys.stderr)
+            return 1
+        existing = None
+        if 'identifier' in spec['sign'].get('preserve', []):
+            shown = subprocess.run(['codesign', '-dv', a.input], capture_output=True, text=True)
+            existing = next((l.split('=', 1)[1] for l in shown.stderr.splitlines() if l.startswith('Identifier=')), None)
+        args = S.codesign_args(spec['sign'], existing)
+        subprocess.run(args + [a.output], check=True, capture_output=True)
+        record['signed'] = args
+        if level in ('steps', 'edits'):
+            print('  sign     %s  ok' % ' '.join(args[4:]) if len(args) > 4 else '  sign     ad hoc  ok')
+    if a.record:
+        Path(a.record).write_text(json.dumps(record, indent=1) + '\n')
+    return 0
+
+
+def cmd_inspect(a):
+    folder = Path(a.store) / 'view' / a.path.lstrip('/')
+    if not (folder / 'record.json').is_file():
+        print('edit-engine: nothing stored for %s in %s' % (a.path, a.store), file=sys.stderr)
+        return 1
+    record = json.loads((folder / 'record.json').read_text())
+    original, patched = (folder / 'original').read_bytes(), (folder / 'patched').read_bytes()
+    ranges = ST.changed_ranges(original, patched)
+    print('%s\n  original  %s  sha256 %s  %d bytes' % (record['path'], folder / 'original', record['input_sha256'],
+                                                     len(original)))
+    print('  patched   %s  sha256 %s  %d bytes' % (folder / 'patched', record['output_sha256'], len(patched)))
+    print('  changed   %d range%s, %d bytes' % (len(ranges), '' if len(ranges) == 1 else 's',
+                                               sum(e - s for s, e in ranges)))
+    for start, end in ranges[:a.limit]:
+        before, after = original[start:min(end, start + 16)], patched[start:min(end, start + 16)]
+        more = ' …' if end - start > 16 else ''
+        print('    %#010x  %4d  %s%s  ->  %s%s' % (start, end - start, S.spaced(before), more, S.spaced(after), more))
+    if len(ranges) > a.limit:
+        print('    … %d more (--limit)' % (len(ranges) - a.limit))
+    print((folder / 'explain.txt').read_text().rstrip())
+    return 0
+
+
+def cmd_check(a):
+    bad = 0
+    for path in a.specs:
+        try:
+            problems = S.validate(S.load(path))
+        except (OSError, ValueError) as x:
+            problems = [str(x)]
+        for p in problems:
+            print('%s: %s' % (path, p))
+        bad += len(problems)
+    if not bad:
+        print('edit-engine: %d spec%s follow format %d' % (len(a.specs), '' if len(a.specs) == 1 else 's', S.FORMAT))
+    return 1 if bad else 0
+
+
+def cmd_explain(a):
+    for i, path in enumerate(a.specs):
+        spec = S.load(path)
+        problems = S.validate(spec)
+        if problems:
+            print('%s: %s' % (path, '; '.join(problems)), file=sys.stderr)
+            return 1
+        print(('\n' if i else '') + '\n'.join(S.describe(spec)))
+    return 0
+
+
+def main():
+    p = argparse.ArgumentParser(prog='edit-engine', description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest='action', required=True)
+    q = sub.add_parser('apply')
+    q.add_argument('spec'); q.add_argument('input'); q.add_argument('output')
+    q.add_argument('--record'); q.add_argument('--sign', action='store_true'); q.add_argument('--store')
+    g = q.add_mutually_exclusive_group()
+    g.add_argument('--quiet', action='store_true'); g.add_argument('--show-edits', action='store_true')
+    g.add_argument('--log', choices=['json'])
+    q.set_defaults(fn=cmd_apply)
+    q = sub.add_parser('inspect')
+    q.add_argument('store'); q.add_argument('path'); q.add_argument('--limit', type=int, default=20)
+    q.set_defaults(fn=cmd_inspect)
+    for name, fn in (('check', cmd_check), ('explain', cmd_explain)):
+        q = sub.add_parser(name)
+        q.add_argument('specs', nargs='+')
+        q.set_defaults(fn=fn)
+    a = p.parse_args()
+    return a.fn(a)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

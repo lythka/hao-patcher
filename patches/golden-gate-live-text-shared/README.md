@@ -30,6 +30,12 @@ unless: the System's `libhelloblur` is the one the artifact was made from (row `
 `libhaoMetalCompilerCompat.dylib` is installed, the runtime folder holds exactly its manifest's files, and
 `/usr/lib/hao-live-text` does not exist. Then it copies the runtime (root:wheel) and replaces `libhelloblur`.
 
+The files this adds to the System are declared in `patch.json` `files`: the runtime's files (origin: row
+`live_text_framework`) and `usr/lib/libhelloblur.dylib`, whose one added load command (`LC_LOAD_DYLIB`, timestamp 0,
+then an ad-hoc signature with identifier `local.libhelloblur`) is `edits/libhelloblur.json`. `tests/test_edits.py`
+proves the spec writes the same bytes as `tools/live-text/lib/framework.py`. Ownership and flags
+(root:wheel, `restricted` on libhelloblur) are set by `src/install.py` and are not part of the spec.
+
 ## Input
 
 Row `live_text_framework` is `framework/` of a `tools/live-text build` (26B131:
@@ -41,6 +47,10 @@ Row `live_text_framework` is `framework/` of a `tools/live-text build` (26B131:
 python3.14 -I -B -m unittest discover -s patches/golden-gate-live-text-shared/tests
 python3.14 -I -B -m unittest discover -s tools/live-text/tests
 ```
+
+`tests/test_edits.py` also runs on the real files: `LIVE_TEXT_SHARED_INPUT` (libhelloblur.dylib) and
+`LIVE_TEXT_SHARED_FRAMEWORK` (the row's `framework/` folder).
+
 
 On the laptop (with `golden-gate-live-text-service` in the image):
 
@@ -65,5 +75,6 @@ Photos' Live Text was never seen working. Not yet built into an image or booted 
 
 ## Revisions
 
+- r3 2026-11-12 Declare the runtime files and the libhelloblur load command in edits/libhelloblur.json; the hook is unchanged.
 - r2 2026-11-11 Runtime in System (/usr/lib/hao-live-text, umbrella LiveText.dylib: the load command must fit libhelloblur's 64-byte header padding) instead of a Data-volume alias; built for 26B131 by tools/live-text (MPSNDArray repaired from 26B131's library, no matrix helper); refuses another MPSNDArray library or a missing compiler-service repair; selected by dev-bs-test.
 - r1 2026-11-09 Add unselected shared-framework OCR image recipe without modifying Photos or Metal.

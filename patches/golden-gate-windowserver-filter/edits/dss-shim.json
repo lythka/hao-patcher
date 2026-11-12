@@ -1,0 +1,30 @@
+{
+ "format": 1,
+ "path": "usr/lib/dss_shim.dylib",
+ "arch": "x86_64",
+ "origin": {
+  "kind": "hao",
+  "row": "display_state_shim",
+  "note": "the display-state shim golden-gate-userspace installs (input row of that recipe; tools/display-fixes builds it)"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "load-windowserver-filter",
+   "kind": "op",
+   "op": "macho.add-dylib",
+   "args": {
+    "path": "/usr/lib/windowserver_filter.dylib",
+    "weak": false,
+    "timestamp": 2,
+    "current_version": 65536,
+    "compat_version": 65536
+   },
+   "reason": "WindowServer's launcher has no free load-command room, so the display-state shim it already loads depends on the filter adapter library; a required load, so the adapters (Siri filter inversion, backdrop clipping) come up with the display-state shim"
+  }
+ ],
+ "sign": {"mode": "adhoc", "preserve": ["identifier", "entitlements", "flags", "runtime"]},
+ "expect": {
+  "187c53cd08ac6ab27ece99fb1fdd8d154e7153b5d85f7e0dffdc0ba876c8d636": "4aaff013f45156a37e3408ae5f2d7f44a3deeebf587af8fc227274db37d2e719"
+ }
+}

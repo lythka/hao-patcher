@@ -1,0 +1,28 @@
+{
+ "format": 1,
+ "description": "Legacy Metal (MTLCompiler 3802): OCLP Metal, GVA and OpenCL, our Metal library repairs, hello, the compiler compatibility layer and Live Text.",
+ "detect": {
+  "oclp_patchsets": [
+   "Metal 3802 Common"
+  ]
+ },
+ "oclp_patchsets": [
+  "Metal 3802 Common",
+  "Metal 3802 .metallibs Tahoe",
+  "Big Sur GVA",
+  "Monterey OpenCL",
+  "Big Sur OpenCL",
+  "Tahoe Graphics"
+ ],
+ "phase": "live-capable",
+ "proven_on": [
+  "MacBookPro9,2"
+ ],
+ "recipes": [
+  "golden-gate-metal-libraries",
+  "golden-gate-hello",
+  "metal-compiler-compat",
+  "golden-gate-live-text-shared",
+  "golden-gate-live-text-service"
+ ]
+}

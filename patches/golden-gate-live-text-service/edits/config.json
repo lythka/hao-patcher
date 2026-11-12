@@ -1,0 +1,30 @@
+{
+ "format": 1,
+ "path": "EFI/OC/config.plist",
+ "origin": {
+  "kind": "oclp",
+  "name": "OCLP's OpenCore config.plist for MacBookPro9,2, after hao-opencore",
+  "note": "in the image's EFI partition, not in the System volume; OCLP 3.0.0 writes NVRAM revblock=media (disable_mediaanalysisd), its NVRAM/Delete already lists revblock, and hao-opencore never sets a revblock boot argument"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "revblock-without-media",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {
+    "key": [
+     "NVRAM",
+     "Add",
+     "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",
+     "revblock"
+    ],
+    "value": "none"
+   },
+   "reason": "RestrictEvents stops refusing to start mediaanalysisd, so Photos' Live Text gets an answer; media was the only token, so none says nothing is blocked"
+  }
+ ],
+ "expect": {
+  "5eb4c243d3f271029c59e35dfc02f985e34b8a04a593d4b86f565dd1eb920ad1": "40cc9f971d1cd995d7bf589f0e44d84ffd436454ac19e40713941c7986d411fa"
+ }
+}

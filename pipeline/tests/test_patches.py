@@ -154,10 +154,57 @@ class Repo(unittest.TestCase):
             self.assertIn('\n- r%d ' % p['revision'], '\n' + rev, d.name)
 
 
+    def test_catalog_is_current(self):
+        # docs/PATCHES.md is generated; regenerate with `python3.14 -I pipeline/patches.py catalog`
+        import patches
+        self.assertEqual((TOP / 'docs/PATCHES.md').read_text(), patches.catalog(), 'docs/PATCHES.md is stale')
+
     def test_tracker_is_current(self):
         # patches/TRACKER.md is generated; regenerate with `python3 -I pipeline/patches.py tracker`
         import patches
         self.assertEqual((TOP / 'patches/TRACKER.md').read_text(), patches.tracker(), 'patches/TRACKER.md is stale')
+
+
+class Packs(unittest.TestCase):
+    """packs/*.json: detection from the target, plan filtering, and the 9,2 plan unchanged under --packs auto."""
+    DEFS = {'base': {'format': 1, 'detect': {'any_intel': True}, 'phase': 'installer', 'recipes': ['a']},
+            'gpu': {'format': 1, 'detect': {'oclp_patchsets': ['Intel Ivy Bridge']}, 'phase': 'installer',
+                    'recipes': ['b']},
+            'other': {'format': 1, 'detect': {'board_ids': ['Mac-0000']}, 'phase': 'live-capable', 'recipes': ['c']}}
+
+    def test_detection_for_the_real_target(self):
+        got = patches.detect_packs(TOP / 'pipeline/targets/mbp92.json', self.DEFS)
+        self.assertEqual(sorted(got), ['base', 'gpu'])
+
+    def test_plan_filters_unselected_packs(self):
+        d = Path(tempfile.mkdtemp())
+        for n in 'abcd':
+            (d / n).mkdir(); (d / n / 'patch.json').write_text(json.dumps({'revision': 1, 'stage': 'post', 'applies': 'any'}))
+        s = d / 'set.txt'; s.write_text('a\nb\nc\nd\n')
+        t = d / 't.json'; t.write_text(json.dumps({'model': 'MacBookPro9,2'}))
+        run = lambda packs: [n for _, n, _ in patches.plan(s, t, '25G342', root=d, packs=packs, pack_defs=self.DEFS)]
+        self.assertEqual(run(None), ['a', 'b', 'c', 'd'])
+        self.assertEqual(run(['base', 'gpu']), ['a', 'b', 'd'])      # d is in no pack: applies as before
+
+    def test_pack_rules(self):
+        bad = patches.pack_problems({'x': {'format': 1, 'detect': {}, 'phase': 'sometimes', 'recipes': ['nope']},
+                                     'y': {'format': 1, 'detect': {'any_intel': True}, 'phase': 'installer',
+                                           'recipes': ['hao-runtime']},
+                                     'z': {'format': 1, 'detect': {'any_intel': True}, 'phase': 'installer',
+                                           'recipes': ['hao-runtime']}})
+        got = '\n'.join(bad)
+        for want in ('x.json: needs format 1 and phase', 'x.json: detect is one of', 'x.json: no recipe nope',
+                     'z.json: hao-runtime is already in pack y'):
+            self.assertIn(want, got)
+
+    def test_mbp92_plan_is_unchanged_with_detected_packs(self):
+        target = TOP / 'pipeline/targets/mbp92.json'
+        for s in ('golden-gate-26B131', 'golden-gate'):
+            setfile = TOP / 'pipeline/sets' / (s + '.txt')
+            for build in ('25G332', '25G342'):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(patches.plan(setfile, target, build),
+                                     patches.plan(setfile, target, build, packs=patches.detect_packs(target)), s)
 
 
 class Format(unittest.TestCase):
@@ -199,6 +246,73 @@ class Format(unittest.TestCase):
         self.assertNotIn('opt:', got); self.assertNotIn('cons:', got)
         self.assertIn('badgroup: optional must be a group name', got)
         self.assertIn('loose: needs_any without optional', got)
+
+    def edits(self, name, spec_name, spec):
+        d = self.d / 'patches' / name / 'edits'; d.mkdir(exist_ok=True)
+        (d / spec_name).write_text(json.dumps(spec))
+
+    SPEC = {'format': 1, 'path': 'usr/lib/libx.dylib', 'origin': {'kind': 'apple'},
+            'edits': [{'id': 'e', 'kind': 'literal', 'at': 16, 'find': '01', 'replace': '00', 'reason': 'why'}]}
+
+    def test_declared_files(self):
+        self.patch('good', inputs=['row_a'], files=[{'path': 'usr/lib/libx.dylib', 'edits': 'edits/x.json'},
+                                                    {'path': 'usr/lib/new', 'origin': {'kind': 'hao', 'row': 'row_a'}}])
+        self.edits('good', 'x.json', self.SPEC)
+        self.assertEqual(self.check(), [])
+        self.assertIn('1. e  literal at 0x10', patches.explain('libx.dylib', root=self.d / 'patches'))
+        self.assertIn('origin   hao (row row_a)', patches.explain('good', root=self.d / 'patches'))
+
+    def test_tree_and_install(self):
+        self.patch('t', files=[{'path': 'usr/lib/hao', 'origin': {'kind': 'hao'}, 'tree': True,
+                                'install': {'mode': '0755', 'owner': 'root:wheel', 'flags': ['restricted']}}])
+        self.patch('badtree', files=[{'path': 'a', 'origin': {'kind': 'hao'}, 'tree': 'yes'}])
+        self.patch('badinst', files=[{'path': 'a', 'origin': {'kind': 'hao'}, 'install': {'mode': 'rwx'}}])
+        got = '\n'.join(self.check())
+        self.assertFalse([l for l in got.splitlines() if l.startswith('t: ')])
+        self.assertIn('badtree: files: a: "tree": true goes with an origin', got)
+        self.assertIn('badinst: files: a: install is', got)
+        self.assertIn('every file under it from hao', patches.explain('t', root=self.d / 'patches'))
+
+    def test_declared_file_rules(self):
+        self.patch('both', files=[{'path': 'a', 'edits': 'edits/a.json', 'origin': {'kind': 'hao'}}])
+        self.patch('abs', files=[{'path': '/abs', 'origin': {'kind': 'hao'}}])
+        self.patch('norow', files=[{'path': 'a', 'origin': {'kind': 'hao', 'row': 'missing'}}])
+        self.patch('kind', files=[{'path': 'a', 'origin': {'kind': 'mystery'}}])
+        self.patch('otherpath', files=[{'path': 'usr/lib/other', 'edits': 'edits/x.json'}])
+        self.edits('otherpath', 'x.json', self.SPEC)
+        self.patch('badspec', files=[{'path': 'usr/lib/libx.dylib', 'edits': 'edits/x.json'}])
+        self.edits('badspec', 'x.json', dict(self.SPEC, edits=[dict(self.SPEC['edits'][0], reason='')]))
+        self.patch('stray')
+        self.edits('stray', 'loose.json', self.SPEC)
+        got = '\n'.join(self.check())
+        for want in ('both: files: each entry is', 'abs: files: path must be relative', 'norow: files: a: origin row missing',
+                     'kind: files: a: origin is', 'otherpath: edits/x.json: names usr/lib/libx.dylib',
+                     'badspec: edits/x.json: e: reason is required', 'stray: edits/loose.json is not declared'):
+            self.assertIn(want, got)
+
+    def test_validated_revision_keeps_proof_only_while_installed_bytes_are_unchanged(self):
+        self.patch('kept', revision=3)
+        d = self.d / 'patches' / 'kept'
+        (d / 'README.md').write_text(self.README.replace('- r1 ', '- r3 ') % 'In use.')
+        (d / 'src').mkdir(); (d / 'src' / 'kc-hook.sh').write_text('#!/bin/sh\ntrue\n')
+        digest = patches.recipe_digest('kept', root=self.d / 'patches')
+        pj = json.loads((d / 'patch.json').read_text())
+        (d / 'patch.json').write_text(json.dumps(dict(pj, validated_revision=2, validated_digest=digest)))
+        self.assertEqual(self.check(), [])
+        (d / 'edits').mkdir(); (d / 'tests').mkdir(); (d / 'tests' / 't.py').write_text('# declaration only\n')
+        self.assertEqual(patches.recipe_digest('kept', root=self.d / 'patches'), digest)
+        (d / 'src' / 'kc-hook.sh').write_text('#!/bin/sh\nfalse\n')
+        self.assertIn('kept: validated at r2, but what it installs changed since', '\n'.join(self.check()))
+
+    def test_validated_revision_rules(self):
+        self.patch('alone', validated_revision=1)
+        self.patch('same', revision=1, validated_revision=1, validated_digest='0' * 64)
+        self.patch('unproven', revision=2, validated=False, validated_revision=1, validated_digest='0' * 64,
+                   validation='NEEDS VALIDATION.')
+        got = '\n'.join(self.check())
+        for want in ('alone: validated_revision and validated_digest go together',
+                     'same: validated_revision must be an earlier revision', 'unproven: validated_revision without'):
+            self.assertIn(want, got)
 
     def test_repo_patches_follow_the_format(self):
         self.assertEqual(patches.check(), [])

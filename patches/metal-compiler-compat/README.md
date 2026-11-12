@@ -19,6 +19,10 @@ written for and stays inactive otherwise.
 `src/install.py`, which refuses unless the System's service executable, `Info.plist` and `CodeResources` are the
 files the artifact was made from, then writes the library and then the executable.
 
+`patch.json` `files` declares the service executable and the library as whole files from the row (the hook edits
+nothing in place). `tests/test_edits.py` checks them against `install.py` and, with real inputs, rebuilds both with
+`tools/live-text` and compares the bytes with the row.
+
 ## Input
 
 Row `metal_compiler_compat` is `compiler-service/` of a `tools/live-text build` (26B131:
@@ -30,6 +34,9 @@ Row `metal_compiler_compat` is `compiler-service/` of a `tools/live-text build` 
 python3.14 -I -B -m unittest discover -s patches/metal-compiler-compat/tests
 python3.14 -I -B -m unittest discover -s tools/live-text/tests
 ```
+
+`METAL_COMPILER_COMPAT_ROW`, `METAL_COMPILER_COMPAT_SOURCE` and `METAL_COMPILER_COMPAT_ADAPTER` (see
+`tests/test_edits.py`) add the rebuild-and-compare check.
 
 On the image, the hook log lists the two hashes from `build.json` `files`. On the laptop:
 `vmmap $(pgrep -n MTLCompilerService) | grep libhaoMetalCompilerCompat` once any app has compiled a shader, no
@@ -44,5 +51,6 @@ yet built into an image or booted with 26B131.
 
 ## Revisions
 
+- r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in tests/test_edits.py; the hook is unchanged.
 - r2 2026-11-11 Restored from darwin27-live-text-fixes v0.2.0 into tools/live-text; row metal_compiler_compat for 26B131 (selected by dev-bs-test).
 - r1 2026-11-09 Add an unselected shared compiler-service repair recipe that leaves client applications unchanged.

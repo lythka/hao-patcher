@@ -71,7 +71,10 @@ flag word moved 0x10 bytes (0x540 to 0x550; bits 0 and 2 of its fourth byte keep
 The WindowServer launcher's 48 bytes of load-command padding are already used by `dss_shim.dylib`, so
 `src/kc-hook.sh` adds a dependency on `/usr/lib/windowserver_filter.dylib` to **that dylib**
 (`src/load_shim.py`), re-signs it and installs the filter library. Existing display-state interposition and
-launcher entitlements are preserved. `src/install_dss.py` installs the display-state shim;
+launcher entitlements are preserved. The edit is declared in `edits/dss-shim.json` (one required `LC_LOAD_DYLIB`,
+timestamp 2, versions 1.0.0, then an ad-hoc signature with the shim's own identifier) and the installed library in
+`patch.json` `files`; `tests/test_edits.py` proves the engine writes the same bytes as `load_shim.py`. The hook is
+unchanged. `src/install_dss.py` installs the display-state shim;
 `golden-gate-userspace` uses it through input row `display_install_helper`. Run this patch after `golden-gate-userspace`.
 
 ## Build
@@ -92,6 +95,7 @@ Needs Xcode clang/SDK and codesign. Compiler or linker changes can change the ou
 
 ```sh
 python3.14 -I -m unittest discover -s patches/golden-gate-windowserver-filter/tests
+# WINDOWSERVER_FILTER_DSS_SHIM=PATH (26B131 dss_shim.dylib): the edit spec also runs on the real shim
 ```
 
 The native x86_64 harness reproduces the out-of-bounds read without the adapter at slots 124 and 126, then checks
@@ -115,6 +119,7 @@ checked statically only: no 26B131 image has run it (OPEN). Correct rendering on
 are not yet proven; restart rendering artifacts after a WindowServer crash are outside this patch.
 
 ## Revisions
+- r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json and patch.json files; the hook is unchanged. Keeps r5's validation: what it installs is unchanged (validated_digest).
 - r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A428
   offsets; adds 26B131. r4 was silently inert there (UUID gate), and its slot 124 and flag byte 0x543 would be wrong:
   26B131 QuartzCore calls `actual_inverse_color` at slot 126 and keeps the flags at 0x553. A missing image or

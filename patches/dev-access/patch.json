@@ -1,5 +1,5 @@
 {
- "revision": 3,
+ "revision": 4,
  "stage": "post",
  "applies": "any",
  "inputs": [
@@ -7,5 +7,39 @@
   "test_authorized_key"
  ],
  "status": "dev",
- "validated": true
+ "validated": true,
+ "validated_revision": 3,
+ "validated_digest": "f8a8a5003b368b65afe0585788ca13da8bbc2a5675e393b4f00bc2d81c80dbf9",
+ "files": [
+  {
+   "path": "private/var/root/.testssh/ssh_host_ed25519_key",
+   "origin": {
+    "kind": "hao",
+    "row": "test_host_key",
+    "note": "Data volume; the test host's private key, root:wheel 0600; dev images only"
+   }
+  },
+  {
+   "path": "private/var/root/.testssh/authorized_keys",
+   "origin": {
+    "kind": "hao",
+    "row": "test_authorized_key",
+    "note": "Data volume; the bench host's public key, root:wheel 0600"
+   }
+  },
+  {
+   "path": "private/var/root/.testssh/sshd_config",
+   "origin": {
+    "kind": "hao",
+    "note": "Data volume; src/sshd_config: root by key only, no passwords, UsePAM no; root:wheel 0644"
+   }
+  },
+  {
+   "path": "Library/LaunchDaemons/local.testssh.plist",
+   "origin": {
+    "kind": "hao",
+    "note": "Data volume; src/local.testssh.plist: launchd runs sshd -i per connection on port 22; root:wheel 0644"
+   }
+  }
+ ]
 }

@@ -1,0 +1,17 @@
+{
+ "format": 1,
+ "description": "Broadcom Wi-Fi supported by OCLP Modern Wireless.",
+ "detect": {
+  "oclp_patchsets": [
+   "Modern Wireless Common"
+  ]
+ },
+ "oclp_patchsets": [
+  "Modern Wireless Common"
+ ],
+ "phase": "live-capable",
+ "proven_on": [
+  "MacBookPro9,2"
+ ],
+ "recipes": []
+}

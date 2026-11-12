@@ -1,5 +1,5 @@
 {
- "revision": 1,
+ "revision": 2,
  "stage": "recovery",
  "applies": {
   "models": [
@@ -7,5 +7,57 @@
   ]
  },
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "System/Library/Extensions/AppleHIDKeyboard.kext",
+   "origin": {
+    "kind": "tahoe",
+    "name": "Tahoe AppleHIDKeyboard.kext",
+    "note": "bundle copied whole from the root-patched System by apply.sh (ditto); external keyboards"
+   }
+  },
+  {
+   "path": "System/Library/Extensions/AppleHIDMouse.kext",
+   "origin": {
+    "kind": "tahoe",
+    "name": "Tahoe AppleHIDMouse.kext",
+    "note": "bundle copied whole from the root-patched System by apply.sh (ditto); external mice"
+   }
+  },
+  {
+   "path": "System/Library/Extensions/IOBluetoothHIDDriver.kext",
+   "origin": {
+    "kind": "tahoe",
+    "name": "Tahoe IOBluetoothHIDDriver.kext",
+    "note": "bundle copied whole from the root-patched System by apply.sh (ditto); Bluetooth HID"
+   }
+  },
+  {
+   "path": "System/Library/Extensions/AppleBluetoothMultitouch.kext",
+   "origin": {
+    "kind": "tahoe",
+    "name": "Tahoe AppleBluetoothMultitouch.kext",
+    "note": "bundle copied whole from the root-patched System by apply.sh (ditto); Bluetooth trackpads"
+   }
+  },
+  {
+   "path": "usr/local/ssdtools/btpower",
+   "origin": {
+    "kind": "hao",
+    "note": "built from src/btpower.c by make.sh (x86_64, ad hoc signed with src/bt.entitlements); turns the Bluetooth controller on at boot"
+   }
+  },
+  {
+   "path": "System/Library/LaunchDaemons/local.btpower.plist",
+   "origin": {
+    "kind": "hao",
+    "note": "src/local.btpower.plist: starts btpower once at boot"
+   }
+  },
+  {
+   "path": "System/Library/KernelCollections/BaseSystemKernelExtensions.kc",
+   "edits": "edits/kc.json"
+  }
+ ]
 }

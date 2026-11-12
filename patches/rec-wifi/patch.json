@@ -1,5 +1,5 @@
 {
- "revision": 1,
+ "revision": 2,
  "stage": "recovery",
  "applies": {
   "models": [
@@ -7,5 +7,15 @@
   ]
  },
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "System/Library/PrivateFrameworks/IO80211.framework",
+   "origin": {
+    "kind": "oclp",
+    "name": "Modern Wireless IO80211.framework",
+    "note": "a whole folder: replaces the BaseSystem's copy with the root-patched System's (ditto), which holds OCLP's framework; no byte is edited"
+   }
+  }
+ ]
 }

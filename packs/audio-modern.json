@@ -1,0 +1,17 @@
+{
+ "format": 1,
+ "description": "Audio supported by OCLP Modern Audio.",
+ "detect": {
+  "oclp_patchsets": [
+   "Modern Audio"
+  ]
+ },
+ "oclp_patchsets": [
+  "Modern Audio"
+ ],
+ "phase": "installer",
+ "proven_on": [
+  "MacBookPro9,2"
+ ],
+ "recipes": []
+}

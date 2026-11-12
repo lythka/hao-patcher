@@ -9,34 +9,34 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | Patch | Rev | Stage | Status | Optional | golden-gate-26B131 | golden-gate | recovery | stock | Validation | Newest revision |
 |---|---|---|---|---|---|---|---|---|---|---|
 | darwin27-kernel | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
-| darwin27-sandbox-disk-space | r2 | oclp-hook | experiment |  |  | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
-| dev-access | r3 | post | dev |  |  |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
-| golden-gate-corespotlight-compat | r4 | oclp-hook | experiment |  | x | x |  |  | ok | r4 2026-11-11 Checked against 26B131: the getter is still missing and the ivar unchanged; the 26A428 artifact  |
-| golden-gate-font-registry | r3 | post | experiment | caches | x |  |  |  | ok | r3 2026-11-11 Row `font_registry_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest. No  |
-| golden-gate-hello | r3 | oclp-hook | experiment |  | x | x |  |  | **needs** | r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Rec |
-| golden-gate-icon-caches | r3 | post | experiment | caches | x |  |  |  | ok | r3 2026-11-11 Row `icon_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (668 s |
-| golden-gate-live-text-service | r2 | post | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Checks the runtime in System (/usr/lib/hao-live-text/LiveText.dylib) on the read-only System ins |
-| golden-gate-live-text-shared | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Runtime in System (/usr/lib/hao-live-text, umbrella LiveText.dylib: the load command must fit li |
-| golden-gate-metal-framebuffer | r3 | oclp-hook | experiment |  | x | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
-| golden-gate-metal-libraries | r18 | oclp-hook | experiment |  | x | x |  |  | **needs** | r18 2026-11-12 26B131 artifact from cache/metallib r56: cube and 1D sampler-form reads converted, which change |
-| golden-gate-native-identities | r1 | oclp-hook | experiment |  | x | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
-| golden-gate-shader-caches | r11 | post | experiment | caches | x |  |  |  | **needs** | r11 2026-11-12 Row `shader_caches_golden_gate` (26B131): the same harvest made by cache/seeds r2, without the  |
-| golden-gate-user-seed | r6 | post | experiment | caches | x |  |  |  | **needs** | r6 2026-11-12 seed.zsh never places `com.apple.metalfe`: an older seed's clang module cache (Preview's `.pcm`) |
+| darwin27-sandbox-disk-space | r3 | oclp-hook | experiment |  |  | x |  |  | **needs** | r3 2026-11-12 Declare the system.sb rule in `edits/system-sb.json` (edit-engine text.insert, unless already pr |
+| dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
+| golden-gate-corespotlight-compat | r5 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files |
+| golden-gate-font-registry | r4 | post | experiment | caches | x |  |  |  | ok (r3) | r4 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them f |
+| golden-gate-hello | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the Metal wrapper edits in `edits/metal.json` and the three files in `patch.json` `files |
+| golden-gate-icon-caches | r4 | post | experiment | caches | x |  |  |  | ok (r3) | r4 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them f |
+| golden-gate-live-text-service | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the config edit in edits/config.json; the hook is unchanged. |
+| golden-gate-live-text-shared | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the runtime files and the libhelloblur load command in edits/libhelloblur.json; the hook |
+| golden-gate-metal-framebuffer | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
+| golden-gate-metal-libraries | r19 | oclp-hook | experiment |  | x | x |  |  | **needs** | r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/t |
+| golden-gate-native-identities | r2 | oclp-hook | experiment |  | x | x |  |  | ok (r1) | r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.jso |
+| golden-gate-shader-caches | r12 | post | experiment | caches | x |  |  |  | **needs** | r12 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them  |
+| golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
 | golden-gate-userspace | r58 | oclp-hook | experiment |  | x | x |  |  | ok | r58 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
-| golden-gate-windowserver-filter | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A4 |
+| golden-gate-windowserver-filter | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json a |
 | hao-opencore | r40 | post | experiment |  | x | x |  |  | ok | r40 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | hao-runtime | r65 | oclp-hook | experiment |  | x | x |  |  | ok | r65 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
-| metal-compiler-compat | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Restored from darwin27-live-text-fixes v0.2.0 into tools/live-text; row metal_compiler_compat fo |
-| metalold-selectors | r3 | oclp-hook | product |  | x | x |  |  | ok | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
-| rec-audio | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-bluetooth-input | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-brightness-keys | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-display-ethernet | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-install-volume | r3 | post | product |  |  |  |  |  | **needs** | r3 2026-11-10 Initial public release. |
-| rec-language-list | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-power | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-progress-phase | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-reinstall | r3 | recovery | product |  |  |  | x |  | **needs** | r3 2026-11-10 Initial public release. |
-| rec-startup-guard | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-wifi | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
-| rec-wifi-autojoin | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
+| metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
+| metalold-selectors | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
+| rec-audio | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three kext bundles and the kernel collection link in `patch.json` `files` and `edits |
+| rec-bluetooth-input | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the four kext bundles, btpower, its plist and the kernel collection link in `patch.json` |
+| rec-brightness-keys | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare brightkeys and its plist in `patch.json` `files`; the recipe is unchanged. |
+| rec-display-ethernet | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the two kext bundles and the kernel collection link in `patch.json` `files` and `edits/k |
+| rec-install-volume | r4 | post | product |  |  |  |  |  | **needs** | r4 2026-11-12 Declare the Recovery dmg and chunklist in `patch.json` `files`; the recipe is unchanged. |
+| rec-language-list | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three files in the Language Chooser's folder in `patch.json` `files`; the recipe is  |
+| rec-power | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-progress-phase | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-reinstall | r4 | recovery | product |  |  |  | x |  | **needs** | r4 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-startup-guard | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-wifi | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
+| rec-wifi-autojoin | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |

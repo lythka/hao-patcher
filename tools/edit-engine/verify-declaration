@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""verify-declaration: accept or refuse a branch that declares recipes' edits (tools/edit-engine/DECLARING.md).
+
+  verify-declaration BRANCH [--base REF] [--env NAME=PATH ...]
+
+Checks, against BASE (default builder/edit-engine), without trusting the branch's own report:
+  1. only patches/NAME/{patch.json,README.md,edits/*,tests/*}, patches/TRACKER.md and docs/PATCHES.md changed
+  2. each changed recipe: revision + 1, newest README Revisions line names it, files declared, and no other
+     patch.json key changed (validated, status, inputs, applies, stage stay as they were)
+  3. no private paths in added lines
+  4. in a clean detached checkout of BRANCH: patches.py check, the pipeline, edit-engine and recipe suites, with the
+     --env variables and without them; every environment variable a recipe test reads is listed, and one that was
+     not given is reported as UNVERIFIED (its real-input test was skipped)
+Exit 0 only when every check passed and no real-input test went unverified (--allow-unverified relaxes the latter).
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+REPO = Path(__file__).resolve().parents[2]
+ALLOWED = re.compile(r'patches/([^/]+)/(patch\.json|README\.md|edits/[^/]+\.json|tests/[^/]+\.py)\Z')
+GENERATED = {'patches/TRACKER.md', 'docs/PATCHES.md'}
+TMP = re.compile('/' r'private/tmp/[A-Za-z]')   # scratch folders; the other private patterns come from the repo's test
+PY = sys.executable
+STANDARD_ENV = {'PATH', 'HOME', 'TMPDIR', 'USER', 'LOGNAME', 'SHELL', 'LANG', 'LC_ALL', 'PWD', 'TERM'}
+
+
+def git(*args, cwd=REPO):
+    return subprocess.run(['git', *args], cwd=cwd, capture_output=True, text=True, check=True).stdout
+
+
+def show(ref, path):
+    try:
+        return git('show', '%s:%s' % (ref, path))
+    except subprocess.CalledProcessError:
+        return None
+
+
+def private_patterns():
+    import runpy
+    test = runpy.run_path(str(REPO / 'pipeline' / 'tests' / 'test_private_references.py'))
+    return test['PATTERNS'] + [('scratch folder', TMP)]
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument('branch')
+    p.add_argument('--base', default='builder/edit-engine')
+    p.add_argument('--env', action='append', default=[], help='NAME=PATH for a real-input test')
+    p.add_argument('--allow-unverified', action='store_true')
+    a = p.parse_args()
+    env_given = dict(e.split('=', 1) for e in a.env)
+    problems, notes = [], []
+
+    changed = [l for l in git('diff', '--name-only', '%s...%s' % (a.base, a.branch)).splitlines() if l]
+    recipes = set()
+    for path in changed:
+        m = ALLOWED.match(path)
+        if m:
+            recipes.add(m.group(1))
+        elif path not in GENERATED:
+            problems.append('changed outside the allowed paths: %s' % path)
+    if not recipes:
+        problems.append('no recipe declared')
+
+    for name in sorted(recipes):
+        old, new = show(a.base, 'patches/%s/patch.json' % name), show(a.branch, 'patches/%s/patch.json' % name)
+        if old is None or new is None:
+            problems.append('%s: patch.json missing on one side (new recipes are not declarations)' % name)
+            continue
+        old, new = json.loads(old), json.loads(new)
+        if new.get('revision') != old.get('revision', 0) + 1:
+            problems.append('%s: revision %s -> %s (must go up by exactly 1)' % (name, old.get('revision'),
+                                                                                 new.get('revision')))
+        if not new.get('files'):
+            problems.append('%s: patch.json declares no files' % name)
+        keep = {'validated_revision', 'validated_digest'}
+        if old.get('validated') is True and keep <= set(new) and not keep & set(old):
+            # a validated recipe keeps its proof: allowed when it names the revision it had (patches.py check,
+            # run below, confirms the digest of what it installs is unchanged)
+            if new['validated_revision'] != old.get('revision'):
+                problems.append('%s: validated_revision %s, but the validated revision was %s' % (
+                    name, new['validated_revision'], old.get('revision')))
+            ignore = {'revision', 'files'} | keep
+        else:
+            ignore = {'revision', 'files'}
+        for k in sorted((set(old) | set(new)) - ignore):
+            if old.get(k) != new.get(k):
+                problems.append('%s: patch.json %s changed (%r -> %r)' % (name, k, old.get(k), new.get(k)))
+        readme = show(a.branch, 'patches/%s/README.md' % name) or ''
+        section = readme.split('\n## Revisions\n', 1)[1] if '\n## Revisions\n' in readme else ''
+        top = re.search(r'^- r(\d+) ', section, re.M)            # the first revision line, after any intro
+        if not top or int(top.group(1)) != new.get('revision'):
+            problems.append('%s: newest README Revisions line is not r%s' % (name, new.get('revision')))
+
+    diff = git('diff', '-U0', '%s...%s' % (a.base, a.branch))
+    patterns = private_patterns()
+    for line in diff.splitlines():
+        if line.startswith('+') and not line.startswith('+++'):
+            for label, pattern in patterns:
+                if pattern.search(line):
+                    problems.append('%s added: %s' % (label, line[1:].strip()[:120]))
+
+    tmp = Path(tempfile.mkdtemp(prefix='verify-declaration-'))
+    work = tmp / 'tree'
+    git('worktree', 'add', '--detach', str(work), a.branch)
+    try:
+        env_names = set()
+        # real-input variables of the test files this branch adds or changes (older tests are not its claims)
+        for path in changed:
+            if re.match(r'patches/[^/]+/tests/[^/]+\.py\Z', path) and (work / path).is_file():
+                text = (work / path).read_text()
+                env_names |= set(re.findall(r"environ(?:\.get)?\(\s*['\"]([A-Z0-9_]+)['\"]", text))
+                env_names |= set(re.findall(r"environ\[\s*['\"]([A-Z0-9_]+)['\"]", text))
+        env_names -= STANDARD_ENV                       # a test reading PATH or HOME is not naming a real input
+        for n in sorted(env_names):
+            if n in env_given:
+                if not Path(env_given[n]).exists():
+                    problems.append('--env %s: %s does not exist' % (n, env_given[n]))
+            else:
+                notes.append('UNVERIFIED: no --env %s, so its real-input test was skipped' % n)
+        clean = {k: v for k, v in os.environ.items() if k not in env_names}
+        runs = [('patches.py check', [PY, '-I', 'pipeline/patches.py', 'check'], clean)]
+        suites = ['pipeline/tests', 'tools/edit-engine/tests'] + ['patches/%s/tests' % n for n in sorted(recipes)]
+        for s in suites:
+            runs.append(('%s (no real inputs)' % s, [PY, '-I', '-B', '-m', 'unittest', 'discover', '-s', s], clean))
+        if env_given:
+            for n in sorted(recipes):
+                runs.append(('patches/%s/tests (real inputs)' % n,
+                             [PY, '-I', '-B', '-m', 'unittest', 'discover', '-s', 'patches/%s/tests' % n, '-v'],
+                             dict(clean, **env_given)))
+        for label, cmd, env in runs:
+            r = subprocess.run(cmd, cwd=work, env=env, capture_output=True, text=True)
+            tail = (r.stdout + r.stderr).strip().splitlines()[-1:] or ['']
+            print('%-58s %s  %s' % (label, 'ok  ' if r.returncode == 0 else 'FAIL', tail[0][:60]))
+            if r.returncode:
+                problems.append('%s failed:\n%s' % (label, (r.stdout + r.stderr)[-2000:]))
+            if '(real inputs)' in label:
+                for l in r.stderr.splitlines():
+                    m = re.search(r"skipped '(.*)'", l)
+                    if m and any(n in m.group(1) for n in env_names):
+                        notes.append('UNVERIFIED: %s' % l.strip())
+    finally:
+        git('worktree', 'remove', '--force', str(work))
+
+    print('\nrecipes: %s' % (', '.join(sorted(recipes)) or 'none'))
+    for n in notes:
+        print(n)
+    for pr in problems:
+        print('PROBLEM: %s' % pr)
+    unverified = any(n.startswith('UNVERIFIED') for n in notes)
+    ok = not problems and (a.allow_unverified or not unverified)
+    print('\n%s' % ('ACCEPTED' if ok else 'REFUSED'))
+    return 0 if ok else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -57,6 +57,11 @@ Recipes, source and limits are in [cache/metallib/README.md](../../cache/metalli
 - `metal_quad_runtime_golden_gate`: the extended `runtime.igil64.split` and
   `iCBE.dylib`, made by `cache/metallib/make runtime-build`.
 
+`patch.json` `files` declares every installed file as a whole file from its row (no in-place edit, so no
+`metallib.rewrite` entry): the libraries from `metallib_repairs_golden_gate`, and `runtime.igil64.split` and
+`iCBE.dylib` from `metal_quad_runtime_golden_gate`. `tests/test_edits.py` checks the list against
+`install_libraries.py`, the hook and `compiler_mask.py`, and against the real artifacts.
+
 The kc-hook runs in set order after `golden-gate-userspace`. Shader-pack records keyed
 to the old libraries must be re-keyed from captured requests before an image uses this
 patch.
@@ -87,7 +92,8 @@ floating association and GPU performance are not measured.
 ## Verify
 
 - `python3.14 -I pipeline/patches.py check`, the `cache/metallib` host tests and
-  `python3.14 -I -m unittest discover -s patches/golden-gate-metal-libraries/tests`.
+  `python3.14 -I -m unittest discover -s patches/golden-gate-metal-libraries/tests`
+  (`METALLIB_REPAIRS_ROW`, `METALLIB_RUNTIME_ROW`, `METALLIB_ICBE_SOURCE` add the real-artifact checks).
 - Compare the installed files with the input artifacts' `SHA256SUMS`, and the export
   lists with the original libraries.
 - On an Apple GPU: `python3.14 -I cache/metallib/make winograd-check NEW_OUTPUT` and
@@ -105,6 +111,7 @@ matching Tungsten library. A complete image with every library, shader-cache
 re-keying and full-workload performance remain open.
 
 ## Revisions
+- r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/test_edits.py; the hook is unchanged.
 - r18 2026-11-12 26B131 artifact from cache/metallib r56: cube and 1D sampler-form reads converted, which changes SceneKit (both), VFX and CoreRE; the other six libraries are byte-identical. SceneKit renders on the laptop (test scene with a cube-map environment, shadows, SSAO; the r55 library crashes it), and Weather renders with the new VFX and CoreRE libraries.
 - r17 2026-11-12 26B131 artifact adds SceneKit (macOS and iOSSupport, cache/metallib r55); the other nine libraries are byte-identical.
 - r16 2026-11-11 26B131 artifact adds VectorKit, AlloyCommon and VFX (cache/metallib r54), superseding OCLP's 26.0 copies; VFX `particle_fill_grid` atomic exchange repaired.

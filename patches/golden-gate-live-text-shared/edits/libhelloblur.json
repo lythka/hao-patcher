@@ -1,0 +1,31 @@
+{
+ "format": 1,
+ "path": "usr/lib/libhelloblur.dylib",
+ "arch": "x86_64",
+ "origin": {
+  "kind": "hao",
+  "name": "libhelloblur",
+  "note": "golden-gate-hello's prebuilt blur helper (input row libhelloblur of that patch, 26B131 sha256 d471519b...); one load command is added to its copy"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "load-live-text-runtime",
+   "kind": "op",
+   "op": "macho.add-dylib",
+   "args": {
+    "path": "/usr/lib/hao-live-text/LiveText.dylib",
+    "weak": false,
+    "timestamp": 0
+   },
+   "reason": "every Metal client already loads libhelloblur, so it now also loads the Live Text runtime: Vision text recognition works on the HD 4000 in mediaanalysisd, Photos and any other Metal client, and no Apple binary changes"
+  }
+ ],
+ "sign": {
+  "mode": "adhoc",
+  "identifier": "local.libhelloblur"
+ },
+ "expect": {
+  "d471519b1f00fdc318191eeefef6cf9b84d62e5cf341def90ecac80860570c1e": "b06e59b2273201cd94bf0ee53ceb1c78a62347dc5dc1093235f22bbbbb4e7b9b"
+ }
+}

@@ -1,5 +1,5 @@
 {
-  "revision": 4,
+  "revision": 5,
   "stage": "oclp-hook",
   "applies": {
     "models": [
@@ -12,5 +12,16 @@
     "corespotlight_compat_shim"
   ],
   "status": "experiment",
-  "validated": true
+  "validated": true,
+  "validated_revision": 4,
+  "validated_digest": "fb6a8dd0c53b4dcbec458743f3d40840df9867e5186fc2f4a3669897583a68a5",
+  "files": [
+    {"path": "System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd",
+     "edits": "edits/corespotlightd.json"},
+    {"path": "System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/managedcorespotlightd",
+     "edits": "edits/managedcorespotlightd.json"},
+    {"path": "usr/lib/corespotlight_compat.dylib",
+     "origin": {"kind": "hao", "row": "corespotlight_compat_shim",
+                "note": "new file: adds -[CSSearchQueryContext compiledRankingFactsConfiguration] (src/corespotlight_compat.m, built by make)"}}
+  ]
 }

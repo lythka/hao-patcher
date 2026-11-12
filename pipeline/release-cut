@@ -1,0 +1,113 @@
+#!/usr/bin/python3 -I
+"""release-cut: what a release of an assembly would ship, and whether each input could be made again.
+
+  release-cut --dry-run ASSEMBLY [--store DIR] [--json]     (ASSEMBLY = pipeline/assemblies/NAME.json)
+
+Every input row the assembly's set and donors use is resolved (pipeline/inputs/golden/BUILD, then the donor build,
+then common) and classified, without changing anything:
+  download      Apple or third-party bytes the user's builder fetches itself (installers, KDK, OCLP); must be
+                pinned by URL, size and sha256 in release.json (tools/acquire)
+  reproducible  an artifact whose build.json names a clean commit of a producer this repository can find
+  dirty         built from a tree with uncommitted changes
+  harvested     made from a running laptop (caches, seeds): a release can ship it, a user cannot make it again
+  unrecorded    no build.json, or no producer commit in it
+  missing       the row's file is not in the store
+The cut itself (exporting rows and build records into release.json, refusing dirty or unrecorded producers)
+follows once every row is downloadable or reproducible (workflow plan step 13). Exit 1 when a row is not.
+"""
+import json
+import os
+from pathlib import Path
+import runpy
+import subprocess
+import sys
+
+TOP = Path(__file__).resolve().parents[1]
+DOWNLOAD_ROOTS = ('store/installers', 'store/kdk', 'store/oclp', 'store/inputs', 'store/packages')
+
+
+def rows_for(assembly):
+    """[(row, lock folder)] for every input the assembly's set uses plus its donor rows, first lock folder wins."""
+    patches = runpy.run_path(str(TOP / 'pipeline' / 'patches.py'))
+    lock = runpy.run_path(str(TOP / 'pipeline' / 'lock.py'))
+    a = json.loads(Path(assembly).read_text())
+    folders = [TOP / 'pipeline/inputs/golden' / a['golden_build'], TOP / 'pipeline/inputs' / a['donor_build'],
+               TOP / 'pipeline/inputs/common']
+    tables = [(f, lock['rows'](str(f))) for f in folders if f.is_dir()]
+    target = TOP / 'pipeline/targets' / (a['target'] + '.json')
+    setfile = TOP / 'pipeline/sets' / (a['patch_set'] + '.txt')
+    import contextlib, io
+    with contextlib.redirect_stderr(io.StringIO()):
+        plan = patches['plan'](setfile, target, a['donor_build'], locks=None)
+    wanted = []
+    for _, _, inputs in plan:
+        wanted += inputs
+    wanted += list(a.get('inputs', {}).values())
+    out, seen = [], set()
+    for row in wanted:
+        if row in seen:
+            continue
+        seen.add(row)
+        hit = next(((f, t[row]) for f, t in tables if row in t), None)
+        out.append((row, hit))
+    return out
+
+
+def commit_known(commit):
+    for repo in (TOP, Path.home() / 'hao-runtime'):
+        if repo.is_dir() and subprocess.run(['git', '-C', str(repo), 'cat-file', '-e', commit + '^{commit}'],
+                                            capture_output=True).returncode == 0:
+            return 'hao-patcher' if repo == TOP else repo.name
+    return None
+
+
+def classify(row, hit):
+    if hit is None:
+        return 'missing', 'no row file for %s' % row
+    folder, (sha, path) = hit
+    rel = os.path.relpath(path, TOP)
+    if not os.path.exists(path):
+        return 'missing', '%s is not in the store' % rel
+    if any(rel == r or rel.startswith(r + '/') for r in DOWNLOAD_ROOTS):
+        return 'download', rel
+    parts = rel.split('/')
+    if len(parts) < 3 or parts[:2] != ['store', 'artifacts']:
+        return 'unrecorded', rel
+    art = TOP / 'store' / 'artifacts' / parts[2]
+    build = next((b for b in (art / 'build.json', art / 'payload' / 'build.json') if b.is_file()), None)
+    if build is None:
+        return 'unrecorded', '%s has no build.json' % parts[2]
+    meta = json.loads(build.read_text())
+    if meta.get('harvest') or meta.get('kind') == 'harvest' or meta.get('harvest_sha256'):
+        return 'harvested', parts[2]
+    commit = meta.get('commit') or meta.get('hao_commit')
+    dirty = meta.get('dirty', meta.get('hao_dirty', not meta.get('clean', True)))
+    if not commit:
+        return 'unrecorded', '%s: build.json names no commit' % parts[2]
+    if dirty:
+        return 'dirty', '%s: built from a dirty tree at %s' % (parts[2], commit)
+    repo = commit_known(str(commit))
+    if not repo:
+        return 'unrecorded', '%s: commit %s is in no repository here' % (parts[2], commit)
+    return 'reproducible', '%s: %s@%s' % (parts[2], repo, str(commit)[:10])
+
+
+def main(argv):
+    if '--dry-run' not in argv or len([a for a in argv if not a.startswith('--')]) != 1:
+        sys.exit(__doc__)
+    assembly = next(a for a in argv if not a.startswith('--'))
+    results = [(row,) + classify(row, hit) for row, hit in rows_for(assembly)]
+    if '--json' in argv:
+        print(json.dumps([{'row': r, 'class': c, 'detail': d} for r, c, d in results], indent=1))
+    else:
+        for row, c, detail in sorted(results, key=lambda x: (x[1], x[0])):
+            print('%-14s %-34s %s' % (c, row, detail))
+        counts = {}
+        for _, c, _ in results:
+            counts[c] = counts.get(c, 0) + 1
+        print('\nrelease-cut: %d rows: %s' % (len(results), ', '.join('%d %s' % (n, c) for c, n in sorted(counts.items()))))
+    return 0 if all(c in ('download', 'reproducible') for _, c, _ in results) else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
