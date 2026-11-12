@@ -50,7 +50,10 @@ Tested with macOS 27.2.1 (26B131), 2026-11-12.
 - Wi-Fi: joining from Setup or Settings, and automatic joining of remembered networks,
   also at startup.
 - Speakers, brightness, keyboard, trackpad, Bluetooth; AirPlay displays are discovered.
-- Safari (including YouTube), Calendar, Terminal, System Settings, Preview.
+- Safari (including YouTube), Calendar, Terminal, System Settings, Preview, App Store, Books, Calculator,
+  Automator.
+- iPad-style apps: Stocks (watchlist, interactive charts, news) and News (Today feed with images); Home opens
+  (it needs an iCloud account to go further).
 - Control Center (Wi-Fi, Bluetooth, AirDrop, Now Playing, Display, Sound).
 - Notification Center and widgets.
 - Maps: tiles, search, place cards, current location, satellite (3D globe and street level) and 3D buildings
@@ -58,7 +61,8 @@ Tested with macOS 27.2.1 (26B131), 2026-11-12.
 - Weather: conditions, hourly, air quality, 10-day, and the precipitation, temperature, air-quality and wind
   maps (native Metal argument buffers and ASTC textures on the HD 4000).
 - WebGPU in Safari: compute and rendering on the HD 4000.
-- SceneKit: 3D scenes with physically based materials, cube-map environments, shadows and reflections.
+- SceneKit: 3D scenes with physically based materials, cube-map environments, shadows and reflections; Preview
+  opens SceneKit scenes.
 - Photos: import, thumbnails, full-size view.
 - Spotlight opens and searches.
 - macOS 27's ARM-only programs run on the Intel CPU through hao-runtime, including the
@@ -73,7 +77,10 @@ Tested with macOS 27.2.1 (26B131), 2026-11-12.
 - Performance of translated code: general code runs at about 1/2 to 1/3 of native speed;
   vector and floating-point work is profiled, with hao-runtime optimizations lined up.
 - Metal argument buffers and ASTC textures: the image recipe is being packaged.
-- Safari canvases: WebGPU renders correctly; showing WebGL and WebGPU canvases on screen is being worked on.
+- Safari WebGL and canvases: WebGPU computes and renders correctly; WebGL drawing and showing WebGL and WebGPU
+  canvases on screen are being worked on.
+- Freeform: opens; opening a board is being fixed in hao-runtime.
+- Maps links to a coordinate (`maps://?ll=`): fixed in hao-runtime, in the next payload.
 - RealityKit: needs placement heaps, which the HD 4000's Metal driver lacks.
 - Sleep and updates: not tested yet.
 
@@ -121,6 +128,8 @@ refuses a set that breaks that order.
   Safari work.
 - **SceneKit:** its shader library joins the Metal library repairs, and cube-map and 1D texture reads are
   converted for the old shader compiler (they crashed it); 3D scenes render.
+- **New accounts compile Metal shaders at run time again:** the account seed no longer copies a compiler cache
+  that is tied to the harvest account's folder (SceneKit in Preview drew magenta).
 - **Wi-Fi:** Setup's join dialog works, and remembered networks join automatically
   (Tahoe's CoreWiFi).
 - **Login:** Setup's automatic login after creating an account works.
