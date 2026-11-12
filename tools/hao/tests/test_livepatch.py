@@ -1,0 +1,142 @@
+"""hao patch: write only changed files, check before and after, revert replaced and added files, lock, phases.
+python3.14 -I -B -m unittest discover -s tools/hao/tests"""
+import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / 'src'))
+import livepatch as LP   # noqa: E402
+
+T0 = datetime.datetime(2026, 11, 12, 18, 0, 0)
+
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.d = Path(tempfile.mkdtemp())
+        self.root = self.d / 'root'
+        self.state = self.d / 'state'
+        (self.root / 'System/Library/Frameworks/Metal.framework/Versions/A').mkdir(parents=True)
+        self.metal = self.root / 'System/Library/Frameworks/Metal.framework/Versions/A/Metal'
+        self.metal.write_bytes(b'oclp metal')
+        (self.root / 'usr/lib').mkdir(parents=True)
+        (self.root / 'usr/lib/libsame.dylib').write_bytes(b'same')
+
+    def overlay(self, name, phase, files):
+        o = self.d / ('overlay-' + name)
+        manifest = {'format': 1, 'pack': name, 'phase': phase, 'files': {}}
+        for path, data in files.items():
+            (o / 'files' / path).parent.mkdir(parents=True, exist_ok=True)
+            (o / 'files' / path).write_bytes(data)
+            manifest['files'][path] = {'sha256': sha(data), 'mode': '0755', 'owner': 'root:wheel'}
+        o.mkdir(exist_ok=True)
+        (o / 'manifest.json').write_text(json.dumps(manifest))
+        return o
+
+    def metal_pack(self):
+        return LP.load_overlay(self.overlay('metal-3802', 'live-capable', {
+            'System/Library/Frameworks/Metal.framework/Versions/A/Metal': b'patched metal',
+            'usr/lib/libhelloblur.dylib': b'new library',
+            'usr/lib/libsame.dylib': b'same'}))
+
+
+class Planning(Base):
+    def test_only_changed_files_are_written(self):
+        p = LP.plan([self.metal_pack()], self.root)
+        self.assertEqual(sorted(r['path'] for r in p['write']),
+                         ['System/Library/Frameworks/Metal.framework/Versions/A/Metal', 'usr/lib/libhelloblur.dylib'])
+        self.assertEqual([r['path'] for r in p['same']], ['usr/lib/libsame.dylib'])
+
+    def test_installer_packs_need_recovery_when_live(self):
+        kext = LP.load_overlay(self.overlay('intel-hd4000', 'installer', {'System/Library/Extensions/A.kext/A': b'k'}))
+        p = LP.plan([self.metal_pack(), kext], self.root, 'live')
+        self.assertEqual(p['needs_recovery'], ['intel-hd4000'])
+        self.assertNotIn('System/Library/Extensions/A.kext/A', [r['path'] for r in p['write']])
+        p = LP.plan([self.metal_pack(), kext], self.root, 'installer')
+        self.assertIn('System/Library/Extensions/A.kext/A', [r['path'] for r in p['write']])
+
+    def test_bad_overlays_refused(self):
+        o = self.overlay('x', 'live-capable', {'usr/lib/a': b'a'})
+        (o / 'files/usr/lib/a').write_bytes(b'tampered')
+        with self.assertRaisesRegex(LP.PatchError, 'does not match its manifest'):
+            LP.load_overlay(o)
+        a = LP.load_overlay(self.overlay('a', 'live-capable', {'usr/lib/x': b'1'}))
+        b = LP.load_overlay(self.overlay('b', 'live-capable', {'usr/lib/x': b'2'}))
+        with self.assertRaisesRegex(LP.PatchError, 'usr/lib/x is in packs a and b'):
+            LP.plan([a, b], self.root)
+
+
+class ApplyRevert(Base):
+    def test_apply_then_revert(self):
+        events = []
+        rec = LP.apply([self.metal_pack()], self.root, self.state, on_event=events.append, now=T0)
+        self.assertEqual(rec['id'], 'hao-20261112-180000')
+        self.assertEqual(self.metal.read_bytes(), b'patched metal')
+        self.assertEqual((self.root / 'usr/lib/libhelloblur.dylib').read_bytes(), b'new library')
+        self.assertEqual(oct(os.stat(self.metal).st_mode & 0o777), '0o755')
+        self.assertEqual([e['ev'] for e in events], ['plan', 'file.write', 'file.write', 'done'])
+        self.assertEqual({f['path']: f['old_sha256'] is None for f in rec['files']},
+                         {'System/Library/Frameworks/Metal.framework/Versions/A/Metal': False,
+                          'usr/lib/libhelloblur.dylib': True})
+        again = LP.apply([self.metal_pack()], self.root, self.state, now=T0)     # same second: hao-…-2
+        self.assertEqual(again['id'], 'hao-20261112-180000-2')
+        self.assertEqual(again['files'], [])                         # nothing differs: nothing written
+        LP.revert(self.root, self.state, patch_id=rec['id'])
+        self.assertEqual(self.metal.read_bytes(), b'oclp metal')
+        self.assertFalse((self.root / 'usr/lib/libhelloblur.dylib').exists())   # files new to the image go too
+        self.assertEqual({r['id']: r['state'] for r in LP.records(self.state)},
+                         {'hao-20261112-180000': 'reverted', 'hao-20261112-180000-2': 'applied'})
+
+    def test_revert_refuses_files_changed_since(self):
+        rec = LP.apply([self.metal_pack()], self.root, self.state, now=T0)
+        self.metal.write_bytes(b'someone else')
+        with self.assertRaisesRegex(LP.PatchError, 'changed after %s' % rec['id']):
+            LP.revert(self.root, self.state)
+        self.assertEqual(self.metal.read_bytes(), b'someone else')
+
+    def test_lock(self):
+        self.state.mkdir()
+        (self.state / 'lock').write_text('pid 1\n')
+        with self.assertRaisesRegex(LP.PatchError, 'another hao patch holds'):
+            LP.apply([self.metal_pack()], self.root, self.state)
+
+    def test_live_backend_is_not_proven(self):
+        with self.assertRaisesRegex(LP.PatchError, 'not proven yet'):
+            LP.apply([self.metal_pack()], self.root, self.state, backend=LP.MacOSLiveBackend())
+        self.assertEqual(self.metal.read_bytes(), b'oclp metal')
+
+
+class CommandLine(Base):
+    TOOL = HERE.parent / 'hao'
+
+    def run_hao(self, *args):
+        return subprocess.run([sys.executable, '-I', str(self.TOOL), *map(str, args)], capture_output=True, text=True)
+
+    def test_dry_run_apply_list_revert(self):
+        o = self.overlay('metal-3802', 'live-capable', {'usr/lib/libhelloblur.dylib': b'new'})
+        k = self.overlay('intel-hd4000', 'installer', {'System/Library/Extensions/A.kext/A': b'k'})
+        r = self.run_hao('patch', o, k, '--root', self.root, '--dry-run')
+        self.assertIn('needs Recovery (installer-only packs, not applied live): intel-hd4000', r.stdout)
+        self.assertFalse((self.root / 'usr/lib/libhelloblur.dylib').exists())
+        r = self.run_hao('patch', o, '--root', self.root, '--log', 'json')
+        self.assertEqual([json.loads(l)['ev'] for l in r.stdout.splitlines()], ['plan', 'file.write', 'done'])
+        r = self.run_hao('patch', '--list', '--root', self.root)
+        self.assertIn('applied', r.stdout)
+        r = self.run_hao('patch', '--revert', '--root', self.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse((self.root / 'usr/lib/libhelloblur.dylib').exists())
+        self.assertEqual(self.run_hao('patch', '--revert', '--root', self.root).returncode, 1)   # nothing left
+
+
+if __name__ == '__main__':
+    unittest.main()
