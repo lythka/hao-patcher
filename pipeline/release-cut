@@ -58,7 +58,7 @@ def rows_for(assembly):
 
 
 def commit_known(commit):
-    for repo in (TOP, Path.home() / 'hao-runtime'):
+    for repo in (TOP, Path.home() / 'hao-runtime', Path.home() / 'hao-tools'):
         if repo.is_dir() and subprocess.run(['git', '-C', str(repo), 'cat-file', '-e', commit + '^{commit}'],
                                             capture_output=True).returncode == 0:
             return 'hao-patcher' if repo == TOP else repo.name
@@ -84,7 +84,8 @@ def classify(row, hit):
     meta = json.loads(build.read_text())
     if meta.get('harvest') or meta.get('kind') == 'harvest' or meta.get('harvest_sha256'):
         return 'harvested', parts[2]
-    commit = meta.get('commit') or meta.get('hao_commit')
+    producer = meta.get('producer') if isinstance(meta.get('producer'), dict) else {}
+    commit = meta.get('commit') or meta.get('hao_commit') or producer.get('commit')
     dirty = meta.get('dirty', meta.get('hao_dirty', not meta.get('clean', True)))
     if not commit:
         return 'unrecorded', '%s: build.json names no commit' % parts[2]

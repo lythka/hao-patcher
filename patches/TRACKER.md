@@ -27,6 +27,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | hao-opencore | r41 | post | experiment |  | x | x |  |  | ok (r40) | r41 2026-11-12 Declare the config keys with fixed values (edits/config.json) and the IntelCommpage and HaoExec |
 | hao-runtime | r67 | oclp-hook | experiment |  | x | x |  |  | ok (r65) | r67 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the |
 | metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
+| metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |
 | metalold-selectors | r5 | oclp-hook | product |  | x | x |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the  |
 | rec-audio | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three kext bundles and the kernel collection link in `patch.json` `files` and `edits |
 | rec-bluetooth-input | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the four kext bundles, btpower, its plist and the kernel collection link in `patch.json` |

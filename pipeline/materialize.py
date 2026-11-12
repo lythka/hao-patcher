@@ -168,7 +168,12 @@ def compose(entry, root, sources, store, repo):
             raise Deferred('%s is made on the target (%s)' % (entry['path'], ', '.join(sorted(set(external)))))
         if data is None:
             inp = w.get('input')
-            data = sources.base(inp['path'], inp['kind']) if inp else sources.base(entry['path'], entry['base']['kind'])
+            if inp and inp.get('row'):
+                data = sources.row_file(inp['row'], entry['path'])
+            elif inp:
+                data = sources.base(inp['path'], inp['kind'])
+            else:
+                data = sources.base(entry['path'], entry['base']['kind'])
         original = data if original is None else original
         data, _ = ENGINE.apply_stored(spec, data, store, repo=str(repo))
         signing = spec.get('sign') or signing

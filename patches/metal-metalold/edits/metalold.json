@@ -1,0 +1,35 @@
+{
+ "format": 1,
+ "path": "System/Library/Frameworks/Metal.framework/Versions/A/MetalOld.dylib",
+ "arch": "x86_64",
+ "origin": {
+  "kind": "ventura",
+  "name": "macOS 13.2.1 (22D68) Metal 306.3.5",
+  "row": "metalold_22d68"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "legacy-slice-for-any-device",
+   "kind": "literal",
+   "section": "__TEXT,__text",
+   "find": "48 89 C3 48 85 C0 74 72 4D 85 E4 74",
+   "replace": "48 89 C3 48 85 C0 90 90 4D 85 E4 74",
+   "asm": {
+    "before": "test rax,rax; je +0x72",
+    "after": "test rax,rax; nop; nop"
+   },
+   "reason": "+[MTLLoader sliceIDForDevice:legacyDriverVersion:airntDriverVersion:] no longer skips the legacy driver slice after the device type test, as in OCLP's MetalOld",
+   "evidence": "hao-tools docs/metal-legacy-base.md, Q1: OCLP's MetalOld differs from Apple's 22D68 cut only by this edit and the install name"
+  }
+ ],
+ "sign": {
+  "mode": "adhoc",
+  "preserve": [
+   "identifier"
+  ]
+ },
+ "expect": {
+  "dd1ad67623fecdeb746c9ab29ca8d81268f630460089d89006aa6d30fad2525f": "53ea9cf5615186fd7cc9424e816e7df825e056f9ca5155447309ea1d24268372"
+ }
+}

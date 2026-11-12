@@ -1,0 +1,3 @@
+# Apple macOS 13.2.1 (22D68) x86_64 Metal, cut out of the IPSW's Rosetta cache by hao-tools cache-dylib r5 (84f3e8c),
+# install name MetalOld.dylib, unedited otherwise; build.json names the pinned IPSW and the six cache hashes.
+dd1ad67623fecdeb746c9ab29ca8d81268f630460089d89006aa6d30fad2525f store/artifacts/metalold-22D68-dd1ad67623fe/MetalOld.dylib

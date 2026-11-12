@@ -1,0 +1,31 @@
+{
+ "revision": 1,
+ "stage": "oclp-hook",
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
+  ],
+  "builds": [
+   "25G342"
+  ]
+ },
+ "inputs": [
+  "metalold_22d68"
+ ],
+ "status": "unfinished",
+ "validated": false,
+ "files": [
+  {
+   "path": "System/Library/Frameworks/Metal.framework/Versions/A/MetalOld.dylib",
+   "edits": "edits/metalold.json",
+   "input": {
+    "kind": "ventura",
+    "row": "metalold_22d68"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel"
+   }
+  }
+ ]
+}

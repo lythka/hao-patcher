@@ -118,6 +118,12 @@ def classify(e, oclp):
                 if w['origin_kind'] not in (current_kind, 'hao'):
                     e['problems'].append('%s: spec origin %s, but the file is %s from %s' % (
                         w['recipe'], w['origin_kind'], current_kind, current))
+            elif current is None and w.get('input') and w['input'].get('row'):
+                if w['input']['kind'] != w['origin_kind']:
+                    e['problems'].append('%s: spec origin %s, but its input row is %s' % (
+                        w['recipe'], w['origin_kind'], w['input']['kind']))
+                if base['kind'] == 'oclp':                 # our file in place of one OCLP installs
+                    kinds.append('superseded')
             elif current is None and w['origin_kind'] != current_kind and not (
                     w['origin_kind'] == 'hao' and current_kind == 'apple'):
                 e['problems'].append('%s: spec origin %s, but %s comes from %s (%s)' % (

@@ -374,10 +374,13 @@ def file_problems(d, p):
                 bad.append('files: %s: source is a relative path inside the origin row ("ARCHIVE!MEMBER" for a '
                            'file in a tar), and needs an origin with a row' % f.get('path'))
             inp = f.get('input')
-            if inp is not None and ('edits' not in f or not isinstance(inp, dict) or set(inp) != {'kind', 'path'}
-                                    or inp['kind'] not in S['ORIGINS'] or str(inp['path']).startswith('/')):
-                bad.append('files: %s: input is {"kind": %s, "path": RELATIVE}, the file an edits entry starts from '
-                           'when it is installed under another name' % (f.get('path'), '|'.join(S['ORIGINS'])))
+            if inp is not None and ('edits' not in f or not isinstance(inp, dict) or inp.get('kind') not in S['ORIGINS']
+                                    or set(inp) not in ({'kind', 'path'}, {'kind', 'row'})
+                                    or str(inp.get('path', '')).startswith('/')
+                                    or ('row' in inp and inp['row'] not in p.get('inputs', []))):
+                bad.append('files: %s: input is {"kind": %s, "path": RELATIVE} (the installed file an edits entry starts '
+                           'from) or {"kind", "row": INPUT_ROW} (bytes from one of the patch inputs)'
+                           % (f.get('path'), '|'.join(S['ORIGINS'])))
             if 'tree' in f and (f['tree'] is not True or 'edits' in f):
                 bad.append('files: %s: "tree": true goes with an origin (every file under the folder)' % f.get('path'))
             inst = f.get('install')

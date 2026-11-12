@@ -7,7 +7,7 @@ import json
 import re
 
 FORMAT = 1
-ORIGINS = ('apple', 'tahoe', 'oclp', 'hao')
+ORIGINS = ('apple', 'tahoe', 'oclp', 'hao', 'ventura')   # ventura: Apple's macOS 13 files, extracted by the builder
 APPLIED_BY = ('installer', 'opencore', 'kext:IntelCommpage')
 PRESERVE = {'identifier', 'entitlements', 'requirements', 'flags', 'runtime'}
 KINDS = ('literal', 'matcher', 'op')
@@ -256,7 +256,8 @@ def _op_problems(e):
 
 
 def origin_text(origin):
-    text = {'apple': 'Apple', 'tahoe': 'Tahoe donor', 'oclp': 'OCLP', 'hao': 'hao'}.get(origin.get('kind'), '?')
+    text = {'apple': 'Apple', 'tahoe': 'Tahoe donor', 'oclp': 'OCLP', 'hao': 'hao',
+            'ventura': 'Apple macOS 13'}.get(origin.get('kind'), '?')
     if origin.get('tree'):
         text = 'every file under it from ' + text
     if origin.get('name'):
