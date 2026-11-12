@@ -451,7 +451,21 @@ def catalog(root=os.path.join(TOP, 'patches')):
     for name in declaring:
         mine = [r for r in rows if r[0] == name]
         md += ['## %s' % name, '', 'Revision r%s, status %s. [Recipe](../patches/%s/README.md)' % (mine[0][1], mine[0][2], name), '']
+        groups = {}
         for _, _, _, path, origin, spec in mine:
+            if not spec:
+                groups.setdefault(json.dumps(origin, sort_keys=True), []).append(path)
+        large = {k: v for k, v in groups.items() if len(v) > 10}
+        for k, paths in large.items():
+            origin = json.loads(k)
+            prefix = os.path.commonpath(paths) if len(paths) > 1 else os.path.dirname(paths[0])
+            where = 'under `%s/`' % prefix if prefix else 'in several folders'
+            md.append('- %d whole files from %s, %s (for example `%s`).%s Listed by `patches.py explain %s`.' % (
+                len(paths), S['origin_text'](origin), where, os.path.relpath(paths[0], prefix) if prefix else paths[0],
+                ' ' + sentence(origin['note']) if origin.get('note') else '', name))
+        for _, _, _, path, origin, spec in mine:
+            if not spec and json.dumps(origin, sort_keys=True) in large:
+                continue
             if not spec:
                 md.append('- `%s`: whole file from %s.%s' % (path, S['origin_text'](origin),
                                                               ' ' + sentence(origin['note']) if origin.get('note') else ''))
