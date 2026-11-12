@@ -39,7 +39,6 @@ static void agb_log(const char *fmt, ...) {
     if (g_stderr) fprintf(stderr, "argbuf: %s\n", msg);
 }
 
-static MTLStructType *(*createStructType)(NSArray<MTLArgumentDescriptor *> *);
 static char tableKey, stateKey;
 
 // ---------------------------------------------------------------------------------------------------- sizes
@@ -83,11 +82,6 @@ static void typeSize(MTLDataType t, NSUInteger *size, NSUInteger *align) {
 static NSMutableDictionary<NSString *, NSData *> *g_handles; // layout key -> int32 handle per slot
 static int32_t g_nextTex, g_nextBuf;
 
-static MTLArgumentDescriptor *descriptor(MTLDataType type, NSUInteger index, NSUInteger len, MTLTextureType tt, MTLBindingAccess access) {
-    MTLArgumentDescriptor *d = [MTLArgumentDescriptor argumentDescriptor];
-    d.dataType = type; d.index = index; d.arrayLength = len; d.textureType = tt; d.access = access; return d;
-}
-
 @implementation AGBLayout
 - (instancetype)init {
     if ((self = [super init])) {
@@ -117,57 +111,80 @@ static uint8_t kindOf(MTLDataType t) {
     default: return K_CONST;
     }
 }
-// Rebuild argument descriptors from any struct type (reflection types carry no resource offsets) and let MetalOld's
-// own MTLCreateStructTypeFromArgumentDescriptors pack them: that packing is what the IGIL target reads.
-- (void)setStructType:(MTLStructType *)st withDevice:(id)dev {
-    device = dev;
-    NSArray<MTLStructMember *> *members = [st.members sortedArrayUsingComparator:^NSComparisonResult(MTLStructMember *a, MTLStructMember *b) {
+// Pack a struct type the way the AIR front end lays out argument buffers (measured: probe9, kab.igil, kin.igil):
+// members in argument-index order, every resource (texture, sampler, pointer, other object) 8 bytes 8-aligned,
+// constants at their natural size and alignment (float3 = 16), inline structs with natural C layout (aligned to their
+// largest member, size rounded up to it), arrays by element stride. Reflection carries no resource offsets (-1) and
+// constant offsets of 0, so offsets are always computed here. Nested argument indices are relative to the parent
+// member's index (probe15). Returns the struct's size and alignment; adds a slot per argument index.
+static NSUInteger roundUp(NSUInteger v, NSUInteger a) { return a ? (v + a - 1) / a * a : v; }
+static NSArray<MTLStructMember *> *byIndex(MTLStructType *st) {
+    return [st.members sortedArrayUsingComparator:^NSComparisonResult(MTLStructMember *a, MTLStructMember *b) {
         return a.argumentIndex < b.argumentIndex ? NSOrderedAscending : a.argumentIndex > b.argumentIndex ? NSOrderedDescending : NSOrderedSame;
     }];
-    NSMutableArray *descs = [NSMutableArray new];
-    NSMutableString *k = [NSMutableString stringWithString:@"{"];
-    NSMutableDictionary<NSNumber *, AGBLayout *> *nestedByIndex = [NSMutableDictionary new];
-    for (MTLStructMember *m in members) {
-        MTLDataType t = m.dataType; NSUInteger len = 0; MTLTextureType tt = MTLTextureType2D;
-        if (t == MTLDataTypeArray) {
-            MTLArrayType *a = m.arrayType; t = a.elementType; len = a.arrayLength;
-            if (t == MTLDataTypeTexture) tt = a.elementTextureReferenceType.textureType;
-            if (t == MTLDataTypeStruct || t == MTLDataTypeArray) agb_log("member %lu: arrays of %s are not supported", (unsigned long)m.argumentIndex, t == MTLDataTypeStruct ? "structs" : "arrays");
-        } else if (t == MTLDataTypeTexture) {
-            tt = m.textureReferenceType.textureType;
-        } else if (t == MTLDataTypePointer) {
-            MTLPointerType *p = m.pointerType;
-            if (p.elementIsArgumentBuffer && p.elementStructType) {
-                AGBLayout *n = [AGBLayout new]; [n setStructType:p.elementStructType withDevice:dev];
-                nestedByIndex[@(m.argumentIndex)] = n;
+}
+- (void)pack:(MTLStructType *)st base:(NSUInteger)base index:(NSUInteger)parentIndex key:(NSMutableString *)k
+        size:(NSUInteger *)outSize align:(NSUInteger *)outAlign depth:(int)depth {
+    NSUInteger cursor = 0, maxAlign = 1;
+    [k appendString:@"{"];
+    for (MTLStructMember *m in byIndex(st)) {
+        NSUInteger idx = parentIndex + m.argumentIndex, size = 8, al = 8, off;
+        MTLDataType t = m.dataType;
+        [k appendFormat:@"%lu:%lu", (unsigned long)m.argumentIndex, (unsigned long)t];
+        if (t == MTLDataTypeStruct && depth < 8) {
+            NSMutableString *probe = [NSMutableString new];
+            AGBLayout *measure = [AGBLayout new];
+            [measure pack:m.structType base:0 index:0 key:probe size:&size align:&al depth:depth + 1];
+            off = cursor = roundUp(cursor, al);
+            [self pack:m.structType base:base + off index:idx key:k size:&size align:&al depth:depth + 1];
+        } else if (t == MTLDataTypeArray) {
+            MTLArrayType *a = m.arrayType; MTLDataType e = a.elementType; NSUInteger n = a.arrayLength;
+            [k appendFormat:@"[%lu:%lu]", (unsigned long)n, (unsigned long)e];
+            if (e == MTLDataTypeStruct && depth < 8) {
+                NSUInteger esz, eal; NSMutableString *probe = [NSMutableString new]; AGBLayout *measure = [AGBLayout new];
+                [measure pack:a.elementStructType base:0 index:0 key:probe size:&esz align:&eal depth:depth + 1];
+                NSUInteger stride = roundUp(esz, eal), istride = a.argumentIndexStride ? a.argumentIndexStride : 1;
+                off = cursor = roundUp(cursor, eal);
+                for (NSUInteger i = 0; i < n; i++)
+                    [self pack:a.elementStructType base:base + off + i * stride index:idx + i * istride key:(i ? [NSMutableString new] : k)
+                          size:&esz align:&eal depth:depth + 1];
+                size = n * stride; al = eal;
+            } else {
+                uint8_t kind = kindOf(e);
+                NSUInteger esz = 8, eal = 8;
+                if (kind == K_CONST) typeSize(e, &esz, &eal);
+                NSUInteger stride = kind == K_CONST ? roundUp(esz, eal) : 8;
+                if (e == MTLDataTypeTexture) [k appendFormat:@"t%lu", (unsigned long)a.elementTextureReferenceType.textureType];
+                off = cursor = roundUp(cursor, eal);
+                if (kind == K_CONST) [self addSlot:idx offset:base + off kind:K_CONST];   // one index; elements by pointer math
+                else for (NSUInteger i = 0; i < n; i++) [self addSlot:idx + i offset:base + off + i * 8 kind:kind];
+                size = n * stride; al = eal;
             }
-        } else if (t == MTLDataTypeStruct) {
-            agb_log("member %lu: inline structs are not supported", (unsigned long)m.argumentIndex);
+        } else {
+            uint8_t kind = kindOf(t);
+            if (kind == K_CONST) typeSize(t, &size, &al);
+            off = cursor = roundUp(cursor, al);
+            if (t == MTLDataTypeTexture) [k appendFormat:@"t%lu", (unsigned long)m.textureReferenceType.textureType];
+            if (t == MTLDataTypePointer && m.pointerType.elementIsArgumentBuffer && m.pointerType.elementStructType) {
+                AGBLayout *n = [AGBLayout new]; [n setStructType:m.pointerType.elementStructType withDevice:device];
+                [self addSlot:idx offset:base + off kind:K_BUF];
+                nested[@([self count] - 1)] = n;
+                [k appendString:n->key];
+            } else [self addSlot:idx offset:base + off kind:kind == K_OTHER ? K_OTHER : kind];
         }
-        [descs addObject:descriptor(t, m.argumentIndex, len, tt, MTLBindingAccessReadOnly)];
-        [k appendFormat:@"%lu:%lu:%lu:%lu%@;", (unsigned long)m.argumentIndex, (unsigned long)t, (unsigned long)len,
-            (unsigned long)tt, nestedByIndex[@(m.argumentIndex)] ? nestedByIndex[@(m.argumentIndex)]->key : @""];
+        [k appendString:@";"];
+        cursor = off + size;
+        maxAlign = MAX(maxAlign, al);
     }
-    [k appendString:@"}"]; key = k;
-    MTLStructType *packed = descs.count ? createStructType(descs) : nil;
-    NSUInteger end = 0;
-    for (MTLStructMember *m in packed.members) {
-        MTLDataType t = m.dataType; NSUInteger n = 1, stride = 8;
-        if (t == MTLDataTypeArray) { n = m.arrayType.arrayLength; stride = m.arrayType.stride; t = m.arrayType.elementType; }
-        uint8_t kind = kindOf(t);
-        NSUInteger size, al; typeSize(t, &size, &al);
-        if (kind != K_CONST) { size = 8; al = 8; }
-        if (!stride) stride = size;
-        for (NSUInteger e = 0; e < n; e++) {
-            [self addSlot:m.argumentIndex + e offset:m.offset + e * stride kind:kind];
-            if (kind == K_CONST && e) break;   // a constant array is one index (base); elements by pointer math
-        }
-        AGBLayout *nl = nestedByIndex[@(m.argumentIndex)];
-        if (nl) nested[@([self slotForIndex:m.argumentIndex])] = nl;
-        end = MAX(end, m.offset + (n - 1) * stride + size);
-        align = MAX(align, al);
-    }
-    length = (end + align - 1) / align * align;
+    [k appendString:@"}"];
+    *outSize = roundUp(cursor, maxAlign); *outAlign = maxAlign;
+}
+- (void)setStructType:(MTLStructType *)st withDevice:(id)dev {
+    device = dev;
+    NSMutableString *k = [NSMutableString new];
+    NSUInteger size = 0, al = 8;
+    [self pack:st base:0 index:0 key:k size:&size align:&al depth:0];
+    key = k; align = MAX(al, (NSUInteger)8); length = roundUp(size, align);
     [self assignHandles];
 }
 - (void)assignHandles {
@@ -483,6 +500,22 @@ static void hookDraws(Class c, int render) {
     free(ms);
 }
 
+// AGB_TRACE_TEXTURES=1 (diagnosis): log every texture descriptor MTLIGAccelDevice is asked for, before MetalOld
+// validates it (a failing validation aborts without a public message).
+static void traceTextures(Class dev) {
+    SEL sel = @selector(newTextureWithDescriptor:);
+    __block IMP orig = NULL;
+    orig = replace(dev, sel, imp_implementationWithBlock(^id(id d, MTLTextureDescriptor *td) __attribute__((ns_returns_retained)) {
+        unsigned long comp = [td respondsToSelector:@selector(compressionType)] ? (unsigned long)[[td valueForKey:@"compressionType"] integerValue] : 0;
+        agb_log("texture: type %lu fmt %lu %lux%lux%lu mips %lu array %lu samples %lu usage 0x%lx storage %lu options 0x%lx swizzle 0x%x comp %lu",
+                (unsigned long)td.textureType, (unsigned long)td.pixelFormat, (unsigned long)td.width, (unsigned long)td.height,
+                (unsigned long)td.depth, (unsigned long)td.mipmapLevelCount, (unsigned long)td.arrayLength, (unsigned long)td.sampleCount,
+                (unsigned long)td.usage, (unsigned long)td.storageMode, (unsigned long)td.resourceOptions,
+                *(uint32_t *)&(MTLTextureSwizzleChannels){ td.swizzle.red, td.swizzle.green, td.swizzle.blue, td.swizzle.alpha }, comp);
+        return ((id (*)(id, SEL, id))orig)(d, sel, td);
+    }));
+}
+
 void agb_install(void);
 void agb_install(void) {
     static dispatch_once_t once;
@@ -490,8 +523,7 @@ void agb_install(void) {
         Class dev = NSClassFromString(@"MTLIGAccelDevice");
         Class cce = NSClassFromString(@"MTLIGAccelComputeCommandEncoder");
         Class rce = NSClassFromString(@"MTLIGAccelRenderCommandEncoder");
-        createStructType = dlsym(RTLD_DEFAULT, "MTLCreateStructTypeFromArgumentDescriptors");
-        if (!dev || !cce || !rce || !createStructType) { agb_log("not installed: driver classes or MetalOld entry point missing"); return; }
+        if (!dev || !cce || !rce) { agb_log("not installed: driver classes missing"); return; }
         g_handles = [NSMutableDictionary new]; g_samplers = [NSMutableArray new];
         // AGB_HANDLE_BASE=T,B (tests): start texture/buffer handle allocation at T and B, to exercise the top slots
         const char *hb = getenv("AGB_HANDLE_BASE");
@@ -509,6 +541,7 @@ void agb_install(void) {
         hookStage(rce, 2, @"Fragment");
         hookDraws(cce, 0);
         hookDraws(rce, 1);
+        if (getenv("AGB_TRACE_TEXTURES")) traceTextures(dev);
         agb_log("installed: textures %d..%d, buffers %d..%d (BTI %d), samplers %d..%d, %d draw/dispatch selectors",
                 AGB_TEX_SLOT, AGB_TEX_SLOT + AGB_TEX_COUNT - 1, AGB_BUF_SLOT, AGB_BUF_SLOT + AGB_BUF_COUNT - 1, AGB_BUF_BTI,
                 AGB_SAMP_SLOT, AGB_SAMP_SLOT + AGB_SAMP_COUNT - 1, g_nhooks);
