@@ -136,7 +136,7 @@ changed three callout reply blocks (an added `reason` argument lands where Tahoe
 back to Tahoe 25G342's CoreWiFi for every process: airportd and its clients then agree by construction.
 
 Tahoe has CoreWiFi only inside its x86_64h OS cache. The native donors cut it out (`tools/tahoe-donors`,
-recipe `cache_images`, with `tools/cache-dylib`) and install it at `CoreWiFi.framework/Versions/A/CoreWiFi` with its
+recipe `cache_images`, with hao-tools' `tools/cache-dylib`) and install it at `CoreWiFi.framework/Versions/A/CoreWiFi` with its
 own install name. `install.py` then renames it `CoreWiFiTahoe.dylib` (install name and file, re-signed) and installs
 the compat library as `CoreWiFi`, re-exporting it, the same way as IO80211 and WiFiPeerToPeer. dyld loads the file
 instead of the cached 27.x CoreWiFi and repoints the cached clients' bindings to it. airportd is not edited.
@@ -288,6 +288,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r56 2026-11-11 `src/corewifi/make` takes `dsc.py` from hao-tools' `tools/cache-dylib` (its single copy; next to this repository or `CACHE_DYLIB`) and records that checkout's commit and dirty state in `build.json`. No recipe or output change.
 - r55 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 746f1ec (12685dd + the native-call cache signal/fork fix) with the 26B131 async contract provider. No recipe change.
 - r54 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 12685dd (5651d79 + x86-64-v2 build and a startup CPU-feature check). No recipe change.
 - r53 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 5651d79 (native-call cache, JIT vector FP and LD1/ST1, scalar FP and conversions, round-to-odd FP32 FMA; u3 units + the optional-data contract). No recipe change.

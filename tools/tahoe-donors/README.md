@@ -29,7 +29,8 @@ Tahoe ships some libraries only inside its OS shared cache. The recipe's
 `cache_images` names them (today CoreWiFi, from the x86_64h OS cache: Tahoe's
 airportd needs the CoreWiFi it was built with). `native --cache DIR` cuts each
 one out of the cache family in `DIR` (donor-inputs' `out/os-cache/`) with
-[`tools/cache-dylib`](../cache-dylib/README.md), keeping its install name, signs it
+hao-tools' `tools/cache-dylib` (a hao-tools checkout next to this
+repository, or `CACHE_DYLIB=DIR`), keeping its install name, signs it
 ad hoc, verifies it with cache-dylib's `check.py` (bound GOT slots, resolvable
 Swift references, no instruction Ivy Bridge lacks) and adds it to the `system`
 role at its own path, with the recipe's owner, mode and flags. The extraction
@@ -78,5 +79,6 @@ list. Mixed-architecture, missing and resource-only roots remain candidates;
 with Tahoe's IOHDIXController, as established by the 27-first laptop test.
 
 ## Revisions
+- r12 2026-11-11 cache-dylib moved to hao-tools (its single copy): found next to this repository or through `CACHE_DYLIB`; a missing copy is an error before extracting.
 - r11 2026-11-11 `native --cache`: the recipe's `cache_images` (Tahoe CoreWiFi from the x86_64h OS cache) are cut out with tools/cache-dylib, verified and added to the system role at their own path; extraction records in `cache-images.json`.
 - r10 2026-11-11 Select positively identified native target roots before extracting the Tahoe payload; support fat64 Mach-O headers. DriverKit fixture metadata now follows the actual optional metadata argument.

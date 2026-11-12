@@ -13,8 +13,9 @@ import stat
 import subprocess
 
 UNIT = Path(__file__).resolve().parent
-REVISION = 11
-CACHE_DYLIB = UNIT.parent/'cache-dylib'
+REVISION = 12
+# tools/cache-dylib lives in hao-tools (a checkout next to this repository unless CACHE_DYLIB names its directory)
+CACHE_DYLIB = Path(os.environ.get('CACHE_DYLIB', UNIT.parents[2]/'hao-tools'/'tools'/'cache-dylib'))
 
 
 def sha(path):
@@ -142,6 +143,8 @@ def extract_cache_image(cache, family, image, destination):
     bind or (Apple's) export information, cache segment order, so dyld refuses them (README). Returns
     (extraction record, verification record)."""
     import sys
+    if not (CACHE_DYLIB/'cache_dylib.py').is_file():
+        raise ValueError('cache-dylib not found at '+str(CACHE_DYLIB)+': check out hao-tools next to this repository or set CACHE_DYLIB')
     sys.path.insert(0, str(CACHE_DYLIB))
     import cache_dylib, check  # noqa: E401 (imported here: the guest copy of this tool never extracts)
     record = cache_dylib.extract(cache, family.removeprefix('dyld_shared_cache_'), image, destination)
