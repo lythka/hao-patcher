@@ -17,7 +17,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-icon-caches | r3 | post | experiment | caches | x |  |  |  | ok | r3 2026-11-11 Row `icon_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (668 s |
 | golden-gate-live-text-service | r2 | post | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Checks the runtime in System (/usr/lib/hao-live-text/LiveText.dylib) on the read-only System ins |
 | golden-gate-live-text-shared | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Runtime in System (/usr/lib/hao-live-text, umbrella LiveText.dylib: the load command must fit li |
-| golden-gate-metal-framebuffer | r3 | oclp-hook | experiment |  | x | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
+| golden-gate-metal-framebuffer | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
 | golden-gate-metal-libraries | r18 | oclp-hook | experiment |  | x | x |  |  | **needs** | r18 2026-11-12 26B131 artifact from cache/metallib r56: cube and 1D sampler-form reads converted, which change |
 | golden-gate-native-identities | r1 | oclp-hook | experiment |  | x | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
 | golden-gate-shader-caches | r11 | post | experiment | caches | x |  |  |  | **needs** | r11 2026-11-12 Row `shader_caches_golden_gate` (26B131): the same harvest made by cache/seeds r2, without the  |
@@ -27,7 +27,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | hao-opencore | r40 | post | experiment |  | x | x |  |  | ok | r40 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | hao-runtime | r65 | oclp-hook | experiment |  | x | x |  |  | ok | r65 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | metal-compiler-compat | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Restored from darwin27-live-text-fixes v0.2.0 into tools/live-text; row metal_compiler_compat fo |
-| metalold-selectors | r3 | oclp-hook | product |  | x | x |  |  | ok | r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe  |
+| metalold-selectors | r4 | oclp-hook | product |  | x | x |  |  | ok | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
 | rec-audio | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-bluetooth-input | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-brightness-keys | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |

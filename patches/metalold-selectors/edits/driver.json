@@ -1,0 +1,14 @@
+{
+ "format": 1,
+ "path": "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver",
+ "arch": "x86_64",
+ "origin": {"kind": "oclp", "name": "AppleIntelHD4000GraphicsMTLDriver", "note": "OCLP's HD 4000 Metal driver (PatcherSupportPkg 2.0.5, hardware overlay)"},
+ "applied_by": "installer",
+ "edits": [
+  {"id": "weak-load-metalold-selectors", "kind": "op", "op": "macho.add-dylib",
+   "args": {"path": "/usr/lib/libmetalold-selectors.dylib", "weak": true, "timestamp": 2, "current_version": 0, "compat_version": 0},
+   "reason": "the driver loads the Metal selector shim, so frameworks that send newer Metal selectors get an answer instead of an unrecognized-selector crash; weak, so the driver still loads without the library"}
+ ],
+ "sign": {"mode": "adhoc", "identifier": "AppleIntelHD4000GraphicsMTLDriver"},
+ "expect": {"43ff24fc61c93a320f869ac913edf34e6c6af181a792c864c31511900bdbb6e9": "fb453c0a1e4882c9d628f10fd0ffe13e4f4a879ddae70396d31380ad96e85bea"}
+}
