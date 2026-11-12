@@ -87,6 +87,13 @@ static int is_load(const insn *x) {
         || startswith(x->op, "GATHER") || startswith(x->op, "SAMPLE") || strstr(x->op, "ATOMIC");
 }
 
+// "s0[r28.x]" with r28 holding argument-buffer data (a sampler handle)
+static int abt_index(const char *op, const char *abt, int temps);
+static int sampler_index(const char *op, const char *abt, int temps) {
+    if (op[0] != 's' || !isdigit((unsigned char)op[1])) return 0;
+    const char *b = strchr(op, '['); if (!b || b[1] != 'r') return 0;
+    int r = atoi(b + 2); return r >= 0 && r <= temps && abt[r];
+}
 // "t[r9.x]" -> 9 when r9 holds argument-buffer data
 static int abt_index(const char *op, const char *abt, int temps) {
     if (op[1] != '[' || op[2] != 'r') return 0;
@@ -95,11 +102,12 @@ static int abt_index(const char *op, const char *abt, int temps) {
 
 static char *rewrite_resources(const char *in, const igil_config *cfg, igil_stats *st) {
     int nl; line *L = split(in, &nl);
-    int temps = -1, tmax = -1, umax = -1, karg = -1, dcl_at = -1, temps_at = -1, ncb = 0, ntexdcl = 0;
+    int temps = -1, tmax = -1, umax = -1, smax = -1, karg = -1, dcl_at = -1, temps_at = -1, ncb = 0, ntexdcl = 0;
     for (int i = 0; i < nl; i++) {
         char t[256]; size_t n = L[i].n < 255 ? L[i].n : 255; memcpy(t, L[i].s, n); t[n] = 0;
         const char *d;
         if ((d = strstr(t, "DCL_TEMPS r0..r"))) { temps = atoi(d + 15); temps_at = i; }
+        if ((d = strstr(t, "DCL_SAMPLER s")) && atoi(d + 13) > smax) smax = atoi(d + 13);
         if ((d = strstr(t, "DCL_RESOURCE t")) && atoi(d + 14) > tmax) tmax = atoi(d + 14);
         if ((d = strstr(t, "DCL_UAV")) && (d = strstr(d, " u")) && isdigit((unsigned char)d[2]) && atoi(d + 2) > umax) umax = atoi(d + 2);
         if ((d = strstr(t, "KERNEL_ARGUMENT, ")) && atoi(d + 17) > karg) karg = atoi(d + 17);
@@ -139,18 +147,19 @@ static char *rewrite_resources(const char *in, const igil_config *cfg, igil_stat
         }
     }
     // what to rewrite
-    int ntex = 0, nbuf = 0;
+    int ntex = 0, nbuf = 0, nsamp = 0;
     for (int i = temps_at + 1; i < nl; i++) {
         if (!parse(L[i], &x)) continue;
+        for (int k = 0; k < x.na; k++) if (sampler_index(x.a[k], abt, temps)) { nsamp++; break; }
         if (!strcmp(x.op, "LD_UAV_TYPED") && x.na == 3 && startswith(x.a[2], "u[")) ntex++;
         for (int k = 0; k < x.na; k++) if (startswith(x.a[k], "t[") && abt_index(x.a[k], abt, temps)) { ntex++; break; }
         const ptrop *p = ptr_access(&x);
         if (p && x.na > p->surf && (ureg(x.a[p->surf]) >= 0 || creg(x.a[p->surf]) >= 0)) { int a = reg(x.a[p->addr]); if (a >= 0 && a <= temps && taint[a]) nbuf++; }
     }
-    if (!ntex && !nbuf) { free(taint); free(abt); free(L); return NULL; }
+    if (!ntex && !nbuf && !nsamp) { free(taint); free(abt); free(L); return NULL; }
 
-    int tbase = tmax + 1, ubase = umax + 1;
-    int T = temps + 1;   // scratch register
+    int tbase = tmax + 1, ubase = umax + 1, sbase = smax + 1;
+    int T = temps + 1;   // scratch registers: T (texture index), T+1 (sampler index)
     // binding table: constant buffers, then textures, then UAVs by register number (measured on the HD 4000), so
     // uN has index ncb + ntex + N and u(BUF_BTI - ncb - ntex + k) has the fixed index BUF_BTI + k
     int ufix = cfg->buf_bti - ncb - ntexdcl - (ntex ? cfg->tex_count : 0);
@@ -165,24 +174,34 @@ static char *rewrite_resources(const char *in, const igil_config *cfg, igil_stat
             if (nbuf) for (int k = 0; k < cfg->buf_count; k++)
                 putf(&o, "\tDCL_UAVRAW u%d, TRUE =\n\t{\n\t  KERNEL_ARGUMENT, %d,\n\t  LOCATION_INDEX, %d, 0,\n"
                          "\t  EMULATION_ARGUMENT, FALSE,\n\t  STRIDE, 4, 4\n\t};\n\n", ufix + k, ka++, cfg->buf_slot + k);
+            if (nsamp) for (int k = 0; k < cfg->samp_count; k++)
+                putf(&o, "\tDCL_SAMPLER s%d =\n\t{\n\t  KERNEL_ARGUMENT, %d,\n\t  LOCATION_INDEX, %d, 0,\n"
+                         "\t  EMULATION_ARGUMENT, FALSE\n\t};\n\n", sbase + k, ka++, cfg->samp_slot + k);
         }
-        if (i == temps_at) { putf(&o, "\tDCL_TEMPS r0..r%d;\n", T); continue; }
+        if (i == temps_at) { putf(&o, "\tDCL_TEMPS r0..r%d;\n", T + 1); continue; }
         if (i > temps_at && parse(L[i], &x)) {
             if (!strcmp(x.op, "LD_UAV_TYPED") && x.na == 3 && startswith(x.a[2], "u[")) {
                 char idx[48]; strcpy(idx, x.a[2] + 2); idx[strcspn(idx, "]")] = 0;
                 putf(&o, "\tIADD r%d.x, %s, %d;\n\tLOAD %s, %s, t[r%d.x], 2D;\n", T, idx, tbase, x.a[0], x.a[1], T);
                 st->textures++; continue;
             }
-            int ti = -1;
-            for (int k = 0; k < x.na; k++) if (startswith(x.a[k], "t[") && abt_index(x.a[k], abt, temps)) ti = k;
-            if (ti >= 0) {   // sample/load/gather on an argument-buffer handle: offset into the declared range
-                char idx[48]; strcpy(idx, x.a[ti] + 2); idx[strcspn(idx, "]")] = 0;
-                putf(&o, "\tIADD r%d.x, %s, %d;\n\t%s ", T, idx, tbase, x.op);
+            int ti = -1, si = -1;
+            for (int k = 0; k < x.na; k++) {
+                if (startswith(x.a[k], "t[") && abt_index(x.a[k], abt, temps)) ti = k;
+                if (sampler_index(x.a[k], abt, temps)) si = k;
+            }
+            if (ti >= 0 || si >= 0) {   // sample/load/gather on argument-buffer handles: offset into the declared ranges
+                char idx[48];
+                if (ti >= 0) { strcpy(idx, x.a[ti] + 2); idx[strcspn(idx, "]")] = 0; putf(&o, "\tIADD r%d.x, %s, %d;\n", T, idx, tbase); st->textures++; }
+                if (si >= 0) { strcpy(idx, strchr(x.a[si], '[') + 1); idx[strcspn(idx, "]")] = 0; putf(&o, "\tIADD r%d.x, %s, %d;\n", T + 1, idx, sbase); st->samplers++; }
+                putf(&o, "\t%s ", x.op);
                 for (int k = 0; k < x.na; k++) {
                     if (k) put(&o, ", ", 2);
-                    if (k == ti) putf(&o, "t[r%d.x]", T); else put(&o, x.a[k], strlen(x.a[k]));
+                    if (k == ti) putf(&o, "t[r%d.x]", T);
+                    else if (k == si) putf(&o, "s0[r%d.x]", T + 1);
+                    else put(&o, x.a[k], strlen(x.a[k]));
                 }
-                put(&o, ";\n", 2); st->textures++; continue;
+                put(&o, ";\n", 2); continue;
             }
             {
                 const ptrop *p = ptr_access(&x);
@@ -206,7 +225,7 @@ static char *rewrite_resources(const char *in, const igil_config *cfg, igil_stat
     }
     // keep the input's trailing-newline shape
     if (o.n && in[strlen(in) - 1] != '\n') o.p[--o.n] = 0;
-    st->tex_base = tbase; st->buf_base = ufix; (void)ubase;
+    st->tex_base = tbase; st->buf_base = ufix; st->samp_base = sbase; (void)ubase;
     free(taint); free(abt); free(L);
     return o.p;
 }

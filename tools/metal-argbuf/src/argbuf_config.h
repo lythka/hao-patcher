@@ -8,5 +8,5 @@
 #define AGB_BUF_SLOT   40
 #define AGB_BUF_COUNT  8
 #define AGB_BUF_BTI    40
-#define AGB_SAMP_SLOT  8
-#define AGB_SAMP_COUNT 8
+#define AGB_SAMP_SLOT  10   // Gen7 and Metal both have 16 sampler slots per stage: the top 6 are shared with clients
+#define AGB_SAMP_COUNT 6

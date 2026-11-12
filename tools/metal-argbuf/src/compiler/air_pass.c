@@ -9,6 +9,7 @@
 //      byte offset of AIR's 64-bit layout;
 //   2. a load of a pointer from constant memory becomes a volatile <2 x i32> load + bitcast i64 + inttoptr (volatile
 //      so instcombine does not fold it back into a pointer load).
+// ARGBUF_LLVM_OPTIONS (host harness) passes options such as -print-after-all to LLVM.
 // ARGBUF_IR_DUMP_DIR=DIR (host harness) prints each module before and after to DIR/N.before.ll, DIR/N.after.ll.
 #include "air_hook.h"
 #include <dlfcn.h>
@@ -43,7 +44,9 @@ enum { OP_GEP = 29, OP_LOAD = 27 };                                             
     X(TD, LLVMCreateTargetData, const char *) X(unsigned long long, LLVMOffsetOfElement, TD, T, unsigned) \
     X(unsigned long long, LLVMABISizeOfType, TD, T) X(unsigned, LLVMGetNamedMetadataNumOperands, M, const char *) \
     X(void, LLVMGetNamedMetadataOperands, M, const char *, V *) X(V, LLVMMDNode, V *, unsigned) \
-    X(unsigned, LLVMGetMDNodeNumOperands, V) X(void, LLVMGetMDNodeOperands, V, V *) X(V, LLVMIsAFunction, V)
+    X(unsigned, LLVMGetMDNodeNumOperands, V) X(void, LLVMGetMDNodeOperands, V, V *) X(V, LLVMIsAFunction, V) \
+    X(void *, LLVMGetFirstUse, V) X(void *, LLVMGetNextUse, void *) X(V, LLVMGetUser, void *) X(void, LLVMSetOperand, V, unsigned, V) \
+    X(V, LLVMIsAConstantAggregateZero, V) X(V, LLVMIsACallInst, V) X(const char *, LLVMGetStructName, T)
 #define DECL(R, N, ...) static R (*N)(__VA_ARGS__);
 API(DECL)
 #undef DECL
@@ -63,6 +66,15 @@ void air_transform_init(void) {
 #undef LOAD
     if (ok) td64 = LLVMCreateTargetData(AIR64);
     ready = ok && td64;
+    // ARGBUF_LLVM_OPTIONS="-print-after-all ..." (host harness): LLVM options for the IGIL target's passes
+    const char *opts = getenv("ARGBUF_LLVM_OPTIONS");
+    void (*parse)(int, const char *const *, const char *) = opts ? (void (*)(int, const char *const *, const char *))dlsym(llvm, "LLVMParseCommandLineOptions") : NULL;
+    if (parse) {
+        static char buf[1024]; static const char *argv[32]; int argc = 0;
+        snprintf(buf, sizeof buf, "%s", opts); argv[argc++] = "argbuf";
+        for (char *t = strtok(buf, " "); t && argc < 31; t = strtok(NULL, " ")) argv[argc++] = t;
+        parse(argc, argv, "argbuf");
+    }
 }
 
 static int contains_pointer(T t, int depth) {
@@ -182,4 +194,45 @@ void air_transform(void *module) {
     LLVMDisposeBuilder(b);
     if (geps || loads) syslog(LOG_NOTICE, "icbe_wrap: AIR argument buffers: %d member addresses, %d pointer loads", geps, loads);
     dump(m, n, "after");
+}
+
+// ---- IGIL TextureTypeEncode wrapper ------------------------------------------------------------------------------
+// The pass builds a map from the function's own texture/sampler arguments; when the function has any, a texture or
+// sampler call with an operand outside that map (an argument-buffer handle) has all its uses replaced by
+// zeroinitializer (IGILTextureTypeEncode::runOnFunction, ConstantAggregateZero::get + replaceAllUsesWith). Record
+// the uses of every call taking a texture/sampler, run the pass, and give back the uses it zeroed.
+static int texture_or_sampler(T t) {
+    if (LLVMGetTypeKind(t) != K_POINTER) return 0;
+    T e = LLVMGetElementType(t);
+    if (LLVMGetTypeKind(e) != K_STRUCT) return 0;
+    const char *n = LLVMGetStructName(e);
+    return n && (strstr(n, "_texture") || strstr(n, "_sampler"));
+}
+typedef struct { V user, call; unsigned idx; } use_rec;
+_Bool air_tte_run(void *pass, void *fn) {
+    if (!ready || getenv("ARGBUF_TTE_DISABLE")) return air_tte_orig(pass, fn);
+    size_t n = 0, cap = 64; use_rec *r = malloc(cap * sizeof *r);
+    for (BB bb = LLVMGetFirstBasicBlock(fn); bb; bb = LLVMGetNextBasicBlock(bb))
+        for (V in = LLVMGetFirstInstruction(bb); in; in = LLVMGetNextInstruction(in)) {
+            if (!LLVMIsACallInst(in) || LLVMGetTypeKind(LLVMTypeOf(in)) == K_VOID) continue;
+            int tex = 0, no = LLVMGetNumOperands(in);
+            for (int k = 0; k < no && !tex; k++) tex = texture_or_sampler(LLVMTypeOf(LLVMGetOperand(in, (unsigned)k)));
+            if (!tex) continue;
+            for (void *u = LLVMGetFirstUse(in); u; u = LLVMGetNextUse(u)) {
+                V user = LLVMGetUser(u); int uo = LLVMGetNumOperands(user);
+                for (int k = 0; k < uo; k++) if (LLVMGetOperand(user, (unsigned)k) == in) {
+                    if (n == cap) r = realloc(r, (cap *= 2) * sizeof *r);
+                    r[n++] = (use_rec){ user, in, (unsigned)k };
+                }
+            }
+        }
+    _Bool changed = air_tte_orig(pass, fn);
+    int restored = 0;
+    for (size_t i = 0; i < n; i++) {
+        V now = LLVMGetOperand(r[i].user, r[i].idx);
+        if (now != r[i].call && LLVMIsAConstantAggregateZero(now)) { LLVMSetOperand(r[i].user, r[i].idx, r[i].call); restored++; }
+    }
+    free(r);
+    if (restored) syslog(LOG_NOTICE, "icbe_wrap: IGILTextureTypeEncode: restored %d uses of argument-buffer texture/sampler calls", restored);
+    return changed || restored;
 }

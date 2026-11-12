@@ -30,12 +30,12 @@ static void **rvt(TB *real) { return real->vptr; }   // real vptr points at its 
 #include "igil_rewrite.h"
 #include "../argbuf_config.h"
 #include "air_hook.h"
-static const igil_config CFG = { AGB_TEX_SLOT, AGB_TEX_COUNT, AGB_BUF_SLOT, AGB_BUF_COUNT, AGB_BUF_BTI };
+static const igil_config CFG = { AGB_TEX_SLOT, AGB_TEX_COUNT, AGB_BUF_SLOT, AGB_BUF_COUNT, AGB_BUF_BTI, AGB_SAMP_SLOT, AGB_SAMP_COUNT };
 static char *rewrite(const char *in) {
     igil_stats st; char *r = igil_rewrite(in, &CFG, &st);
-    if (r) syslog(LOG_NOTICE, "icbe_wrap: argument buffers: %d texture reads (t%d.., slots %d..%d), %d buffer accesses (u%d.., slots %d..%d)%s",
+    if (r) syslog(LOG_NOTICE, "icbe_wrap: argument buffers: %d texture reads (t%d.., slots %d..%d), %d buffer accesses (u%d.., slots %d..%d), %d samplers (s%d..)%s",
                   st.textures, st.tex_base, CFG.tex_slot, CFG.tex_slot + CFG.tex_count - 1,
-                  st.buffers, st.buf_base, CFG.buf_slot, CFG.buf_slot + CFG.buf_count - 1,
+                  st.buffers, st.buf_base, CFG.buf_slot, CFG.buf_slot + CFG.buf_count - 1, st.samplers, st.samp_base,
                   st.unresolved ? ", SOME POINTER ACCESSES UNRESOLVED" : "");
     return r;
 }

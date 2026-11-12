@@ -83,15 +83,31 @@ class Rewrite(unittest.TestCase):
             self.assertNotIn(before, out)
             self.assertIn(after, out)
 
-    def test_sampler_member_untouched(self):
-        # ks: texture + sampler members; textures are offset into the declared range, s0[r] is not handled yet
+    def samplers(self, text):
+        return [(int(a), int(b)) for a, b in re.findall(r'DCL_SAMPLER s(\d+) =\s*\{\s*KERNEL_ARGUMENT, \d+,\s*LOCATION_INDEX, (\d+), 0', text)]
+
+    def test_sampler_range(self):
+        # ks: texture + sampler members; both handles are offset into declared ranges
         changed, out, _ = self.fixture('ks.igil')
         self.assertTrue(changed)
+        c = self.cfg
+        self.assertEqual(self.samplers(out), [(k, c['SAMP_SLOT'] + k) for k in range(c['SAMP_COUNT'])])
         self.assertEqual(len(re.findall(r'SAMPLE_L .*t\[r\d+\.x\], s0\[r\d+\.x\]', out)), 2)
-        self.assertNotIn('DCL_SAMPLER', out)
+
+    def test_sampler_range_after_own_sampler(self):
+        # c7 compiled with the IGILTextureTypeEncode wrapper: the function's own sampler is s0, so the argument-buffer
+        # range starts at s1 and the handle is offset by 1
+        src = (FIX / 'k13-c7-kept.igil').read_text()
+        self.assertRegex(src, r'SAMPLE_L .*s0\[r\d+\.x\]')
+        changed, out, _ = self.fixture('k13-c7-kept.igil')
+        self.assertTrue(changed)
+        c = self.cfg
+        self.assertEqual(self.samplers(out)[1:], [(1 + k, c['SAMP_SLOT'] + k) for k in range(c['SAMP_COUNT'])])
+        self.assertRegex(out, r'IADD r(\d+)\.x, r\d+\.x, 1;\n\tSAMPLE_L .*s0\[r\1\.x\]')
+        self.assertRegex(out, r'SAMPLE_L .*t0, s0, ')   # the function's own sample is untouched
 
     def test_dropped_sample_documented(self):
-        # c6/c3: with a sampler of the function's own, the IGIL target drops the argument-buffer sample entirely
+        # c6/c3 compiled WITHOUT the wrapper: IGILTextureTypeEncode drops the argument-buffer sample
         for name in ('k13-c6.igil', 'k13-c3.igil'):
             self.assertNotRegex((FIX / name).read_text(), r'SAMPLE_L .*s0\[', name)
         self.assertRegex((FIX / 'k13-c8.igil').read_text(), r'SAMPLE_L .*s0\[')
