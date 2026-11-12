@@ -1,0 +1,6779 @@
+{
+ "displaced-preboot": {
+  "commands": [
+   {
+    "capture": true,
+    "command": [
+     "hdiutil",
+     "attach",
+     "-imagekey",
+     "diskimage-class=CRawDiskImage",
+     "-nomount",
+     "-plist",
+     "<root>/output.img"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "partitionDisk",
+     "/dev/disk70",
+     "GPT",
+     "APFS",
+     "Golden",
+     "100%"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "disk71s1"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Golden",
+     "-role",
+     "S",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "deleteVolume",
+     "disk71s1"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/system",
+     "disk71s2"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "/staged/pristine.sh",
+     "system",
+     "--filesystem",
+     "/staged/golden-payload/filesystem.dmg",
+     "--system",
+     "<root>/work/mnt/system",
+     "--image",
+     "<root>/output.img",
+     "--layout-helper",
+     "/staged/layout.py",
+     "--python",
+     "/staged/python"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Golden - Data",
+     "-role",
+     "D",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/layout.py",
+     "group",
+     "--image",
+     "<root>/output.img",
+     "--system",
+     "<root>/work/mnt/system",
+     "--data",
+     "disk71s3"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/data",
+     "disk71s3"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/data"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Preboot",
+     "-role",
+     "B",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Recovery",
+     "-role",
+     "R",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "VM",
+     "-role",
+     "V",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/preboot",
+     "disk71s4"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/recovery",
+     "disk71s5"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/recovery"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "/sbin/mount_msdos",
+     "-o",
+     "nobrowse",
+     "/dev/disk70s1",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s2"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s3"
+    ],
+    "environment": 1
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 2
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s5"
+    ],
+    "environment": 3
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "/staged/pristine.sh",
+     "finalize",
+     "--system",
+     "<root>/work/mnt/system",
+     "--data",
+     "<root>/work/mnt/data",
+     "--fl",
+     "/staged/fl",
+     "--kernel",
+     "/staged/kernel",
+     "--kdk",
+     "/staged/kdk",
+     "--donor-cli",
+     "/staged/tahoe-donors/make",
+     "--extensions-artifact",
+     "<root>/extensions",
+     "--native-artifact",
+     "<root>/native",
+     "--kdk-preparer",
+     "/staged/kdk-preparer.py",
+     "--python",
+     "/staged/python"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/tahoe-donors/make",
+     "install-role",
+     "--artifact",
+     "<root>/boot",
+     "--role",
+     "preboot",
+     "--destination",
+     "<root>/work/mnt/preboot/DATA-UUID"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/tahoe-donors/make",
+     "install-role",
+     "--artifact",
+     "<root>/recovery",
+     "--role",
+     "recovery",
+     "--destination",
+     "<root>/work/mnt/recovery/DATA-UUID"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "--rsrc",
+     "--extattr",
+     "--acl",
+     "<root>/esp",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/hardware/apply",
+     "apply",
+     "--artifact",
+     "/staged/hardware",
+     "--system-root",
+     "<root>/work/mnt/system",
+     "--data-root",
+     "<root>/work/mnt/data",
+     "--report",
+     "<root>/work/hardware.json"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "rm",
+     "-rf",
+     "<root>/work/mnt/system/.Spotlight-V100"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/kernel/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/KernelCollections/BootKernelExtensions.kc",
+     "<root>/work/BootKernelExtensions.kc"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/userspace/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/hao/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/selectors/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/metal/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "rm",
+     "-rf",
+     "<root>/work/mnt/system/.Spotlight-V100"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "updatePreboot",
+     "disk71s2"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/preboot",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+     "<root>/work/mnt/preboot/DATA-UUID/System/Library/CoreServices/SystemVersion.plist"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+     "<root>/work/mnt/preboot/DATA-UUID/boot/System/Library/CoreServices/SystemVersion.plist"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+     "<root>/work/mnt/preboot/DATA-UUID/cryptex1/current/SystemVersion.plist"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "bless",
+     "--folder",
+     "<root>/work/mnt/system/System/Library/CoreServices",
+     "--bootefi",
+     "--label",
+     "Golden"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "bless",
+     "--mount",
+     "<root>/work/mnt/system",
+     "--create-snapshot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/preboot",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "mount",
+     "-o",
+     "nobrowse,rdonly",
+     "-t",
+     "apfs",
+     "/dev/disk71s2",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/posts/esp/apply.sh"
+    ],
+    "environment": 6
+   },
+   {
+    "capture": false,
+    "command": [
+     "rm",
+     "-rf",
+     "<root>/work/mnt/data/.Spotlight-V100"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sync"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/esp",
+     "<root>/work/boot-efi/payload"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/recovery"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/data"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "hdiutil",
+     "detach",
+     "/dev/disk70"
+    ],
+    "environment": 4
+   }
+  ],
+  "environments": [
+   {
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site"
+   },
+   {
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "SYSU": "SYSTEM-UUID",
+    "TAHOE_DONOR_TOOL": "/staged/tahoe-donors/make",
+    "TAHOE_DRIVERKIT_ARTIFACT": "<root>/driverkit",
+    "TAHOE_NATIVE_ARTIFACT": "<root>/native"
+   },
+   {
+    "DATA": "<root>/work/mnt/data",
+    "DATU": "DATA-UUID",
+    "ESP": "<root>/work/mnt/esp",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "P": "/staged/posts/esp",
+    "PATCH_OUTPUT_DIR": "<root>/work/post/esp",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PRE": "<root>/work/mnt/preboot",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "REC": "<root>/work/mnt/recovery",
+    "SYS": "<root>/work/mnt/system",
+    "SYSU": "SYSTEM-UUID"
+   }
+  ],
+  "error": null,
+  "record": {
+   "attached_device": null,
+   "commands": [
+    {
+     "capture": true,
+     "command": [
+      "hdiutil",
+      "attach",
+      "-imagekey",
+      "diskimage-class=CRawDiskImage",
+      "-nomount",
+      "-plist",
+      "<root>/output.img"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "partitionDisk",
+      "/dev/disk70",
+      "GPT",
+      "APFS",
+      "Golden",
+      "100%"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "disk71s1"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Golden",
+      "-role",
+      "S",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "deleteVolume",
+      "disk71s1"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/system",
+      "disk71s2"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "/staged/pristine.sh",
+      "system",
+      "--filesystem",
+      "/staged/golden-payload/filesystem.dmg",
+      "--system",
+      "<root>/work/mnt/system",
+      "--image",
+      "<root>/output.img",
+      "--layout-helper",
+      "/staged/layout.py",
+      "--python",
+      "/staged/python"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Golden - Data",
+      "-role",
+      "D",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/layout.py",
+      "group",
+      "--image",
+      "<root>/output.img",
+      "--system",
+      "<root>/work/mnt/system",
+      "--data",
+      "disk71s3"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/data",
+      "disk71s3"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/data"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Preboot",
+      "-role",
+      "B",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Recovery",
+      "-role",
+      "R",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "VM",
+      "-role",
+      "V",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/preboot",
+      "disk71s4"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/recovery",
+      "disk71s5"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/recovery"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "/sbin/mount_msdos",
+      "-o",
+      "nobrowse",
+      "/dev/disk70s1",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s2"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s3"
+     ],
+     "environment": 1
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 2
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s5"
+     ],
+     "environment": 3
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "/staged/pristine.sh",
+      "finalize",
+      "--system",
+      "<root>/work/mnt/system",
+      "--data",
+      "<root>/work/mnt/data",
+      "--fl",
+      "/staged/fl",
+      "--kernel",
+      "/staged/kernel",
+      "--kdk",
+      "/staged/kdk",
+      "--donor-cli",
+      "/staged/tahoe-donors/make",
+      "--extensions-artifact",
+      "<root>/extensions",
+      "--native-artifact",
+      "<root>/native",
+      "--kdk-preparer",
+      "/staged/kdk-preparer.py",
+      "--python",
+      "/staged/python"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/tahoe-donors/make",
+      "install-role",
+      "--artifact",
+      "<root>/boot",
+      "--role",
+      "preboot",
+      "--destination",
+      "<root>/work/mnt/preboot/DATA-UUID"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/tahoe-donors/make",
+      "install-role",
+      "--artifact",
+      "<root>/recovery",
+      "--role",
+      "recovery",
+      "--destination",
+      "<root>/work/mnt/recovery/DATA-UUID"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "--rsrc",
+      "--extattr",
+      "--acl",
+      "<root>/esp",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/hardware/apply",
+      "apply",
+      "--artifact",
+      "/staged/hardware",
+      "--system-root",
+      "<root>/work/mnt/system",
+      "--data-root",
+      "<root>/work/mnt/data",
+      "--report",
+      "<root>/work/hardware.json"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "rm",
+      "-rf",
+      "<root>/work/mnt/system/.Spotlight-V100"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/kernel/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/KernelCollections/BootKernelExtensions.kc",
+      "<root>/work/BootKernelExtensions.kc"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/userspace/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/hao/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/selectors/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/metal/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "rm",
+      "-rf",
+      "<root>/work/mnt/system/.Spotlight-V100"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "updatePreboot",
+      "disk71s2"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/preboot",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+      "<root>/work/mnt/preboot/DATA-UUID/System/Library/CoreServices/SystemVersion.plist"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+      "<root>/work/mnt/preboot/DATA-UUID/boot/System/Library/CoreServices/SystemVersion.plist"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+      "<root>/work/mnt/preboot/DATA-UUID/cryptex1/current/SystemVersion.plist"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "bless",
+      "--folder",
+      "<root>/work/mnt/system/System/Library/CoreServices",
+      "--bootefi",
+      "--label",
+      "Golden"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "bless",
+      "--mount",
+      "<root>/work/mnt/system",
+      "--create-snapshot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/preboot",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "mount",
+      "-o",
+      "nobrowse,rdonly",
+      "-t",
+      "apfs",
+      "/dev/disk71s2",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/posts/esp/apply.sh"
+     ],
+     "environment": 6
+    },
+    {
+     "capture": false,
+     "command": [
+      "rm",
+      "-rf",
+      "<root>/work/mnt/data/.Spotlight-V100"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sync"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/esp",
+      "<root>/work/boot-efi/payload"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/recovery"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/data"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "hdiutil",
+      "detach",
+      "/dev/disk70"
+     ],
+     "environment": 4
+    }
+   ],
+   "configuration": {
+    "donor_tool": "/staged/tahoe-donors/make",
+    "donors": {
+     "boot": "<root>/boot",
+     "driverkit": "<root>/driverkit",
+     "extensions": "<root>/extensions",
+     "native": "<root>/native",
+     "recovery": "<root>/recovery"
+    },
+    "environment": {
+     "OCLP": "/staged/oclp",
+     "PYTHONPATH": "/staged/site"
+    },
+    "esp": "<root>/esp",
+    "fl": "/staged/fl",
+    "hardware": {
+     "artifact": "/staged/hardware",
+     "tool": "/staged/hardware/apply"
+    },
+    "hooks": [
+     {
+      "kc_hook": "/staged/kernel/kc-hook.sh",
+      "name": "darwin27-kernel"
+     },
+     {
+      "kc_hook": "/staged/userspace/kc-hook.sh",
+      "name": "golden-gate-userspace"
+     },
+     {
+      "kc_hook": "/staged/hao/kc-hook.sh",
+      "name": "hao"
+     },
+     {
+      "kc_hook": "/staged/selectors/kc-hook.sh",
+      "name": "selectors"
+     },
+     {
+      "kc_hook": "/staged/metal/kc-hook.sh",
+      "name": "metal"
+     }
+    ],
+    "image": "<root>/output.img",
+    "kdk": "/staged/kdk",
+    "kdk_preparer": "/staged/kdk-preparer.py",
+    "kernel": "/staged/kernel",
+    "layout_helper": "/staged/layout.py",
+    "name": "Golden",
+    "payload": "/staged/golden-payload",
+    "posts": [
+     {
+      "folder": "/staged/posts/esp",
+      "name": "esp",
+      "script": "/staged/posts/esp/apply.sh"
+     }
+    ],
+    "pristine_script": "/staged/pristine.sh",
+    "python": "/staged/python",
+    "size_bytes": 32768,
+    "work": "<root>/work"
+   },
+   "group_uuid": "DATA-UUID",
+   "operation": "golden-first-image",
+   "revision": 1,
+   "status": "assembled",
+   "steps": [
+    {
+     "complete": true,
+     "name": "layout"
+    },
+    {
+     "complete": true,
+     "name": "golden-system"
+    },
+    {
+     "complete": true,
+     "name": "group-volumes"
+    },
+    {
+     "complete": true,
+     "name": "golden-finalize"
+    },
+    {
+     "complete": true,
+     "name": "boot-and-esp"
+    },
+    {
+     "complete": true,
+     "name": "hardware"
+    },
+    {
+     "complete": true,
+     "name": "recipes"
+    },
+    {
+     "complete": true,
+     "name": "recipe darwin27-kernel"
+    },
+    {
+     "complete": true,
+     "name": "recipe golden-gate-userspace"
+    },
+    {
+     "complete": true,
+     "name": "recipe hao"
+    },
+    {
+     "complete": true,
+     "name": "recipe selectors"
+    },
+    {
+     "complete": true,
+     "name": "recipe metal"
+    },
+    {
+     "complete": true,
+     "name": "snapshot"
+    },
+    {
+     "complete": true,
+     "name": "posts"
+    },
+    {
+     "complete": true,
+     "name": "post esp"
+    },
+    {
+     "complete": true,
+     "name": "efi-bundle"
+    }
+   ],
+   "unit": "pipeline",
+   "validation": "BUILD ONLY; boot and complete product acceptance remain untested",
+   "volumes": {
+    "data": "disk71s3",
+    "esp": "/dev/disk70s1",
+    "preboot": "disk71s4",
+    "recovery": "disk71s5",
+    "system": "disk71s2",
+    "vm": "disk71s6"
+   }
+  }
+ },
+ "full": {
+  "commands": [
+   {
+    "capture": true,
+    "command": [
+     "hdiutil",
+     "attach",
+     "-imagekey",
+     "diskimage-class=CRawDiskImage",
+     "-nomount",
+     "-plist",
+     "<root>/output.img"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "partitionDisk",
+     "/dev/disk70",
+     "GPT",
+     "APFS",
+     "Golden",
+     "100%"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "disk71s1"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Golden",
+     "-role",
+     "S",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "deleteVolume",
+     "disk71s1"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/system",
+     "disk71s2"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "/staged/pristine.sh",
+     "system",
+     "--filesystem",
+     "/staged/golden-payload/filesystem.dmg",
+     "--system",
+     "<root>/work/mnt/system",
+     "--image",
+     "<root>/output.img",
+     "--layout-helper",
+     "/staged/layout.py",
+     "--python",
+     "/staged/python"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Golden - Data",
+     "-role",
+     "D",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/layout.py",
+     "group",
+     "--image",
+     "<root>/output.img",
+     "--system",
+     "<root>/work/mnt/system",
+     "--data",
+     "disk71s3"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/data",
+     "disk71s3"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/data"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Preboot",
+     "-role",
+     "B",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Recovery",
+     "-role",
+     "R",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "VM",
+     "-role",
+     "V",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/preboot",
+     "disk71s4"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/recovery",
+     "disk71s5"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/recovery"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "/sbin/mount_msdos",
+     "-o",
+     "nobrowse",
+     "/dev/disk70s1",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s2"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s3"
+    ],
+    "environment": 1
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 2
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s5"
+    ],
+    "environment": 3
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "/staged/pristine.sh",
+     "finalize",
+     "--system",
+     "<root>/work/mnt/system",
+     "--data",
+     "<root>/work/mnt/data",
+     "--fl",
+     "/staged/fl",
+     "--kernel",
+     "/staged/kernel",
+     "--kdk",
+     "/staged/kdk",
+     "--donor-cli",
+     "/staged/tahoe-donors/make",
+     "--extensions-artifact",
+     "<root>/extensions",
+     "--native-artifact",
+     "<root>/native",
+     "--kdk-preparer",
+     "/staged/kdk-preparer.py",
+     "--python",
+     "/staged/python"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/tahoe-donors/make",
+     "install-role",
+     "--artifact",
+     "<root>/boot",
+     "--role",
+     "preboot",
+     "--destination",
+     "<root>/work/mnt/preboot/DATA-UUID"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/tahoe-donors/make",
+     "install-role",
+     "--artifact",
+     "<root>/recovery",
+     "--role",
+     "recovery",
+     "--destination",
+     "<root>/work/mnt/recovery/DATA-UUID"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "--rsrc",
+     "--extattr",
+     "--acl",
+     "<root>/esp",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/hardware/apply",
+     "apply",
+     "--artifact",
+     "/staged/hardware",
+     "--system-root",
+     "<root>/work/mnt/system",
+     "--data-root",
+     "<root>/work/mnt/data",
+     "--report",
+     "<root>/work/hardware.json"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "rm",
+     "-rf",
+     "<root>/work/mnt/system/.Spotlight-V100"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/kernel/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/KernelCollections/BootKernelExtensions.kc",
+     "<root>/work/BootKernelExtensions.kc"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/userspace/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/hao/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/selectors/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/metal/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "rm",
+     "-rf",
+     "<root>/work/mnt/system/.Spotlight-V100"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "updatePreboot",
+     "disk71s2"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+     "<root>/work/mnt/preboot/DATA-UUID/System/Library/CoreServices/SystemVersion.plist"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+     "<root>/work/mnt/preboot/DATA-UUID/boot/System/Library/CoreServices/SystemVersion.plist"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+     "<root>/work/mnt/preboot/DATA-UUID/cryptex1/current/SystemVersion.plist"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "bless",
+     "--folder",
+     "<root>/work/mnt/system/System/Library/CoreServices",
+     "--bootefi",
+     "--label",
+     "Golden"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "bless",
+     "--mount",
+     "<root>/work/mnt/system",
+     "--create-snapshot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/preboot",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "mount",
+     "-o",
+     "nobrowse,rdonly",
+     "-t",
+     "apfs",
+     "/dev/disk71s2",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/posts/esp/apply.sh"
+    ],
+    "environment": 6
+   },
+   {
+    "capture": false,
+    "command": [
+     "rm",
+     "-rf",
+     "<root>/work/mnt/data/.Spotlight-V100"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sync"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/esp",
+     "<root>/work/boot-efi/payload"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/recovery"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/data"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "hdiutil",
+     "detach",
+     "/dev/disk70"
+    ],
+    "environment": 4
+   }
+  ],
+  "environments": [
+   {
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site"
+   },
+   {
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "SYSU": "SYSTEM-UUID",
+    "TAHOE_DONOR_TOOL": "/staged/tahoe-donors/make",
+    "TAHOE_DRIVERKIT_ARTIFACT": "<root>/driverkit",
+    "TAHOE_NATIVE_ARTIFACT": "<root>/native"
+   },
+   {
+    "DATA": "<root>/work/mnt/data",
+    "DATU": "DATA-UUID",
+    "ESP": "<root>/work/mnt/esp",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "P": "/staged/posts/esp",
+    "PATCH_OUTPUT_DIR": "<root>/work/post/esp",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PRE": "<root>/work/mnt/preboot",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "REC": "<root>/work/mnt/recovery",
+    "SYS": "<root>/work/mnt/system",
+    "SYSU": "SYSTEM-UUID"
+   }
+  ],
+  "error": null,
+  "record": {
+   "attached_device": null,
+   "commands": [
+    {
+     "capture": true,
+     "command": [
+      "hdiutil",
+      "attach",
+      "-imagekey",
+      "diskimage-class=CRawDiskImage",
+      "-nomount",
+      "-plist",
+      "<root>/output.img"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "partitionDisk",
+      "/dev/disk70",
+      "GPT",
+      "APFS",
+      "Golden",
+      "100%"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "disk71s1"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Golden",
+      "-role",
+      "S",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "deleteVolume",
+      "disk71s1"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/system",
+      "disk71s2"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "/staged/pristine.sh",
+      "system",
+      "--filesystem",
+      "/staged/golden-payload/filesystem.dmg",
+      "--system",
+      "<root>/work/mnt/system",
+      "--image",
+      "<root>/output.img",
+      "--layout-helper",
+      "/staged/layout.py",
+      "--python",
+      "/staged/python"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Golden - Data",
+      "-role",
+      "D",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/layout.py",
+      "group",
+      "--image",
+      "<root>/output.img",
+      "--system",
+      "<root>/work/mnt/system",
+      "--data",
+      "disk71s3"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/data",
+      "disk71s3"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/data"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Preboot",
+      "-role",
+      "B",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Recovery",
+      "-role",
+      "R",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "VM",
+      "-role",
+      "V",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/preboot",
+      "disk71s4"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/recovery",
+      "disk71s5"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/recovery"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "/sbin/mount_msdos",
+      "-o",
+      "nobrowse",
+      "/dev/disk70s1",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s2"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s3"
+     ],
+     "environment": 1
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 2
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s5"
+     ],
+     "environment": 3
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "/staged/pristine.sh",
+      "finalize",
+      "--system",
+      "<root>/work/mnt/system",
+      "--data",
+      "<root>/work/mnt/data",
+      "--fl",
+      "/staged/fl",
+      "--kernel",
+      "/staged/kernel",
+      "--kdk",
+      "/staged/kdk",
+      "--donor-cli",
+      "/staged/tahoe-donors/make",
+      "--extensions-artifact",
+      "<root>/extensions",
+      "--native-artifact",
+      "<root>/native",
+      "--kdk-preparer",
+      "/staged/kdk-preparer.py",
+      "--python",
+      "/staged/python"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/tahoe-donors/make",
+      "install-role",
+      "--artifact",
+      "<root>/boot",
+      "--role",
+      "preboot",
+      "--destination",
+      "<root>/work/mnt/preboot/DATA-UUID"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/tahoe-donors/make",
+      "install-role",
+      "--artifact",
+      "<root>/recovery",
+      "--role",
+      "recovery",
+      "--destination",
+      "<root>/work/mnt/recovery/DATA-UUID"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "--rsrc",
+      "--extattr",
+      "--acl",
+      "<root>/esp",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/hardware/apply",
+      "apply",
+      "--artifact",
+      "/staged/hardware",
+      "--system-root",
+      "<root>/work/mnt/system",
+      "--data-root",
+      "<root>/work/mnt/data",
+      "--report",
+      "<root>/work/hardware.json"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "rm",
+      "-rf",
+      "<root>/work/mnt/system/.Spotlight-V100"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/kernel/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/KernelCollections/BootKernelExtensions.kc",
+      "<root>/work/BootKernelExtensions.kc"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/userspace/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/hao/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/selectors/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/metal/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "rm",
+      "-rf",
+      "<root>/work/mnt/system/.Spotlight-V100"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "updatePreboot",
+      "disk71s2"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+      "<root>/work/mnt/preboot/DATA-UUID/System/Library/CoreServices/SystemVersion.plist"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+      "<root>/work/mnt/preboot/DATA-UUID/boot/System/Library/CoreServices/SystemVersion.plist"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+      "<root>/work/mnt/preboot/DATA-UUID/cryptex1/current/SystemVersion.plist"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "bless",
+      "--folder",
+      "<root>/work/mnt/system/System/Library/CoreServices",
+      "--bootefi",
+      "--label",
+      "Golden"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "bless",
+      "--mount",
+      "<root>/work/mnt/system",
+      "--create-snapshot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/preboot",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "mount",
+      "-o",
+      "nobrowse,rdonly",
+      "-t",
+      "apfs",
+      "/dev/disk71s2",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/posts/esp/apply.sh"
+     ],
+     "environment": 6
+    },
+    {
+     "capture": false,
+     "command": [
+      "rm",
+      "-rf",
+      "<root>/work/mnt/data/.Spotlight-V100"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sync"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/esp",
+      "<root>/work/boot-efi/payload"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/recovery"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/data"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "hdiutil",
+      "detach",
+      "/dev/disk70"
+     ],
+     "environment": 4
+    }
+   ],
+   "configuration": {
+    "donor_tool": "/staged/tahoe-donors/make",
+    "donors": {
+     "boot": "<root>/boot",
+     "driverkit": "<root>/driverkit",
+     "extensions": "<root>/extensions",
+     "native": "<root>/native",
+     "recovery": "<root>/recovery"
+    },
+    "environment": {
+     "OCLP": "/staged/oclp",
+     "PYTHONPATH": "/staged/site"
+    },
+    "esp": "<root>/esp",
+    "fl": "/staged/fl",
+    "hardware": {
+     "artifact": "/staged/hardware",
+     "tool": "/staged/hardware/apply"
+    },
+    "hooks": [
+     {
+      "kc_hook": "/staged/kernel/kc-hook.sh",
+      "name": "darwin27-kernel"
+     },
+     {
+      "kc_hook": "/staged/userspace/kc-hook.sh",
+      "name": "golden-gate-userspace"
+     },
+     {
+      "kc_hook": "/staged/hao/kc-hook.sh",
+      "name": "hao"
+     },
+     {
+      "kc_hook": "/staged/selectors/kc-hook.sh",
+      "name": "selectors"
+     },
+     {
+      "kc_hook": "/staged/metal/kc-hook.sh",
+      "name": "metal"
+     }
+    ],
+    "image": "<root>/output.img",
+    "kdk": "/staged/kdk",
+    "kdk_preparer": "/staged/kdk-preparer.py",
+    "kernel": "/staged/kernel",
+    "layout_helper": "/staged/layout.py",
+    "name": "Golden",
+    "payload": "/staged/golden-payload",
+    "posts": [
+     {
+      "folder": "/staged/posts/esp",
+      "name": "esp",
+      "script": "/staged/posts/esp/apply.sh"
+     }
+    ],
+    "pristine_script": "/staged/pristine.sh",
+    "python": "/staged/python",
+    "size_bytes": 32768,
+    "work": "<root>/work"
+   },
+   "group_uuid": "DATA-UUID",
+   "operation": "golden-first-image",
+   "revision": 1,
+   "status": "assembled",
+   "steps": [
+    {
+     "complete": true,
+     "name": "layout"
+    },
+    {
+     "complete": true,
+     "name": "golden-system"
+    },
+    {
+     "complete": true,
+     "name": "group-volumes"
+    },
+    {
+     "complete": true,
+     "name": "golden-finalize"
+    },
+    {
+     "complete": true,
+     "name": "boot-and-esp"
+    },
+    {
+     "complete": true,
+     "name": "hardware"
+    },
+    {
+     "complete": true,
+     "name": "recipes"
+    },
+    {
+     "complete": true,
+     "name": "recipe darwin27-kernel"
+    },
+    {
+     "complete": true,
+     "name": "recipe golden-gate-userspace"
+    },
+    {
+     "complete": true,
+     "name": "recipe hao"
+    },
+    {
+     "complete": true,
+     "name": "recipe selectors"
+    },
+    {
+     "complete": true,
+     "name": "recipe metal"
+    },
+    {
+     "complete": true,
+     "name": "snapshot"
+    },
+    {
+     "complete": true,
+     "name": "posts"
+    },
+    {
+     "complete": true,
+     "name": "post esp"
+    },
+    {
+     "complete": true,
+     "name": "efi-bundle"
+    }
+   ],
+   "unit": "pipeline",
+   "validation": "BUILD ONLY; boot and complete product acceptance remain untested",
+   "volumes": {
+    "data": "disk71s3",
+    "esp": "/dev/disk70s1",
+    "preboot": "disk71s4",
+    "recovery": "disk71s5",
+    "system": "disk71s2",
+    "vm": "disk71s6"
+   }
+  }
+ },
+ "hardware-failure": {
+  "commands": [
+   {
+    "capture": true,
+    "command": [
+     "hdiutil",
+     "attach",
+     "-imagekey",
+     "diskimage-class=CRawDiskImage",
+     "-nomount",
+     "-plist",
+     "<root>/output.img"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "partitionDisk",
+     "/dev/disk70",
+     "GPT",
+     "APFS",
+     "Golden",
+     "100%"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "disk71s1"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Golden",
+     "-role",
+     "S",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "deleteVolume",
+     "disk71s1"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/system",
+     "disk71s2"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "/staged/pristine.sh",
+     "system",
+     "--filesystem",
+     "/staged/golden-payload/filesystem.dmg",
+     "--system",
+     "<root>/work/mnt/system",
+     "--image",
+     "<root>/output.img",
+     "--layout-helper",
+     "/staged/layout.py",
+     "--python",
+     "/staged/python"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Golden - Data",
+     "-role",
+     "D",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/layout.py",
+     "group",
+     "--image",
+     "<root>/output.img",
+     "--system",
+     "<root>/work/mnt/system",
+     "--data",
+     "disk71s3"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/data",
+     "disk71s3"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/data"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Preboot",
+     "-role",
+     "B",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Recovery",
+     "-role",
+     "R",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "VM",
+     "-role",
+     "V",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/preboot",
+     "disk71s4"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/recovery",
+     "disk71s5"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/recovery"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "/sbin/mount_msdos",
+     "-o",
+     "nobrowse",
+     "/dev/disk70s1",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s2"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s3"
+    ],
+    "environment": 1
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 2
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s5"
+    ],
+    "environment": 3
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "/staged/pristine.sh",
+     "finalize",
+     "--system",
+     "<root>/work/mnt/system",
+     "--data",
+     "<root>/work/mnt/data",
+     "--fl",
+     "/staged/fl",
+     "--kernel",
+     "/staged/kernel",
+     "--kdk",
+     "/staged/kdk",
+     "--donor-cli",
+     "/staged/tahoe-donors/make",
+     "--extensions-artifact",
+     "<root>/extensions",
+     "--native-artifact",
+     "<root>/native",
+     "--kdk-preparer",
+     "/staged/kdk-preparer.py",
+     "--python",
+     "/staged/python"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/tahoe-donors/make",
+     "install-role",
+     "--artifact",
+     "<root>/boot",
+     "--role",
+     "preboot",
+     "--destination",
+     "<root>/work/mnt/preboot/DATA-UUID"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/tahoe-donors/make",
+     "install-role",
+     "--artifact",
+     "<root>/recovery",
+     "--role",
+     "recovery",
+     "--destination",
+     "<root>/work/mnt/recovery/DATA-UUID"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "--rsrc",
+     "--extattr",
+     "--acl",
+     "<root>/esp",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/hardware/apply",
+     "apply",
+     "--artifact",
+     "/staged/hardware",
+     "--system-root",
+     "<root>/work/mnt/system",
+     "--data-root",
+     "<root>/work/mnt/data",
+     "--report",
+     "<root>/work/hardware.json"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/recovery"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/data"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "hdiutil",
+     "detach",
+     "/dev/disk70"
+    ],
+    "environment": 4
+   }
+  ],
+  "environments": [
+   {
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site"
+   },
+   {
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "SYSU": "SYSTEM-UUID"
+   }
+  ],
+  "error": "CalledProcessError",
+  "record": {
+   "attached_device": null,
+   "commands": [
+    {
+     "capture": true,
+     "command": [
+      "hdiutil",
+      "attach",
+      "-imagekey",
+      "diskimage-class=CRawDiskImage",
+      "-nomount",
+      "-plist",
+      "<root>/output.img"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "partitionDisk",
+      "/dev/disk70",
+      "GPT",
+      "APFS",
+      "Golden",
+      "100%"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "disk71s1"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Golden",
+      "-role",
+      "S",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "deleteVolume",
+      "disk71s1"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/system",
+      "disk71s2"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "/staged/pristine.sh",
+      "system",
+      "--filesystem",
+      "/staged/golden-payload/filesystem.dmg",
+      "--system",
+      "<root>/work/mnt/system",
+      "--image",
+      "<root>/output.img",
+      "--layout-helper",
+      "/staged/layout.py",
+      "--python",
+      "/staged/python"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Golden - Data",
+      "-role",
+      "D",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/layout.py",
+      "group",
+      "--image",
+      "<root>/output.img",
+      "--system",
+      "<root>/work/mnt/system",
+      "--data",
+      "disk71s3"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/data",
+      "disk71s3"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/data"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Preboot",
+      "-role",
+      "B",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Recovery",
+      "-role",
+      "R",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "VM",
+      "-role",
+      "V",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/preboot",
+      "disk71s4"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/recovery",
+      "disk71s5"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/recovery"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "/sbin/mount_msdos",
+      "-o",
+      "nobrowse",
+      "/dev/disk70s1",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s2"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s3"
+     ],
+     "environment": 1
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 2
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s5"
+     ],
+     "environment": 3
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "/staged/pristine.sh",
+      "finalize",
+      "--system",
+      "<root>/work/mnt/system",
+      "--data",
+      "<root>/work/mnt/data",
+      "--fl",
+      "/staged/fl",
+      "--kernel",
+      "/staged/kernel",
+      "--kdk",
+      "/staged/kdk",
+      "--donor-cli",
+      "/staged/tahoe-donors/make",
+      "--extensions-artifact",
+      "<root>/extensions",
+      "--native-artifact",
+      "<root>/native",
+      "--kdk-preparer",
+      "/staged/kdk-preparer.py",
+      "--python",
+      "/staged/python"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/tahoe-donors/make",
+      "install-role",
+      "--artifact",
+      "<root>/boot",
+      "--role",
+      "preboot",
+      "--destination",
+      "<root>/work/mnt/preboot/DATA-UUID"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/tahoe-donors/make",
+      "install-role",
+      "--artifact",
+      "<root>/recovery",
+      "--role",
+      "recovery",
+      "--destination",
+      "<root>/work/mnt/recovery/DATA-UUID"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "--rsrc",
+      "--extattr",
+      "--acl",
+      "<root>/esp",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/hardware/apply",
+      "apply",
+      "--artifact",
+      "/staged/hardware",
+      "--system-root",
+      "<root>/work/mnt/system",
+      "--data-root",
+      "<root>/work/mnt/data",
+      "--report",
+      "<root>/work/hardware.json"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/recovery"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/data"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "hdiutil",
+      "detach",
+      "/dev/disk70"
+     ],
+     "environment": 4
+    }
+   ],
+   "configuration": {
+    "donor_tool": "/staged/tahoe-donors/make",
+    "donors": {
+     "boot": "<root>/boot",
+     "driverkit": "<root>/driverkit",
+     "extensions": "<root>/extensions",
+     "native": "<root>/native",
+     "recovery": "<root>/recovery"
+    },
+    "environment": {
+     "OCLP": "/staged/oclp",
+     "PYTHONPATH": "/staged/site"
+    },
+    "esp": "<root>/esp",
+    "fl": "/staged/fl",
+    "hardware": {
+     "artifact": "/staged/hardware",
+     "tool": "/staged/hardware/apply"
+    },
+    "hooks": [
+     {
+      "kc_hook": "/staged/kernel/kc-hook.sh",
+      "name": "darwin27-kernel"
+     },
+     {
+      "kc_hook": "/staged/userspace/kc-hook.sh",
+      "name": "golden-gate-userspace"
+     },
+     {
+      "kc_hook": "/staged/hao/kc-hook.sh",
+      "name": "hao"
+     },
+     {
+      "kc_hook": "/staged/selectors/kc-hook.sh",
+      "name": "selectors"
+     },
+     {
+      "kc_hook": "/staged/metal/kc-hook.sh",
+      "name": "metal"
+     }
+    ],
+    "image": "<root>/output.img",
+    "kdk": "/staged/kdk",
+    "kdk_preparer": "/staged/kdk-preparer.py",
+    "kernel": "/staged/kernel",
+    "layout_helper": "/staged/layout.py",
+    "name": "Golden",
+    "payload": "/staged/golden-payload",
+    "posts": [
+     {
+      "folder": "/staged/posts/esp",
+      "name": "esp",
+      "script": "/staged/posts/esp/apply.sh"
+     }
+    ],
+    "pristine_script": "/staged/pristine.sh",
+    "python": "/staged/python",
+    "size_bytes": 32768,
+    "work": "<root>/work"
+   },
+   "error": "Command '['/staged/python', '-I', '/staged/hardware/apply', 'apply', '--artifact', '/staged/hardware', '--system-root', '<root>/work/mnt/system', '--data-root', '<root>/work/mnt/data', '--report', '<root>/work/hardware.json']' returned non-zero exit status 19.",
+   "group_uuid": "DATA-UUID",
+   "operation": "golden-first-image",
+   "revision": 1,
+   "status": "failed",
+   "steps": [
+    {
+     "complete": true,
+     "name": "layout"
+    },
+    {
+     "complete": true,
+     "name": "golden-system"
+    },
+    {
+     "complete": true,
+     "name": "group-volumes"
+    },
+    {
+     "complete": true,
+     "name": "golden-finalize"
+    },
+    {
+     "complete": true,
+     "name": "boot-and-esp"
+    },
+    {
+     "name": "hardware"
+    }
+   ],
+   "unit": "pipeline",
+   "validation": "BUILD ONLY; boot and complete product acceptance remain untested",
+   "volumes": {
+    "data": "disk71s3",
+    "esp": "/dev/disk70s1",
+    "preboot": "disk71s4",
+    "recovery": "disk71s5",
+    "system": "disk71s2",
+    "vm": "disk71s6"
+   }
+  }
+ },
+ "unmount-failure": {
+  "commands": [
+   {
+    "capture": true,
+    "command": [
+     "hdiutil",
+     "attach",
+     "-imagekey",
+     "diskimage-class=CRawDiskImage",
+     "-nomount",
+     "-plist",
+     "<root>/output.img"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "partitionDisk",
+     "/dev/disk70",
+     "GPT",
+     "APFS",
+     "Golden",
+     "100%"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "disk71s1"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Golden",
+     "-role",
+     "S",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "deleteVolume",
+     "disk71s1"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/system",
+     "disk71s2"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "/staged/pristine.sh",
+     "system",
+     "--filesystem",
+     "/staged/golden-payload/filesystem.dmg",
+     "--system",
+     "<root>/work/mnt/system",
+     "--image",
+     "<root>/output.img",
+     "--layout-helper",
+     "/staged/layout.py",
+     "--python",
+     "/staged/python"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Golden - Data",
+     "-role",
+     "D",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/layout.py",
+     "group",
+     "--image",
+     "<root>/output.img",
+     "--system",
+     "<root>/work/mnt/system",
+     "--data",
+     "disk71s3"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/data",
+     "disk71s3"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/data"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Preboot",
+     "-role",
+     "B",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "Recovery",
+     "-role",
+     "R",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "addVolume",
+     "disk71",
+     "APFS",
+     "VM",
+     "-role",
+     "V",
+     "-nomount"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "apfs",
+     "list",
+     "-plist"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/preboot",
+     "disk71s4"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/recovery",
+     "disk71s5"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/recovery"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": false,
+    "command": [
+     "/sbin/mount_msdos",
+     "-o",
+     "nobrowse",
+     "/dev/disk70s1",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s2"
+    ],
+    "environment": 0
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s3"
+    ],
+    "environment": 1
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 2
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s5"
+    ],
+    "environment": 3
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "/staged/pristine.sh",
+     "finalize",
+     "--system",
+     "<root>/work/mnt/system",
+     "--data",
+     "<root>/work/mnt/data",
+     "--fl",
+     "/staged/fl",
+     "--kernel",
+     "/staged/kernel",
+     "--kdk",
+     "/staged/kdk",
+     "--donor-cli",
+     "/staged/tahoe-donors/make",
+     "--extensions-artifact",
+     "<root>/extensions",
+     "--native-artifact",
+     "<root>/native",
+     "--kdk-preparer",
+     "/staged/kdk-preparer.py",
+     "--python",
+     "/staged/python"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/tahoe-donors/make",
+     "install-role",
+     "--artifact",
+     "<root>/boot",
+     "--role",
+     "preboot",
+     "--destination",
+     "<root>/work/mnt/preboot/DATA-UUID"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/tahoe-donors/make",
+     "install-role",
+     "--artifact",
+     "<root>/recovery",
+     "--role",
+     "recovery",
+     "--destination",
+     "<root>/work/mnt/recovery/DATA-UUID"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "--rsrc",
+     "--extattr",
+     "--acl",
+     "<root>/esp",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "/staged/python",
+     "-I",
+     "/staged/hardware/apply",
+     "apply",
+     "--artifact",
+     "/staged/hardware",
+     "--system-root",
+     "<root>/work/mnt/system",
+     "--data-root",
+     "<root>/work/mnt/data",
+     "--report",
+     "<root>/work/hardware.json"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "rm",
+     "-rf",
+     "<root>/work/mnt/system/.Spotlight-V100"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/kernel/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/KernelCollections/BootKernelExtensions.kc",
+     "<root>/work/BootKernelExtensions.kc"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/userspace/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/hao/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/selectors/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/metal/kc-hook.sh",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 5
+   },
+   {
+    "capture": false,
+    "command": [
+     "rm",
+     "-rf",
+     "<root>/work/mnt/system/.Spotlight-V100"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "apfs",
+     "updatePreboot",
+     "disk71s2"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+     "<root>/work/mnt/preboot/DATA-UUID/System/Library/CoreServices/SystemVersion.plist"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+     "<root>/work/mnt/preboot/DATA-UUID/boot/System/Library/CoreServices/SystemVersion.plist"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+     "<root>/work/mnt/preboot/DATA-UUID/cryptex1/current/SystemVersion.plist"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "bless",
+     "--folder",
+     "<root>/work/mnt/system/System/Library/CoreServices",
+     "--bootefi",
+     "--label",
+     "Golden"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "bless",
+     "--mount",
+     "<root>/work/mnt/system",
+     "--create-snapshot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": true,
+    "command": [
+     "diskutil",
+     "info",
+     "-plist",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "mount",
+     "-mountOptions",
+     "nobrowse",
+     "-mountPoint",
+     "<root>/work/mnt/preboot",
+     "disk71s4"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "enableOwnership",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "mount",
+     "-o",
+     "nobrowse,rdonly",
+     "-t",
+     "apfs",
+     "/dev/disk71s2",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sh",
+     "-eu",
+     "/staged/posts/esp/apply.sh"
+    ],
+    "environment": 6
+   },
+   {
+    "capture": false,
+    "command": [
+     "rm",
+     "-rf",
+     "<root>/work/mnt/data/.Spotlight-V100"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "sync"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "ditto",
+     "<root>/work/mnt/esp",
+     "<root>/work/boot-efi/payload"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/system"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/preboot"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/esp"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/recovery"
+    ],
+    "environment": 4
+   },
+   {
+    "capture": false,
+    "command": [
+     "diskutil",
+     "unmount",
+     "<root>/work/mnt/data"
+    ],
+    "environment": 4
+   }
+  ],
+  "environments": [
+   {
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site"
+   },
+   {
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "SYSU": "SYSTEM-UUID"
+   },
+   {
+    "DATU": "DATA-UUID",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "SYSU": "SYSTEM-UUID",
+    "TAHOE_DONOR_TOOL": "/staged/tahoe-donors/make",
+    "TAHOE_DRIVERKIT_ARTIFACT": "<root>/driverkit",
+    "TAHOE_NATIVE_ARTIFACT": "<root>/native"
+   },
+   {
+    "DATA": "<root>/work/mnt/data",
+    "DATU": "DATA-UUID",
+    "ESP": "<root>/work/mnt/esp",
+    "GRP": "DATA-UUID",
+    "HOME": "/var/root",
+    "LANG": "C",
+    "OCLP": "/staged/oclp",
+    "OCLP_PYTHON": "/staged/python",
+    "P": "/staged/posts/esp",
+    "PATCH_OUTPUT_DIR": "<root>/work/post/esp",
+    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    "PBU": "PREBOOT-UUID",
+    "PRE": "<root>/work/mnt/preboot",
+    "PYTHONPATH": "/staged/site",
+    "RCU": "RECOVERY-UUID",
+    "REC": "<root>/work/mnt/recovery",
+    "SYS": "<root>/work/mnt/system",
+    "SYSU": "SYSTEM-UUID"
+   }
+  ],
+  "error": "RuntimeError",
+  "record": {
+   "attached_device": "/dev/disk70",
+   "cleanup_errors": [
+    "Command '['diskutil', 'unmount', '<root>/work/mnt/data']' returned non-zero exit status 19."
+   ],
+   "commands": [
+    {
+     "capture": true,
+     "command": [
+      "hdiutil",
+      "attach",
+      "-imagekey",
+      "diskimage-class=CRawDiskImage",
+      "-nomount",
+      "-plist",
+      "<root>/output.img"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "partitionDisk",
+      "/dev/disk70",
+      "GPT",
+      "APFS",
+      "Golden",
+      "100%"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "disk71s1"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Golden",
+      "-role",
+      "S",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "deleteVolume",
+      "disk71s1"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/system",
+      "disk71s2"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "/staged/pristine.sh",
+      "system",
+      "--filesystem",
+      "/staged/golden-payload/filesystem.dmg",
+      "--system",
+      "<root>/work/mnt/system",
+      "--image",
+      "<root>/output.img",
+      "--layout-helper",
+      "/staged/layout.py",
+      "--python",
+      "/staged/python"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Golden - Data",
+      "-role",
+      "D",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/layout.py",
+      "group",
+      "--image",
+      "<root>/output.img",
+      "--system",
+      "<root>/work/mnt/system",
+      "--data",
+      "disk71s3"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/data",
+      "disk71s3"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/data"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Preboot",
+      "-role",
+      "B",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "Recovery",
+      "-role",
+      "R",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "addVolume",
+      "disk71",
+      "APFS",
+      "VM",
+      "-role",
+      "V",
+      "-nomount"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "apfs",
+      "list",
+      "-plist"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/preboot",
+      "disk71s4"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/recovery",
+      "disk71s5"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/recovery"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": false,
+     "command": [
+      "/sbin/mount_msdos",
+      "-o",
+      "nobrowse",
+      "/dev/disk70s1",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s2"
+     ],
+     "environment": 0
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s3"
+     ],
+     "environment": 1
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 2
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s5"
+     ],
+     "environment": 3
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "/staged/pristine.sh",
+      "finalize",
+      "--system",
+      "<root>/work/mnt/system",
+      "--data",
+      "<root>/work/mnt/data",
+      "--fl",
+      "/staged/fl",
+      "--kernel",
+      "/staged/kernel",
+      "--kdk",
+      "/staged/kdk",
+      "--donor-cli",
+      "/staged/tahoe-donors/make",
+      "--extensions-artifact",
+      "<root>/extensions",
+      "--native-artifact",
+      "<root>/native",
+      "--kdk-preparer",
+      "/staged/kdk-preparer.py",
+      "--python",
+      "/staged/python"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/tahoe-donors/make",
+      "install-role",
+      "--artifact",
+      "<root>/boot",
+      "--role",
+      "preboot",
+      "--destination",
+      "<root>/work/mnt/preboot/DATA-UUID"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/tahoe-donors/make",
+      "install-role",
+      "--artifact",
+      "<root>/recovery",
+      "--role",
+      "recovery",
+      "--destination",
+      "<root>/work/mnt/recovery/DATA-UUID"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "--rsrc",
+      "--extattr",
+      "--acl",
+      "<root>/esp",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "/staged/python",
+      "-I",
+      "/staged/hardware/apply",
+      "apply",
+      "--artifact",
+      "/staged/hardware",
+      "--system-root",
+      "<root>/work/mnt/system",
+      "--data-root",
+      "<root>/work/mnt/data",
+      "--report",
+      "<root>/work/hardware.json"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "rm",
+      "-rf",
+      "<root>/work/mnt/system/.Spotlight-V100"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/kernel/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/KernelCollections/BootKernelExtensions.kc",
+      "<root>/work/BootKernelExtensions.kc"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/userspace/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/hao/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/selectors/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/metal/kc-hook.sh",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 5
+    },
+    {
+     "capture": false,
+     "command": [
+      "rm",
+      "-rf",
+      "<root>/work/mnt/system/.Spotlight-V100"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "apfs",
+      "updatePreboot",
+      "disk71s2"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+      "<root>/work/mnt/preboot/DATA-UUID/System/Library/CoreServices/SystemVersion.plist"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+      "<root>/work/mnt/preboot/DATA-UUID/boot/System/Library/CoreServices/SystemVersion.plist"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/system/System/Library/CoreServices/SystemVersion.plist",
+      "<root>/work/mnt/preboot/DATA-UUID/cryptex1/current/SystemVersion.plist"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "bless",
+      "--folder",
+      "<root>/work/mnt/system/System/Library/CoreServices",
+      "--bootefi",
+      "--label",
+      "Golden"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "bless",
+      "--mount",
+      "<root>/work/mnt/system",
+      "--create-snapshot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": true,
+     "command": [
+      "diskutil",
+      "info",
+      "-plist",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "mount",
+      "-mountOptions",
+      "nobrowse",
+      "-mountPoint",
+      "<root>/work/mnt/preboot",
+      "disk71s4"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "enableOwnership",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "mount",
+      "-o",
+      "nobrowse,rdonly",
+      "-t",
+      "apfs",
+      "/dev/disk71s2",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sh",
+      "-eu",
+      "/staged/posts/esp/apply.sh"
+     ],
+     "environment": 6
+    },
+    {
+     "capture": false,
+     "command": [
+      "rm",
+      "-rf",
+      "<root>/work/mnt/data/.Spotlight-V100"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "sync"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "ditto",
+      "<root>/work/mnt/esp",
+      "<root>/work/boot-efi/payload"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/system"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/preboot"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/esp"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/recovery"
+     ],
+     "environment": 4
+    },
+    {
+     "capture": false,
+     "command": [
+      "diskutil",
+      "unmount",
+      "<root>/work/mnt/data"
+     ],
+     "environment": 4
+    }
+   ],
+   "configuration": {
+    "donor_tool": "/staged/tahoe-donors/make",
+    "donors": {
+     "boot": "<root>/boot",
+     "driverkit": "<root>/driverkit",
+     "extensions": "<root>/extensions",
+     "native": "<root>/native",
+     "recovery": "<root>/recovery"
+    },
+    "environment": {
+     "OCLP": "/staged/oclp",
+     "PYTHONPATH": "/staged/site"
+    },
+    "esp": "<root>/esp",
+    "fl": "/staged/fl",
+    "hardware": {
+     "artifact": "/staged/hardware",
+     "tool": "/staged/hardware/apply"
+    },
+    "hooks": [
+     {
+      "kc_hook": "/staged/kernel/kc-hook.sh",
+      "name": "darwin27-kernel"
+     },
+     {
+      "kc_hook": "/staged/userspace/kc-hook.sh",
+      "name": "golden-gate-userspace"
+     },
+     {
+      "kc_hook": "/staged/hao/kc-hook.sh",
+      "name": "hao"
+     },
+     {
+      "kc_hook": "/staged/selectors/kc-hook.sh",
+      "name": "selectors"
+     },
+     {
+      "kc_hook": "/staged/metal/kc-hook.sh",
+      "name": "metal"
+     }
+    ],
+    "image": "<root>/output.img",
+    "kdk": "/staged/kdk",
+    "kdk_preparer": "/staged/kdk-preparer.py",
+    "kernel": "/staged/kernel",
+    "layout_helper": "/staged/layout.py",
+    "name": "Golden",
+    "payload": "/staged/golden-payload",
+    "posts": [
+     {
+      "folder": "/staged/posts/esp",
+      "name": "esp",
+      "script": "/staged/posts/esp/apply.sh"
+     }
+    ],
+    "pristine_script": "/staged/pristine.sh",
+    "python": "/staged/python",
+    "size_bytes": 32768,
+    "work": "<root>/work"
+   },
+   "group_uuid": "DATA-UUID",
+   "operation": "golden-first-image",
+   "revision": 1,
+   "status": "failed",
+   "steps": [
+    {
+     "complete": true,
+     "name": "layout"
+    },
+    {
+     "complete": true,
+     "name": "golden-system"
+    },
+    {
+     "complete": true,
+     "name": "group-volumes"
+    },
+    {
+     "complete": true,
+     "name": "golden-finalize"
+    },
+    {
+     "complete": true,
+     "name": "boot-and-esp"
+    },
+    {
+     "complete": true,
+     "name": "hardware"
+    },
+    {
+     "complete": true,
+     "name": "recipes"
+    },
+    {
+     "complete": true,
+     "name": "recipe darwin27-kernel"
+    },
+    {
+     "complete": true,
+     "name": "recipe golden-gate-userspace"
+    },
+    {
+     "complete": true,
+     "name": "recipe hao"
+    },
+    {
+     "complete": true,
+     "name": "recipe selectors"
+    },
+    {
+     "complete": true,
+     "name": "recipe metal"
+    },
+    {
+     "complete": true,
+     "name": "snapshot"
+    },
+    {
+     "complete": true,
+     "name": "posts"
+    },
+    {
+     "complete": true,
+     "name": "post esp"
+    },
+    {
+     "complete": true,
+     "name": "efi-bundle"
+    }
+   ],
+   "unit": "pipeline",
+   "validation": "BUILD ONLY; boot and complete product acceptance remain untested",
+   "volumes": {
+    "data": "disk71s3",
+    "esp": "/dev/disk70s1",
+    "preboot": "disk71s4",
+    "recovery": "disk71s5",
+    "system": "disk71s2",
+    "vm": "disk71s6"
+   }
+  }
+ }
+}
