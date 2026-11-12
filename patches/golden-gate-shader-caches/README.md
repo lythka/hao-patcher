@@ -32,7 +32,15 @@ functions.data/libraries.data in the user's iconservicesagent tree alone). Apps 
 image with this pack and run `cache/seeds/make compare PACK HARVEST`; each new or changed file is a miss to fold into
 the next pack.
 
+## Declared files
+`patch.json` `files` lists the 118 regular files of `data.tar`, all whole files from row `shader_caches_golden_gate` (no edit
+specs): the system accounts' Metal trees under `private/var/folders/zz/` and the per-user trees under
+`PerUserSeed/metal/`. `tests/test_edits.py` derives the list from the artifact manifest and runs apply.sh on a fixture;
+it is exact for this row's artifact and goes stale when the row changes. Not declared: folders and their owners, and
+the per-account copy golden-gate-user-seed makes at run time (its path holds the account's uid and cache-folder hash).
+
 ## Verify
+Declaration: `python3.14 -I -B -m unittest discover -s patches/golden-gate-shader-caches/tests` (with SHADER_CACHES_ARTIFACT=the artifact folder it also compares the artifact manifest).
 Host: `patches/golden-gate-user-seed/tests` (the seed chain). On the image: the system accounts' `com.apple.metal`
 trees with their owners (0, 88, 248, 92). On the laptop: MTLCompilerService CPU at Setup + 9 min and the load peak
 against bf10de4 (4:21, 476); then `make compare` on a new harvest.
@@ -45,6 +53,7 @@ Earlier: r8 is built and chain-tested on the host only; no image with it has boo
 r9 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r8's, so the result above stands.
 
 ## Revisions
+- r12 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them from the artifact manifest); the hook is unchanged.
 - r11 2026-11-12 Row `shader_caches_golden_gate` (26B131): the same harvest made by cache/seeds r2, without the user's `com.apple.metalfe` trees. Preview's held a clang module cache recording the harvest account's cache folder, which the Metal front end refused in every new account (SceneKit drew magenta in Preview). Every other file is unchanged.
 - r10 2026-11-11 Row `shader_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (84 user trees, was 57: adds Maps/VectorKit, Safari and WebKit records, and the repaired VectorKit/VFX libraries). No recipe change.
 - r9 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch instead of stopping. apply.sh unchanged.

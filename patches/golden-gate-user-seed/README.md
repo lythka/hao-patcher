@@ -27,7 +27,15 @@ r1-r3 (2026-11-05 to 11-09, 26A428) shipped the same runtime plus the font regis
 deferral; a54ec244 removed it with the reduced Golden Gate profile. r4 brings back the runtime only: fonts are their
 own patch now, so each seed can be dropped alone, and the efilogin deferral (untested on 27) stays out.
 
+## Declared files
+`patch.json` `files` lists the two files apply.sh installs: the launchd plist (made by `src/plist.sh` from `src/seed.zsh`)
+and `PerUserSeed/build`, both generated at install (origin `hao`, no row, no edit specs). Not declared: what seed.zsh
+writes into each new account at run time (icon index, Metal trees, font registry), since those paths hold the account's
+uid and cache-folder hash. The payload files it reads are declared by the three cache patches.
+`tests/test_edits.py` runs apply.sh on a fixture and checks the installed files equal the declared ones.
+
 ## Verify
+Declaration: `python3.14 -I -B -m unittest discover -s patches/golden-gate-user-seed/tests`.
 Host: `python3.14 -I -B -m unittest discover -s patches/golden-gate-user-seed/tests` (the four seed patches as a chain
 on a fixture Data volume, the plist carries seed.zsh byte for byte, `zsh -n`). On the laptop after Setup made an
 account: `/private/var/log/peruser-seed.log` shows the icon index, the Metal trees and the font registry placed for
@@ -42,6 +50,7 @@ placed trees (owner sessions 2026-11-06), not re-checked on 26B131.
 r5 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r4's, so the result above stands.
 
 ## Revisions
+- r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged.
 - r6 2026-11-12 seed.zsh never places `com.apple.metalfe`: an older seed's clang module cache (Preview's `.pcm`) records the harvest account's cache folder, so in a new account the Metal front end refused it ("PCH was compiled with module cache path ...") and SceneKit in Preview drew magenta. Test runs `place_chunk` itself.
 - r5 2026-11-11 Optional (group caches) with needs_any caches: skipped when no cache patch runs, since the copier would have nothing to place. apply.sh unchanged.
 - r4 2026-11-11 Restored for 26B131 without payloads of its own: runtime and build gate only; fonts moved to golden-gate-font-registry, efilogin deferral dropped. Root cause: a54ec244 removed every seed, so each new account compiles and renders everything at first login (bf10de4: benchtest iconservicesagent 2:13 CPU).

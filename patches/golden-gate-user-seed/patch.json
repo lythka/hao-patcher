@@ -1,10 +1,14 @@
 {
- "revision": 6,
+ "revision": 7,
  "stage": "post",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G342"]},
  "inputs": [],
  "status": "experiment",
  "validated": false,
  "optional": "caches",
- "needs_any": "caches"
+ "needs_any": "caches",
+ "files": [
+  {"path": "Library/LaunchDaemons/local.peruser-seed.plist", "origin": {"kind": "hao", "note": "launchd daemon made at install by src/plist.sh, which escapes src/seed.zsh into the plist (root 644): places the seeded caches into each new account"}},
+  {"path": "Library/Application Support/PerUserSeed/build", "origin": {"kind": "hao", "note": "the System's ProductBuildVersion written at install (root 644): seed.zsh places nothing on another build"}}
+ ]
 }

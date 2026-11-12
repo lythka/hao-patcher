@@ -25,7 +25,16 @@ mtimes the build reproduces (OPEN: compare the next image's iconservicesagent lo
 "Generated image", with a run of bf10de4). Icons drawn on bf10de4 only: Language Chooser, Setup, ~20 min of a first
 desktop.
 
+## Declared files
+`patch.json` `files` lists every file apply.sh installs on the Data volume: the 673 regular files of `icon-caches.tar` (store
+units, `store-info.plist`, the system accounts' indexes) and `PerUserSeed/is/{store.index,__cache_info__}`, each a whole
+file from row `icon_caches_golden_gate`, so there are no edit specs. The list is derived from the artifact's manifest in
+`tests/test_edits.py`, which also runs apply.sh on a fixture; it is exact for this row's artifact and goes stale when the
+row changes. Not declared: folders and their owners, and the per-account copy golden-gate-user-seed makes at run time
+(its path holds the account's uid and cache-folder hash).
+
 ## Verify
+Declaration: `python3.14 -I -B -m unittest discover -s patches/golden-gate-icon-caches/tests` (with ICON_CACHES_ARTIFACT=the artifact folder it also compares the artifact manifest).
 Host: `patches/golden-gate-user-seed/tests` (the seed chain). On the laptop: iconservicesagent CPU at Setup + 9 min
 against bf10de4 (1:24 Setup, 2:13 benchtest at 08:22); `log show --predicate 'subsystem == "com.apple.iconservices"'`
 with private data shows records served, not generated.
@@ -36,6 +45,7 @@ Earlier: built and chain-tested on the host only; no image with it has booted.
 r2 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r1's, so the result above stands.
 
 ## Revisions
+- r4 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them from the artifact manifest); the hook is unchanged.
 - r3 2026-11-11 Row `icon_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (668 store units, was 540). No recipe change.
 - r2 2026-11-11 Optional (group caches): a build without the harvest row or its store artifact skips this patch instead of stopping. apply.sh unchanged.
 - r1 2026-11-11 IconServices store and indexes harvested from 26B131 (bf10de4), with the 27 index checks. Root cause: a54ec244 removed Tahoe's icon-caches and no 27 artifact existed, so every account rendered every icon in the translated agent.
