@@ -488,8 +488,16 @@ place_chunk() {   # $1 u $2 uid $3 gid $4 C $5 metal start, rest = tree names. S
     done
     (( ${#todo} )) || return 0
     S=${C}.peruser-seed.stage; zf_rm -rf "$S"; zf_mkdir -p "$S" || { log "$u: FAILED to create $S"; return 1 }
-    if ! cp -Rpc "${src[@]}" "$S/" || ! own "$uid:$gid" "$S"; then
+    if ! cp -Rpc "${src[@]}" "$S/"; then
         log "$u: FAILED to copy metal chunk (${todo[*]})"; zf_rm -rf "$S"; return 1
+    fi
+    # Never place com.apple.metalfe: its clang module caches (*.pcm) record the harvest account's cache path, and the
+    # Metal front end refuses them in any other account ("PCH was compiled with module cache path ..."). Older seed
+    # artifacts carry them; cache/seeds r2 leaves them out.
+    local -a fe; fe=("$S"/**/com.apple.metalfe(N/))
+    (( ${#fe} )) && { zf_rm -rf "${fe[@]}"; log "$u: left out ${#fe} com.apple.metalfe tree(s)" }
+    if ! own "$uid:$gid" "$S"; then
+        log "$u: FAILED to own metal chunk (${todo[*]})"; zf_rm -rf "$S"; return 1
     fi
     local -a i0 i1 i2
     for n in $todo; do

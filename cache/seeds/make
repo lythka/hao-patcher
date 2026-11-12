@@ -14,8 +14,11 @@ to the harvest's folder. UID is the harvested user account (uid >= 501); default
 
 shader-caches: data.tar for patches/golden-gate-shader-caches. System accounts' (uid < 501) com.apple.metal and
   com.apple.metalfe trees at their own paths with their owners and modes, every ancestor folder from folders.txt
-  first; the user's trees under Library/Application Support/PerUserSeed/metal/<bundle path>/ (root, 755/644), which
-  patches/golden-gate-user-seed's seed.zsh copies into each new account.
+  first; the user's com.apple.metal trees under Library/Application Support/PerUserSeed/metal/<bundle path>/ (root,
+  755/644), which patches/golden-gate-user-seed's seed.zsh copies into each new account. The user's
+  com.apple.metalfe trees are left out: they are clang module caches (*.pcm) that record their own absolute cache
+  path, and a new account's cache folder differs, so the Metal front end refuses them ("PCH was compiled with module
+  cache path ..."). A system tree's .pcm must record the path it is installed at, or make stops.
 icon-caches: icon-caches.tar (the shared store Library/Caches/com.apple.iconservices.store and the system accounts'
   C/com.apple.iconservices folders with their ancestors) and user/ (the user's index files) for
   patches/golden-gate-icon-caches. The index header is checked (version 11, heap = count x record size).
@@ -29,6 +32,7 @@ import datetime
 import hashlib
 import io
 import json
+import re
 import shutil
 import sqlite3
 import struct
@@ -38,7 +42,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-UNIT, REVISION = 'cache/seeds', 1
+UNIT, REVISION = 'cache/seeds', 2
 SEED = 'Library/Application Support/PerUserSeed'
 STORE = 'Library/Caches/com.apple.iconservices.store'
 METAL = ('com.apple.metal', 'com.apple.metalfe')
@@ -131,9 +135,20 @@ def metal_root(rest):
     return next((i for i, x in enumerate(parts) if x in METAL), None)
 
 
+PCM_PATH = re.compile(rb'/(?:private/)?var/folders/[\w.+-]+/[\w.+-]+/C/[\w./+-]*?com\.apple\.metalfe/[A-Z0-9]+')
+
+
+def pcm_path_check(name, data):
+    """A clang module cache file only loads from the folder it records; stop on one recorded elsewhere."""
+    want = '/' + name.split('private/', 1)[1].rsplit('/', 1)[0]
+    found = {m.decode().replace('/private/var/', '/var/') for m in PCM_PATH.findall(data)}
+    if found != {want}:
+        raise SystemExit('make: %s records module cache path %s, not %s' % (name, sorted(found) or 'none', want))
+
+
 def shader_members(h):
     """[(TarInfo, bytes)] of the shader pack, ancestors first, sorted; and counts."""
-    out, seen, counts = [], set(), {'system_files': 0, 'user_files': 0, 'trees': set()}
+    out, seen, counts = [], set(), {'system_files': 0, 'user_files': 0, 'user_metalfe_skipped': 0, 'trees': set()}
 
     def add(t, data=b''):
         if t.name in seen:
@@ -149,6 +164,8 @@ def shader_members(h):
         parts = rest.split('/')
         tree = '/'.join(parts[:metal_root(rest) + 1])
         if uid < 501:
+            if m.isfile() and m.name.endswith('.pcm'):
+                pcm_path_check(m.name, h.data(m))
             for t in h.ancestors(m.name, 'private/var/folders'):
                 add(t)
             t = tarfile.TarInfo(m.name)
@@ -157,6 +174,9 @@ def shader_members(h):
             counts['trees'].add(c + '/' + tree)
             counts['system_files'] += m.isfile()
         elif uid == h.uid:
+            if parts[metal_root(rest)] == 'com.apple.metalfe':
+                counts['user_metalfe_skipped'] += m.isfile()
+                continue
             name = SEED + '/metal/' + rest
             for i in range(1, len(parts)):
                 d = tarfile.TarInfo(SEED + '/metal/' + '/'.join(parts[:i]))
