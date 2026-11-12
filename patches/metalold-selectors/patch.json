@@ -1,5 +1,5 @@
 {
- "revision": 3,
+ "revision": 4,
  "stage": "oclp-hook",
  "applies": {
   "models": [
@@ -12,5 +12,10 @@
   "metalold_selectors"
  ],
  "status": "product",
- "validated": true
+ "validated": true,
+ "files": [
+  {"path": "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver", "edits": "edits/driver.json"},
+  {"path": "usr/lib/libmetalold-selectors.dylib",
+   "origin": {"kind": "hao", "row": "metalold_selectors", "note": "new file: Metal selector shim built by build/make, ad hoc signed"}}
+ ]
 }

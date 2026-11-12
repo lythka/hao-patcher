@@ -31,6 +31,10 @@ by Metal debugging and replay tools. Details and tooling: [build/](build/README.
 | `usr/lib/libmetalold-selectors.dylib` (new) | x86_64 dylib from the `metalold_selectors` input, ad hoc signed. At load it adds each selector in its table that the class does not already answer; it never overrides a method. |
 | `System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver` | One `LC_LOAD_WEAK_DYLIB /usr/lib/libmetalold-selectors.dylib` in the zero padding after the load commands, then re-signed ad hoc. |
 
+The driver edit is declared in [`edits/driver.json`](edits/driver.json) for
+[tools/edit-engine](../../tools/edit-engine/README.md); `tests/test_edits.py` proves the engine writes the same bytes
+as `src/add_weak_dylib.py`.
+
 Both are installed root:wheel 0755 with the `restricted` flag. Because both are ad hoc
 signed, the boot arguments must relax AMFI ([hao-opencore](../hao-opencore/README.md)
 does).
@@ -82,6 +86,8 @@ See [build/README.md](build/README.md) for the survey options and outputs.
   preview, `log show --predicate 'subsystem == "metalold-selectors"'` has
   `N Metal selectors added` lines, and no RAQL* or WindowServer crash report appears.
 - On the host: `python3.14 -I -m unittest discover -s patches/metalold-selectors/build/tests`.
+- The declared edit: `python3.14 -I -B -m unittest discover -s patches/metalold-selectors/tests`
+  (`METALOLD_SELECTORS_INPUT=PATH`, OCLP's HD 4000 driver, adds the real file).
 
 ## Upstream
 
@@ -98,5 +104,6 @@ built image remain open, and nothing has been checked on 26B131.
 
 ## Revisions
 
+- r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json` `files`; the hook is unchanged.
 - r3 2026-11-11 `src/hook.sh` became `src/kc-hook.sh` (same commands): the Golden Gate runner runs every recipe once, in set order; the sets list it before golden-gate-metal-framebuffer, the order it already had in effect. README: built for 26A428, not yet checked on 26B131. Build validation pending.
 - r2 2026-11-10 Initial public release.

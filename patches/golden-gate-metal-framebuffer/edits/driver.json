@@ -1,0 +1,14 @@
+{
+ "format": 1,
+ "path": "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver",
+ "arch": "x86_64",
+ "origin": {"kind": "oclp", "name": "AppleIntelHD4000GraphicsMTLDriver", "note": "after metalold-selectors: OCLP's HD 4000 Metal driver with that recipe's weak load command already added"},
+ "applied_by": "installer",
+ "edits": [
+  {"id": "weak-load-metal-framebuffer", "kind": "op", "op": "macho.add-dylib",
+   "args": {"path": "/usr/lib/libmetal-framebuffer.dylib", "weak": true, "timestamp": 2, "current_version": 0, "compat_version": 0},
+   "reason": "the driver loads the framebuffer-read adapter, so RenderBox symbols (Wi-Fi, Control Center) draw on the HD 4000; weak, so the driver still loads without the library"}
+ ],
+ "sign": {"mode": "adhoc", "identifier": "AppleIntelHD4000GraphicsMTLDriver"},
+ "expect": {"fb453c0a1e4882c9d628f10fd0ffe13e4f4a879ddae70396d31380ad96e85bea": "a9f430e2f4140149e0a36316012005c051d90e2b22534ced956c0608ff6fce7e"}
+}
