@@ -1,0 +1,65 @@
+#!/bin/bash
+# make OUT --icbe ORIGINAL_ICBE [--runtime STOCK_REPLAY_RUNTIME]
+#
+# Builds everything in this tool into the new folder OUT:
+#   OUT/igil_tool                 host build of the IGIL rewrite (tests, inspecting a rewrite)
+#   OUT/iCBE.dylib                x86_64 wrapper, re-exports iCBE-real.dylib from the GL driver bundle
+#   OUT/iCBE-real.dylib           copy of ORIGINAL_ICBE (the image's repaired iCBE; installed beside the wrapper)
+#   OUT/libargbuf.dylib           x86_64 device side (argument-buffer layout/encoder, draw-time binding)
+#   OUT/probes/probeN             x86_64 GPU test programs (run on the laptop; see README)
+#   OUT/kernels/NAME.metallib     host-harness kernels (AIR air64_v25, readable by the 3802 compiler)
+#   OUT/rt-wrap                   with --runtime: a replay runtime whose dl/iCBE.dylib is the wrapper
+# Everything x86_64 is ad hoc signed. Nothing is run.
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+out= icbe= rt=
+while (($#)); do
+    case $1 in
+    --icbe) icbe=$2; shift 2 ;;
+    --runtime) rt=$2; shift 2 ;;
+    -*) echo "unknown option $1" >&2; exit 2 ;;
+    *) out=$1; shift ;;
+    esac
+done
+[[ -n $out && -n $icbe ]] || { sed -n 2,13p "$0" >&2; exit 2; }
+[[ -e $out ]] && { echo "$out exists; give a new folder" >&2; exit 2; }
+[[ -f $icbe ]] || { echo "no file $icbe" >&2; exit 2; }
+mkdir -p "$out/probes" "$out/kernels"; out=$(cd "$out" && pwd)
+T=/System/Library/Extensions/AppleIntelHD4000GraphicsGLDriver.bundle/Contents/MacOS
+X86=(-arch x86_64 -mmacosx-version-min=11.7)
+src=$here/src
+
+clang -O1 -Wall -Wextra "$src/compiler/igil_rewrite.c" "$src/compiler/igil_tool.c" -o "$out/igil_tool"
+
+cp "$icbe" "$out/iCBE-real.dylib"
+clang "${X86[@]}" -O1 -Wall -dynamiclib "$src/compiler/icbe_wrap.c" "$src/compiler/igil_rewrite.c" \
+    -Wl,-not_for_dyld_shared_cache -Wl,-reexport_library,"$out/iCBE-real.dylib" -install_name "$T/iCBE.dylib" -o "$out/iCBE.dylib"
+old=$(otool -l "$out/iCBE.dylib" | grep -A2 LC_REEXPORT_DYLIB | awk '/name/{print $2}')
+install_name_tool -change "$old" "$T/iCBE-real.dylib" "$out/iCBE.dylib" 2>/dev/null
+codesign -f -s - "$out/iCBE.dylib"
+
+clang "${X86[@]}" -fobjc-arc -O1 -Wall -Wextra -Wno-unused-parameter -Wno-protocol -Wno-mismatched-parameter-types \
+    -Wl,-no_warn_inits -dynamiclib "$src/device/argbuf.m" "$src/device/argbuf_tramp.s" \
+    -framework Foundation -framework Metal -install_name /usr/lib/libargbuf.dylib -o "$out/libargbuf.dylib"
+codesign -f -s - "$out/libargbuf.dylib"
+
+for p in "$here"/probes/*.m; do
+    n=$(basename "$p" .m)
+    clang "${X86[@]}" -fobjc-arc -O1 -Wall "$p" -framework Foundation -framework Metal -o "$out/probes/$n"
+    codesign -f -s - "$out/probes/$n"
+done
+
+for k in "$here"/kernels/*.metal; do
+    n=$(basename "$k" .metal)
+    xcrun -sdk macosx metal -target air64_v25-apple-macosx13.0 -std=metal3.0 -c "$k" -o "$out/kernels/$n.air"
+    xcrun -sdk macosx metallib "$out/kernels/$n.air" -o "$out/kernels/$n.metallib"
+done
+
+if [[ -n $rt ]]; then
+    rt=$(cd "$rt" && pwd -P); w=$out/rt-wrap
+    mkdir -p "$w/dl"
+    for x in bin bundles fw root runtime.json; do ln -s "$rt/$x" "$w/$x"; done
+    for x in "$rt"/dl/*; do [[ $(basename "$x") == iCBE.dylib ]] || ln -s "$x" "$w/dl/"; done
+    cp "$out/iCBE.dylib" "$w/dl/iCBE.dylib"; cp "$out/iCBE-real.dylib" "$w/dl/iCBE-real.dylib"
+fi
+echo "built into $out"

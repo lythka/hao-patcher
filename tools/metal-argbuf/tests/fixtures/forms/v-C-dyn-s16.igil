@@ -1,0 +1,154 @@
+	PROGRAM
+	SHADER t5
+
+	VERSION_3_0
+
+	DCL_THREADGROUP VARIABLE;
+
+	DCL_UAVRAW u0, TRUE =
+	{
+	  KERNEL_ARGUMENT, 1,
+	  LOCATION_INDEX, 1, 0,
+	  EMULATION_ARGUMENT, FALSE,
+	  STRIDE, 16, 16
+	};
+
+	DCL_CONSTANTBUFFER C0=
+	{
+	  KERNEL_ARGUMENT, 0,
+	  LOCATION_INDEX, 0, 0,
+	  EMULATION_ARGUMENT, FALSE,
+	  STRIDE, 8, 8
+	};
+
+	DCL_TPM m0, 16;
+
+	DCL_UAVRAW u1, TRUE =
+	{
+	  KERNEL_ARGUMENT, 2,
+	  LOCATION_INDEX, 24, 0,
+	  EMULATION_ARGUMENT, FALSE,
+	  STRIDE, 16, 16
+	};
+
+	DCL_UAVRAW u2, TRUE =
+	{
+	  KERNEL_ARGUMENT, 3,
+	  LOCATION_INDEX, 25, 0,
+	  EMULATION_ARGUMENT, FALSE,
+	  STRIDE, 16, 16
+	};
+
+	DCL_INPUT i0.xyz, THREAD_ID;
+
+	DCL_TEMPS r0..r90;
+	ADDRESS_OF r0, C0;
+	ADDRESS_OF r1, u0;
+	MOV r2.x, i0.x;
+	ADDRESS_OF r3, m0;
+
+
+
+	LD_RAW_PTR r7, r0, C0;
+	MOV r8.x, 0;
+	MOV_SWZ r9, r7.x, r8.x, r8.x, r8.x;
+	MOV r10, r9;
+	MOV r11.x, r10.y;
+	MOV r12.x, 4;
+	MOV_SWZ r13, r12.x, r8.x, r8.x, r8.x;
+	MOV r14, r13;
+	LADD r15, r0, r14;
+	LD_RAW_PTR r16, r15, C0;
+	MOV_SWZ r17, r16.x, r8.x, r8.x, r8.x;
+	MOV r18, r17;
+	MOV r19.x, r18.x;
+	MOV_SWZ r20, r8.x, r19.x, r8.x, r8.x;
+	MOV r21, r20;
+	MOV r22.x, r21.y;
+	OR r23.x, r22.x, r11.x;
+	MOV r24.x, r10.x;
+	MOV r25.x, r21.x;
+	OR r26.x, r25.x, r24.x;
+	MOV_SWZ r27, r26.x, r23.x, r8.x, r8.x;
+	MOV r28, r3;
+	STORE_RAW_PTR m0.xy, r28, r27;
+	MOV r29.x, 8;
+	MOV_SWZ r30, r29.x, r8.x, r8.x, r8.x;
+	MOV r31, r30;
+	LADD r32, r0, r31;
+	LADD r33, r32, r14;
+	LD_RAW_PTR r34, r33, C0;
+	MOV_SWZ r35, r34.x, r8.x, r8.x, r8.x;
+	MOV r36, r35;
+	MOV r37.x, r36.x;
+	MOV_SWZ r38, r8.x, r37.x, r8.x, r8.x;
+	MOV r39, r38;
+	MOV r40.x, r39.y;
+	LD_RAW_PTR r41, r32, C0;
+	MOV_SWZ r42, r41.x, r8.x, r8.x, r8.x;
+	MOV r43, r42;
+	MOV r44.x, r43.y;
+	OR r45.x, r40.x, r44.x;
+	MOV r46.x, r39.x;
+	MOV r47.x, r43.x;
+	OR r48.x, r46.x, r47.x;
+	MOV_SWZ r49, r48.x, r45.x, r8.x, r8.x;
+	LADD r50, r28, r31;
+	STORE_RAW_PTR m0.xy, r50, r49;
+	LD_RAW_PTR r51, r28, m0;
+	MOV r52.x, r51.w;
+	MOV r53.x, r51.z;
+	MOV_SWZ r54, r53.x, r52.x, r8.x, r8.x;
+	MOV r55, r54;
+	MOV r56.x, r51.y;
+	MOV r57.x, r51.x;
+	MOV_SWZ r58, r57.x, r56.x, r8.x, r8.x;
+	MOV r59, r58;
+	AND r60.x, r2.x, 3;
+	SHL r61.x, r60.x, 4;
+	MOV_SWZ r62, r61.x, r8.x, r8.x, r8.x;
+	MOV r63, r62;
+	LADD r64, r59, r63;
+	MOV r77.x, r64.y;
+	ICMP.ne r78.x, r77.x, 0;
+	AND r78.x, r78.x, 0x1;
+	IMUL r79.x, r77.x, r78.x;
+	MOV r80, r64;
+	MOV r80.y, 0;
+	LOOP;
+	GET_VALUE_FROM_FIRST_ACTIVE_LANE r81, r79;
+	MOV r82.x, r81;
+	LD_RAW_PTR r65, r80, u[r82.x];
+	ICMP.ne r83.x, r82.x, r79.x;
+	AND r83.x, r83.x, 0x1;
+	BREAK_CND.z r83.x;
+	ENDLOOP;
+	MOV r66.x, 16;
+	MOV_SWZ r67, r66.x, r8.x, r8.x, r8.x;
+	MOV r68, r67;
+	LADD r69, r55, r68;
+	MOV r84.x, r69.y;
+	ICMP.ne r85.x, r84.x, 0;
+	AND r85.x, r85.x, 0x1;
+	IMUL r86.x, r84.x, r85.x;
+	MOV r87, r69;
+	MOV r87.y, 0;
+	LOOP;
+	GET_VALUE_FROM_FIRST_ACTIVE_LANE r88, r86;
+	MOV r89.x, r88;
+	LD_RAW_PTR r70, r87, u[r89.x];
+	ICMP.ne r90.x, r89.x, r86.x;
+	AND r90.x, r90.x, 0x1;
+	BREAK_CND.z r90.x;
+	ENDLOOP;
+	FADD r71, r70, r65;
+	SHR r72.x, r2.x, 28;
+	SHL r73.x, r2.x, 4;
+	MOV_SWZ r74, r73.x, r72.x, r8.x, r8.x;
+	MOV r75, r74;
+	LADD r76, r1, r75;
+	STORE_RAW_PTR u0, r76, r71;
+
+	RET;
+
+	END

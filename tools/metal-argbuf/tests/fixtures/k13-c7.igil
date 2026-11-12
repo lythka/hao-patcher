@@ -1,0 +1,130 @@
+	PROGRAM
+	SHADER c7
+
+	VERSION_3_0
+
+	DCL_THREADGROUP VARIABLE;
+
+	DCL_UAVRAW u0, TRUE =
+	{
+	  KERNEL_ARGUMENT, 3,
+	  LOCATION_INDEX, 1, 0,
+	  EMULATION_ARGUMENT, FALSE,
+	  STRIDE, 16, 16
+	};
+
+	DCL_RESOURCE t0, 2D, FLOAT =
+	{
+	  KERNEL_ARGUMENT, 0,
+	  LOCATION_INDEX, 2, 0,
+	  EMULATION_ARGUMENT, FALSE,
+	  SAMPLER_NUM, [0]
+	};
+
+	DCL_CONSTANTREGISTER c0 =
+	{
+		SAMPLER_NORMALIZED_COORDS, 1, 0,
+		SAMPLER_ADDRESS_MODE, 1, 0,
+		UNUSED, 0, 0,
+		UNUSED, 0, 0
+	};
+
+	DCL_CONSTANTBUFFER C0=
+	{
+	  KERNEL_ARGUMENT, 2,
+	  LOCATION_INDEX, 0, 0,
+	  EMULATION_ARGUMENT, FALSE,
+	  STRIDE, 8, 8
+	};
+
+	DCL_SAMPLER s0 =
+	{
+	  KERNEL_ARGUMENT, 1,
+	  LOCATION_INDEX, 3, 0,
+	  EMULATION_ARGUMENT, FALSE
+	};
+
+	DCL_INPUT i0.xyz, THREAD_ID;
+
+	DCL_TEMPS r0..r66;
+	ADDRESS_OF r0, C0;
+	ADDRESS_OF r1, u0;
+	MOV r2.x, i0.x;
+
+
+
+	MOV r66.x, 1;
+	MOV r10.x, 0;
+	MOV_SWZ r11, r10.x, r10.x, r10.x, r10.x;
+	MOV r9, r11;
+	MOV r8, r9;
+	MOV r12.x, 8;
+	MOV_SWZ r13, r12.x, r10.x, r10.x, r10.x;
+	MOV r14, r13;
+	LADD r15, r0, r14;
+	LD_RAW_PTR r3, r15, C0;
+	LD_RAW_PTR r4, r0, C0;
+
+	LOOP;
+	GET_VALUE_FROM_FIRST_ACTIVE_LANE r16, r4;
+	MOV r17.x, r16;
+	MOV r18.x, r4;
+	ICMP.eq r19.x, r17.x, r18.x;
+	AND r19.x, r19.x, 0x1;
+	GET_VALUE_FROM_FIRST_ACTIVE_LANE r20, r3;
+	MOV r21.x, r20;
+	MOV r22.x, r3;
+	ICMP.eq r23.x, r21.x, r22.x;
+	AND r23.x, r23.x, 0x1;
+	AND r24.x, r19.x, r23.x;
+
+	MOV r25.x, 0;
+	MOV r26.x, 1;
+	MOV_CND.nz r27.x, r24.x, r26.x, r25.x;
+	ICMP.ne r28.x, r27.x, r26.x;
+	AND r28.x, r28.x, 0x1;
+	MOV r66.x, r28.x;
+	BREAK_CND.z r28.x;
+	ENDLOOP;
+
+	MOV r66.x, 1;
+	MOV r31.x, r8;
+	MOV r32.x, 0x00000000;
+	MOV r33.x, 0x3F000000;
+	MOV_SWZ r34, r33.x, r33.x, r32.x, r32.x;
+	MOV r35.x, r34.x;
+	MOV r36.x, r35.x;
+	SHR r37.x, r36.x, 31;
+	AND r38.x, r37.x, 1;
+	MOV r39.x, 0xBF800000;
+	MOV_CND.nz r40.x, r38.x, r39.x, r35.x;
+	MOV_SWZ r41.xy, r40.x, r34.y, 0, 0;
+	MOV r42.x, r41.y;
+	MOV r43.x, r42.x;
+	SHR r44.x, r43.x, 31;
+	AND r45.x, r44.x, 1;
+	MOV_CND.nz r46.x, r45.x, r39.x, r42.x;
+	MOV_SWZ r47.xy, r41.x, r46.x, 0, 0;
+	MOV r48.x, 2;
+	ICMP.eq r49.x, c0.y, r48.x;
+	AND r49.x, r49.x, 0x1;
+	MOV_CND.nz r50, r49.x, r34, r47;
+	MOV r51.x, 8;
+	ICMP.eq r52.x, c0.x, r51.x;
+	AND r52.x, r52.x, 0x1;
+	MOV_CND.nz r53, r52.x, r34, r50;
+	MOV r54.x, r9;
+	SAMPLE_L r55, r53(0, 0, 0), t0, s0, r32, 2D;
+	MOV_SWZ r58, r32.x, r32.x, r32.x, r32.x;
+	FADD r59, r55, r58;
+	SHR r60.x, r2.x, 28;
+	SHL r61.x, r2.x, 4;
+	MOV r62.x, 0;
+	MOV_SWZ r63, r61.x, r60.x, r62.x, r62.x;
+	MOV r64, r63;
+	LADD r65, r1, r64;
+	STORE_RAW_PTR u0, r65, r59;
+
+	RET;
+
+	END
