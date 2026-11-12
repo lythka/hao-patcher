@@ -78,11 +78,22 @@ def main():
                                                                                  new.get('revision')))
         if not new.get('files'):
             problems.append('%s: patch.json declares no files' % name)
-        for k in sorted((set(old) | set(new)) - {'revision', 'files'}):
+        keep = {'validated_revision', 'validated_digest'}
+        if old.get('validated') is True and keep <= set(new) and not keep & set(old):
+            # a validated recipe keeps its proof: allowed when it names the revision it had (patches.py check,
+            # run below, confirms the digest of what it installs is unchanged)
+            if new['validated_revision'] != old.get('revision'):
+                problems.append('%s: validated_revision %s, but the validated revision was %s' % (
+                    name, new['validated_revision'], old.get('revision')))
+            ignore = {'revision', 'files'} | keep
+        else:
+            ignore = {'revision', 'files'}
+        for k in sorted((set(old) | set(new)) - ignore):
             if old.get(k) != new.get(k):
                 problems.append('%s: patch.json %s changed (%r -> %r)' % (name, k, old.get(k), new.get(k)))
         readme = show(a.branch, 'patches/%s/README.md' % name) or ''
-        top = re.search(r'^## Revisions\n+- r(\d+) ', readme, re.M)
+        section = readme.split('\n## Revisions\n', 1)[1] if '\n## Revisions\n' in readme else ''
+        top = re.search(r'^- r(\d+) ', section, re.M)            # the first revision line, after any intro
         if not top or int(top.group(1)) != new.get('revision'):
             problems.append('%s: newest README Revisions line is not r%s' % (name, new.get('revision')))
 
