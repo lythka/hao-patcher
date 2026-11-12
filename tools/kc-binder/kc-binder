@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""kc-binder: compute the Darwin 27 OpenCore kernel repairs and the IntelCommpage address table for a Boot KC.
+
+  kc-binder bind --boot-kc KC --out DIR [--recipe RECIPE]
+        DIR/EFI/OC/config.plist   Kernel.Patch (the four early-VM repairs) and the IntelCommpage Kernel.Add entry
+        DIR/capture.json          the early-VM capture the repairs were computed from
+        DIR/commpage-table.json   every collection address IntelCommpage uses, as (member, segment, offset, address)
+        DIR/bind.json             inputs, resolved points and output hashes
+  kc-binder compare --boot-kc KC --repair-efi DIR [--binding DIR] [--abi-header FILE] [--recipe RECIPE]
+        bind in memory and compare with a recorded repair artifact (kernel_repair_efi), binding profile
+        (kernel_repair_binding) and commpage_abi.hpp; one line per field, exit 1 if any differs
+  kc-binder make-blob ... | make-recipe ...
+        release-time producers (need clang, llvm-objdump and the standalone kernel): src/make_recipe.py
+
+The default recipe is the one in recipes/ whose kc-recipe.json names the collection's kernel UUID.
+Exit status: 0 bound (and, for compare, identical), 1 refused or different, 2 usage.
+"""
+import argparse
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import runpy
+import sys
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
+sys.path.insert(0, str(HERE/'src'))
+import kcbind   # noqa: E402
+import compare   # noqa: E402
+
+
+def recipe_for(path, kc):
+    if path:
+        return kcbind.Recipe(path, REPO)
+    return kcbind.select([kcbind.Recipe(p, REPO) for p in sorted((HERE/'recipes').glob('*.json'))], kc)
+
+
+def relative(path):
+    path = Path(path).resolve()
+    return str(path.relative_to(REPO)) if path.is_relative_to(REPO) else path.name
+
+
+def foundation():
+    return runpy.run_path(str(REPO/'tools/kernel-foundation/commpage_build.py'))
+
+
+def bind(args):
+    data = args.boot_kc.read_bytes()
+    kc = kcbind.Collection(data)
+    recipe = recipe_for(args.recipe, kc)
+    patches, capture, report = kcbind.bind_repairs(recipe, kc)
+    table = kcbind.commpage_table(recipe, kc)
+    kcbind.abi_lines(table, foundation())  # the shape checks commpage_build.py applies to user_trap and csr
+    out = args.out
+    (out/'EFI/OC').mkdir(parents=True, exist_ok=False)
+    config = kcbind.config_plist(patches)
+    (out/'EFI/OC/config.plist').write_bytes(config)
+    (out/'capture.json').write_text(json.dumps(capture, indent=2)+'\n')
+    (out/'commpage-table.json').write_text(json.dumps(table, indent=1)+'\n')
+    record = dict(unit='tools/kc-binder', operation='bind', date=datetime.now(timezone.utc).isoformat(),
+                  inputs=dict(boot_kc=kcbind.sha256(data), recipe=relative(recipe.path),
+                              recipe_sha256=kcbind.sha256(recipe.path.read_bytes()),
+                              kc_recipe=recipe.binder['kc_recipe'], pv_blob=recipe.binder['pv_blob']),
+                  kernel=dict(uuid=kc.kernel.uuid.hex(), darwin=kc.darwin_version()), points=report,
+                  patches=[dict(comment=p['Comment'], offset=hex(data.index(p['Find'])), length=len(p['Find']),
+                                find_sha256=kcbind.sha256(p['Find']), replace_sha256=kcbind.sha256(p['Replace']))
+                           for p in patches],
+                  files={str(p.relative_to(out)): kcbind.sha256(p.read_bytes())
+                         for p in sorted(out.rglob('*')) if p.is_file()},
+                  validation='Static binding only; boot of this collection is a separate check')
+    (out/'bind.json').write_text(json.dumps(record, indent=2)+'\n')
+    print(out)
+    return 0
+
+
+def run_compare(args):
+    kc = kcbind.Collection(args.boot_kc.read_bytes())
+    recipe = recipe_for(args.recipe, kc)
+    patches, capture, _ = kcbind.bind_repairs(recipe, kc)
+    table = kcbind.commpage_table(recipe, kc)
+    rows = compare.repairs(patches, capture, kc, args.repair_efi)
+    if args.binding:
+        rows += compare.binding(patches, table, kc, json.loads((args.binding/'profile.json').read_text()))
+    if args.abi_header:
+        rows += compare.abi_header(table, args.abi_header.read_text(), foundation())
+    for what, same, detail in rows:
+        print(f'{"same   " if same else "DIFFERS"} {what}: {detail}')
+    bad = sum(1 for _, same, _ in rows if not same)
+    print(f'{len(rows)-bad} same, {bad} differ')
+    return 1 if bad else 0
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in ('make-blob', 'make-recipe'):
+        sys.argv = [str(HERE/'src/make_recipe.py'), argv[0][len('make-'):], *argv[1:]]
+        runpy.run_path(str(HERE/'src/make_recipe.py'), run_name='__main__')
+        return 0
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest='command', required=True)
+    b = sub.add_parser('bind')
+    b.add_argument('--boot-kc', type=Path, required=True)
+    b.add_argument('--out', type=Path, required=True)
+    b.add_argument('--recipe', type=Path)
+    c = sub.add_parser('compare')
+    c.add_argument('--boot-kc', type=Path, required=True)
+    c.add_argument('--repair-efi', type=Path, required=True)
+    c.add_argument('--binding', type=Path)
+    c.add_argument('--abi-header', type=Path)
+    c.add_argument('--recipe', type=Path)
+    args = parser.parse_args(argv)
+    try:
+        return bind(args) if args.command == 'bind' else run_compare(args)
+    except (OSError, ValueError, KeyError) as error:
+        print(f'kc-binder: {error}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -1,0 +1,84 @@
+{
+ "format": 1,
+ "source": {
+  "path": "tools/kernel-foundation/src/bootstrap_pv_alias.S",
+  "sha256": "b8e19f613e82e284be309360678f0f9261af15240e5afb6a761563b551d90d2f"
+ },
+ "assembler": "xcrun clang -target x86_64-apple-macos10.13 -c (pv_bootstrap.py)",
+ "rule": "at each fixup: int32 = symbol - (origin + at + 4); origin = the cave address",
+ "symbols": [
+  "pv_zone",
+  "zalloc_flags",
+  "pv_hash_mask",
+  "pv_hash_table",
+  "kernel_pmap",
+  "avail_start",
+  "pmap_find_pa",
+  "last_managed_page",
+  "phys_attributes",
+  "pv_head_table",
+  "pmap_query_pagesize",
+  "virtual_avail",
+  "vm_pages_end",
+  "pmap_remove_options"
+ ],
+ "code": "5756525141504151535541544155415641574883ec084c8d350000000048bb0000000080ffffff4c8b25000000004901dc4981e400f0ffff4531ff4c39e3735f4c89f74889dee80000000048c1e80c85c074433b0500000000773b488b1500000000f6040201742e48c1e005488b15000000004801c2e86f0000004c89f74889dee8000000003d0000200075094881c300002000eba54881c300100000eb9c4585ff752b41ffc7488b1d000000004881c3ff0f00004881e300f0ffff4c8b25000000004981e400f0ffffe96cffffff4883c408415f415e415d415c5d5b41594158595a5e5fe90000000048837a18000f84910000004889d14c39711875104c8b41104981e000f0ffff4939d87477488b094839d175e2415441554883ec084989d44989c549c1ed05488b3d00000000be04800000e800000000488958104c89701844896820498b0c244889084c89600848894108498904244889da48c1ea0c4431f2231500000000488b0d00000000488d14d1488b0a488948284889024883c408415d415cc348895a104c89721848891248895208c3",
+ "fixups": [
+  {
+   "at": 25,
+   "symbol": "kernel_pmap"
+  },
+  {
+   "at": 42,
+   "symbol": "avail_start"
+  },
+  {
+   "at": 71,
+   "symbol": "pmap_find_pa"
+  },
+  {
+   "at": 85,
+   "symbol": "last_managed_page"
+  },
+  {
+   "at": 94,
+   "symbol": "phys_attributes"
+  },
+  {
+   "at": 111,
+   "symbol": "pv_head_table"
+  },
+  {
+   "at": 130,
+   "symbol": "pmap_query_pagesize"
+  },
+  {
+   "at": 170,
+   "symbol": "virtual_avail"
+  },
+  {
+   "at": 191,
+   "symbol": "vm_pages_end"
+  },
+  {
+   "at": 230,
+   "symbol": "pmap_remove_options"
+  },
+  {
+   "at": 299,
+   "symbol": "pv_zone"
+  },
+  {
+   "at": 309,
+   "symbol": "zalloc_flags"
+  },
+  {
+   "at": 356,
+   "symbol": "pv_hash_mask"
+  },
+  {
+   "at": 363,
+   "symbol": "pv_hash_table"
+  }
+ ]
+}
