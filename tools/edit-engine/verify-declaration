@@ -27,6 +27,7 @@ ALLOWED = re.compile(r'patches/([^/]+)/(patch\.json|README\.md|edits/[^/]+\.json
 GENERATED = {'patches/TRACKER.md', 'docs/PATCHES.md'}
 TMP = re.compile('/' r'private/tmp/[A-Za-z]')   # scratch folders; the other private patterns come from the repo's test
 PY = sys.executable
+STANDARD_ENV = {'PATH', 'HOME', 'TMPDIR', 'USER', 'LOGNAME', 'SHELL', 'LANG', 'LC_ALL', 'PWD', 'TERM'}
 
 
 def git(*args, cwd=REPO):
@@ -116,6 +117,7 @@ def main():
                 text = (work / path).read_text()
                 env_names |= set(re.findall(r"environ(?:\.get)?\(\s*['\"]([A-Z0-9_]+)['\"]", text))
                 env_names |= set(re.findall(r"environ\[\s*['\"]([A-Z0-9_]+)['\"]", text))
+        env_names -= STANDARD_ENV                       # a test reading PATH or HOME is not naming a real input
         for n in sorted(env_names):
             if n in env_given:
                 if not Path(env_given[n]).exists():
