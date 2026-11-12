@@ -12,7 +12,7 @@ ARM-only programs on the Intel CPU.
 
 ![macOS 27 desktop and Control Center on an Intel Mac](docs/images/desktop-intel.jpg)
 
-More screenshots: [the gallery](docs/gallery.md) (Weather and its maps, Maps in 3D, WebGPU in Safari).
+More screenshots: [the gallery](docs/gallery.md) (Weather and its maps, Maps in 3D, WebGPU in Safari, SceneKit).
 
 ## Risks
 
@@ -53,10 +53,12 @@ Tested with macOS 27.2.1 (26B131), 2026-11-12.
 - Safari (including YouTube), Calendar, Terminal, System Settings, Preview.
 - Control Center (Wi-Fi, Bluetooth, AirDrop, Now Playing, Display, Sound).
 - Notification Center and widgets.
-- Maps: tiles, search, place cards, current location, satellite (3D globe and street level) and 3D buildings.
+- Maps: tiles, search, place cards, current location, satellite (3D globe and street level) and 3D buildings
+  (VectorKit's shader library repaired for the old compiler).
 - Weather: conditions, hourly, air quality, 10-day, and the precipitation, temperature, air-quality and wind
   maps (native Metal argument buffers and ASTC textures on the HD 4000).
 - WebGPU in Safari: compute and rendering on the HD 4000.
+- SceneKit: 3D scenes with physically based materials, cube-map environments, shadows and reflections.
 - Photos: import, thumbnails, full-size view.
 - Spotlight opens and searches.
 - macOS 27's ARM-only programs run on the Intel CPU through hao-runtime, including the
@@ -72,7 +74,7 @@ Tested with macOS 27.2.1 (26B131), 2026-11-12.
   vector and floating-point work is profiled, with hao-runtime optimizations lined up.
 - Metal argument buffers and ASTC textures: the image recipe is being packaged.
 - Safari canvases: WebGPU renders correctly; showing WebGL and WebGPU canvases on screen is being worked on.
-- SceneKit (its shader library joins the Metal library repairs) and RealityKit (placement heaps).
+- RealityKit: needs placement heaps, which the HD 4000's Metal driver lacks.
 - Sleep and updates: not tested yet.
 
 ## Requirements
@@ -115,8 +117,10 @@ refuses a set that breaks that order.
 
 - **Metal argument buffers on the HD 4000:** native support in the shader compiler and the driver (compute,
   vertex and fragment, nested buffers, samplers), plus ASTC textures decoded at upload. Apple's effects engine
-  (VFX), RealityKit, SceneKit, WebGPU, WebGL and Maps' renderer use argument buffers. Weather (including its
-  maps), Maps' satellite and 3D views, and WebGPU in Safari work.
+  (VFX), RealityKit, SceneKit, WebGPU and WebGL use argument buffers. Weather (including its maps) and WebGPU in
+  Safari work.
+- **SceneKit:** its shader library joins the Metal library repairs, and cube-map and 1D texture reads are
+  converted for the old shader compiler (they crashed it); 3D scenes render.
 - **Wi-Fi:** Setup's join dialog works, and remembered networks join automatically
   (Tahoe's CoreWiFi).
 - **Login:** Setup's automatic login after creating an account works.
