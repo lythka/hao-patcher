@@ -1,7 +1,8 @@
 // probe3.m: texture-only argument buffer on the HD 4000 GPU with the iCBE wrapper. Two textures in the argument
-// buffer, handles written by hand (handle k = slot 16+k); each thread reads one of them (non-uniform member choice).
+// buffer, handles written by hand (handle k = slot AGB_TEX_SLOT+k); each thread reads one of them (non-uniform member choice).
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#include "../src/argbuf_config.h"
 static NSString *src = @
 "#include <metal_stdlib>\n"
 "using namespace metal;\n"
@@ -25,7 +26,7 @@ int main(void) { @autoreleasepool {
     enum { N = 32 }; id<MTLBuffer> out = [d newBufferWithLength:N*16 options:MTLResourceStorageModeShared]; memset(out.contents, 0xff, N*16);
     id<MTLCommandBuffer> cb = [q commandBuffer]; id<MTLComputeCommandEncoder> ce = [cb computeCommandEncoder];
     [ce setComputePipelineState:p]; [ce setBuffer:abuf offset:0 atIndex:0]; [ce setBuffer:out offset:0 atIndex:1];
-    [ce setTexture:tx[0] atIndex:16]; [ce setTexture:tx[1] atIndex:17];
+    [ce setTexture:tx[0] atIndex:AGB_TEX_SLOT]; [ce setTexture:tx[1] atIndex:AGB_TEX_SLOT + 1];
     [ce dispatchThreads:MTLSizeMake(N,1,1) threadsPerThreadgroup:MTLSizeMake(16,1,1)]; [ce endEncoding]; [cb commit]; [cb waitUntilCompleted];
     printf("status %ld %s\n", (long)cb.status, cb.error ? cb.error.localizedDescription.UTF8String : "");
     float *o = out.contents; int bad = 0;

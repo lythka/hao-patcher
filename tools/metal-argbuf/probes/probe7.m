@@ -1,7 +1,8 @@
-// probe7.m: texture kinds through an argument buffer on the HD 4000 (iCBE wrapper declares a 2D range at slots 16..).
+// probe7.m: texture kinds through an argument buffer on the HD 4000 (iCBE wrapper declares a 2D range at slots AGB_TEX_SLOT..).
 // Each texture is filled with one known value; the argument buffer holds handle 0 (slot 16).
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#include "../src/argbuf_config.h"
 static NSString *src = @
 "#include <metal_stdlib>\n"
 "using namespace metal;\n"
@@ -61,7 +62,7 @@ int main(void) { @autoreleasepool {
         id<MTLBuffer> out = [d newBufferWithLength:16 options:MTLResourceStorageModeShared]; memset(out.contents, 0xff, 16);
         id<MTLCommandBuffer> cb = [q commandBuffer]; id<MTLComputeCommandEncoder> ce = [cb computeCommandEncoder];
         [ce setComputePipelineState:p]; [ce setBuffer:abuf offset:0 atIndex:0]; [ce setBuffer:out offset:0 atIndex:1];
-        [ce setTexture:t atIndex:16];
+        [ce setTexture:t atIndex:AGB_TEX_SLOT];
         [ce dispatchThreads:MTLSizeMake(1,1,1) threadsPerThreadgroup:MTLSizeMake(1,1,1)]; [ce endEncoding]; [cb commit]; [cb waitUntilCompleted];
         float *o = out.contents; int ok = cb.status == MTLCommandBufferStatusCompleted;
         for (int c = 0; c < 4; c++) if (o[c] != T[i].w[c]) ok = 0;

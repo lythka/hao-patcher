@@ -162,13 +162,16 @@ static char *rewrite_resources(const char *in, const igil_config *cfg, igil_stat
     int T = temps + 1;   // scratch registers: T (texture index), T+1 (sampler index)
     // binding table: constant buffers, then textures, then UAVs by register number (measured on the HD 4000), so
     // uN has index ncb + ntex + N and u(BUF_BTI - ncb - ntex + k) has the fixed index BUF_BTI + k
-    int ufix = cfg->buf_bti - ncb - ntexdcl - (ntex ? cfg->tex_count : 0);
+    // The texture range is declared whenever buffers are rewritten too: it keeps uN registers low (iCBE rejects UAV
+    // registers in the 150s) and the binding-table arithmetic the same in every pipeline.
+    int dtex = ntex || nbuf;
+    int ufix = cfg->buf_bti - ncb - ntexdcl - (dtex ? cfg->tex_count : 0);
     if (nbuf && umax >= ufix) { free(taint); free(abt); free(L); return NULL; }   // would collide with the fixed range
     buf o = {0};
     for (int i = 0; i < nl; i++) {
         if (i == dcl_at) {
             int ka = karg + 1;
-            if (ntex) for (int k = 0; k < cfg->tex_count; k++)
+            if (dtex) for (int k = 0; k < cfg->tex_count; k++)
                 putf(&o, "\tDCL_RESOURCE t%d, 2D, FLOAT =\n\t{\n\t  KERNEL_ARGUMENT, %d,\n\t  LOCATION_INDEX, %d, 0,\n"
                          "\t  EMULATION_ARGUMENT, FALSE,\n\t  SAMPLER_NUM, [4294967295]\n\t};\n\n", tbase + k, ka++, cfg->tex_slot + k);
             if (nbuf) for (int k = 0; k < cfg->buf_count; k++)
@@ -235,11 +238,21 @@ static char *rewrite_resources(const char *in, const igil_config *cfg, igil_stat
 // buffer as `MOV rD, C-1[rI.x]` (constant pointer: rI = byte address >> 4, "C-1" = no buffer) or
 // `LD_RAW rD, rA.x, u0` (device pointer, u0 undeclared). Only the pointer's low word (byte offset) survives; its high
 // word, BUF_BTI + h, is still in .y of the LD_RAW that loaded the pointer (air_pass.c makes that a 64-bit load). Each
-// access becomes LD_RAW from a declared raw-UAV range indexed by h: u(ubase+h) at buffer slot BUF_SLOT+h.
+// access becomes LD_RAW from a declared raw-UAV range selected by h: u(ubase+h) at buffer slot BUF_SLOT+h (emit_read).
 typedef struct { int ptr; int addr; } gdef;   // per register: LD_RAW register holding the pointer, byte-address register
 static int graphics(const char *in) { return strstr(in, "PIXELSHADER ") || strstr(in, "VERTEXSHADER "); }
 
+// One read through a pointer: pixel shaders index the UAV range with the handle; vertex shaders (Gen7 SIMD4x2) ignore a
+// dynamic surface index -- measured: they always read the first UAV -- so they select the surface with a compare chain
+// (the handle is uniform per draw).
+static void emit_read(buf *o, int vertex, int T, int ptr, const char *dst, const char *addr, int ubase, const igil_config *cfg) {
+    if (!vertex) { putf(o, "\tIADD r%d.x, r%d.y, %d;\n\tLD_RAW %s, %s, u[r%d.x];\n", T, ptr, ubase - cfg->buf_bti, dst, addr, T); return; }
+    putf(o, "\tIADD r%d.x, r%d.y, %d;\n", T, ptr, -cfg->buf_bti);
+    for (int k = 0; k < cfg->buf_count; k++) putf(o, "\tIF_ICMP.eq r%d.x, %d;\n\tLD_RAW %s, %s, u%d;\n\tENDIF;\n", T, k, dst, addr, ubase + k);
+}
+
 static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, igil_stats *st) {
+    int vertex = strstr(in, "VERTEXSHADER ") != NULL;
     int nl; line *L = split(in, &nl);
     int temps = -1, temps_at = -1, umax = -1, karg = -1, dcl_at = -1;
     for (int i = 0; i < nl; i++) {
@@ -288,7 +301,7 @@ static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, ig
             if (!strcmp(x.op, "LD_RAW") && x.na == 3 && !strcmp(x.a[2], "u0") && umax < 0) {   // device pointer
                 int a = reg(x.a[1]);
                 if (a >= 0 && a <= temps && g[a].ptr >= 0) {
-                    putf(&o, "\tIADD r%d.x, r%d.y, %d;\n\tLD_RAW %s, %s, u[r%d.x];\n", T, g[a].ptr, ubase - cfg->buf_bti, x.a[0], x.a[1], T);
+                    emit_read(&o, vertex, T, g[a].ptr, x.a[0], x.a[1], ubase, cfg);
                     st->buffers++; continue;
                 }
                 fails++;
@@ -298,8 +311,10 @@ static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, ig
             if (ck >= 0) {   // constant pointer: load the 16-byte register the operand names, keep its swizzle
                 int ri = reg(x.a[ck] + 4); const char *close = strchr(x.a[ck], ']');
                 if (ri >= 0 && ri <= temps && close && g[ri].ptr >= 0 && g[ri].addr >= 0) {
-                    putf(&o, "\tIADD r%d.x, r%d.y, %d;\n\tAND r%d.x, r%d.x, -16;\n\tLD_RAW r%d, r%d.x, u[r%d.x];\n\t%s ",
-                         T, g[ri].ptr, ubase - cfg->buf_bti, T + 1, g[ri].addr, T + 2, T + 1, T, x.op);
+                    char d2[16], a2[16]; snprintf(d2, sizeof d2, "r%d", T + 2); snprintf(a2, sizeof a2, "r%d.x", T + 1);
+                    putf(&o, "\tAND r%d.x, r%d.x, -16;\n", T + 1, g[ri].addr);
+                    emit_read(&o, vertex, T, g[ri].ptr, d2, a2, ubase, cfg);
+                    putf(&o, "\t%s ", x.op);
                     for (int k = 0; k < x.na; k++) {
                         if (k) put(&o, ", ", 2);
                         if (k == ck) putf(&o, "r%d%s", T + 2, close + 1); else put(&o, x.a[k], strlen(x.a[k]));

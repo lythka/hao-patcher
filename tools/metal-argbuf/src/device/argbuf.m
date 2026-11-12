@@ -493,6 +493,9 @@ void agb_install(void) {
         createStructType = dlsym(RTLD_DEFAULT, "MTLCreateStructTypeFromArgumentDescriptors");
         if (!dev || !cce || !rce || !createStructType) { agb_log("not installed: driver classes or MetalOld entry point missing"); return; }
         g_handles = [NSMutableDictionary new]; g_samplers = [NSMutableArray new];
+        // AGB_HANDLE_BASE=T,B (tests): start texture/buffer handle allocation at T and B, to exercise the top slots
+        const char *hb = getenv("AGB_HANDLE_BASE");
+        if (hb) { int t = 0, b = 0; if (sscanf(hb, "%d,%d", &t, &b) == 2 && t >= 0 && b >= 0) { g_nextTex = t; g_nextBuf = b; } }
         class_addProtocol(AGBEncoder.class, @protocol(MTLArgumentEncoder));
         class_replaceMethod(dev, @selector(newIndirectArgumentBufferLayoutWithStructType:),
             imp_implementationWithBlock(^id(id d, MTLStructType *st) __attribute__((ns_returns_retained)) { return [AGBLayout new]; }), "@@:@");
