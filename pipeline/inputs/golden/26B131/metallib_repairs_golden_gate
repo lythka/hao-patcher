@@ -1,2 +1,2 @@
-# Repaired Golden Gate metallibs made by cache/metallib make (r54) from 26B131, including VectorKit, AlloyCommon and VFX (SOURCES names the System libraries they replace).
-- store/artifacts/metallib-repairs-26B131-20261111-0ac019f8d69b
+# Repaired Golden Gate metallibs made by cache/metallib make (r55) from 26B131, including VectorKit, AlloyCommon, VFX and SceneKit (macOS and iOSSupport) (SOURCES names the System libraries they replace).
+- store/artifacts/metallib-repairs-26B131-20261112-f6e8a30c6897

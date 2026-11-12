@@ -18,7 +18,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-live-text-service | r2 | post | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Checks the runtime in System (/usr/lib/hao-live-text/LiveText.dylib) on the read-only System ins |
 | golden-gate-live-text-shared | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Runtime in System (/usr/lib/hao-live-text, umbrella LiveText.dylib: the load command must fit li |
 | golden-gate-metal-framebuffer | r3 | oclp-hook | experiment |  | x | x |  |  | **needs** | r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. |
-| golden-gate-metal-libraries | r16 | oclp-hook | experiment |  | x | x |  |  | **needs** | r16 2026-11-11 26B131 artifact adds VectorKit, AlloyCommon and VFX (cache/metallib r54), superseding OCLP's 26 |
+| golden-gate-metal-libraries | r17 | oclp-hook | experiment |  | x | x |  |  | **needs** | r17 2026-11-12 26B131 artifact adds SceneKit (macOS and iOSSupport, cache/metallib r55); the other nine librar |
 | golden-gate-native-identities | r1 | oclp-hook | experiment |  | x | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
 | golden-gate-shader-caches | r10 | post | experiment | caches | x |  |  |  | ok | r10 2026-11-11 Row `shader_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (84 |
 | golden-gate-user-seed | r5 | post | experiment | caches | x |  |  |  | ok | r5 2026-11-11 Optional (group caches) with needs_any caches: skipped when no cache patch runs, since the copie |

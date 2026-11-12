@@ -1,7 +1,7 @@
 # golden-gate-metal-libraries
 
 Installs Golden Gate's own MPSImage, MPSNeuralNetwork, RenderBox, MetalFX, CoreRE,
-Tungsten, VectorKit (with its AlloyCommon library) and VFX shader libraries, repaired for the HD 4000 compiler, plus an extended Intel
+Tungsten, VectorKit (with its AlloyCommon library), VFX and SceneKit (macOS and iOSSupport) shader libraries, repaired for the HD 4000 compiler, plus an extended Intel
 shader runtime. Every exported Apple function is preserved. This is a partial
 compatibility repair, not full Metal 4.1 support.
 
@@ -80,7 +80,8 @@ Texture atomics, imageblocks, texture block reads, rasterization-rate mapping an
 CoreRE indirect calls are not implemented. 27.2 VectorKit's nine new `Flyover::*`
 functions (tile and bindless paths) and `DaVinci::resetLM` still crash the 3802
 compiler, as do VFX's ray-tracing, layered and simdgroup kernels and `vfx_ssao_trace`
-(derivatives in a kernel). Constant-offset sample lowering costs
+(derivatives in a kernel). Shaders SceneKit compiles at run time still crash the 31001 downgrader (depth
+sampler-form reads; the offline repair covers only its `default.metallib`). Constant-offset sample lowering costs
 extra samples per call. Floating-point reduction order is preserved, but general
 floating association and GPU performance are not measured.
 
@@ -105,6 +106,7 @@ matching Tungsten library. A complete image with every library, shader-cache
 re-keying and full-workload performance remain open.
 
 ## Revisions
+- r17 2026-11-12 26B131 artifact adds SceneKit (macOS and iOSSupport, cache/metallib r55); the other nine libraries are byte-identical.
 - r16 2026-11-11 26B131 artifact adds VectorKit, AlloyCommon and VFX (cache/metallib r54), superseding OCLP's 26.0 copies; VFX `particle_fill_grid` atomic exchange repaired.
 - r15 2026-11-11 README: runs in set order after golden-gate-userspace (which no longer replaces System); documents that replacing OCLP's RenderBox and Tungsten libraries is a deliberate supersede. Recipe unchanged.
 - r14 2026-11-11 Installs a repaired library only over the System library it was made from (`SOURCES`), or over OCLP's copy on the build it was made from; 26B131 libraries.
