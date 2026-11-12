@@ -1,0 +1,38 @@
+{
+ "format": 1,
+ "path": "System/Library/KernelCollections/SystemKernelExtensions.kc",
+ "origin": {
+  "kind": "hao",
+  "name": "no earlier file",
+  "note": "created by Tahoe's kmutil in the kc-hook, in a second kmutil run, after the boot collection and its member list exist"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "link-system-collection",
+   "kind": "op",
+   "op": "kc.link",
+   "args": {
+    "tool": "kmutil",
+    "tool_row": "tahoe_kmutil",
+    "tool_note": "copied to builder scratch and re-signed ad hoc; it runs only while linking",
+    "subcommand": "create",
+    "arch": "x86_64",
+    "allow_missing_kdk": true,
+    "root": "the image's System volume (-R)",
+    "kernel": "System/Library/Kernels/kernel",
+    "kernel_row": "darwin27_kernel",
+    "variant": "release",
+    "build_directory": "/.darwin27-kc-build",
+    "build_directory_note": "inside the System volume while linking and removed after; its path is linked into the BootKC, so changing it changes the bytes hao-opencore's repairs are bound to",
+    "kexts": "the image's Intel driver tree: Tahoe Extensions, KDK kexts, OCLP's hardware kexts, found by kmutil under the root",
+    "name": "sys",
+    "boot_collection": "BootKernelExtensions.kc (-B, as for the boot collection)",
+    "system_collection": "SystemKernelExtensions.kc (-S, in the build directory)",
+    "elide_identifiers": "every identifier in System/Library/KernelCollections/BootKernelExtensions.kc.elides (--elide-identifier), so no driver is in both collections"
+   },
+   "reason": "the rest of the Intel drivers load from a system collection that repeats nothing the boot collection already holds"
+  }
+ ],
+ "sign": null
+}

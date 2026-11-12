@@ -1,0 +1,74 @@
+{
+ "format": 1,
+ "path": "EFI/OC/config.plist",
+ "origin": {
+  "kind": "oclp",
+  "name": "OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it",
+  "note": "in the image's EFI partition, not in the System volume. Not declared here (no edit kind for it yet): the four recorded kernel repairs in Kernel.Patch and the IntelCommpage.kext and HaoExec.kext entries appended to Kernel.Add (plist.set cannot append or carry data bytes), the early Tahoe kext entries (none on any recorded build), and removal of bootercfg and bootercfg-once from NVRAM.Add (OCLP's config has neither). The boot-args value is the one a build without a dev recipe writes: dev builds (IMAGE_DEV_BUILD=1) add hao_nx_stats=1 hao_bridge_stats=1 after hao_crash=1"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "debug-log-to-file",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {
+    "key": [
+     "Misc",
+     "Debug",
+     "Target"
+    ],
+    "value": 65
+   },
+   "reason": "OpenCore's DEBUG log goes to the file on the EFI partition only and nothing is printed on screen, so early-boot evidence can be collected from Recovery"
+  },
+  {
+   "id": "debug-log-info-lines",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {
+    "key": [
+     "Misc",
+     "Debug",
+     "DisplayLevel"
+    ],
+    "value": 2147483714
+   },
+   "reason": "the OpenCore file log also records informational lines, so it shows the result of each kernel patch"
+  },
+  {
+   "id": "boot-args",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {
+    "key": [
+     "NVRAM",
+     "Add",
+     "7C436110-AB2A-4BBB-A880-FE41995C9F82",
+     "boot-args"
+    ],
+    "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 ic_csr_internal=1"
+   },
+   "reason": "the Intel Mac boots Darwin 27 with its Lilu-based drivers loading, PCID off, hao's arm64-only programs allowed to start and hao's crash lines on the console, the Intel commpage reporting Apple-internal CSR so OCLP's on-disk Metal loads, and a panic rebooting instead of waiting for a debugger"
+  },
+  {
+   "id": "clear-boot-logging-overrides",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {
+    "key": [
+     "NVRAM",
+     "Delete",
+     "7C436110-AB2A-4BBB-A880-FE41995C9F82"
+    ],
+    "value": [
+     "boot-args",
+     "csr-active-config",
+     "bootercfg",
+     "bootercfg-once"
+    ]
+   },
+   "reason": "the next OpenCore boot deletes the firmware's boot logging overrides, so they cannot hide early-boot output"
+  }
+ ]
+}

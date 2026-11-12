@@ -15,7 +15,10 @@ before OCLP's hardware overlay, which reads its Darwin version. The kc-hook chec
 same file (it does not copy it again), builds the Boot and System kernel collections around it with Tahoe's `kmutil`
 (the `tahoe_kmutil` input, re-signed ad hoc so it runs in the builder) over the image's Intel driver tree (Tahoe
 Extensions, KDK kexts, OCLP's hardware kexts), then copies the Boot collection to Preboot. The target keeps Golden
-Gate's own `/usr/bin/kmutil`. The runner keeps a copy of this exact BootKC in the build record
+Gate's own `/usr/bin/kmutil`. The files are declared in `patch.json` `files`: the kernel as an origin of row `darwin27_kernel`, each collection as a
+`kc.link` spec ([edits/boot-kc.json](edits/boot-kc.json), [edits/system-kc.json](edits/system-kc.json)) naming kmutil's
+inputs as the hook passes them, the member list, and the two Preboot copies; `tests/test_edits.py` checks the specs against
+`src/kc-hook.sh`. The runner keeps a copy of this exact BootKC in the build record
 (`guest-output/guest/BootKernelExtensions.kc`), from which the `dev-golden-bootstrap` set derives `darwin27_boot_kc`.
 
 The early-boot repairs in [hao-opencore](../hao-opencore/README.md) are bound to the BootKC this recipe produces for
@@ -29,6 +32,9 @@ those repairs ([tools/kernel-foundation](../../tools/kernel-foundation/README.md
 - `tahoe_kmutil`: Tahoe's collection linker, used only in builder scratch space.
 
 ## Verify
+Host tests: `python3.14 -I -B -m unittest discover -s patches/darwin27-kernel/tests` (`DARWIN27_KERNEL_KERNEL` and
+`DARWIN27_KERNEL_BOOT_KC` add the real-input check that the BootKC links the row kernel).
+
 On the built image, `System/Library/Kernels/kernel` has the `darwin27_kernel` row's sha256 and the BootKC has the
 `darwin27_boot_kc` row's sha256 in both System and Preboot (hao-opencore's `repairs.py` stops the build otherwise). On
 the Mac, `uname -v` reports the build's Darwin 27 version and `kmutil showloaded` lists the Ethernet and HD 4000
@@ -41,6 +47,7 @@ Earlier: the collection recipe reproduces BootKC 6494d8e3 (26A428) and c8ae8b05 
 (kernel file no longer copied by the hook) has not been built.
 
 ## Revisions
+- r6 2026-11-12 Declare the kernel, both kernel collections (kc.link) and their Preboot copies in `patch.json` `files` and edits/; the hook is unchanged.
 - r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the hardware overlay that reads it); the kc-hook now checks it is `inputs/darwin27_kernel` instead of copying it again, and creates the System and Preboot KernelCollections folders itself. Runs as an ordinary set entry. Collection recipe unchanged. Build and boot validation pending.
 - r4 2026-11-11 Use the measured 26B131 Intel kernel with the 25G342 Tahoe donor kexts. Boot validation pending.
 - r3 2026-11-10 Initial public release.
