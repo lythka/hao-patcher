@@ -76,7 +76,8 @@ Tested with macOS 27.2.1 (26B131), 2026-11-12.
 - Faster first login for new accounts: a preloaded account template is built.
 - Performance of translated code: general code runs at about 1/2 to 1/3 of native speed;
   vector and floating-point work is profiled, with hao-runtime optimizations lined up.
-- Metal argument buffers and ASTC textures: the image recipe is being packaged.
+- Metal argument buffers and ASTC textures: the image recipe (`golden-gate-metal-argbuf`) is ready for the next
+  image build.
 - Safari WebGL and canvases: WebGPU computes and renders correctly; WebGL drawing and showing WebGL and WebGPU
   canvases on screen are being worked on.
 - Freeform: opens; opening a board is being fixed in hao-runtime.
@@ -162,7 +163,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 | Apple code identity of hao and re-signed programs | `golden-gate-userspace` (carrier in Security), `golden-gate-native-identities` | [patches/golden-gate-userspace/src/codeid](patches/golden-gate-userspace/src/codeid), hao-runtime `libhao_codeid` |
 | Boot time: no failing Aux KC build; kernel-manager helper and, before Setup, Setup's system service started early | `hao-opencore` (`auxKCAtBoot=false`), `golden-gate-launchd-warm` | [patches/golden-gate-launchd-warm](patches/golden-gate-launchd-warm) |
 | Live Text (Vision text recognition) | `metal-compiler-compat`, `golden-gate-live-text-shared`, `golden-gate-live-text-service` | [tools/live-text](tools/live-text), [cache/metallib](cache/metallib) |
-| Metal argument buffers and ASTC textures (HD 4000) | recipe in progress | [tools/metal-argbuf](tools/metal-argbuf) |
+| Metal argument buffers and ASTC textures (HD 4000) | `golden-gate-metal-argbuf` | [tools/metal-argbuf](tools/metal-argbuf) |
 | macOS 27's own Metal on the HD 4000 (adapter in place of MetalOld) | laptop test only | [tools/metal-adapter](tools/metal-adapter) |
 
 [patches/README.md](patches/README.md) describes the recipe format, and

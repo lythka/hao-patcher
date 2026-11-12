@@ -4,7 +4,8 @@ Native Metal argument buffers (tier 1) for the Intel HD 4000 (Gen7) under OCLP's
 (MetalOld + `AppleIntelHD4000GraphicsMTLDriver`), on Golden Gate (macOS 27.2.1, 26B131). No software fallback and no
 spoofing: shaders read argument buffers on the GPU, and the driver binds what they refer to.
 
-**Status: prototype, not in any image and not yet part of a patch.** Proven on the laptop GPU through the real Metal
+**Status: installed by the recipe [golden-gate-metal-argbuf](../../patches/golden-gate-metal-argbuf) (26B131); not yet in
+a booted image.** Proven on the laptop GPU through the real Metal
 API, with the shim loaded by the driver bundle itself (live swap, not an image):
 
 | Feature | Probe | Result |

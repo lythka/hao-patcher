@@ -16,6 +16,7 @@ golden-gate-windowserver-filter   # two WindowServer rendering paths (Siri bubbl
 golden-gate-corespotlight-compat  # the CoreSpotlight getter 27's corespotlightd/managedcorespotlightd call on every query
 metalold-selectors                # Metal selectors OCLP's MetalOld does not answer, via a weak dylib in the HD 4000 Metal driver; built for 26A428, not yet checked on 26B131
 golden-gate-metal-framebuffer     # framebuffer reads for RenderBox symbols, a second weak dylib in the same driver; built for 26A428, not yet checked on 26B131
+golden-gate-metal-argbuf          # Metal argument buffers + ASTC textures (tools/metal-argbuf): iCBE wrapper and a third weak dylib in the HD 4000 Metal driver; after metal-libraries (its iCBE) and metal-framebuffer; 26B131 only
 metal-compiler-compat             # Live Text 1/3: OCLP's legacy MTLCompilerService loads cache/metallib's compat.dylib (runtime-generated shaders); OS-independent service, row in golden/26B131
 golden-gate-live-text-shared      # Live Text 2/3: Vision text recognition runtime in /usr/lib/hao-live-text via libhelloblur; after golden-gate-hello and metal-compiler-compat; 26B131 only (refuses another MPSNDArray library)
 golden-gate-metal27               # dev only: 27.2.1's own Metal for every process (Metal27 + shim over OCLP's wrapper, the MTLCompiler 32023/32024 stand-in); after golden-gate-hello, whose wrapper edits it replaces
