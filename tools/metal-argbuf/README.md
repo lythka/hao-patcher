@@ -14,8 +14,13 @@ API, with the shim loaded by the driver bundle itself (live swap, not an image):
 | vertex + fragment argument buffers (device and constant pointers, textures) | probe11, probe14 | CORRECT |
 | samplers in argument buffers, also beside a function's own sampler | probe12 | CORRECT |
 | top of every slot range (texture slot 127, buffer slot 63), both render stages and compute | `AGB_HANDLE_BASE=90,18`, probe14 bases up to 94,22 | CORRECT |
+| inline structs in argument buffers (constants + texture inside) | probe16 | CORRECT |
+| ASTC textures (created as RGBA8, decoded with libate at upload; replaceRegion and blit) | probe17 | CORRECT |
 
-Weather has not been retried yet.
+**Weather (27.2.1) loads and renders on the laptop** (current conditions, hourly, air quality, 10-day), with the shim
+loaded by the driver bundle: the first launches aborted in argument-buffer code (inline struct), then in MetalOld's
+texture validation (WeatherMaps' ASTC 8x8 KTX textures); both are fixed. Not yet exercised: the map views, VFX
+effects in depth, long runs.
 
 | Piece | Where |
 |---|---|
@@ -196,7 +201,14 @@ like `metalold-selectors`), or injected into a test program (`DYLD_INSERT_LIBRAR
   ([argbuf_tramp.s](src/device/argbuf_tramp.s)) that calls `agb_pre` and tail-jumps to the original. `agb_pre` binds
   each bound argument buffer's recorded resources into the fixed slots (recursing into nested ones) through the
   driver's own setters, caching per encoder and stage.
-- Switches: `AGB_LOG=1` (stderr copy of the log), `AGB_DISABLE`, `AGB_HANDLE_BASE=T,B` (tests: start handles high).
+- Layouts are packed here, not by MetalOld (`MTLCreateStructTypeFromArgumentDescriptors` asserts on inline structs):
+  index order, resources 8/8, constants natural size/alignment (float3 = 16), inline structs natural C layout,
+  nested argument indices relative to the parent member (probe15), arrays of structs by stride.
+- ASTC ([astc.m](src/device/astc.m)): `newTextureWithDescriptor:` (device, heap) creates ASTC textures as RGBA8
+  (sRGB as RGBA8 sRGB) and tags them; `replaceRegion` (slice form; the 4-argument form forwards to it) and both blit
+  `copyFromBuffer:...toTexture:` variants decode the blocks with libate (`at_encoder_decompress_texels`) first.
+- Switches: `AGB_LOG=1` (stderr copy of the log), `AGB_DISABLE`, `AGB_HANDLE_BASE=T,B` (tests: start handles high),
+  `AGB_ASTC_DISABLE`, `AGB_TRACE_TEXTURES=1` (log every texture descriptor; `open -a App --env VAR=1` reaches apps).
 
 ## What was changed on the laptop (live only, nothing in the image; overlays die on reboot)
 
@@ -250,11 +262,17 @@ it) and, for whole-system use, the `--driver` output plus `libargbuf.dylib` into
 | probe11 | render: vertex AB (device + constant pointer), fragment AB (2 textures + constant pointer) |
 | probe12 | AB samplers: linear/nearest, beside the function's own sampler, two ABs with different samplers |
 | probe14 | render stages one at a time (vertex buffer, fragment buffer, vertex texture); run with `AGB_HANDLE_BASE` |
+| probe15 | `probe15 FILE.metal FUNCTION INDEX`: dump MetalOld's reflection of an argument buffer and the encoder size |
+| probe16 | inline struct in an argument buffer (kernels/k17.metal) |
+| probe17 | ASTC 8x8 upload through replaceRegion and blit, compared with libate's decode |
 
 ## Open problems
 
-1. **Weather/VFX**: not retried. Expect new shapes (texture arrays in ABs, `half` pointers, struct arrays) and
-   handle exhaustion if VFX creates many distinct layouts (96 textures / 24 buffers per process today).
+1. **Weather/VFX**: loads and renders; maps, effects and long runs not exercised. Watch for handle exhaustion
+   (96 textures / 24 buffers per process; logged as "out of ... handles") and unsupported shapes (logged by argbuf
+   and icbe_wrap, see Build and test).
+8. ASTC: `getBytes` returns RGBA8, texture views with an ASTC format, ASTC HDR, and buffer-backed/IOSurface ASTC
+   textures are not handled; textures report `pixelFormat` RGBA8.
 2. Handle collisions: two instances of the same layout bound in one draw share handles. Arrays of argument buffers
    are encoded but not bound per element (VFX does not use them).
 3. Samplers share Metal slots 10..15 with clients (Gen7 has no spare sampler slots).
