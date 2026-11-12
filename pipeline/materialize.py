@@ -6,7 +6,8 @@
 The ledger (pipeline/ledger.py) gives every declared path its base and its writers in set order. Each path is
 composed once: the base bytes when the first writer edits (OCLP's payload through its install map, Golden
 Gate's system at --system, or a Tahoe donor payload), then each writer in turn: a whole file from its input row,
-or an edit spec applied by tools/edit-engine (through --store, so an unchanged spec and input are reused by hash).
+or an edit spec applied by tools/edit-engine (through --store, so an unchanged spec and input are reused by hash),
+and an edited file is signed ad hoc once, after its last edit (macOS codesign).
 The result goes to DIR/<pack>/files/<path>, and DIR/<pack>/manifest.json records sha256, mode, owner and flags
 (the format tools/hao reads). A path is "deferred" when it can only be made on the target (kc.link, cryptex.build,
 hao.embed-stub, files the hook generates) and "unresolved" when its source isn't found; both are reported with
@@ -120,16 +121,38 @@ class Sources:
         src = self.rows.get(row)
         if not src or not Path(src).is_dir():
             raise Unresolved('row %s is not a folder' % row)
-        for cand in ([Path(src) / source] if source else [Path(src) / path, Path(src) / 'root' / path, Path(src)]):
+        # never the whole row: a tree is the folder named by source, by its install path, or by its own name
+        for cand in ([Path(src) / source] if source else
+                     [Path(src) / path, Path(src) / 'root' / path, Path(src) / os.path.basename(path)]):
             if cand.is_dir() and any(cand.rglob('*')):
                 return {str(Path(path, f.relative_to(cand))): f.read_bytes()
                         for f in sorted(cand.rglob('*')) if f.is_file() and not f.is_symlink()}
         raise Unresolved('row %s has no folder for %s' % (row, path))
 
 
+def sign(data, sign_spec, original):
+    """DATA signed ad hoc as SIGN_SPEC says, once (codesign on a temporary copy); ORIGINAL gives a preserved
+    identifier."""
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        existing = None
+        if 'identifier' in sign_spec.get('preserve', []):
+            Path(tmp, 'original').write_bytes(original)
+            shown = subprocess.run(['codesign', '-dv', str(Path(tmp, 'original'))], capture_output=True, text=True)
+            existing = next((l.split('=', 1)[1] for l in shown.stderr.splitlines() if l.startswith('Identifier=')), None)
+        Path(tmp, 'file').write_bytes(data)
+        r = subprocess.run(SPEC.codesign_args(sign_spec, existing) + [str(Path(tmp, 'file'))], capture_output=True,
+                           text=True)
+        if r.returncode:
+            raise Unresolved('codesign failed: %s' % r.stderr.strip()[:200])
+        return Path(tmp, 'file').read_bytes()
+
+
 def compose(entry, root, sources, store, repo):
-    """{path: bytes} for one ledger entry (a tree origin yields many paths)."""
-    data = None
+    """{path: bytes} for one ledger entry (a tree origin yields many paths). Edited files are signed once, after
+    the last edit, as the last signing spec says."""
+    data, original, signing = None, None, None
     for w in entry['writers']:
         if w['action'] == 'origin':
             o = w['origin']
@@ -144,8 +167,13 @@ def compose(entry, root, sources, store, repo):
         if external:
             raise Deferred('%s is made on the target (%s)' % (entry['path'], ', '.join(sorted(set(external)))))
         if data is None:
-            data = sources.base(entry['path'], entry['base']['kind'])
+            inp = w.get('input')
+            data = sources.base(inp['path'], inp['kind']) if inp else sources.base(entry['path'], entry['base']['kind'])
+        original = data if original is None else original
         data, _ = ENGINE.apply_stored(spec, data, store, repo=str(repo))
+        signing = spec.get('sign') or signing
+    if signing:
+        data = sign(data, signing, original)
     return {entry['path']: data}
 
 

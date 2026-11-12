@@ -53,6 +53,7 @@ Earlier: r8 is built and chain-tested on the host only; no image with it has boo
 r9 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r8's, so the result above stands.
 
 ## Revisions
+- r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) for pipeline/materialize.py; the hook is unchanged.
 - r12 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them from the artifact manifest); the hook is unchanged.
 - r11 2026-11-12 Row `shader_caches_golden_gate` (26B131): the same harvest made by cache/seeds r2, without the user's `com.apple.metalfe` trees. Preview's held a clang module cache recording the harvest account's cache folder, which the Metal front end refused in every new account (SceneKit drew magenta in Preview). Every other file is unchanged.
 - r10 2026-11-11 Row `shader_caches_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest (84 user trees, was 57: adds Maps/VectorKit, Safari and WebKit records, and the repaired VectorKit/VFX libraries). No recipe change.

@@ -1,15 +1,40 @@
 {
- "revision": 4,
+ "revision": 5,
  "stage": "post",
- "applies": {"models": ["MacBookPro9,2"], "builds": ["25G342"]},
- "inputs": ["font_registry_golden_gate"],
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
+  ],
+  "builds": [
+   "25G342"
+  ]
+ },
+ "inputs": [
+  "font_registry_golden_gate"
+ ],
  "status": "experiment",
  "validated": true,
  "optional": "caches",
  "validated_revision": 3,
  "validated_digest": "70aa39012b80a50da4cdfbb0137e202074e672e923f67c3fed31f17b318d99e2",
  "files": [
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user", "origin": {"kind": "hao", "row": "font_registry_golden_gate", "note": "Setup account's fontd registry, from setup.tar (owner 248)"}},
-  {"path": "Library/Application Support/PerUserSeed/fonts/fontregistry.user", "origin": {"kind": "hao", "row": "font_registry_golden_gate", "note": "account-neutral user registry from user/; golden-gate-user-seed's seed.zsh places it into each new account"}}
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user",
+   "origin": {
+    "kind": "hao",
+    "row": "font_registry_golden_gate",
+    "note": "Setup account's fontd registry, from setup.tar (owner 248)"
+   },
+   "source": "setup.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/fonts/fontregistry.user",
+   "origin": {
+    "kind": "hao",
+    "row": "font_registry_golden_gate",
+    "note": "account-neutral user registry from user/; golden-gate-user-seed's seed.zsh places it into each new account"
+   },
+   "source": "user/fontregistry.user"
+  }
  ]
 }

@@ -75,6 +75,7 @@ Photos' Live Text was never seen working. Not yet built into an image or booted 
 
 ## Revisions
 
+- r4 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) for pipeline/materialize.py; the hook is unchanged.
 - r3 2026-11-12 Declare the runtime files and the libhelloblur load command in edits/libhelloblur.json; the hook is unchanged.
 - r2 2026-11-11 Runtime in System (/usr/lib/hao-live-text, umbrella LiveText.dylib: the load command must fit libhelloblur's 64-byte header padding) instead of a Data-volume alias; built for 26B131 by tools/live-text (MPSNDArray repaired from 26B131's library, no matrix helper); refuses another MPSNDArray library or a missing compiler-service repair; selected by dev-bs-test.
 - r1 2026-11-09 Add unselected shared-framework OCR image recipe without modifying Photos or Metal.

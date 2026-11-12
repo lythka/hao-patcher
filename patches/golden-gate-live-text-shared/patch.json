@@ -1,24 +1,141 @@
 {
- "revision": 3,
+ "revision": 4,
  "stage": "oclp-hook",
- "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
- "inputs": ["live_text_framework"],
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
+  ],
+  "builds": [
+   "25G332",
+   "25G342"
+  ]
+ },
+ "inputs": [
+  "live_text_framework"
+ ],
  "status": "experiment",
  "validated": false,
  "files": [
- {"path": "usr/lib/libhelloblur.dylib", "edits": "edits/libhelloblur.json"},
- {"path": "usr/lib/hao-live-text/LiveText.dylib", "origin": {"kind": "hao", "row": "live_text_framework", "note": "umbrella that loads the helpers; the one load command libhelloblur gains"}},
- {"path": "usr/lib/hao-live-text/MPSNDArray.metallib", "origin": {"kind": "hao", "row": "live_text_framework", "note": "the build's own MPSNDArray library repaired by cache/metallib --legacy-sync-only; Intel HD 4000 devices load it instead of Apple's"}},
- {"path": "usr/lib/hao-live-text/detector/analytics/coremldata.bin", "origin": {"kind": "hao", "row": "live_text_framework", "note": "Live Text detector model file"}},
- {"path": "usr/lib/hao-live-text/detector/coremldata.bin", "origin": {"kind": "hao", "row": "live_text_framework", "note": "Live Text detector model file"}},
- {"path": "usr/lib/hao-live-text/detector/metadata.json", "origin": {"kind": "hao", "row": "live_text_framework", "note": "Live Text detector model file"}},
- {"path": "usr/lib/hao-live-text/detector/model.mil", "origin": {"kind": "hao", "row": "live_text_framework", "note": "Live Text detector model file"}},
- {"path": "usr/lib/hao-live-text/detector/weights/weight.bin", "origin": {"kind": "hao", "row": "live_text_framework", "note": "Live Text detector model file"}},
- {"path": "usr/lib/hao-live-text/gpu-client.dylib", "origin": {"kind": "hao", "row": "live_text_framework", "note": "cache/metallib's GPU-client adapter for translated shaders"}},
- {"path": "usr/lib/hao-live-text/libLiveTextConfig.dylib", "origin": {"kind": "hao", "row": "live_text_framework", "note": "sets HAO_LIVE_TEXT_ROOT and VISION_MPSNDARRAY_LIBRARY in the process"}},
- {"path": "usr/lib/hao-live-text/libLiveTextLibrary.dylib", "origin": {"kind": "hao", "row": "live_text_framework", "note": "makes Intel HD Graphics 4000 devices load the runtime MPSNDArray.metallib"}},
- {"path": "usr/lib/hao-live-text/libLiveTextPolicy.dylib", "origin": {"kind": "hao", "row": "live_text_framework", "note": "compiles TextRecognition's models for the GPU with the runtime's detector"}},
- {"path": "usr/lib/hao-live-text/libhao_input_coherence.dylib", "origin": {"kind": "hao", "row": "live_text_framework", "note": "locks and unlocks the detector's input IOSurfaces before each execution"}},
- {"path": "usr/lib/hao-live-text/build.json", "origin": {"kind": "hao", "row": "live_text_framework", "note": "the runtime's manifest (file hashes, load paths); golden-gate-live-text-service reads it"}}
+  {
+   "path": "usr/lib/libhelloblur.dylib",
+   "edits": "edits/libhelloblur.json"
+  },
+  {
+   "path": "usr/lib/hao-live-text/LiveText.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "umbrella that loads the helpers; the one load command libhelloblur gains"
+   },
+   "source": "runtime/LiveText.dylib"
+  },
+  {
+   "path": "usr/lib/hao-live-text/MPSNDArray.metallib",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "the build's own MPSNDArray library repaired by cache/metallib --legacy-sync-only; Intel HD 4000 devices load it instead of Apple's"
+   },
+   "source": "runtime/MPSNDArray.metallib"
+  },
+  {
+   "path": "usr/lib/hao-live-text/detector/analytics/coremldata.bin",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "Live Text detector model file"
+   },
+   "source": "runtime/detector/analytics/coremldata.bin"
+  },
+  {
+   "path": "usr/lib/hao-live-text/detector/coremldata.bin",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "Live Text detector model file"
+   },
+   "source": "runtime/detector/coremldata.bin"
+  },
+  {
+   "path": "usr/lib/hao-live-text/detector/metadata.json",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "Live Text detector model file"
+   },
+   "source": "runtime/detector/metadata.json"
+  },
+  {
+   "path": "usr/lib/hao-live-text/detector/model.mil",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "Live Text detector model file"
+   },
+   "source": "runtime/detector/model.mil"
+  },
+  {
+   "path": "usr/lib/hao-live-text/detector/weights/weight.bin",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "Live Text detector model file"
+   },
+   "source": "runtime/detector/weights/weight.bin"
+  },
+  {
+   "path": "usr/lib/hao-live-text/gpu-client.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "cache/metallib's GPU-client adapter for translated shaders"
+   },
+   "source": "runtime/gpu-client.dylib"
+  },
+  {
+   "path": "usr/lib/hao-live-text/libLiveTextConfig.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "sets HAO_LIVE_TEXT_ROOT and VISION_MPSNDARRAY_LIBRARY in the process"
+   },
+   "source": "runtime/libLiveTextConfig.dylib"
+  },
+  {
+   "path": "usr/lib/hao-live-text/libLiveTextLibrary.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "makes Intel HD Graphics 4000 devices load the runtime MPSNDArray.metallib"
+   },
+   "source": "runtime/libLiveTextLibrary.dylib"
+  },
+  {
+   "path": "usr/lib/hao-live-text/libLiveTextPolicy.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "compiles TextRecognition's models for the GPU with the runtime's detector"
+   },
+   "source": "runtime/libLiveTextPolicy.dylib"
+  },
+  {
+   "path": "usr/lib/hao-live-text/libhao_input_coherence.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "locks and unlocks the detector's input IOSurfaces before each execution"
+   },
+   "source": "runtime/libhao_input_coherence.dylib"
+  },
+  {
+   "path": "usr/lib/hao-live-text/build.json",
+   "origin": {
+    "kind": "hao",
+    "row": "live_text_framework",
+    "note": "the runtime's manifest (file hashes, load paths); golden-gate-live-text-service reads it"
+   },
+   "source": "runtime/build.json"
+  }
  ]
 }

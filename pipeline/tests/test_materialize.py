@@ -120,6 +120,38 @@ class Materialize(unittest.TestCase):
         self.assertEqual((target / METAL).read_bytes(), b'\xaa\x02\x03\x04oclp-metal')
         self.assertEqual([f['path'] for f in rec['files']], [METAL])
 
+    def test_a_tree_is_its_own_folder_never_the_whole_row(self):
+        kext = self.d / 'rows' / 'payload' / 'HaoExec.kext' / 'Contents'; kext.mkdir(parents=True)
+        (kext / 'Info.plist').write_bytes(b'plist')
+        (self.d / 'rows' / 'payload' / 'big.aot').write_bytes(b'not part of the kext')
+        self.sources.rows['payload'] = str(self.d / 'rows' / 'payload')
+        self.recipe('oc', [{'path': 'EFI/OC/Kexts/HaoExec.kext', 'origin': {'kind': 'hao', 'row': 'payload'}, 'tree': True},
+                           {'path': 'EFI/OC/Kexts/Missing.kext', 'origin': {'kind': 'hao', 'row': 'payload'}, 'tree': True}])
+        report, out = self.run_all()
+        made = sorted(str(p.relative_to(out / 'base/files')) for p in (out / 'base/files').rglob('*') if p.is_file())
+        self.assertEqual(made, ['EFI/OC/Kexts/HaoExec.kext/Contents/Info.plist'])
+        self.assertEqual(report['EFI/OC/Kexts/Missing.kext']['outcome'], 'unresolved')
+
+    def test_hello_metal_is_signed_once_like_its_hook(self):
+        # the real hello spec on OCLP's real wrapper, when HELLO_OCLP_METAL is set: the overlay's Metal is
+        # byte-identical to edit-metal.py + `codesign -f -s - -i Metal` (what the hook installs)
+        import os, shutil, subprocess
+        real = os.environ.get('HELLO_OCLP_METAL')
+        if not real or not shutil.which('codesign'):
+            self.skipTest('set HELLO_OCLP_METAL to OCLP\'s Metal wrapper')
+        payload = self.d / 'oclp' / 'payload' / '13.2.1-25' / 'System/Library/Frameworks/Metal.framework/Versions/A'
+        shutil.copy(real, payload / 'Metal')
+        d = self.root / 'golden-gate-hello'; shutil.copytree(TOP / 'patches/golden-gate-hello/edits', d / 'edits')
+        (d / 'patch.json').write_text(json.dumps({'revision': 1, 'stage': 'oclp-hook', 'applies': 'any',
+                                                  'files': [{'path': METAL, 'edits': 'edits/metal.json'}]}))
+        self.order.append('golden-gate-hello')
+        self.run_all()
+        ref = self.d / 'ref'
+        subprocess.run([sys.executable, '-I', str(TOP / 'patches/golden-gate-hello/src/edit-metal.py'), real, str(ref)],
+                       check=True, capture_output=True)
+        subprocess.run(['codesign', '-f', '-s', '-', '-i', 'Metal', str(ref)], check=True, capture_output=True)
+        self.assertEqual((self.d / 'out/base/files' / METAL).read_bytes(), ref.read_bytes())
+
     def test_last_writer_decides_the_pack(self):
         self.recipe('a', [{'path': 'usr/lib/one.dylib', 'origin': {'kind': 'hao', 'row': 'one'}}])
         report, out = self.run_all(packs={'a': 'metal-3802'})

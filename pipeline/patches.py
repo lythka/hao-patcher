@@ -45,7 +45,8 @@ catalog and (later) the ledger: [{"path": RELATIVE, "edits": "edits/FILE.json"} 
 apple|tahoe|oclp|hao, "row": INPUT_ROW, "name": ..., "note": ...}}], optionally "tree": true (an origin entry
 for a folder: every file under it), "install": {"mode", "owner", "flags"} and "source" (where the bytes are inside
 the origin row: a relative path, or "ARCHIVE!MEMBER" for a file in a tar; pipeline/materialize.py needs it when the row
-is a folder laid out differently from the install path). An edits file is an edit spec for
+is a folder laid out differently from the install path); an edits entry installed under another name than the file it
+starts from names that file as "input": {"kind", "path"}. An edits file is an edit spec for
 tools/edit-engine (format in its README) and must name the same path; every patches/NAME/edits/*.json must be declared.
 """
 import hashlib, json, os, re, sys
@@ -362,7 +363,7 @@ def file_problems(d, p):
             return ['files must be a non-empty list']
         paths = set()
         for f in files:
-            if not isinstance(f, dict) or set(f) - {'path', 'edits', 'origin', 'tree', 'install', 'source'} \
+            if not isinstance(f, dict) or set(f) - {'path', 'edits', 'origin', 'tree', 'install', 'source', 'input'} \
                     or ('edits' in f) == ('origin' in f):
                 bad.append('files: each entry is {"path", "edits"} or {"path", "origin"} (+ "tree", "install"): %s'
                            % json.dumps(f))
@@ -372,6 +373,11 @@ def file_problems(d, p):
                                     or src.startswith('/') or '..' in src.replace('!', '/').split('/')):
                 bad.append('files: %s: source is a relative path inside the origin row ("ARCHIVE!MEMBER" for a '
                            'file in a tar), and needs an origin with a row' % f.get('path'))
+            inp = f.get('input')
+            if inp is not None and ('edits' not in f or not isinstance(inp, dict) or set(inp) != {'kind', 'path'}
+                                    or inp['kind'] not in S['ORIGINS'] or str(inp['path']).startswith('/')):
+                bad.append('files: %s: input is {"kind": %s, "path": RELATIVE}, the file an edits entry starts from '
+                           'when it is installed under another name' % (f.get('path'), '|'.join(S['ORIGINS'])))
             if 'tree' in f and (f['tree'] is not True or 'edits' in f):
                 bad.append('files: %s: "tree": true goes with an origin (every file under the folder)' % f.get('path'))
             inst = f.get('install')

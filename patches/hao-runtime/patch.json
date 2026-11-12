@@ -1,33 +1,152 @@
 {
-  "revision": 66,
-  "stage": "oclp-hook",
-  "applies": {
-    "models": [
-      "MacBookPro9,2"
-    ],
-    "builds": [
-      "25G332",
-      "25G342"
-    ]
-  },
-  "inputs": [
-    "hao_runtime"
+ "revision": 67,
+ "stage": "oclp-hook",
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
   ],
-  "status": "experiment",
-  "validated": true,
-  "validated_revision": 65,
-  "validated_digest": "8ba6f310a77c15f24ea6fdac732e13f90d19cf65d2f73d56552d42c1def67d9c",
-  "files": [
-   {"path": "usr/libexec/hao", "origin": {"kind": "hao", "row": "hao_runtime", "note": "the hao launcher that runs ARM64 programs on Intel (payload root/usr/libexec/hao, copied by hao-install.py)"}, "install": {"mode": "0755", "owner": "root:wheel"}},
-   {"path": "usr/lib/hao/libhao.dylib", "origin": {"kind": "hao", "row": "hao_runtime", "note": "hao runtime library (payload root)"}, "install": {"mode": "0755", "owner": "root:wheel"}},
-   {"path": "usr/lib/hao/libhao_identity.dylib", "origin": {"kind": "hao", "row": "hao_runtime", "note": "hao code-identity library loaded by the stubs (payload root)"}, "install": {"mode": "0755", "owner": "root:wheel"}},
-   {"path": "usr/lib/hao/libhao_async_contract.dylib", "origin": {"kind": "hao", "row": "hao_runtime", "note": "Swift async contract provider named by async-contract.json (payload root)"}, "install": {"mode": "0755", "owner": "root:wheel"}},
-   {"path": "usr/lib/hao/async-contract.json", "origin": {"kind": "hao", "row": "hao_runtime", "note": "which async contract provider hao loads (payload root)"}, "install": {"mode": "0644", "owner": "root:wheel"}},
-   {"path": "usr/lib/hao/stub-identities", "origin": {"kind": "hao", "row": "hao_runtime", "note": "stub cdhash, Apple arm64 slice cdhash, architecture and path of every stub, read by the code identity carrier (payload root)"}, "install": {"mode": "0644", "owner": "root:wheel"}},
-   {"path": "usr/lib/hao/trusted-cdhashes", "origin": {"kind": "hao", "row": "hao_runtime", "note": "cdhashes hao trusts, root-owned and not writable by others (payload root)"}, "install": {"mode": "0644", "owner": "root:wheel"}},
-   {"path": "usr/lib/hao/if", "origin": {"kind": "hao", "row": "hao_runtime", "note": "interface units (1895 in the 26B131 payload): one file per image, copied whole from the payload root"}, "tree": true, "install": {"mode": "0644", "owner": "root:wheel"}},
-   {"path": "usr/lib/hao/aot", "origin": {"kind": "hao", "row": "hao_runtime", "note": "AOT caches (<uuid>.aot) bound to libhao.dylib, in the directory hao trusts for root, PID 1 and daemons; hao-install.py also removes any cache in it that does not belong to the installed libhao"}, "tree": true, "install": {"mode": "0644", "owner": "root:wheel"}},
-   {"path": "usr/lib/dyld", "origin": {"kind": "hao", "row": "hao_runtime", "note": "the x86_64 dyld with the libignition boot-spec stage count fixed (payload replace/dyld), written in place only over Apple's file with the manifest's source hash; PID 1 faults after the last stage without it"}},
-   {"path": "usr/lib/hao/install.json", "origin": {"kind": "hao", "note": "the installation record hao-install.py writes last (embedded, already embedded, kept native, missing, replaced, AOT, errors); root:wheel 0644"}, "install": {"mode": "0644", "owner": "root:wheel"}}
+  "builds": [
+   "25G332",
+   "25G342"
   ]
+ },
+ "inputs": [
+  "hao_runtime"
+ ],
+ "status": "experiment",
+ "validated": true,
+ "validated_revision": 65,
+ "validated_digest": "8ba6f310a77c15f24ea6fdac732e13f90d19cf65d2f73d56552d42c1def67d9c",
+ "files": [
+  {
+   "path": "usr/libexec/hao",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "the hao launcher that runs ARM64 programs on Intel (payload root/usr/libexec/hao, copied by hao-install.py)"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "usr/lib/hao/libhao.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "hao runtime library (payload root)"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "usr/lib/hao/libhao_identity.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "hao code-identity library loaded by the stubs (payload root)"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "usr/lib/hao/libhao_async_contract.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "Swift async contract provider named by async-contract.json (payload root)"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "usr/lib/hao/async-contract.json",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "which async contract provider hao loads (payload root)"
+   },
+   "install": {
+    "mode": "0644",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "usr/lib/hao/stub-identities",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "stub cdhash, Apple arm64 slice cdhash, architecture and path of every stub, read by the code identity carrier (payload root)"
+   },
+   "install": {
+    "mode": "0644",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "usr/lib/hao/trusted-cdhashes",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "cdhashes hao trusts, root-owned and not writable by others (payload root)"
+   },
+   "install": {
+    "mode": "0644",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "usr/lib/hao/if",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "interface units (1895 in the 26B131 payload): one file per image, copied whole from the payload root"
+   },
+   "tree": true,
+   "install": {
+    "mode": "0644",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "usr/lib/hao/aot",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "AOT caches (<uuid>.aot) bound to libhao.dylib, in the directory hao trusts for root, PID 1 and daemons; hao-install.py also removes any cache in it that does not belong to the installed libhao"
+   },
+   "tree": true,
+   "install": {
+    "mode": "0644",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "usr/lib/dyld",
+   "origin": {
+    "kind": "hao",
+    "row": "hao_runtime",
+    "note": "the x86_64 dyld with the libignition boot-spec stage count fixed (payload replace/dyld), written in place only over Apple's file with the manifest's source hash; PID 1 faults after the last stage without it"
+   },
+   "source": "replace/dyld"
+  },
+  {
+   "path": "usr/lib/hao/install.json",
+   "origin": {
+    "kind": "hao",
+    "note": "the installation record hao-install.py writes last (embedded, already embedded, kept native, missing, replaced, AOT, errors); root:wheel 0644"
+   },
+   "install": {
+    "mode": "0644",
+    "owner": "root:wheel"
+   }
+  }
+ ]
 }

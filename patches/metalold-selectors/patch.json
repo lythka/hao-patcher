@@ -1,12 +1,14 @@
 {
- "revision": 4,
+ "revision": 5,
  "stage": "oclp-hook",
  "applies": {
   "models": [
    "MacBookPro9,2"
   ],
   "builds": [
-   "25G332", "25G342"]
+   "25G332",
+   "25G342"
+  ]
  },
  "inputs": [
   "metalold_selectors"
@@ -16,8 +18,18 @@
  "validated_revision": 3,
  "validated_digest": "78f16f715e78f329662ba3e0de77b61bc446b6a096ca96728c8747599c1d28fc",
  "files": [
-  {"path": "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver", "edits": "edits/driver.json"},
-  {"path": "usr/lib/libmetalold-selectors.dylib",
-   "origin": {"kind": "hao", "row": "metalold_selectors", "note": "new file: Metal selector shim built by build/make, ad hoc signed"}}
+  {
+   "path": "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver",
+   "edits": "edits/driver.json"
+  },
+  {
+   "path": "usr/lib/libmetalold-selectors.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "metalold_selectors",
+    "note": "new file: Metal selector shim built by build/make, ad hoc signed"
+   },
+   "source": "libmetalold-selectors.dylib"
+  }
  ]
 }

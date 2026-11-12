@@ -52,7 +52,7 @@ Revision r5, status experiment. [Recipe](../patches/golden-gate-corespotlight-co
 
 ## golden-gate-font-registry
 
-Revision r4, status experiment. [Recipe](../patches/golden-gate-font-registry/README.md)
+Revision r5, status experiment. [Recipe](../patches/golden-gate-font-registry/README.md)
 
 - `private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user`: whole file from hao (row font_registry_golden_gate). Setup account's fontd registry, from setup.tar (owner 248).
 - `Library/Application Support/PerUserSeed/fonts/fontregistry.user`: whole file from hao (row font_registry_golden_gate). Account-neutral user registry from user/; golden-gate-user-seed's seed.zsh places it into each new account.
@@ -73,7 +73,7 @@ Revision r4, status experiment. [Recipe](../patches/golden-gate-hello/README.md)
 
 ## golden-gate-icon-caches
 
-Revision r4, status experiment. [Recipe](../patches/golden-gate-icon-caches/README.md)
+Revision r5, status experiment. [Recipe](../patches/golden-gate-icon-caches/README.md)
 
 - 673 whole files from hao (row icon_caches_golden_gate), in several folders (for example `Library/Caches/com.apple.iconservices.store/007F36FE-7D6C-3B42-BF6A-5D1CC54204B0.isdata`). IconServices store or system-account index, from icon-caches.tar. Listed by `patches.py explain golden-gate-icon-caches`.
 - `Library/Application Support/PerUserSeed/is/__cache_info__`: whole file from hao (row icon_caches_golden_gate). User's index from user/; golden-gate-user-seed copies it into each new account.
@@ -89,7 +89,7 @@ Revision r3, status experiment. [Recipe](../patches/golden-gate-live-text-servic
 
 ## golden-gate-live-text-shared
 
-Revision r3, status experiment. [Recipe](../patches/golden-gate-live-text-shared/README.md)
+Revision r4, status experiment. [Recipe](../patches/golden-gate-live-text-shared/README.md)
 
 - `usr/lib/libhelloblur.dylib`: from hao · libhelloblur; 1 edit, applied by the installer, then signed: ad hoc, once, identifier local.libhelloblur
   1. `load-live-text-runtime`: macho.add-dylib LC_LOAD_DYLIB /usr/lib/hao-live-text/LiveText.dylib.
@@ -110,7 +110,7 @@ Revision r3, status experiment. [Recipe](../patches/golden-gate-live-text-shared
 
 ## golden-gate-metal-framebuffer
 
-Revision r4, status experiment. [Recipe](../patches/golden-gate-metal-framebuffer/README.md)
+Revision r5, status experiment. [Recipe](../patches/golden-gate-metal-framebuffer/README.md)
 
 - `System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver`: from OCLP · AppleIntelHD4000GraphicsMTLDriver; 1 edit, applied by the installer, then signed: ad hoc, once, identifier AppleIntelHD4000GraphicsMTLDriver
   1. `weak-load-metal-framebuffer`: macho.add-dylib LC_LOAD_WEAK_DYLIB /usr/lib/libmetal-framebuffer.dylib.
@@ -137,7 +137,7 @@ Revision r2, status experiment. [Recipe](../patches/golden-gate-native-identitie
 
 ## golden-gate-shader-caches
 
-Revision r12, status experiment. [Recipe](../patches/golden-gate-shader-caches/README.md)
+Revision r13, status experiment. [Recipe](../patches/golden-gate-shader-caches/README.md)
 
 - 72 whole files from hao (row shader_caches_golden_gate), under `Library/Application Support/PerUserSeed/metal/` (for example `com.apple.LoginItems-Settings.extension/com.apple.metal/0_0/functions.data`). Per-user Metal tree; golden-gate-user-seed copies it into each new account. Listed by `patches.py explain golden-gate-shader-caches`.
 - 46 whole files from hao (row shader_caches_golden_gate), under `private/var/folders/zz/` (for example `zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/0_0/functions.data`). System account's Metal shader cache, from data.tar (owner as harvested). Listed by `patches.py explain golden-gate-shader-caches`.
@@ -151,7 +151,7 @@ Revision r7, status experiment. [Recipe](../patches/golden-gate-user-seed/README
 
 ## golden-gate-userspace
 
-Revision r59, status experiment. [Recipe](../patches/golden-gate-userspace/README.md)
+Revision r60, status experiment. [Recipe](../patches/golden-gate-userspace/README.md)
 
 - `usr/lib/dss_shim.dylib`: whole file from hao (row display_state_shim). New file: the display-state shim (tools/display-state-shim), installed by the display installer helper; WindowServer loads it.
 - `System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211`: whole file from hao (row io80211_compat). The IO80211 compatibility library (src/io80211), installed under the framework's own name over OCLP's Modern Wireless wrapper; it re-exports the wrapper, kept as IO80211OCLP.dylib.
@@ -336,7 +336,7 @@ Revision r41, status experiment. [Recipe](../patches/hao-opencore/README.md)
 
 ## hao-runtime
 
-Revision r66, status experiment. [Recipe](../patches/hao-runtime/README.md)
+Revision r67, status experiment. [Recipe](../patches/hao-runtime/README.md)
 
 - `usr/libexec/hao`: whole file from hao (row hao_runtime). The hao launcher that runs ARM64 programs on Intel (payload root/usr/libexec/hao, copied by hao-install.py).
 - `usr/lib/hao/libhao.dylib`: whole file from hao (row hao_runtime). Hao runtime library (payload root).
@@ -359,7 +359,7 @@ Revision r3, status experiment. [Recipe](../patches/metal-compiler-compat/README
 
 ## metalold-selectors
 
-Revision r4, status product. [Recipe](../patches/metalold-selectors/README.md)
+Revision r5, status product. [Recipe](../patches/metalold-selectors/README.md)
 
 - `System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver`: from OCLP · AppleIntelHD4000GraphicsMTLDriver; 1 edit, applied by the installer, then signed: ad hoc, once, identifier AppleIntelHD4000GraphicsMTLDriver
   1. `weak-load-metalold-selectors`: macho.add-dylib LC_LOAD_WEAK_DYLIB /usr/lib/libmetalold-selectors.dylib.

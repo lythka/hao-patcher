@@ -15,6 +15,7 @@
  ],
  "recipes": [
   "metalold-selectors",
-  "golden-gate-metal-framebuffer"
+  "golden-gate-metal-framebuffer",
+  "golden-gate-shader-caches"
  ]
 }

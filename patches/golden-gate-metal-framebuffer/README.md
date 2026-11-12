@@ -54,6 +54,7 @@ Wi-Fi symbol correctly, and Setup renders with it installed. The full desktop
 remain open. Nothing has been checked on 26B131.
 
 ## Revisions
+- r5 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the hook is unchanged.
 - r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json` `files`; the hook is unchanged.
 - r3 2026-11-11 README: runs in set order after metalold-selectors; built for 26A428, not yet checked on 26B131. Recipe unchanged.
 

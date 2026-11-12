@@ -16,6 +16,10 @@
   "golden-gate-userspace",
   "golden-gate-corespotlight-compat",
   "golden-gate-native-identities",
-  "hao-opencore"
+  "hao-opencore",
+  "golden-gate-icon-caches",
+  "golden-gate-font-registry",
+  "golden-gate-user-seed",
+  "golden-gate-windowserver-filter"
  ]
 }

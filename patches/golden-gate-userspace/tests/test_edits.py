@@ -102,7 +102,8 @@ class Declaration(unittest.TestCase):
         self.assertEqual(len(SPECS), len(BY_PATH))
         for name, spec in SPECS.items():
             self.assertEqual(S.validate(spec), [], name)
-            self.assertIn({'path': spec['path'], 'edits': 'edits/' + name}, PATCH_JSON['files'], name)
+            self.assertTrue(any(f['path'] == spec['path'] and f.get('edits') == 'edits/' + name for f in PATCH_JSON['files']),
+                        name)
         self.assertEqual({f['edits'][6:] for f in PATCH_JSON['files'] if 'edits' in f}, set(SPECS))
 
     def test_origin_entries_are_whole_files_from_this_patchs_rows(self):

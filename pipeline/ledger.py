@@ -88,7 +88,8 @@ def build(setfile, target, build_name, root=os.path.join(TOP, 'patches'), layer_
                 spec = spec_mod['load'](os.path.join(root, name, f['edits']))
                 e['writers'].append({'recipe': name, 'action': 'edits', 'spec': f['edits'],
                                      'edits': [x['id'] for x in spec['edits']], 'sign': bool(spec.get('sign')),
-                                     'origin_kind': spec['origin']['kind'], 'install': f.get('install'), 'source': f.get('source')})
+                                     'origin_kind': spec['origin']['kind'], 'install': f.get('install'), 'source': f.get('source'),
+                                     'input': f.get('input')})
             else:
                 e['writers'].append({'recipe': name, 'action': 'origin', 'origin': f['origin'],
                                      'tree': bool(f.get('tree')), 'install': f.get('install'), 'source': f.get('source')})

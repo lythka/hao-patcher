@@ -1,129 +1,1082 @@
 {
- "revision": 12,
+ "revision": 13,
  "stage": "post",
- "applies": {"models": ["MacBookPro9,2"], "builds": ["25G342"]},
- "inputs": ["shader_caches_golden_gate"],
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
+  ],
+  "builds": [
+   "25G342"
+  ]
+ },
+ "inputs": [
+  "shader_caches_golden_gate"
+ ],
  "status": "experiment",
  "validated": false,
  "optional": "caches",
  "files": [
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions1.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions1.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions2.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions2.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries1.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries1.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries2.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries2.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metalfe/290985HPWBR7I/modules.idx", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metalfe/290985HPWBR7I/monolithic_metal-4JF842TLW74.pcm", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metalfe/modules.timestamp", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metalfe/3BFB57ANS780/modules.idx", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metalfe/3BFB57ANS780/monolithic_metal-4JF842TLW74.pcm", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metalfe/modules.timestamp", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.data", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}},
-  {"path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.list", "origin": {"kind": "hao", "row": "shader_caches_golden_gate", "note": "system account's Metal shader cache, from data.tar (owner as harvested)"}}
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.LoginItems-Settings.extension/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Maps/com.apple.Maps/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Preview/com.apple.Preview/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Safari/com.apple.Safari/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.SetupAssistant/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.Terminal/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.GPU+com.apple.Safari/com.apple.WebKit.GPU/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions1.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions1.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions1.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions1.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions2.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions2.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions2.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/0_0/functions2.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries1.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries1.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries1.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries1.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries2.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries2.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries2.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.WebKit.WebContent+com.apple.Safari/com.apple.WebKit.WebContent/com.apple.metal/31001/libraries2.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.campo/com.apple.campo/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.controlcenter/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.dock.extra/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.mediaanalysisd/com.apple.mediaanalysisd/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.notificationcenterui/com.apple.notificationcenterui/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "per-user Metal tree; golden-gate-user-seed copies it into each new account"
+   },
+   "source": "data.tar!Library/Application Support/PerUserSeed/metal/com.apple.visualintelligenced/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.Language-Chooser/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000b000002r/C/WindowServer/com.apple.WindowServer/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000bh00002w/C/com.apple.SecurityAgent/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metalfe/290985HPWBR7I/modules.idx",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metalfe/290985HPWBR7I/modules.idx"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metalfe/290985HPWBR7I/monolithic_metal-4JF842TLW74.pcm",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metalfe/290985HPWBR7I/monolithic_metal-4JF842TLW74.pcm"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metalfe/modules.timestamp",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.AvatarUI.AvatarPickerMemojiPicker/com.apple.metalfe/modules.timestamp"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metalfe/3BFB57ANS780/modules.idx",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metalfe/3BFB57ANS780/modules.idx"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metalfe/3BFB57ANS780/monolithic_metal-4JF842TLW74.pcm",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metalfe/3BFB57ANS780/monolithic_metal-4JF842TLW74.pcm"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metalfe/modules.timestamp",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.SetupAssistant/com.apple.metalfe/modules.timestamp"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.controlcenter/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.coremedia.videodecoder/com.apple.metal/31001/libraries.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/0_0/functions.list"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.data",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.data"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.list",
+   "origin": {
+    "kind": "hao",
+    "row": "shader_caches_golden_gate",
+    "note": "system account's Metal shader cache, from data.tar (owner as harvested)"
+   },
+   "source": "data.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservicesagent/com.apple.iconservicesagent/com.apple.metal/31001/libraries.list"
+  }
  ]
 }

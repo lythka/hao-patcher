@@ -12,22 +12,22 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | darwin27-sandbox-disk-space | r3 | oclp-hook | experiment |  |  | x |  |  | **needs** | r3 2026-11-12 Declare the system.sb rule in `edits/system-sb.json` (edit-engine text.insert, unless already pr |
 | dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
 | golden-gate-corespotlight-compat | r5 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files |
-| golden-gate-font-registry | r4 | post | experiment | caches | x |  |  |  | ok (r3) | r4 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them f |
+| golden-gate-font-registry | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
 | golden-gate-hello | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the Metal wrapper edits in `edits/metal.json` and the three files in `patch.json` `files |
-| golden-gate-icon-caches | r4 | post | experiment | caches | x |  |  |  | ok (r3) | r4 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them f |
+| golden-gate-icon-caches | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
 | golden-gate-live-text-service | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the config edit in edits/config.json; the hook is unchanged. |
-| golden-gate-live-text-shared | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the runtime files and the libhelloblur load command in edits/libhelloblur.json; the hook |
-| golden-gate-metal-framebuffer | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
+| golden-gate-live-text-shared | r4 | oclp-hook | experiment |  | x |  |  |  | **needs** | r4 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
+| golden-gate-metal-framebuffer | r5 | oclp-hook | experiment |  | x | x |  |  | **needs** | r5 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the  |
 | golden-gate-metal-libraries | r19 | oclp-hook | experiment |  | x | x |  |  | **needs** | r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/t |
 | golden-gate-native-identities | r2 | oclp-hook | experiment |  | x | x |  |  | ok (r1) | r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.jso |
-| golden-gate-shader-caches | r12 | post | experiment | caches | x |  |  |  | **needs** | r12 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them  |
+| golden-gate-shader-caches | r13 | post | experiment | caches | x |  |  |  | **needs** | r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) f |
 | golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
-| golden-gate-userspace | r59 | oclp-hook | experiment |  | x | x |  |  | ok (r58) | r59 2026-11-12 Declare the files and edits in patch.json and edits/*.json (cache repairs, renamed wrappers, Wi |
+| golden-gate-userspace | r60 | oclp-hook | experiment |  | x | x |  |  | ok (r58) | r60 2026-11-12 Declare the original file each renamed wrapper starts from ("input") for pipeline/materialize.p |
 | golden-gate-windowserver-filter | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json a |
 | hao-opencore | r41 | post | experiment |  | x | x |  |  | ok (r40) | r41 2026-11-12 Declare the config keys with fixed values (edits/config.json) and the IntelCommpage and HaoExec |
-| hao-runtime | r66 | oclp-hook | experiment |  | x | x |  |  | ok (r65) | r66 2026-11-12 Declare the installed files and folders in patch.json and its test (the embedding stays a manif |
+| hao-runtime | r67 | oclp-hook | experiment |  | x | x |  |  | ok (r65) | r67 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the |
 | metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
-| metalold-selectors | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
+| metalold-selectors | r5 | oclp-hook | product |  | x | x |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the  |
 | rec-audio | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three kext bundles and the kernel collection link in `patch.json` `files` and `edits |
 | rec-bluetooth-input | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the four kext bundles, btpower, its plist and the kernel collection link in `patch.json` |
 | rec-brightness-keys | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare brightkeys and its plist in `patch.json` `files`; the recipe is unchanged. |

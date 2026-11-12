@@ -1,74 +1,263 @@
 {
-  "revision": 59,
-  "stage": "oclp-hook",
-  "applies": {
-    "models": [
-      "MacBookPro9,2"
-    ],
-    "builds": [
-      "25G332",
-      "25G342"
-    ]
-  },
-  "status": "experiment",
-  "validated": true,
-  "inputs": [
-    "golden_gate_userspace",
-    "display_state_shim",
-    "io80211_compat",
-    "wifip2p_compat",
-    "corewifi_compat",
-    "display_install_helper",
-    "codeid_carrier",
-    "hao_runtime"
+ "revision": 60,
+ "stage": "oclp-hook",
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
   ],
-  "validated_revision": 58,
-  "validated_digest": "c3cf52e0c5c6861a7c49d40b48405e4bb6313b3ac112735e7675906e59d1e833",
-  "files": [
-   {"path": "usr/lib/dss_shim.dylib", "origin": {"kind": "hao", "row": "display_state_shim", "note": "new file: the display-state shim (tools/display-state-shim), installed by the display installer helper; WindowServer loads it"}, "install": {"mode": "0755", "owner": "root:wheel"}},
-   {"path": "System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211", "origin": {"kind": "hao", "row": "io80211_compat", "note": "the IO80211 compatibility library (src/io80211), installed under the framework's own name over OCLP's Modern Wireless wrapper; it re-exports the wrapper, kept as IO80211OCLP.dylib"}, "install": {"mode": "0755", "owner": "root:wheel"}},
-   {"path": "System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/WiFiPeerToPeer", "origin": {"kind": "hao", "row": "wifip2p_compat", "note": "the WiFiPeerToPeer compatibility library (src/wifip2p), installed under the framework's own name over OCLP's wrapper; it re-exports the wrapper, kept as WiFiPeerToPeerOCLP.dylib"}, "install": {"mode": "0755", "owner": "root:wheel"}},
-   {"path": "System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFi", "origin": {"kind": "hao", "row": "corewifi_compat", "note": "the CoreWiFi compatibility library (src/corewifi), installed under the framework's own name in front of Tahoe's CoreWiFi from the native donors; it re-exports Tahoe's, kept as CoreWiFiTahoe.dylib"}, "install": {"mode": "0755", "owner": "root:wheel"}},
-   {"path": "System/Library/LaunchAgents/com.apple.hybridsearchd.plist", "edits": "edits/hybridsearchd-job.json"},
-   {"path": "System/Library/xpc/launchd.plist", "edits": "edits/launchd-job-cache.json"},
-   {"path": "System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211OCLP.dylib", "edits": "edits/io80211-oclp.json"},
-   {"path": "System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/WiFiPeerToPeerOCLP.dylib", "edits": "edits/wifip2p-oclp.json"},
-   {"path": "System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFiTahoe.dylib", "edits": "edits/corewifi-tahoe.json"},
-   {"path": "System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer", "edits": "edits/windowserver-27-identity.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64", "edits": "edits/cache-main.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.01", "edits": "edits/cache-01.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.03", "edits": "edits/cache-03.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.04", "edits": "edits/cache-04.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.06", "edits": "edits/cache-06.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS", "edits": "edits/cryptex-os.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/App", "edits": "edits/cryptex-app.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/Rosetta/System/Library/dyld", "origin": {"kind": "hao", "note": "symbolic link to ../../../OS/System/Library/dyld (src/cryptex-cache-alias.sh): native dyld still looks for the cache in the Rosetta cryptex"}},
-   {"path": "System/Library/CoreServices/golden-gate-userspace.json", "origin": {"kind": "hao", "note": "the install record, written by install.py from the userspace payload's userspace.json plus what this recipe did (root:wheel 0644)"}, "install": {"mode": "0644", "owner": "root:wheel"}},
-   {"path": "System/Volumes/Preboot/Cryptexes/App/usr/libexec/PasswordBreachAgent", "edits": "edits/embed-app-com-apple-safari-passwordbreachagent.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/App/usr/libexec/com.apple.Safari.History", "edits": "edits/embed-app-com-apple-safari-history.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/AuthenticationServices.framework/Versions/A/XPCServices/com.apple.AuthenticationServices.Helper.xpc/Contents/MacOS/com.apple.AuthenticationServices.Helper", "edits": "edits/embed-os-com-apple-authenticationservices-helper.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc", "edits": "edits/embed-os-com-apple-jsc.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/SafariServices.framework/Versions/A/XPCServices/com.apple.SafariServices.ExtensionHelper.xpc/Contents/MacOS/com.apple.SafariServices.ExtensionHelper", "edits": "edits/embed-os-com-apple-safariservices-extensionhelper.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/SafariServices.framework/Versions/A/XPCServices/com.apple.SafariServices.xpc/Contents/MacOS/com.apple.SafariServices", "edits": "edits/embed-os-com-apple-safariservices.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU", "edits": "edits/embed-os-com-apple-webkit-gpu.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking", "edits": "edits/embed-os-com-apple-webkit-networking.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.CaptivePortal.xpc/Contents/MacOS/com.apple.WebKit.WebContent.CaptivePortal", "edits": "edits/embed-os-com-apple-webkit-webcontent-captiveportal.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.Development.xpc/Contents/MacOS/com.apple.WebKit.WebContent.Development", "edits": "edits/embed-os-com-apple-webkit-webcontent-development.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.EnhancedSecurity.xpc/Contents/MacOS/com.apple.WebKit.WebContent.EnhancedSecurity", "edits": "edits/embed-os-com-apple-webkit-webcontent-enhancedsecurity.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent", "edits": "edits/embed-os-com-apple-webkit-webcontent.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariFoundation.framework/Versions/A/XPCServices/CredentialProviderExtensionHelper.xpc/Contents/MacOS/CredentialProviderExtensionHelper", "edits": "edits/embed-os-com-apple-safarifoundation-credentialproviderextensionhelper.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariFoundation.framework/Versions/A/XPCServices/SafariConfigurationSubscriber.xpc/Contents/MacOS/SafariConfigurationSubscriber", "edits": "edits/embed-os-com-apple-safarishared-safariconfigurationsubscriber.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper", "edits": "edits/embed-os-com-apple-safariplatformsupport-helper.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariShared.framework/Versions/A/XPCServices/com.apple.Safari.CredentialExtractionHelper.xpc/Contents/MacOS/com.apple.Safari.CredentialExtractionHelper", "edits": "edits/embed-os-com-apple-safari-credentialextractionhelper.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariShared.framework/Versions/A/XPCServices/com.apple.Safari.SearchHelper.xpc/Contents/MacOS/com.apple.Safari.SearchHelper", "edits": "edits/embed-os-com-apple-safari-searchhelper.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/WebDriver.framework/Versions/A/XPCServices/com.apple.WebDriver.HTTPService.xpc/Contents/MacOS/com.apple.WebDriver.HTTPService", "edits": "edits/embed-os-com-apple-webdriver-httpservice.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/WebDriver.framework/Versions/A/XPCServices/com.apple.WebDriver.MCPService.xpc/Contents/MacOS/com.apple.WebDriver.MCPService", "edits": "edits/embed-os-com-apple-webdriver-mcpservice.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc", "edits": "edits/embed-os-com-apple-jsc-ios.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU", "edits": "edits/embed-os-com-apple-webkit-gpu-ios.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking", "edits": "edits/embed-os-com-apple-webkit-networking-ios.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.CaptivePortal.xpc/Contents/MacOS/com.apple.WebKit.WebContent.CaptivePortal", "edits": "edits/embed-os-com-apple-webkit-webcontent-captiveportal-ios.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.Development.xpc/Contents/MacOS/com.apple.WebKit.WebContent.Development", "edits": "edits/embed-os-com-apple-webkit-webcontent-development-ios.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.EnhancedSecurity.xpc/Contents/MacOS/com.apple.WebKit.WebContent.EnhancedSecurity", "edits": "edits/embed-os-com-apple-webkit-webcontent-enhancedsecurity-ios.json"},
-   {"path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent", "edits": "edits/embed-os-com-apple-webkit-webcontent-ios.json"}
+  "builds": [
+   "25G332",
+   "25G342"
   ]
+ },
+ "status": "experiment",
+ "validated": true,
+ "inputs": [
+  "golden_gate_userspace",
+  "display_state_shim",
+  "io80211_compat",
+  "wifip2p_compat",
+  "corewifi_compat",
+  "display_install_helper",
+  "codeid_carrier",
+  "hao_runtime"
+ ],
+ "validated_revision": 58,
+ "validated_digest": "c3cf52e0c5c6861a7c49d40b48405e4bb6313b3ac112735e7675906e59d1e833",
+ "files": [
+  {
+   "path": "usr/lib/dss_shim.dylib",
+   "origin": {
+    "kind": "hao",
+    "row": "display_state_shim",
+    "note": "new file: the display-state shim (tools/display-state-shim), installed by the display installer helper; WindowServer loads it"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211",
+   "origin": {
+    "kind": "hao",
+    "row": "io80211_compat",
+    "note": "the IO80211 compatibility library (src/io80211), installed under the framework's own name over OCLP's Modern Wireless wrapper; it re-exports the wrapper, kept as IO80211OCLP.dylib"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/WiFiPeerToPeer",
+   "origin": {
+    "kind": "hao",
+    "row": "wifip2p_compat",
+    "note": "the WiFiPeerToPeer compatibility library (src/wifip2p), installed under the framework's own name over OCLP's wrapper; it re-exports the wrapper, kept as WiFiPeerToPeerOCLP.dylib"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFi",
+   "origin": {
+    "kind": "hao",
+    "row": "corewifi_compat",
+    "note": "the CoreWiFi compatibility library (src/corewifi), installed under the framework's own name in front of Tahoe's CoreWiFi from the native donors; it re-exports Tahoe's, kept as CoreWiFiTahoe.dylib"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "System/Library/LaunchAgents/com.apple.hybridsearchd.plist",
+   "edits": "edits/hybridsearchd-job.json"
+  },
+  {
+   "path": "System/Library/xpc/launchd.plist",
+   "edits": "edits/launchd-job-cache.json"
+  },
+  {
+   "path": "System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211OCLP.dylib",
+   "edits": "edits/io80211-oclp.json",
+   "input": {
+    "kind": "oclp",
+    "path": "System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211"
+   }
+  },
+  {
+   "path": "System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/WiFiPeerToPeerOCLP.dylib",
+   "edits": "edits/wifip2p-oclp.json",
+   "input": {
+    "kind": "oclp",
+    "path": "System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/WiFiPeerToPeer"
+   }
+  },
+  {
+   "path": "System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFiTahoe.dylib",
+   "edits": "edits/corewifi-tahoe.json",
+   "input": {
+    "kind": "tahoe",
+    "path": "System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFi"
+   }
+  },
+  {
+   "path": "System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer",
+   "edits": "edits/windowserver-27-identity.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64",
+   "edits": "edits/cache-main.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.01",
+   "edits": "edits/cache-01.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.03",
+   "edits": "edits/cache-03.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.04",
+   "edits": "edits/cache-04.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.06",
+   "edits": "edits/cache-06.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS",
+   "edits": "edits/cryptex-os.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/App",
+   "edits": "edits/cryptex-app.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/Rosetta/System/Library/dyld",
+   "origin": {
+    "kind": "hao",
+    "note": "symbolic link to ../../../OS/System/Library/dyld (src/cryptex-cache-alias.sh): native dyld still looks for the cache in the Rosetta cryptex"
+   }
+  },
+  {
+   "path": "System/Library/CoreServices/golden-gate-userspace.json",
+   "origin": {
+    "kind": "hao",
+    "note": "the install record, written by install.py from the userspace payload's userspace.json plus what this recipe did (root:wheel 0644)"
+   },
+   "install": {
+    "mode": "0644",
+    "owner": "root:wheel"
+   }
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/App/usr/libexec/PasswordBreachAgent",
+   "edits": "edits/embed-app-com-apple-safari-passwordbreachagent.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/App/usr/libexec/com.apple.Safari.History",
+   "edits": "edits/embed-app-com-apple-safari-history.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/AuthenticationServices.framework/Versions/A/XPCServices/com.apple.AuthenticationServices.Helper.xpc/Contents/MacOS/com.apple.AuthenticationServices.Helper",
+   "edits": "edits/embed-os-com-apple-authenticationservices-helper.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc",
+   "edits": "edits/embed-os-com-apple-jsc.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/SafariServices.framework/Versions/A/XPCServices/com.apple.SafariServices.ExtensionHelper.xpc/Contents/MacOS/com.apple.SafariServices.ExtensionHelper",
+   "edits": "edits/embed-os-com-apple-safariservices-extensionhelper.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/SafariServices.framework/Versions/A/XPCServices/com.apple.SafariServices.xpc/Contents/MacOS/com.apple.SafariServices",
+   "edits": "edits/embed-os-com-apple-safariservices.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+   "edits": "edits/embed-os-com-apple-webkit-gpu.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+   "edits": "edits/embed-os-com-apple-webkit-networking.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.CaptivePortal.xpc/Contents/MacOS/com.apple.WebKit.WebContent.CaptivePortal",
+   "edits": "edits/embed-os-com-apple-webkit-webcontent-captiveportal.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.Development.xpc/Contents/MacOS/com.apple.WebKit.WebContent.Development",
+   "edits": "edits/embed-os-com-apple-webkit-webcontent-development.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.EnhancedSecurity.xpc/Contents/MacOS/com.apple.WebKit.WebContent.EnhancedSecurity",
+   "edits": "edits/embed-os-com-apple-webkit-webcontent-enhancedsecurity.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+   "edits": "edits/embed-os-com-apple-webkit-webcontent.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariFoundation.framework/Versions/A/XPCServices/CredentialProviderExtensionHelper.xpc/Contents/MacOS/CredentialProviderExtensionHelper",
+   "edits": "edits/embed-os-com-apple-safarifoundation-credentialproviderextensionhelper.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariFoundation.framework/Versions/A/XPCServices/SafariConfigurationSubscriber.xpc/Contents/MacOS/SafariConfigurationSubscriber",
+   "edits": "edits/embed-os-com-apple-safarishared-safariconfigurationsubscriber.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+   "edits": "edits/embed-os-com-apple-safariplatformsupport-helper.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariShared.framework/Versions/A/XPCServices/com.apple.Safari.CredentialExtractionHelper.xpc/Contents/MacOS/com.apple.Safari.CredentialExtractionHelper",
+   "edits": "edits/embed-os-com-apple-safari-credentialextractionhelper.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/SafariShared.framework/Versions/A/XPCServices/com.apple.Safari.SearchHelper.xpc/Contents/MacOS/com.apple.Safari.SearchHelper",
+   "edits": "edits/embed-os-com-apple-safari-searchhelper.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/WebDriver.framework/Versions/A/XPCServices/com.apple.WebDriver.HTTPService.xpc/Contents/MacOS/com.apple.WebDriver.HTTPService",
+   "edits": "edits/embed-os-com-apple-webdriver-httpservice.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/PrivateFrameworks/WebDriver.framework/Versions/A/XPCServices/com.apple.WebDriver.MCPService.xpc/Contents/MacOS/com.apple.WebDriver.MCPService",
+   "edits": "edits/embed-os-com-apple-webdriver-mcpservice.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc",
+   "edits": "edits/embed-os-com-apple-jsc-ios.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+   "edits": "edits/embed-os-com-apple-webkit-gpu-ios.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+   "edits": "edits/embed-os-com-apple-webkit-networking-ios.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.CaptivePortal.xpc/Contents/MacOS/com.apple.WebKit.WebContent.CaptivePortal",
+   "edits": "edits/embed-os-com-apple-webkit-webcontent-captiveportal-ios.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.Development.xpc/Contents/MacOS/com.apple.WebKit.WebContent.Development",
+   "edits": "edits/embed-os-com-apple-webkit-webcontent-development-ios.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.EnhancedSecurity.xpc/Contents/MacOS/com.apple.WebKit.WebContent.EnhancedSecurity",
+   "edits": "edits/embed-os-com-apple-webkit-webcontent-enhancedsecurity-ios.json"
+  },
+  {
+   "path": "System/Volumes/Preboot/Cryptexes/OS/System/iOSSupport/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+   "edits": "edits/embed-os-com-apple-webkit-webcontent-ios.json"
+  }
+ ]
 }
