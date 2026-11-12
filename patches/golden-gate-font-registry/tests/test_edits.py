@@ -80,7 +80,7 @@ class Hook(unittest.TestCase):
             for name, text in SHIMS.items():
                 (d / 'shims' / name).write_text(text)
                 (d / 'shims' / name).chmod(0o755)
-            env = dict(os.environ, PATH='%s:%s' % (d / 'shims', os.environ['PATH']))
+            env = dict(os.environ, PATH='%s:%s' % (d / 'shims', os.environ.get('PATH', '/usr/bin:/bin:/usr/sbin:/sbin')))
             fixture = test_seeds.Fixture(d)
             (d / 'artifacts').mkdir()
             r = test_seeds.run(fixture.path, '--out', d / 'artifacts')

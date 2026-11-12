@@ -61,7 +61,7 @@ class Declaration(unittest.TestCase):
             folder = d / 'hook'
             shutil.copytree(PATCH, folder, ignore=shutil.ignore_patterns('tests'))
             r = subprocess.run(['sh', '-eu', str(folder / 'apply.sh')], capture_output=True, text=True,
-                               env=dict(os.environ, PATH='%s:%s' % (d / 'shims', os.environ['PATH']),
+                               env=dict(os.environ, PATH='%s:%s' % (d / 'shims', os.environ.get('PATH', '/usr/bin:/bin:/usr/sbin:/sbin')),
                                         DATA=str(data), SYS=str(sysroot), P=str(folder)))
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertEqual(sorted(str(p.relative_to(data)) for p in data.rglob('*') if p.is_file()), sorted(FILES))
