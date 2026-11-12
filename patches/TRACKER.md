@@ -10,7 +10,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 |---|---|---|---|---|---|---|---|---|---|---|
 | darwin27-kernel | r5 | oclp-hook | experiment |  | x | x |  |  | ok | r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the ha |
 | darwin27-sandbox-disk-space | r2 | oclp-hook | experiment |  |  | x |  |  | **needs** | r2 2026-11-11 Leaves a `system.sb` that already has the rule untouched instead of reinstalling it; removed fro |
-| dev-access | r3 | post | dev |  |  |  |  |  | ok | r3 2026-10-28 Lock rows one file each; working files in store/tmp; store-gc; STATUS edited only by the merging |
+| dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
 | golden-gate-corespotlight-compat | r5 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files |
 | golden-gate-font-registry | r3 | post | experiment | caches | x |  |  |  | ok | r3 2026-11-11 Row `font_registry_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest. No  |
 | golden-gate-hello | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the Metal wrapper edits in `edits/metal.json` and the three files in `patch.json` `files |
@@ -19,7 +19,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-live-text-shared | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the runtime files and the libhelloblur load command in edits/libhelloblur.json; the hook |
 | golden-gate-metal-framebuffer | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
 | golden-gate-metal-libraries | r19 | oclp-hook | experiment |  | x | x |  |  | **needs** | r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/t |
-| golden-gate-native-identities | r1 | oclp-hook | experiment |  | x | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
+| golden-gate-native-identities | r2 | oclp-hook | experiment |  | x | x |  |  | ok (r1) | r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.jso |
 | golden-gate-shader-caches | r11 | post | experiment | caches | x |  |  |  | **needs** | r11 2026-11-12 Row `shader_caches_golden_gate` (26B131): the same harvest made by cache/seeds r2, without the  |
 | golden-gate-user-seed | r6 | post | experiment | caches | x |  |  |  | **needs** | r6 2026-11-12 seed.zsh never places `com.apple.metalfe`: an older seed's clang module cache (Preview's `.pcm`) |
 | golden-gate-userspace | r58 | oclp-hook | experiment |  | x | x |  |  | ok | r58 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
