@@ -12,6 +12,8 @@ ARM-only programs on the Intel CPU.
 
 ![macOS 27 desktop and Control Center on an Intel Mac](docs/images/desktop-intel.jpg)
 
+More screenshots: [the gallery](docs/gallery.md) (Weather and its maps, Maps in 3D, WebGPU in Safari).
+
 ## Risks
 
 Use hao-patcher only on a **dedicated test Mac** whose contents you can lose.

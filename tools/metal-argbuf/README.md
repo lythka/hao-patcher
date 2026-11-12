@@ -273,6 +273,7 @@ it) and, for whole-system use, the `--driver` output plus `libargbuf.dylib` into
 | probe15 | `probe15 FILE.metal FUNCTION INDEX`: dump MetalOld's reflection of an argument buffer and the encoder size |
 | probe16 | inline struct in an argument buffer (kernels/k17.metal) |
 | probe17 | ASTC 8x8 upload through replaceRegion and blit, compared with libate's decode |
+| webgpu-check.html | Safari: WebGPU compute (storage buffer) and render (uniform bind group), read back and checked; open it from a file |
 
 ## Open problems
 
