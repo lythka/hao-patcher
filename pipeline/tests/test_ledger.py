@@ -71,6 +71,13 @@ class Ledger(unittest.TestCase):
         led = self.ledger()
         self.assertEqual((led['usr/lib/x']['chain'], led[METAL]['chain']), ('two-origins', 'dead-edits'))
 
+    def test_file_inside_another_recipes_tree(self):
+        self.recipe('a', [{'path': 'usr/lib/hao', 'origin': {'kind': 'hao'}, 'tree': True}])
+        self.recipe('b', [{'path': 'usr/lib/hao/extra.dylib', 'origin': {'kind': 'hao'}}])
+        led = self.ledger()
+        self.assertEqual(led['usr/lib/hao/extra.dylib']['chain'], 'inside-tree')
+        self.assertEqual(L['writer_names'](led['usr/lib/hao/extra.dylib']), ['apple', 'a (tree usr/lib/hao)', 'b'])
+
     def test_superseded_oclp_overwrite(self):
         path = OCLP[1][0]
         self.recipe('a', [{'path': path, 'origin': {'kind': 'hao'}}])

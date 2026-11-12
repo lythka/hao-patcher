@@ -15,6 +15,7 @@ path is listed with the same writers in pipeline/ledger-expected.json:
   two-origins  two recipes install the whole file
   dead-edits   a recipe installs the whole file over another recipe's edits, so those edits are lost
   superseded   a recipe installs the whole file over a file OCLP installs itself (OCLP's write is wasted)
+  inside-tree  a recipe writes a file inside a folder another recipe declares whole ("tree": true)
 and always refuses an edit spec whose origin kind is not the kind of the file it edits. An expected entry that no
 longer matches is refused too, so the list only ever shrinks as chains are collapsed.
 """
@@ -89,9 +90,16 @@ def build(setfile, target, build_name, root=os.path.join(TOP, 'patches'), layer_
                                      'edits': [x['id'] for x in spec['edits']], 'sign': bool(spec.get('sign')),
                                      'origin_kind': spec['origin']['kind']})
             else:
-                e['writers'].append({'recipe': name, 'action': 'origin', 'origin': f['origin']})
+                e['writers'].append({'recipe': name, 'action': 'origin', 'origin': f['origin'],
+                                     'tree': bool(f.get('tree'))})
     for e in ledger.values():
         classify(e, oclp)
+    trees = [(p, w['recipe']) for p, e in ledger.items() for w in e['writers'] if w.get('tree')]
+    for path, e in ledger.items():                     # another recipe's file inside a recipe's whole tree
+        for tree, owner in trees:
+            if path != tree and under(path, tree) and any(w['recipe'] != owner for w in e['writers']):
+                e['inside_tree'] = {'tree': tree, 'recipe': owner}
+                e['chain'] = ','.join(sorted(set(filter(None, (e['chain'] or '').split(','))) | {'inside-tree'}))
     return ledger
 
 
@@ -128,7 +136,8 @@ def classify(e, oclp):
 
 
 def writer_names(e):
-    return [e['base']['kind']] + [w['recipe'] for w in e['writers']]
+    tree = ['%s (tree %s)' % (e['inside_tree']['recipe'], e['inside_tree']['tree'])] if e.get('inside_tree') else []
+    return [e['base']['kind']] + tree + [w['recipe'] for w in e['writers']]
 
 
 def lint(ledger, expected):

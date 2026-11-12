@@ -262,6 +262,17 @@ class Format(unittest.TestCase):
         self.assertIn('1. e  literal at 0x10', patches.explain('libx.dylib', root=self.d / 'patches'))
         self.assertIn('origin   hao (row row_a)', patches.explain('good', root=self.d / 'patches'))
 
+    def test_tree_and_install(self):
+        self.patch('t', files=[{'path': 'usr/lib/hao', 'origin': {'kind': 'hao'}, 'tree': True,
+                                'install': {'mode': '0755', 'owner': 'root:wheel', 'flags': ['restricted']}}])
+        self.patch('badtree', files=[{'path': 'a', 'origin': {'kind': 'hao'}, 'tree': 'yes'}])
+        self.patch('badinst', files=[{'path': 'a', 'origin': {'kind': 'hao'}, 'install': {'mode': 'rwx'}}])
+        got = '\n'.join(self.check())
+        self.assertFalse([l for l in got.splitlines() if l.startswith('t: ')])
+        self.assertIn('badtree: files: a: "tree": true goes with an origin', got)
+        self.assertIn('badinst: files: a: install is', got)
+        self.assertIn('every file under it from hao', patches.explain('t', root=self.d / 'patches'))
+
     def test_declared_file_rules(self):
         self.patch('both', files=[{'path': 'a', 'edits': 'edits/a.json', 'origin': {'kind': 'hao'}}])
         self.patch('abs', files=[{'path': '/abs', 'origin': {'kind': 'hao'}}])

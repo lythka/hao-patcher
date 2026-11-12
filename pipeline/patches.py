@@ -42,7 +42,8 @@ make, build/, kexts.txt and the input rows' files are what it covers).
 
 "files" (optional) declares every file the patch adds or changes on the installed system, for patches.py explain, the
 catalog and (later) the ledger: [{"path": RELATIVE, "edits": "edits/FILE.json"} | {"path": RELATIVE, "origin": {"kind":
-apple|tahoe|oclp|hao, "row": INPUT_ROW, "name": ..., "note": ...}}]. An edits file is an edit spec for
+apple|tahoe|oclp|hao, "row": INPUT_ROW, "name": ..., "note": ...}}], optionally "tree": true (an origin entry
+for a folder: every file under it) and "install": {"mode", "owner", "flags"}. An edits file is an edit spec for
 tools/edit-engine (format in its README) and must name the same path; every patches/NAME/edits/*.json must be declared.
 """
 import hashlib, json, os, re, sys
@@ -359,9 +360,20 @@ def file_problems(d, p):
             return ['files must be a non-empty list']
         paths = set()
         for f in files:
-            if not isinstance(f, dict) or set(f) - {'path', 'edits', 'origin'} or ('edits' in f) == ('origin' in f):
-                bad.append('files: each entry is {"path", "edits"} or {"path", "origin"}: %s' % json.dumps(f))
+            if not isinstance(f, dict) or set(f) - {'path', 'edits', 'origin', 'tree', 'install'} \
+                    or ('edits' in f) == ('origin' in f):
+                bad.append('files: each entry is {"path", "edits"} or {"path", "origin"} (+ "tree", "install"): %s'
+                           % json.dumps(f))
                 continue
+            if 'tree' in f and (f['tree'] is not True or 'edits' in f):
+                bad.append('files: %s: "tree": true goes with an origin (every file under the folder)' % f.get('path'))
+            inst = f.get('install')
+            if inst is not None and (not isinstance(inst, dict) or set(inst) - {'mode', 'owner', 'flags'}
+                                     or ('mode' in inst and not re.fullmatch(r'0[0-7]{3,4}', str(inst['mode'])))
+                                     or ('owner' in inst and not re.fullmatch(r'[a-z_0-9]+:[a-z_0-9]+', str(inst['owner'])))
+                                     or not isinstance(inst.get('flags', []), list)):
+                bad.append('files: %s: install is {"mode": "0644", "owner": "root:wheel", "flags": [...]}'
+                           % f.get('path'))
             path = f.get('path')
             if not (isinstance(path, str) and path and not path.startswith('/') and '..' not in path.split('/')):
                 bad.append('files: path must be relative to the installed system: %r' % (path,))
@@ -407,7 +419,8 @@ def declared_files(root=os.path.join(TOP, 'patches')):
         p = json.load(open(pj))
         for f in p.get('files', []):
             spec = S['load'](os.path.join(directory(name, root), f['edits'])) if 'edits' in f else None
-            out.append((name, p.get('revision'), p.get('status'), f['path'], f.get('origin'), spec))
+            origin = dict(f['origin'], tree=True) if f.get('tree') else f.get('origin')
+            out.append((name, p.get('revision'), p.get('status'), f['path'], origin, spec))
     return out
 
 

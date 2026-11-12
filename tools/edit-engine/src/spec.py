@@ -257,6 +257,8 @@ def _op_problems(e):
 
 def origin_text(origin):
     text = {'apple': 'Apple', 'tahoe': 'Tahoe donor', 'oclp': 'OCLP', 'hao': 'hao'}.get(origin.get('kind'), '?')
+    if origin.get('tree'):
+        text = 'every file under it from ' + text
     if origin.get('name'):
         text += ' · ' + origin['name']
     if origin.get('row'):
