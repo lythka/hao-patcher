@@ -165,6 +165,48 @@ class Repo(unittest.TestCase):
         self.assertEqual((TOP / 'patches/TRACKER.md').read_text(), patches.tracker(), 'patches/TRACKER.md is stale')
 
 
+class Packs(unittest.TestCase):
+    """packs/*.json: detection from the target, plan filtering, and the 9,2 plan unchanged under --packs auto."""
+    DEFS = {'base': {'format': 1, 'detect': {'any_intel': True}, 'phase': 'installer', 'recipes': ['a']},
+            'gpu': {'format': 1, 'detect': {'oclp_patchsets': ['Intel Ivy Bridge']}, 'phase': 'installer',
+                    'recipes': ['b']},
+            'other': {'format': 1, 'detect': {'board_ids': ['Mac-0000']}, 'phase': 'live-capable', 'recipes': ['c']}}
+
+    def test_detection_for_the_real_target(self):
+        got = patches.detect_packs(TOP / 'pipeline/targets/mbp92.json', self.DEFS)
+        self.assertEqual(sorted(got), ['base', 'gpu'])
+
+    def test_plan_filters_unselected_packs(self):
+        d = Path(tempfile.mkdtemp())
+        for n in 'abcd':
+            (d / n).mkdir(); (d / n / 'patch.json').write_text(json.dumps({'revision': 1, 'stage': 'post', 'applies': 'any'}))
+        s = d / 'set.txt'; s.write_text('a\nb\nc\nd\n')
+        t = d / 't.json'; t.write_text(json.dumps({'model': 'MacBookPro9,2'}))
+        run = lambda packs: [n for _, n, _ in patches.plan(s, t, '25G342', root=d, packs=packs, pack_defs=self.DEFS)]
+        self.assertEqual(run(None), ['a', 'b', 'c', 'd'])
+        self.assertEqual(run(['base', 'gpu']), ['a', 'b', 'd'])      # d is in no pack: applies as before
+
+    def test_pack_rules(self):
+        bad = patches.pack_problems({'x': {'format': 1, 'detect': {}, 'phase': 'sometimes', 'recipes': ['nope']},
+                                     'y': {'format': 1, 'detect': {'any_intel': True}, 'phase': 'installer',
+                                           'recipes': ['hao-runtime']},
+                                     'z': {'format': 1, 'detect': {'any_intel': True}, 'phase': 'installer',
+                                           'recipes': ['hao-runtime']}})
+        got = '\n'.join(bad)
+        for want in ('x.json: needs format 1 and phase', 'x.json: detect is one of', 'x.json: no recipe nope',
+                     'z.json: hao-runtime is already in pack y'):
+            self.assertIn(want, got)
+
+    def test_mbp92_plan_is_unchanged_with_detected_packs(self):
+        target = TOP / 'pipeline/targets/mbp92.json'
+        for s in ('golden-gate-26B131', 'golden-gate'):
+            setfile = TOP / 'pipeline/sets' / (s + '.txt')
+            for build in ('25G332', '25G342'):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(patches.plan(setfile, target, build),
+                                     patches.plan(setfile, target, build, packs=patches.detect_packs(target)), s)
+
+
 class Format(unittest.TestCase):
     """patches.check: patch.json keys and values, required README sections, Validation agrees with "validated",
     shipping sets select product patches only."""

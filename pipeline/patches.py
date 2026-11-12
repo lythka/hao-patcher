@@ -1,11 +1,14 @@
 #!/usr/bin/python3 -I
 """patches.py: which patches of a set apply to a build, and at which stage.
 
-  patches.py plan SET TARGET BUILD [--locks DIR:DIR...] [--skip-optional GROUP]... [--record FILE]
+  patches.py plan SET TARGET BUILD [--locks DIR:DIR...] [--skip-optional GROUP]... [--record FILE] [--packs auto|A,B]
                                      one line per patch that applies, in set order: STAGE NAME [INPUT ...]
                                      (SET = pipeline/sets/SET.txt, TARGET = pipeline/targets/MODEL.json). Rows of
                                      optional patches are looked up in --locks (default pipeline/inputs/BUILD then
                                      pipeline/inputs/common); --record writes which optional patches ran or were skipped
+                                     --packs: a recipe listed in a pack (packs/NAME.json) runs only when its pack is
+                                     selected; auto detects them from the target (OCLP patch sets, board id)
+  patches.py packs TARGET            the packs detected for TARGET, with their phase and recipes
   patches.py revisions NAME ...      NAME rN per patch, for the build record (MANIFEST.txt)
   patches.py tracker [OUT]           the patch tracker (patches/TRACKER.md): every patch, revision, sets, validation
 
@@ -102,7 +105,67 @@ def missing_row(row, locks):
     return 'no row %s in %s' % (row, ', '.join(os.path.relpath(d, TOP) if d.startswith(TOP) else d for d in locks))
 
 
-def plan(setfile, target, build, root=os.path.join(TOP, 'patches'), locks=None, skip=(), record=None):
+PACKS = os.path.join(TOP, 'packs')
+PHASES = ('installer', 'live-capable')
+
+
+def load_packs(packs_dir=PACKS):
+    out = {}
+    for n in sorted(os.listdir(packs_dir)) if os.path.isdir(packs_dir) else []:
+        if n.endswith('.json'):
+            with open(os.path.join(packs_dir, n)) as f:
+                out[n[:-5]] = json.load(f)
+    return out
+
+
+def pack_problems(packs, root=os.path.join(TOP, 'patches')):
+    """Problems with packs/*.json: keys, phase, detect rule, and each recipe in at most one pack."""
+    bad, member = [], {}
+    known = set(patch_names(root))
+    for name, p in packs.items():
+        where = 'packs/%s.json' % name
+        unknown = set(p) - {'format', 'description', 'detect', 'oclp_patchsets', 'phase', 'proven_on', 'recipes'}
+        if unknown:
+            bad.append('%s: unknown keys %s' % (where, ', '.join(sorted(unknown))))
+        if p.get('format') != 1 or p.get('phase') not in PHASES:
+            bad.append('%s: needs format 1 and phase %s' % (where, ' or '.join(PHASES)))
+        d = p.get('detect')
+        if not (isinstance(d, dict) and len(d) == 1 and (
+                d.get('any_intel') is True or (isinstance(d.get('oclp_patchsets'), list) and d['oclp_patchsets'])
+                or (isinstance(d.get('board_ids'), list) and d['board_ids']))):
+            bad.append('%s: detect is one of {"any_intel": true}, {"oclp_patchsets": [...]}, {"board_ids": [...]}' % where)
+        for r in p.get('recipes', []):
+            if r not in known:
+                bad.append('%s: no recipe %s' % (where, r))
+            elif r in member:
+                bad.append('%s: %s is already in pack %s' % (where, r, member[r]))
+            member[r] = name
+    return bad
+
+
+def detect_packs(target, packs=None):
+    """Names of the packs TARGET (a targets/*.json path) selects, from its OCLP profile's patch sets and board id."""
+    packs = load_packs() if packs is None else packs
+    with open(target) as f:
+        t = json.load(f)
+    profile = os.path.join(TOP, 'tools', 'oclp-hardware', 'profiles',
+                           os.path.splitext(os.path.basename(target))[0] + '.json')
+    patchsets = set()
+    if os.path.isfile(profile):
+        with open(profile) as f:
+            patchsets = set(json.load(f).get('patchset_order', []))
+    out = []
+    for name, p in packs.items():
+        d = p.get('detect', {})
+        if d.get('any_intel') or patchsets & set(d.get('oclp_patchsets', [])) or t.get('board_id') in d.get('board_ids', []):
+            out.append(name)
+    return out
+
+
+def plan(setfile, target, build, root=os.path.join(TOP, 'patches'), locks=None, skip=(), record=None, packs=None,
+         pack_defs=None):
+    """PACKS (names of selected packs, or None for no pack filtering): a recipe listed in a pack that is not selected
+    is skipped with a note."""
     """[(stage, name, inputs)] in set order. LOCKS (row folders, searched in order) and SKIP (optional groups to leave
     out) decide which optional patches run; with LOCKS None their rows are not looked at. RECORD, a dict, receives
     {"ran": {name: group}, "skipped": {name: {"group", "reason"}}} for the optional patches that apply."""
@@ -123,6 +186,12 @@ def plan(setfile, target, build, root=os.path.join(TOP, 'patches'), locks=None, 
         if not ok:
             print('patches: %s does not apply to %s %s; skipped' % (name, model, build), file=sys.stderr)
             continue
+        if packs is not None:
+            owner = next((pn for pn, pd in (pack_defs if pack_defs is not None else load_packs()).items()
+                          if name in pd.get('recipes', [])), None)
+            if owner is not None and owner not in packs:
+                print('patches: %s is in pack %s, not selected; skipped' % (name, owner), file=sys.stderr)
+                continue
         group = p.get('optional')
         if group:
             reason = 'group %s skipped (--skip-optional)' % group if group in skip else None
@@ -238,6 +307,8 @@ def check(root=os.path.join(TOP, 'patches'), sets_dir=os.path.join(TOP, 'pipelin
         for s, members in shipping.items():
             if name in members and p.get('status') != 'product':
                 bad.append('%s: status %s, but set %s ships to people (product patches only)' % (name, p.get('status'), s))
+    if os.path.abspath(str(root)) == os.path.join(TOP, 'patches'):
+        bad += pack_problems(load_packs(), root)
     return bad
 
 DIGEST_SKIP = {'README.md', 'patch.json', 'edits', 'tests'}
@@ -409,6 +480,11 @@ if __name__ == '__main__':
         out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(TOP, 'patches', 'TRACKER.md')
         open(out, 'w').write(tracker())
         sys.exit(0)
+    if sys.argv[1:2] == ['packs'] and len(sys.argv) == 3:
+        defs = load_packs()
+        for n in detect_packs(sys.argv[2], defs):
+            print('%-22s %-13s %s' % (n, defs[n]['phase'], ', '.join(defs[n].get('recipes', [])) or '-'))
+        sys.exit(0)
     if sys.argv[1:2] == ['digest'] and len(sys.argv) == 3:
         print(recipe_digest(sys.argv[2]))
         sys.exit(0)
@@ -432,9 +508,9 @@ if __name__ == '__main__':
         except (ValueError, OSError) as e:
             sys.exit('patches: %s' % e)
         sys.exit(0)
-    args, locks, skip, out, rest = [], None, [], None, iter(sys.argv[2:])
+    args, locks, skip, out, rest, pack_arg = [], None, [], None, iter(sys.argv[2:]), None
     for a in rest:
-        if a not in ('--locks', '--skip-optional', '--record'):
+        if a not in ('--locks', '--skip-optional', '--record', '--packs'):
             args.append(a)
             continue
         value = next(rest, None)
@@ -444,14 +520,17 @@ if __name__ == '__main__':
             locks = [d for d in value.split(':') if d]
         elif a == '--skip-optional':
             skip.append(value)
+        elif a == '--packs':
+            pack_arg = value
         else:
             out = value
     if sys.argv[1:2] != ['plan'] or len(args) != 3 or any(a.startswith('--') for a in args):
         sys.exit(__doc__)
     try:
         record = {}
+        selected = None if pack_arg is None else detect_packs(args[1]) if pack_arg == 'auto' else pack_arg.split(',')
         for stage, name, inputs in plan(*args, locks=locks if locks is not None else default_locks(args[2]),
-                                        skip=skip, record=record):
+                                        skip=skip, record=record, packs=selected):
             print(' '.join([stage, name] + inputs))
         if out:
             open(out, 'w').write(json.dumps(dict(record, skip_optional=skip), indent=1, sort_keys=True) + '\n')

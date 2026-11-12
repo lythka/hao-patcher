@@ -1,0 +1,21 @@
+{
+ "format": 1,
+ "description": "Everything any Intel Mac needs: the Darwin 27 kernel and its repairs, the hao runtime, the userspace cryptex, Spotlight compatibility, native identities, OpenCore.",
+ "detect": {
+  "any_intel": true
+ },
+ "oclp_patchsets": [],
+ "phase": "installer",
+ "proven_on": [
+  "MacBookPro9,2"
+ ],
+ "recipes": [
+  "darwin27-kernel",
+  "darwin27-sandbox-disk-space",
+  "hao-runtime",
+  "golden-gate-userspace",
+  "golden-gate-corespotlight-compat",
+  "golden-gate-native-identities",
+  "hao-opencore"
+ ]
+}

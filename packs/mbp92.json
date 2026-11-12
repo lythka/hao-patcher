@@ -1,0 +1,15 @@
+{
+ "format": 1,
+ "description": "MacBookPro9,2 model files: its OpenCore EFI and early kexts.",
+ "detect": {
+  "board_ids": [
+   "Mac-6F01561E16C75D06"
+  ]
+ },
+ "oclp_patchsets": [],
+ "phase": "installer",
+ "proven_on": [
+  "MacBookPro9,2"
+ ],
+ "recipes": []
+}
