@@ -1,0 +1,6 @@
+/private/fixture/Metal [x86_64]:
+    -exports:
+        offset      symbol
+        0x00009E70  _MTL4CommandQueueErrorDomain
+        0x00028AC0  _OBJC_CLASS_$_MTL4AccelerationStructureDescriptor
+        0x00028B00  _MTLResolver [resolver]

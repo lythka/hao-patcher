@@ -1,0 +1,15 @@
+
+Metal Imported By:
+==================
+
+In DSC (Dylibs)
+---------------
+/System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore
+/System/Library/Frameworks/CoreVideo.framework/Versions/A/CoreVideo
+
+In FileSystem DMG (Apps)
+------------------------
+/System/Applications/Books.app/Contents/MacOS/Books (/System/Applications/Books.app/Contents/Frameworks/BlissReader.framework/Versions/A/BlissReader)
+/System/Applications/Chess.app/Contents/MacOS/Chess
+/cdhash/0ff26abe057164beef5975652a9e53c349b7dfb2 (/usr/bin/mpsgraphtool)
+/usr/bin/mpsgraphtool
