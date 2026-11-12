@@ -1,8 +1,14 @@
 {
-  "revision": 5,
+  "revision": 6,
   "stage": "oclp-hook",
   "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
   "inputs": ["windowserver_filter_shim"],
   "status": "experiment",
-  "validated": true
+  "validated": true,
+  "files": [
+    {"path": "usr/lib/dss_shim.dylib", "edits": "edits/dss-shim.json"},
+    {"path": "usr/lib/windowserver_filter.dylib",
+     "origin": {"kind": "hao", "row": "windowserver_filter_shim",
+                "note": "new file: the Siri-filter inversion and backdrop-clip adapters (src/filter_shim.c, built by make)"}}
+  ]
 }
