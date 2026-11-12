@@ -1,0 +1,32 @@
+{
+ "format": 1,
+ "path": "System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd",
+ "arch": "x86_64",
+ "origin": {
+  "kind": "apple",
+  "note": "Golden Gate's own universal daemon (26A428 and 26B131 alike)"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "load-corespotlight-compat",
+   "kind": "op",
+   "op": "macho.add-dylib",
+   "args": {
+    "path": "/usr/lib/corespotlight_compat.dylib",
+    "weak": false,
+    "timestamp": 2,
+    "current_version": 65536,
+    "compat_version": 65536
+   },
+   "reason": "Spotlight queries stop crashing the daemon: the compat library adds the CoreSpotlight getter 27.x's SpotlightDaemon calls and x86_64 CoreSpotlight lacks. Required (not weak) load; the x86_64 slice only"
+  }
+ ],
+ "sign": {
+  "mode": "adhoc",
+  "identifier": "com.apple.corespotlightd"
+ },
+ "expect": {
+  "7e0306362f0cfe6dc4c4ac568f82b21bdc58a66a4195107ef0eeb0fb14e88830": "29430f88c3217904557d92ef2bbb9175cf857cf0b44106b0838cce6814c249a6"
+ }
+}
