@@ -17,10 +17,18 @@ API, with the shim loaded by the driver bundle itself (live swap, not an image):
 | inline structs in argument buffers (constants + texture inside) | probe16 | CORRECT |
 | ASTC textures (created as RGBA8, decoded with libate at upload; replaceRegion and blit) | probe17 | CORRECT |
 
-**Weather (27.2.1) loads and renders on the laptop** (current conditions, hourly, air quality, 10-day), with the shim
-loaded by the driver bundle: the first launches aborted in argument-buffer code (inline struct), then in MetalOld's
-texture validation (WeatherMaps' ASTC 8x8 KTX textures); both are fixed. Not yet exercised: the map views, VFX
-effects in depth, long runs.
+Apps on the laptop (27.2.1), with the shim loaded by the driver bundle (2026-11-12):
+
+| App | Works |
+|---|---|
+| Weather | conditions, hourly, air quality, 10-day; precipitation, temperature, air-quality and wind maps (first launches aborted in argument-buffer code, then in MetalOld's texture validation of WeatherMaps' ASTC 8x8 KTX textures; both fixed) |
+| Maps | explore, satellite globe, street-level satellite, 3D buildings |
+| Safari WebGPU | compute (storage buffer) and render (uniform bind group) read back exactly; without the shim the GPU process aborts in `newIndirectArgumentEncoderWithLayout:` from `WebGPU::Device::createBindGroupLayout` |
+
+Not argument buffers, same with and without the shim: Safari never shows WebGL/WebGPU canvases on screen, and
+WebGL draws are dropped; SceneKit's `default.metallib` (macOS and iOSSupport) is missing from the metallib repair
+profile (the 31001 downgrader crashes on its depth sampler-form reads); RealityKit needs placement heaps
+(`MTLHeapTypePlacement`, which MetalOld refuses).
 
 | Piece | Where |
 |---|---|
