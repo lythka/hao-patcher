@@ -1,5 +1,5 @@
 {
- "revision": 1,
+ "revision": 2,
  "stage": "recovery",
  "applies": {
   "models": [
@@ -7,5 +7,35 @@
   ]
  },
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "System/Library/Extensions/AppleHDA.kext",
+   "origin": {
+    "kind": "oclp",
+    "name": "AppleHDA 26.0 Beta 1",
+    "note": "bundle copied whole from the root-patched System by apply.sh (ditto); OCLP's AppleHDA, with its HAL plug-in inside"
+   }
+  },
+  {
+   "path": "System/Library/Extensions/IOAudioFamily.kext",
+   "origin": {
+    "kind": "tahoe",
+    "name": "Tahoe IOAudioFamily.kext",
+    "note": "bundle copied whole from the root-patched System by apply.sh (ditto); the HDA chain's audio family"
+   }
+  },
+  {
+   "path": "System/Library/Extensions/AppleGFXHDA.kext",
+   "origin": {
+    "kind": "tahoe",
+    "name": "Tahoe AppleGFXHDA.kext",
+    "note": "bundle copied whole from the root-patched System by apply.sh (ditto); HDMI/DisplayPort audio"
+   }
+  },
+  {
+   "path": "System/Library/KernelCollections/BaseSystemKernelExtensions.kc",
+   "edits": "edits/kc.json"
+  }
+ ]
 }

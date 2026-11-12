@@ -21,12 +21,20 @@ consumer 0x6F/0x70 (display keys on external Apple keyboards) and 0xE9/0xEA/0xE2
 `make.sh` builds it for x86_64 and signs it ad hoc with the entitlement. The display keys need the framebuffer from
 [rec-display-ethernet](../rec-display-ethernet/README.md); the volume keys need [rec-audio](../rec-audio/README.md).
 
+Declared in `patch.json` `files` (paths relative to the Recovery BaseSystem's root: `brightkeys` and its LaunchAgent plist, whole files); [`tests/test_edits.py`](tests/test_edits.py) checks it against `apply.sh`. No byte edits, so no real-input test.
+
 ## Verify
 Press the brightness, keyboard-light and volume keys in the Recovery: the level changes and the bezel appears.
+
+Declaration test:
+```sh
+python3.14 -I -B -m unittest discover -s patches/rec-brightness-keys/tests
+```
 
 ## Validation
 NEEDS VALIDATION: `brightkeys` builds and installs in every Recovery build; the keys have not been tested in a booted
 Recovery built from this repository.
 
 ## Revisions
+- r2 2026-11-12 Declare brightkeys and its plist in `patch.json` `files`; the recipe is unchanged.
 - r1 2026-11-10 Initial public release.

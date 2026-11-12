@@ -22,6 +22,8 @@ Stage `post`, any model and build. The Recovery comes in as the input row `endus
 OpenCore checks a Recovery chunklist's signature only with `Misc.Security.DmgLoading = Signed`; with `Any` it
 accepts the unsigned chunklist. The kernel checks chunklists only for `root-dmg=` boots.
 
+Declared in `patch.json` `files`: `BaseSystem.dmg` and `BaseSystem.chunklist` from the row, with paths relative to the image's Recovery volume (not the System; `<volume group UUID>` stands for the one folder there); [`tests/test_edits.py`](tests/test_edits.py) checks it against `apply.sh`. No byte edits, so no real-input test.
+
 ## Verify
 - `python3.14 -m unittest discover -s pipeline/tests -k chunklist`: `chunklist.py create` reproduces Apple's chunk
   table for Apple's BaseSystem.dmg.
@@ -32,6 +34,11 @@ accepts the unsigned chunklist. The kernel checks chunklists only for `root-dmg=
 - On the Mac, `nvram recovery-boot-mode=unused` followed by a boot of the internal OpenCore, or Cmd-R through
   OpenCore, reaches Recovery with Reinstall macOS.
 
+Declaration test:
+```sh
+python3.14 -I -B -m unittest discover -s patches/rec-install-volume/tests
+```
+
 ## Limitations
 The chunklist is unsigned, so nothing proves the dmg's origin at boot. The row names one target's Recovery per build.
 To remove the patch, drop it from the set and rebuild; Apple's dmg returns from the pristine stage.
@@ -41,4 +48,5 @@ NEEDS VALIDATION: the Recovery builds and its generated chunklist verifies (0 ba
 Recovery volume, Cmd-R and a full reinstall have not been tested.
 
 ## Revisions
+- r4 2026-11-12 Declare the Recovery dmg and chunklist in `patch.json` `files`; the recipe is unchanged.
 - r3 2026-11-10 Initial public release.

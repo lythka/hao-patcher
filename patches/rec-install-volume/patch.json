@@ -1,10 +1,30 @@
 {
- "revision": 3,
+ "revision": 4,
  "stage": "post",
  "applies": "any",
  "inputs": [
   "enduser_recovery"
  ],
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "<volume group UUID>/BaseSystem.dmg",
+   "origin": {
+    "kind": "hao",
+    "row": "enduser_recovery",
+    "name": "BaseSystem.dmg",
+    "note": "the Recovery built by pipeline/recovery: BaseSystem.dmg from the row's folder, copied in place of Apple's by apply.sh onto the image's Recovery volume (the path is relative to that volume, not the System; <volume group UUID> is the one folder there)"
+   }
+  },
+  {
+   "path": "<volume group UUID>/BaseSystem.chunklist",
+   "origin": {
+    "kind": "hao",
+    "row": "enduser_recovery",
+    "name": "BaseSystem.chunklist",
+    "note": "its unsigned chunklist made by pipeline/stages/chunklist.py: BaseSystem.chunklist from the row's folder, copied in place of Apple's by apply.sh onto the image's Recovery volume (the path is relative to that volume, not the System; <volume group UUID> is the one folder there)"
+   }
+  }
+ ]
 }

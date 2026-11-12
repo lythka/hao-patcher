@@ -1,5 +1,5 @@
 {
- "revision": 1,
+ "revision": 2,
  "stage": "recovery",
  "applies": {
   "models": [
@@ -7,5 +7,21 @@
   ]
  },
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "usr/local/ssdtools/brightkeys",
+   "origin": {
+    "kind": "hao",
+    "note": "built from src/brightkeys.m by make.sh (x86_64, ad hoc signed with src/brightkeys.entitlements); acts on the brightness, keyboard-light and volume keys and draws the bezel"
+   }
+  },
+  {
+   "path": "System/Library/LaunchAgents/local.brightkeys.plist",
+   "origin": {
+    "kind": "hao",
+    "note": "src/local.brightkeys.plist: starts brightkeys in the Recovery GUI session"
+   }
+  }
+ ]
 }

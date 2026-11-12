@@ -1,0 +1,28 @@
+{
+ "format": 1,
+ "path": "System/Library/KernelCollections/BaseSystemKernelExtensions.kc",
+ "origin": {
+  "kind": "tahoe",
+  "name": "BaseSystemKernelExtensions.kc",
+  "note": "the Recovery's own kernel collection, rebuilt around all recovery patches' kexts.txt by pipeline/stages/recovery.sh"
+ },
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "link-display-ethernet",
+   "kind": "op",
+   "op": "kc.link",
+   "args": {
+    "tool": "kmutil",
+    "kexts": "kexts.txt",
+    "bundles": [
+     "com.apple.driver.AppleIntelFramebufferCapri",
+     "com.apple.driver.AppleIntelHD4000Graphics",
+     "com.apple.iokit.AppleBCM5701Ethernet"
+    ]
+   },
+   "reason": "puts the Ivy Bridge framebuffer, HD 4000 graphics and the Broadcom 57765 Ethernet driver in the Recovery kernel collection, for an accelerated native-resolution display and the built-in Ethernet"
+  }
+ ],
+ "sign": null
+}

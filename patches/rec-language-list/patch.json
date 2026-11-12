@@ -1,7 +1,31 @@
 {
- "revision": 1,
+ "revision": 2,
  "stage": "recovery",
  "applies": "any",
  "status": "product",
- "validated": false
+ "validated": false,
+ "files": [
+  {
+   "path": "System/Library/CoreServices/Language Chooser.app/Contents/MacOS/Language Chooser",
+   "origin": {
+    "kind": "hao",
+    "note": "lcwrap, built from src/lcwrap.c by make.sh (x86_64, ad hoc signed); takes the path of the binary it starts"
+   }
+  },
+  {
+   "path": "System/Library/CoreServices/Language Chooser.app/Contents/MacOS/Language Chooser.real",
+   "origin": {
+    "kind": "tahoe",
+    "name": "Language Chooser",
+    "note": "the Recovery's own binary, moved here unchanged by apply.sh (mv)"
+   }
+  },
+  {
+   "path": "System/Library/CoreServices/Language Chooser.app/Contents/MacOS/lcfast.dylib",
+   "origin": {
+    "kind": "hao",
+    "note": "built from src/lcfast.m by make.sh (x86_64, ad hoc signed); ends the fake progress so the list shows at once"
+   }
+  }
+ ]
 }

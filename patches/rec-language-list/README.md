@@ -16,13 +16,21 @@ Shows the Recovery's language list as soon as it is ready instead of after a 60-
   does. It then hides Installer Progress so the list accepts clicks (see the source).
 - `make.sh` builds both for x86_64 and signs them ad hoc.
 
+Declared in `patch.json` `files` (paths relative to the Recovery BaseSystem's root: `lcwrap` at the Language Chooser's path, Apple's binary as `Language Chooser.real`, and `lcfast.dylib`, all whole files); [`tests/test_edits.py`](tests/test_edits.py) checks it. No byte edits, so no real-input test.
+
 ## Verify
 Reset NVRAM and boot the Recovery: the language list is clickable about 24 s after the kernel starts.
 `/var/log/lcfast.log` records the call.
+
+Declaration test:
+```sh
+python3.14 -I -B -m unittest discover -s patches/rec-language-list/tests
+```
 
 ## Validation
 NEEDS VALIDATION: the method encodings were checked against 25G241; on 25G332 `lcfast` either applies or changes
 nothing, and this has not been tested in a booted Recovery.
 
 ## Revisions
+- r2 2026-11-12 Declare the three files in the Language Chooser's folder in `patch.json` `files`; the recipe is unchanged.
 - r1 2026-11-10 Initial public release.
