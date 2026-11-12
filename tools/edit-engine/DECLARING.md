@@ -98,6 +98,17 @@ recorded reference output instead, and explain why in the test docstring and the
   changed and why and ends with a `Tested:` line naming the exact commands and which real-input tests ran. Do not
   push or merge.
 
+## Acceptance
+
+The maintainer runs, on your branch, with each real input you name:
+
+```sh
+python3.14 -I tools/edit-engine/verify-declaration declare/YOURS --env NAME=PATH ...
+```
+
+It refuses changes outside the allowed paths, a revision that does not go up by exactly 1, any other
+`patch.json` change, private paths, and any failing suite; a real-input test without its file is UNVERIFIED.
+
 ## Report
 
 For each recipe: the files declared (path, origin or spec, edit kinds); anything not declared and why; each real
