@@ -1,9 +1,10 @@
-# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 4e68804).
+# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: d9ea9bd).
 # Built from a root that includes the App and OS cryptexes (their 26 programs are embedded by golden-gate-userspace).
 # Interface units u3 + the optional-data (URLRequest.httpBody nil) contract: 1,895 units, 3 thunk libraries, matched
 # 1895/1895 against the x86_64 cache 262FA161 (units-match.txt); stub-identities; AOT for 969 paths bound to libhao
-# 8e445b3e. Async provider swift-async-optional-object 0.1.0-experimental.4-26B131.1 (libhao_async_contract.dylib).
+# 239ea10b. Async provider swift-async-optional-object 0.1.0-experimental.4-26B131.1 (libhao_async_contract.dylib).
 # Adds since 790720d: native-call cache (with its signal/fork and ownership fixes), JIT vector FP/shifts/LD1-ST1 and
 # TBL/EXT/integer MUL-MLA/compares/min-max/ABS/FRINT, scalar FP and conversions, round-to-odd FP32 FMA, x86-64-v2
-# build with a startup CPU check, measured Swift value rules (Stocks/News widgets, Weather), and five review fixes.
-- store/artifacts/hao-runtime-26B131-20261111-4e688041d91d/payload
+# build with a startup CPU check, measured Swift value rules (Stocks/News widgets, Weather), five review fixes, and Swift values under 8 bytes passed
+# unpatched (Weather, StocksWidget, NewsTag, NewsToday2 aborts on 7d0b612).
+- store/artifacts/hao-runtime-26B131-20261111-d9ea9bd9e635/payload
