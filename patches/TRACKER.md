@@ -18,7 +18,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-live-text-service | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the config edit in edits/config.json; the hook is unchanged. |
 | golden-gate-live-text-shared | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the runtime files and the libhelloblur load command in edits/libhelloblur.json; the hook |
 | golden-gate-metal-framebuffer | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
-| golden-gate-metal-libraries | r18 | oclp-hook | experiment |  | x | x |  |  | **needs** | r18 2026-11-12 26B131 artifact from cache/metallib r56: cube and 1D sampler-form reads converted, which change |
+| golden-gate-metal-libraries | r19 | oclp-hook | experiment |  | x | x |  |  | **needs** | r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/t |
 | golden-gate-native-identities | r1 | oclp-hook | experiment |  | x | x |  |  | ok | r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the nativ |
 | golden-gate-shader-caches | r11 | post | experiment | caches | x |  |  |  | **needs** | r11 2026-11-12 Row `shader_caches_golden_gate` (26B131): the same harvest made by cache/seeds r2, without the  |
 | golden-gate-user-seed | r6 | post | experiment | caches | x |  |  |  | **needs** | r6 2026-11-12 seed.zsh never places `com.apple.metalfe`: an older seed's clang module cache (Preview's `.pcm`) |
@@ -26,7 +26,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-windowserver-filter | r6 | oclp-hook | experiment |  | x | x |  |  | ok | r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json a |
 | hao-opencore | r40 | post | experiment |  | x | x |  |  | ok | r40 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
 | hao-runtime | r65 | oclp-hook | experiment |  | x | x |  |  | ok | r65 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804  |
-| metal-compiler-compat | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-11 Restored from darwin27-live-text-fixes v0.2.0 into tools/live-text; row metal_compiler_compat fo |
+| metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
 | metalold-selectors | r4 | oclp-hook | product |  | x | x |  |  | ok | r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json`  |
 | rec-audio | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
 | rec-bluetooth-input | r1 | recovery | product |  |  |  | x |  | **needs** | r1 2026-11-10 Initial public release. |
