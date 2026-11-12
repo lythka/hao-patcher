@@ -37,10 +37,16 @@ this target (the golden-gate set and the Recovery too), including images without
 the daemon only in a set that also installs the repair, and leaves OCLP's setting and the rest of its config
 untouched. Both routes clear the stale NVRAM the same way (OCLP's NVRAM/Delete already lists `revblock`).
 
+The edit is declared in `edits/config.json` (`plist.set` on `EFI/OC/config.plist`, in the image's EFI partition):
+`revblock` becomes `none`. `src/config.py` computes that value and also handles other tokens, a `revblock=` boot
+argument and a missing NVRAM/Delete entry; the spec covers OCLP's MacBookPro9,2 config, where none of those occur,
+and `tests/test_edits.py` proves the same bytes on it.
+
 ## Verify
 
 ```sh
 python3.14 -I -B -m unittest discover -s patches/golden-gate-live-text-service/tests
+python3.14 -I -B -m unittest discover -s patches/golden-gate-live-text-service/tests   # LIVE_TEXT_SERVICE_INPUT, LIVE_TEXT_SERVICE_IMAGE_CONFIG: real configs
 ```
 
 In the image's exported `boot-efi/payload/EFI/OC/config.plist`: `4D1FDA02-...:revblock` is `none`. On the laptop
@@ -56,5 +62,6 @@ an image or booted; background analysis load on the HD 4000 is unmeasured.
 
 ## Revisions
 
+- r3 2026-11-12 Declare the config edit in edits/config.json; the hook is unchanged.
 - r2 2026-11-11 Checks the runtime in System (/usr/lib/hao-live-text/LiveText.dylib) on the read-only System instead of a Data alias; selected by dev-bs-test after hao-opencore.
 - r1 2026-11-09 Remove only the mediaanalysisd compatibility block for images carrying the shared GPU OCR repair.
