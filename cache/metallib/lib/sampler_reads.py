@@ -3,9 +3,9 @@ widened where the module also calls the i32 overload (read_sampler.py, then text
 
 Why only these two passes: on the HD 4000 route the 31001 request downgrader (MTLCompiler 13.6 / GPUCompiler 13.2.1,
 OCLP's `metal_3802.py`) lowers every module to AIR 2.0 for the 3802 backend. It crashes (libLLVM_real+0x7f02a9) on
-every depth sampler-form read and writes invalid IR ("Inserted value type doesn't match aggregate type") when one
-module calls both coordinate widths of the same sampler-form texture read; all other sampler-form reads it converts
-itself, byte-identically to read_sampler.py. The whole suite (compatibility.py) also runs the null-compare and
+every depth, cube and 1D sampler-form read (the forms without an offset operand, and depth) and writes invalid IR
+("Inserted value type doesn't match aggregate type") when one module calls both coordinate widths of the same
+sampler-form texture read; 2D array and 3D sampler-form reads it converts itself. The whole suite (compatibility.py) also runs the null-compare and
 half-vector passes, which change bytes the downgrader handles; a patch for this one root cause must not.
 """
 import compatibility

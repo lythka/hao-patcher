@@ -1,15 +1,17 @@
-"""Convert AIR 2.8 implicit-sampler, zero-offset 2D reads to direct reads.
+"""Convert AIR 2.8 implicit-sampler reads to direct reads: zero-offset 2D (texture and depth), cube and 1D.
 
 The retained request downgrader crashes on the newer signature. Paired VFX
 captures establish the direct-read conversion before that writer. Only the
-builtin read sampler and a zero offset are removed. User samplers and nonzero
-offsets cannot be discarded. Other arguments, result types and metadata remain.
+builtin read sampler and, for 2D, a zero offset are removed (cube and 1D reads
+have no offset operand). User samplers and nonzero offsets cannot be discarded.
+Other arguments, result types and metadata remain. 2D array and 3D reads, which
+the downgrader converts itself, are left alone.
 """
 import re
 import null_compare
 import texture_coords
 
-NAME = r'air\.read_(?:texture|depth)_2d\.[\w.]+'
+NAME = r'air\.read_(?:(?:texture|depth)_2d|texture_cube|texture_1d)\.[\w.]+'
 DECL = re.compile(r'^declare .*?@("?' + NAME + r'"?)\(')
 REFERENCE = re.compile(r'@("?' + NAME + r'"?)(?=[\s,(])')
 GETTER = 'air.get_read_sampler'
@@ -37,11 +39,18 @@ def declarations(lines):
             continue
         depth = name.startswith('air.read_depth_')
         width = 'i16' if '.i16.' in name else 'i32'
-        offset = 4 if depth else 3
         sampler = re.fullmatch(r'%(?:struct\._sampler_t|"struct\._sampler_t") addrspace\(2\)\*(?: .*)?', args[1])
         types = [texture_coords.param_type(arg) for arg in args]
-        expected = [types[0], types[1]] + (['i32'] if depth else []) + [
-            '<2 x ' + width + '>', '<2 x ' + width + '>', width, 'i32']
+        if name.startswith('air.read_texture_cube.'):    # coord, face, lod, access: no offset
+            offset = None
+            expected = [types[0], types[1], '<2 x ' + width + '>', width, width, 'i32']
+        elif name.startswith('air.read_texture_1d.'):    # coord, lod, access: no offset
+            offset = None
+            expected = [types[0], types[1], width, width, 'i32']
+        else:
+            offset = 4 if depth else 3
+            expected = [types[0], types[1]] + (['i32'] if depth else []) + [
+                '<2 x ' + width + '>', '<2 x ' + width + '>', width, 'i32']
         if not sampler or types != expected:
             raise ValueError('unrecognized sampler-form read signature: ' + name)
         found[name] = dict(index=index, start=start, end=end, args=args,
@@ -99,12 +108,13 @@ def rewrite(text):
             if null_compare.last_value(args[1]) not in samplers.get(fn, set()):
                 raise ValueError('read sampler is not the local builtin result: ' + name)
             offset = form['offset']
-            offset_type = texture_coords.param_type(form['args'][offset])
-            width = 'i16' if '.i16.' in name else 'i32'
-            zeros = (offset_type + ' zeroinitializer',
-                     offset_type + ' <' + width + ' 0, ' + width + ' 0>')
-            if args[offset] not in zeros:
-                raise ValueError('read coordinate offset is not zero: ' + args[offset])
+            if offset is not None:
+                offset_type = texture_coords.param_type(form['args'][offset])
+                width = 'i16' if '.i16.' in name else 'i32'
+                zeros = (offset_type + ' zeroinitializer',
+                         offset_type + ' <' + width + ' 0, ' + width + ' 0>')
+                if args[offset] not in zeros:
+                    raise ValueError('read coordinate offset is not zero: ' + args[offset])
             start, end, _ = null_compare.parameters(line, printed)
             kept = [arg for i, arg in enumerate(args) if i not in (1, offset)]
             replacements[index] = lines[index][:start] + ', '.join(kept) + lines[index][end:]

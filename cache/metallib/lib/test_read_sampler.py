@@ -22,7 +22,53 @@ declare {{{result}, i8}} @{name}({', '.join(types)})
 '''
 
 
+def offsetless(kind, width='i32'):
+    """SceneKit's texturecube_copy_kernel / adaptative_lum shapes: cube (coord, face, lod, access) and 1D (coord,
+    lod, access) sampler-form reads, which have no offset operand."""
+    name = 'air.read_texture_' + kind + '.' + ('i16.' if width == 'i16' else '') + 'v4f32'
+    texture = '%struct._texture_' + kind + '_t addrspace(1)*'
+    sampler = '%struct._sampler_t addrspace(2)*'
+    rest = ([('<2 x ' + width + '>', '%coord'), (width, '%face')] if kind == 'cube' else [(width, '%coord')]) + [
+        (width, '0'), ('i32', '1')]
+    types = [texture, sampler] + [t for t, _ in rest]
+    values = ['%texture', '%sampler'] + [v for _, v in rest]
+    args = ', '.join(t + ' ' + v for t, v in zip(types, values))
+    params = ', '.join([texture + ' %texture'] + [t + ' ' + v for t, v in rest if v.startswith('%')])
+    return f'''define void @example({params}) {{
+  %sampler = call {sampler} @air.get_read_sampler()
+  %value = call {{<4 x float>, i8}} @{name}({args})
+  ret void
+}}
+declare {sampler} @air.get_read_sampler()
+declare {{<4 x float>, i8}} @{name}({', '.join(types)})
+''', name
+
+
 class ReadSamplerTests(unittest.TestCase):
+    def test_cube_and_1d_drop_only_the_sampler(self):
+        for kind, width in (('cube', 'i32'), ('cube', 'i16'), ('1d', 'i32')):
+            with self.subTest(kind=kind, width=width):
+                text, name = offsetless(kind, width)
+                out, report = read_sampler.rewrite(text)
+                self.assertEqual(report, dict(calls=1, overloads=[name]))
+                self.assertNotIn('_sampler_t addrspace(2)* %sampler', out)
+                self.assertNotIn('addrspace(2)*, ', out.split('declare {<4 x float>')[1])
+                tail = '%face, ' + width + ' 0, i32 1)' if kind == 'cube' else '%coord, ' + width + ' 0, i32 1)'
+                self.assertIn('(%struct._texture_' + kind + '_t addrspace(1)* %texture, ', out)
+                self.assertIn(tail, out)
+                self.assertEqual(read_sampler.scan(out), [])
+
+    def test_cube_signature_must_match(self):
+        text, _ = offsetless('cube')
+        bad = text.replace('<2 x i32>, i32, i32, i32)', '<2 x i32>, <2 x i32>, i32, i32, i32)')
+        with self.assertRaisesRegex(ValueError, 'unrecognized sampler-form read signature'):
+            read_sampler.rewrite(bad)
+
+    def test_2d_array_and_3d_untouched(self):
+        decl = ('declare {<4 x float>, i8} @air.read_texture_3d.v4f32(%struct._texture_3d_t addrspace(1)*, '
+                '%struct._sampler_t addrspace(2)*, <3 x i32>, <3 x i32>, i32, i32)\n')
+        self.assertEqual(read_sampler.scan(decl), [])
+
     def test_both_widths_and_depth(self):
         for width in ('i16', 'i32'):
             for depth in (False, True):

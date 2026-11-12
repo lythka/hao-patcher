@@ -69,7 +69,7 @@ original. `lib/compatibility.py` refuses output that still contains a known unsu
 | `mkfix_half_vec_int.py` | Integer ops on `bitcast <N x half> to <N x i16>` (N >= 3), scalarized to i16 lanes. |
 | `null_compare.py` | Device-pointer comparisons with null, which crash legalization; validity is threaded as an integer. |
 | `half2_load.py`, `private_half2.py`, `inline_private.py` | Dynamically indexed private `<2 x half>` loads. |
-| `read_sampler.py`, `texture_coords.py`, `sampler_reads.py` | Depth sampler-form reads and modules mixing 16- and 32-bit coordinate overloads, which the downgrader cannot lower. |
+| `read_sampler.py`, `texture_coords.py`, `sampler_reads.py` | Sampler-form reads of 2D, depth 2D, cube and 1D textures (the downgrader crashes on depth, cube and 1D ones) and modules mixing 16- and 32-bit coordinate overloads, which the downgrader cannot lower. |
 | `winograd_matrix.py`, `winograd_offsets.py` | Apple GPU matrix instructions in MPS Winograd kernels, lowered to ordered FMAs over the existing shared tiles; bounded dynamic sample offsets become constant-offset selections. |
 | `collective_runtime.py`, `quad_runtime.py`, `compiler_mask.py` | Runtime helpers (SIMD/quad reductions, scans, shuffles, XOR, broadcast, ballot) built from Intel lane-ID and shuffle intrinsics; the iCBE mask-emitter repair. |
 | `block_reads.py` | Diagnostic only: texture block reads expanded to sampler reads. No profile uses it; native results differ from Apple's. |
@@ -147,6 +147,7 @@ Tests that need Apple binaries are skipped unless `METALLIB_RUNTIME` (a prepared
 
 ## Revisions
 
+- r56 2026-11-12 `read_sampler.py` also converts cube and 1D sampler-form reads (no offset operand; only the builtin sampler is dropped). The 31001 downgrader crashed on them (SceneKit `texturecube_copy_kernel`, used for every cube-map environment, and `adaptative_lum`), so SceneKit failed to build those pipelines and divided by zero in `dispatchOnTextureCube`; VFX and CoreRE have the same reads. A SceneKit scene with a cube-map environment, shadows and SSAO renders on the HD 4000.
 - r55 2026-11-12 `metallib-repairs-golden-gate.txt` adds SceneKit (`default.metallib`, macOS and iOSSupport): the 31001 downgrader crashed (libLLVM_real+0x7f02a9) on its depth sampler-form reads when SceneKit drew; 40 of 339 functions repaired in each. SceneKit Quick Look still crashes there with both installed; only the repaired library is mapped, so the remaining requests are shaders compiled at run time (compat.dylib runs after the downgrader).
 - r54 2026-11-11 `metallib-repairs-golden-gate.txt` adds VectorKit (`default.metallib`, `metal_libraries/AlloyCommonLibrary.metallib`) and VFX, which OCLP otherwise leaves as its 26.0 copies (27.2 VectorKit asks for `Icon::shadow_vertex` and other functions they lack). `legacy_sync.py` also converts `air.atomic.*.xchg` (27.2 VFX `particle_fill_grid` crashed IGIL's uniform analysis).
 - r53 2026-11-11 Profiles name Golden Gate's libraries for any 27.x build (`metallib-repairs-golden-gate.txt`, new `hello-golden-gate.txt`); outputs record `SOURCES` and `system_build` so installers can refuse a library they were not made from; a listed library missing from SYSTEM stops the build.
