@@ -65,7 +65,8 @@ Tested with macOS 27.2.1 (26B131), 2026-11-11.
 - Faster first login for new accounts: a preloaded account template is built.
 - Performance of translated code: general code runs at about 1/2 to 1/3 of native speed;
   vector and floating-point work is profiled, with hao-runtime optimizations lined up.
-- Weather: its crash is fixed in hao-runtime and its interface units.
+- Weather: loads and renders on the laptop (conditions, hourly, air quality, 10-day) with native Metal
+  argument buffers and ASTC textures on the HD 4000; the image recipe is being packaged, map views are next.
 - Sleep and updates: not tested yet.
 
 ## Requirements
@@ -106,6 +107,9 @@ refuses a set that breaks that order.
 
 ## What's new
 
+- **Metal argument buffers on the HD 4000:** native support in the shader compiler and the driver (compute,
+  vertex and fragment, nested buffers, samplers), plus ASTC textures decoded at upload. Apple's effects engine
+  (VFX), RealityKit, SceneKit, WebGPU, WebGL and Maps' renderer use argument buffers; Weather now renders.
 - **Wi-Fi:** Setup's join dialog works, and remembered networks join automatically
   (Tahoe's CoreWiFi).
 - **Login:** Setup's automatic login after creating an account works.
@@ -117,7 +121,7 @@ refuses a set that breaks that order.
 - **Build:** recipes run once, in set-file order ([layer order](docs/building.md#layer-order)).
 
 In development: Live Text, a fast first login for new accounts, Spotlight's local results,
-Maps shadows, faster translated vector and floating-point code.
+Maps shadows, faster translated vector and floating-point code, the argument-buffer recipe.
 
 ## Fixes
 
@@ -137,6 +141,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 | ARM-only programs | `hao-runtime`, `hao-opencore` | [hao-runtime](https://github.com/lythka/hao-runtime) payload |
 | Apple code identity of hao and re-signed programs | `golden-gate-userspace` (carrier in Security), `golden-gate-native-identities` | [patches/golden-gate-userspace/src/codeid](patches/golden-gate-userspace/src/codeid), hao-runtime `libhao_codeid` |
 | Live Text (Vision text recognition) | `metal-compiler-compat`, `golden-gate-live-text-shared`, `golden-gate-live-text-service` | [tools/live-text](tools/live-text), [cache/metallib](cache/metallib) |
+| Metal argument buffers and ASTC textures (HD 4000) | recipe in progress (live-tested) | [tools/metal-argbuf](tools/metal-argbuf) |
 
 [patches/README.md](patches/README.md) describes the recipe format, and
 [patches/TRACKER.md](patches/TRACKER.md) lists every recipe with its stage and
