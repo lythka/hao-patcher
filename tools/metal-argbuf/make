@@ -1,5 +1,5 @@
 #!/bin/bash
-# make OUT --icbe ORIGINAL_ICBE [--runtime STOCK_REPLAY_RUNTIME]
+# make OUT --icbe ORIGINAL_ICBE [--runtime STOCK_REPLAY_RUNTIME] [--driver ORIGINAL_MTL_DRIVER]
 #
 # Builds everything in this tool into the new folder OUT:
 #   OUT/igil_tool                 host build of the IGIL rewrite (tests, inspecting a rewrite)
@@ -9,23 +9,27 @@
 #   OUT/probes/probeN             x86_64 GPU test programs (run on the laptop; see README)
 #   OUT/kernels/NAME.metallib     host-harness kernels (AIR air64_v25, readable by the 3802 compiler)
 #   OUT/rt-wrap                   with --runtime: a replay runtime whose dl/iCBE.dylib is the wrapper
+#   OUT/AppleIntelHD4000GraphicsMTLDriver  with --driver: that driver binary plus LC_LOAD_WEAK_DYLIB of libargbuf
+#                                 (installed beside it in the MTL driver bundle's Contents/MacOS)
 # Everything x86_64 is ad hoc signed. Nothing is run.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
-out= icbe= rt=
+out= icbe= rt= drv=
 while (($#)); do
     case $1 in
     --icbe) icbe=$2; shift 2 ;;
     --runtime) rt=$2; shift 2 ;;
+    --driver) drv=$2; shift 2 ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
     *) out=$1; shift ;;
     esac
 done
-[[ -n $out && -n $icbe ]] || { sed -n 2,13p "$0" >&2; exit 2; }
+[[ -n $out && -n $icbe ]] || { sed -n 2,15p "$0" >&2; exit 2; }
 [[ -e $out ]] && { echo "$out exists; give a new folder" >&2; exit 2; }
 [[ -f $icbe ]] || { echo "no file $icbe" >&2; exit 2; }
 mkdir -p "$out/probes" "$out/kernels"; out=$(cd "$out" && pwd)
 T=/System/Library/Extensions/AppleIntelHD4000GraphicsGLDriver.bundle/Contents/MacOS
+M=/System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS
 X86=(-arch x86_64 -mmacosx-version-min=11.7)
 src=$here/src
 
@@ -41,7 +45,7 @@ codesign -f -s - "$out/iCBE.dylib"
 
 clang "${X86[@]}" -fobjc-arc -O1 -Wall -Wextra -Wno-unused-parameter -Wno-protocol -Wno-mismatched-parameter-types \
     -Wl,-no_warn_inits -dynamiclib "$src/device/argbuf.m" "$src/device/argbuf_tramp.s" \
-    -framework Foundation -framework Metal -install_name /usr/lib/libargbuf.dylib -o "$out/libargbuf.dylib"
+    -framework Foundation -framework Metal -install_name "$M/libargbuf.dylib" -o "$out/libargbuf.dylib"
 codesign -f -s - "$out/libargbuf.dylib"
 
 for p in "$here"/probes/*.m; do
@@ -62,5 +66,9 @@ if [[ -n $rt ]]; then
     for x in bin bundles fw root runtime.json; do ln -s "$rt/$x" "$w/$x"; done
     for x in "$rt"/dl/*; do [[ $(basename "$x") == iCBE.dylib ]] || ln -s "$x" "$w/dl/"; done
     cp "$out/iCBE.dylib" "$w/dl/iCBE.dylib"; cp "$out/iCBE-real.dylib" "$w/dl/iCBE-real.dylib"
+fi
+if [[ -n $drv ]]; then
+    python3.14 -I "$here/../../patches/metalold-selectors/src/add_weak_dylib.py" "$drv" "$out/AppleIntelHD4000GraphicsMTLDriver" "$M/libargbuf.dylib"
+    codesign -f -s - "$out/AppleIntelHD4000GraphicsMTLDriver"
 fi
 echo "built into $out"
