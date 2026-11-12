@@ -51,6 +51,14 @@
     "golden-gate-metal-libraries"
    ]
   },
+  "usr/lib/dss_shim.dylib": {
+   "chain": "chain",
+   "writers": [
+    "apple",
+    "golden-gate-userspace",
+    "golden-gate-windowserver-filter"
+   ]
+  },
   "usr/lib/libhelloblur.dylib": {
    "chain": "chain",
    "writers": [
