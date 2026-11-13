@@ -73,7 +73,9 @@ Use hao-patcher only on a **dedicated test Mac** whose contents you can lose.
 - **Inputs:** the macOS 27.2.1 (26B131) IPSW, the Tahoe 25G342 installer and Kernel Debug Kit, OCLP support files
   and a hao-runtime payload ([Build inputs](docs/inputs.md)). Apple's files are not included: you supply them.
 
-There is no end-user installer yet; the `hao` command ([tools/hao](tools/hao)) is its start.
+There is no end-user installer yet. The `hao` command ([tools/hao](tools/hao)) is its start, and
+[the builder path](docs/builder-path.md) describes where it is going: a USB installer built on any Mac, with no
+Apple silicon and no virtual machine.
 
 ## Building
 
@@ -81,10 +83,11 @@ There is no end-user installer yet; the `hao` command ([tools/hao](tools/hao)) i
 git clone https://github.com/lythka/hao-patcher.git
 cd hao-patcher
 # Prepare the inputs (docs/inputs.md), then:
-python3.14 -I pipeline/build mbp92-26B131 --repo /path/to/new-image-repository
+python3.14 -I tools/hao/hao build-image /path/to/new-image-repository --model MacBookPro9,2 --dry-run   # the plan
+python3.14 -I tools/hao/hao build-image /path/to/new-image-repository --model MacBookPro9,2             # build it
 ```
 
-`mbp92-26B131` is the end-user build; `dev-26B131` adds root SSH and diagnostics for testing.
+The default is the end-user build; `--assembly dev-26B131` adds root SSH and diagnostics for testing.
 [Building an image](docs/building.md) covers the inputs, what the build does and testing in QEMU;
 [architecture](docs/architecture.md) explains how the pieces fit, and [CONTRIBUTING.md](CONTRIBUTING.md) the tests
 and conventions.
