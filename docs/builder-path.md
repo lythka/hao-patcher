@@ -51,9 +51,9 @@ its declarations. Moving an input row clears that proof.
 Nobody building or installing a release needs an Apple silicon Mac or a virtual machine. Each part of the build
 falls on one side of this line:
 
-| Made once, frozen in a release | Made on the user's Intel Mac, every build |
+| Made once, frozen in a release | Made on the user's Mac, every build |
 |---|---|
-| What needs Xcode 27, its Swift or its Metal tools, which run only on Apple silicon: the hao runtime payload, the Metal library repairs, the compiled shims. Published in HaoSupportPkg, pinned by hash, reused, never rebuilt by users. | Apple's files downloaded and checked, unpacked, every declared edit applied once (the artifact store reuses unchanged results), the image assembled, the kernel collections linked with Tahoe's `kmutil` and the kernel repairs bound to them. |
+| Our own code, built with Xcode 27 (which runs only on Apple silicon): hao-runtime's binaries and interface units, the compiled compatibility shims, the kernel binder's recipe. Published in HaoSupportPkg, pinned by hash, never rebuilt by users. | Everything made from Apple's files, which we never publish: the unpacked and decoded system, the Tahoe donors, every declared edit (the artifact store reuses unchanged results), the Metal library repairs (with a bundled LLVM, no Xcode), hao's stubs and ahead-of-time translations, the kernel collections (Tahoe's `kmutil`) and the repairs bound to them, the image itself. |
 
 No build step runs macOS 27's own arm64 programs: its files are only read, edited and signed. What the assembly
 needs from the Mac it runs on is the build environment the builder VM has today (System Integrity Protection off,
