@@ -23,10 +23,10 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-native-identities | r3 | oclp-hook | experiment |  | x | x |  |  | ok (r1) | r3 2026-11-12 Declare that its files are made on the target after every overlay file is installed (`"after": [ |
 | golden-gate-shader-caches | r13 | post | experiment | caches | x |  |  |  | **needs** | r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) f |
 | golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
-| golden-gate-userspace | r62 | oclp-hook | experiment |  | x | x |  |  | **needs** | r62 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on the three wrap |
+| golden-gate-userspace | r63 | oclp-hook | experiment |  | x | x |  |  | **needs** | r63 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runt |
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
-| hao-opencore | r45 | post | experiment |  | x | x |  |  | **needs** | r45 2026-11-12 Bind the kernel repairs to the freshly linked BootKC with tools/kc-binder (src/kc_bind.py, stag |
-| hao-runtime | r69 | oclp-hook | experiment |  | x | x |  |  | **needs** | r69 2026-11-12 Declare install attributes in patch.json `files` (`restricted` on usr/lib/dyld and usr/libexec/ |
+| hao-opencore | r47 | post | experiment |  | x | x |  |  | **needs** | r47 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runt |
+| hao-runtime | r70 | oclp-hook | experiment |  | x | x |  |  | **needs** | r70 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runt |
 | metal-compiler-compat | r4 | oclp-hook | experiment |  | x |  |  |  | **needs** | r4 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the servic |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |
 | metalold-selectors | r6 | oclp-hook | product |  | x | x |  |  | ok (r3) | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the librar |

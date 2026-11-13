@@ -1,10 +1,7 @@
-# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 273ba98).
+# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 0a2c2aa).
 # Built from a root that includes the App and OS cryptexes (their 26 programs are embedded by golden-gate-userspace).
-# Interface units u3 + the optional-data (URLRequest.httpBody nil) contract: 1,895 units, 3 thunk libraries, matched
-# 1895/1895 against the x86_64 cache 262FA161 (units-match.txt); stub-identities; AOT for 969 paths bound to libhao
-# e1ce297d. Async provider swift-async-optional-object 0.1.0-experimental.4-26B131.1 (libhao_async_contract.dylib).
-# Adds since 790720d: native-call cache (with its signal/fork and ownership fixes), JIT vector FP/shifts/LD1-ST1 and
-# TBL/EXT/integer MUL-MLA/compares/min-max/ABS/FRINT, scalar FP and conversions, round-to-odd FP32 FMA, x86-64-v2
-# build with a startup CPU check, measured Swift value rules (Stocks/News widgets, Weather), five review fixes, and Swift values under 8 bytes passed
-# unpatched (Weather, StocksWidget, NewsTag, NewsToday2 aborts on 7d0b612).
-- store/artifacts/hao-runtime-26B131-20261112-273ba980b829/payload
+# Units u4.1; libhao AB009826; 965 AOT caches regenerated for it. Adds since 273ba98: JIT tail rounds (inline FP16
+# FMLA), payload-manifest.json (the runtime -> patcher contract), boot timing (hao_diag_time=1: mach-clock stamps,
+# phase lines, PID 1's lines from before the Data volume mounts) and the Books fix 0900b12.
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=b713cb5fa7927622d551689c8dc57b63024645d9c1cf680c47d0f4794480a5f7
+- store/artifacts/hao-runtime-26B131-20261112-0a2c2aad4755/payload

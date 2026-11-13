@@ -61,12 +61,13 @@ for key in ('bootercfg', 'bootercfg-once'):
 args=[a for a in n.get('boot-args','').split() if a not in ('debug=0x100', '-v', 'startup_debug=1')]
 # amfi_get_out_of_my_way=1: hao gives each arm64-only program an ad-hoc signed x86_64 slice carrying the
 # program's own (Apple-private) entitlements; AMFIPass alone kills such a PID 1 (experimental sets only).
-# hao_crash: hao's crash lines (cheap, every build). hao_nx_stats/hao_bridge_stats: NX fault tables and bridge
+# hao_crash: hao's crash lines (cheap, every build). hao_diag_time (dev): mach-clock stamps and phase lines on hao's
+# lines, PID 1's pre-Data lines kept and flushed by the bridge_stats report. hao_nx_stats/hao_bridge_stats: NX fault tables and bridge
 # statistics, the diagnostics the QEMU runs use; they cost time on every translated native call, so only dev builds
 # (golden-run sets IMAGE_DEV_BUILD=1 when the set has a status-dev recipe) get them.
 dev=os.environ.get('IMAGE_DEV_BUILD')=='1'
 for arg in ('-lilubetaall', '-pmap_pcid_disable', 'amfi_get_out_of_my_way=1',
-            'hao_crash=1') + (('hao_nx_stats=1', 'hao_bridge_stats=1') if dev else ()) + (
+            'hao_crash=1') + (('hao_nx_stats=1', 'hao_bridge_stats=1', 'hao_diag_time=1') if dev else ()) + (
             # IntelCommpage reports CSR_ALLOW_APPLE_INTERNAL so 27.0's dyld honours OCLP's on-disk Metal roots.
             'ic_csr_internal=1',
             # kernelmanagerd skips the boot-time Aux KC build. 27's kmutil cannot build an x86_64 collection, so the

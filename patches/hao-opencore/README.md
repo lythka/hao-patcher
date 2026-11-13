@@ -164,6 +164,8 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r47 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runtime-26B131-20261112-0a2c2aad4755). No recipe change.
+- r46 2026-11-12 Dev builds add `hao_diag_time=1` (hao-runtime 0a2c2aa): mach-clock stamps and phase lines on hao's console lines, and PID 1's lines from before the Data volume mounts, so a bench boot shows launchd's own startup on the Gantt's clock.
 - r45 2026-11-12 Bind the kernel repairs to the freshly linked BootKC with tools/kc-binder (src/kc_bind.py, staged by make.sh): refuses unless they equal the recorded repairs repair_binding.py binds, and binds a collection those refuse when IntelCommpage's compiled addresses still hold for it. New input row `intel_commpage_abi`; the repairs are declared as `kc.bind` in edits/config.json. Same config.plist bytes on every recorded 26B131 KC.
 - r44 2026-11-12 Boot-arg `auxKCAtBoot=false`: kernelmanagerd no longer tries (and fails) to build an Aux KC from the codeless AppleMobileDevice kext before loading the System KC, which cost 18.5 s per boot (23 s first boot).
 - r43 2026-11-12 Declare the HaoExec identity stamp: the executable is its own `files` entry with `edits/haoexec-identity.json` (external op `hao.stamp`, made on the target after the BootKC is linked, not re-signed), so an overlay never ships the unstamped copy; apply.sh is unchanged.

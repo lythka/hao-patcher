@@ -310,6 +310,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r63 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runtime-26B131-20261112-0a2c2aad4755). No recipe change.
 - r62 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on the three wrappers, their renamed originals, CoreWiFi and the two job plists, as `src/install.py` leaves them) and where WindowServer's entitlements come from (`edits/windowserver-27-identity.json` `sign.entitlements_from`: the 27.x WindowServer, as `resign_with_entitlements` signs it); the hook is unchanged.
 - r61 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runtime-26B131-20261112-273ba980b829). No recipe change.
 - r60 2026-11-12 Declare the original file each renamed wrapper starts from ("input") for pipeline/materialize.py; the hook is unchanged.

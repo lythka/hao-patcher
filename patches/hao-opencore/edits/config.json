@@ -4,7 +4,7 @@
  "origin": {
   "kind": "oclp",
   "name": "OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it",
-  "note": "in the image's EFI partition, not in the System volume. Not declared here (no edit kind for it yet): the HaoExec.kext entry appended to Kernel.Add (plist.set cannot append), the early Tahoe kext entries (none on any recorded build), and removal of bootercfg and bootercfg-once from NVRAM.Add (OCLP's config has neither). The boot-args value is the one a build without a dev recipe writes: dev builds (IMAGE_DEV_BUILD=1) add hao_nx_stats=1 hao_bridge_stats=1 after hao_crash=1"
+  "note": "in the image's EFI partition, not in the System volume. Not declared here (no edit kind for it yet): the HaoExec.kext entry appended to Kernel.Add (plist.set cannot append), the early Tahoe kext entries (none on any recorded build), and removal of bootercfg and bootercfg-once from NVRAM.Add (OCLP's config has neither). The boot-args value is the one a build without a dev recipe writes: dev builds (IMAGE_DEV_BUILD=1) add hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 after hao_crash=1"
  },
  "applied_by": "installer",
  "edits": [

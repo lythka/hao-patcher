@@ -55,7 +55,7 @@ class BootLoggingTests(unittest.TestCase):
         # Dev builds: the release boot-args plus the two statistics arguments after hao_crash=1.
         args = self.apply(self.fixture(), '1')['NVRAM']['Add'][APPLE]['boot-args'].split()
         self.assertEqual(['keepsyms=1', '-lilubetaall', '-pmap_pcid_disable', 'amfi_get_out_of_my_way=1', 'hao_crash=1',
-                          'hao_nx_stats=1', 'hao_bridge_stats=1', 'ic_csr_internal=1', 'auxKCAtBoot=false'], args)
+                          'hao_nx_stats=1', 'hao_bridge_stats=1', 'hao_diag_time=1', 'ic_csr_internal=1', 'auxKCAtBoot=false'], args)
 
     def test_missing_or_consumed_overrides_still_deleted_idempotently(self):
         value = self.fixture()

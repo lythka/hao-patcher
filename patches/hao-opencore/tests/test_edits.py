@@ -38,7 +38,7 @@ PLIST = dict(SPEC, edits=[e for e in SPEC['edits'] if e['op'] == 'plist.set'])
 FILES = {f['path']: f for f in json.loads((PATCH / 'patch.json').read_text())['files']}
 SCRIPT = (PATCH / 'apply.sh').read_text().split("<<'PYCONFIG'\n", 1)[1].split('\nPYCONFIG', 1)[0]
 APPLE = '7C436110-AB2A-4BBB-A880-FE41995C9F82'
-DEV_ARGS = 'hao_nx_stats=1 hao_bridge_stats=1'
+DEV_ARGS = 'hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1'
 
 
 def script_output(data, dev=None):
