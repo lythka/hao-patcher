@@ -31,23 +31,18 @@ More in the [gallery](docs/gallery.md): the desktop, Safari and YouTube, the air
 ## Status
 
 Experimental. Developed and tested on a 2012 13-inch MacBook Pro (MacBookPro9,2: Ivy Bridge, Intel HD 4000); other
-Intel Macs are untested. Tested with macOS 27.2.1 (26B131); "next image" means built, not yet tested on hardware.
+Intel Macs are untested. Tested with macOS 27.2.1 (26B131).
 
-| Area | State | Notes |
-|---|---|---|
-| Startup and Setup | Works | Screen on about 45 s after the kernel starts; Setup, account creation and automatic login. |
-| Desktop | Works | Menu bar, Dock, Finder, Liquid Glass, login window, lock screen. |
-| Graphics | Works | Accelerated HD 4000 Metal, argument buffers and ASTC textures; hardware video decoding (YouTube 1080p) |
-| Wi-Fi | Works | Joining from Setup or Settings; remembered networks join automatically, also at startup |
-| Audio, input, Bluetooth | Works | Speakers, brightness, keyboard, trackpad, Bluetooth; AirPlay displays are discovered |
-| Safari | Works | Browsing, YouTube, WebGPU. WebGL is in progress |
-| Maps | Works | Tiles, search, place cards, location, satellite, 3D globe and buildings |
-| Weather | Works | Including its maps (the next image installs this fix) |
-| Photos | Works | Import, thumbnails, full-size view. Live Text is in progress |
-| SceneKit | Works | 3D scenes with materials, shadows and reflections; Preview opens scenes |
-| Other apps | Works | Calendar, Terminal, System Settings, Preview, App Store, Books, Calculator, Automator, Stocks, News; Home and Freeform open |
-| ARM-only programs | Works | Run on the Intel CPU through hao-runtime, at about 1/2 to 1/3 of native speed |
-| Sleep and updates | Not tested | |
+| Area | What works |
+|---|---|
+| Startup | Screen on about 45 s after the kernel starts; Setup Assistant, account creation, automatic login |
+| Desktop | Menu bar, Dock, Finder, Liquid Glass, login window, lock screen |
+| Graphics | Accelerated Metal on the HD 4000, argument buffers, ASTC textures, hardware video decoding (YouTube 1080p) |
+| Connectivity | Wi-Fi (joins at startup and from Setup), Bluetooth, AirPlay display discovery |
+| Audio and input | Speakers, keyboard, trackpad, brightness keys |
+| Apps | Safari (YouTube, WebGPU), Maps (3D globe, satellite), Weather (with its maps), Photos, Calendar, Preview, App Store, Books, News, Stocks, Terminal, System Settings |
+| 3D | SceneKit scenes with materials, shadows and reflections |
+| ARM-only programs | Run on the Intel CPU through hao-runtime, at about half to a third of native speed |
 
 [Progress](docs/progress.md) has the detailed lists, what's new and every fix.
 
