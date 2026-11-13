@@ -1,6 +1,6 @@
 {
  "format": 1,
- "note": "What each input row of a release is, by its content (release-cut reads this; its build-record classes say only whether a row can be made again). ours: our own bytes, published as a release asset (a file row as the file, a folder row as one deterministic tar of the listed files). made-on-mac: made from Apple's files on the user's Mac by the named producer from the named input rows; never published. download: Apple or third-party bytes the user's Mac fetches from their own servers, pinned by url, size and sha256. harvested: made on a running laptop, never shipped. in-checkout: a tracked file of hao-patcher, delivered with the source at the release commit. pending: held out of this release for the reason given. made_on_mac_files: files of an ours row that are Apple-derived; the asset leaves them out and the user's Mac adds them from the named row.",
+ "note": "What each input row of a release is, by its content (release-cut reads this; its build-record classes say only whether a row can be made again). ours: our own bytes, published as a release asset (a file row as the file, a folder row as one deterministic tar of the listed files). made-on-mac: made on the user's Mac by the named producer from the named input rows (Apple's files, or third-party downloads); never published. download: Apple or third-party bytes the user's Mac fetches from their own servers, pinned by url, size and sha256. harvested: made on a running laptop, never shipped. in-checkout: a tracked file of hao-patcher, delivered with the source at the release commit. pending: held out of this release for the reason given. made_on_mac_files: files of an ours row that are Apple-derived; the asset leaves them out and the user's Mac adds them from the named row.",
  "archive": "tar: POSIX pax, entries sorted by path, folders before their contents, mtime 0, uid and gid 0, no user or group names, mode 0755 for folders and executables and 0644 otherwise, symbolic links kept, no extended attributes, no compression; paths relative to the row's folder",
  "rows": {
   "codeid_carrier": {
@@ -177,9 +177,24 @@
    "reason": "the builder's firmlink tool, compiled by pipeline/unpack/pristine-tools/build-fl from fl.c with ent.plist (our source) at 53815151, ad hoc signed with com.apple.private.apfs.set-firmlink; code and data identical to the earlier stored binary (only the UUID, the ld and SDK stamps, libSystem's recorded version and the signature differ)"
   },
   "python_site": {
-   "class": "pending",
-   "content": "download",
-   "reason": "third-party PyPI packages OCLP imports (pyobjc 12.2.2, requests 2.34.2, urllib3 2.8.0, certifi, idna, charset_normalizer, packaging, markdown2, py_sip_xnu, py_applescript), installed as a folder: no single URL; pin each wheel by URL and sha256"
+   "class": "made-on-mac",
+   "producer": "pipeline/python-site make",
+   "inputs": [
+    "python_site_certifi",
+    "python_site_charset_normalizer",
+    "python_site_idna",
+    "python_site_markdown2",
+    "python_site_packaging",
+    "python_site_py_applescript",
+    "python_site_py_sip_xnu",
+    "python_site_pyobjc_core",
+    "python_site_pyobjc_framework_applescriptkit",
+    "python_site_pyobjc_framework_applescriptobjc",
+    "python_site_pyobjc_framework_cocoa",
+    "python_site_requests",
+    "python_site_urllib3"
+   ],
+   "reason": "the site-packages OCLP imports in the builder: the pinned PyPI wheels (pyobjc 12.2.2, requests, urllib3, certifi, idna, charset_normalizer, packaging, markdown2, py_sip_xnu, py_applescript) unpacked by pipeline/python-site; third-party, never published"
   },
   "darwin27_kernel": {
    "class": "made-on-mac",
@@ -336,6 +351,84 @@
   "user_template_golden_gate": {
    "class": "harvested",
    "reason": "user template harvested from the running laptop"
+  },
+  "python_site_certifi": {
+   "class": "download",
+   "name": "certifi-2026.10.18-py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/08/ba/95dd616042484f7c83a06974388b37b837732740ee70bc5dc715b5fcd55a/certifi-2026.10.18-py3-none-any.whl",
+   "reason": "PyPI wheel certifi 2026.10.18 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_charset_normalizer": {
+   "class": "download",
+   "name": "charset_normalizer-3.5.2-cp312-cp312-macosx_10_13_universal2.whl",
+   "url": "https://files.pythonhosted.org/packages/e7/c8/693809898870237d82785a03f3b2b58fe4c9f14669f84a7d4e623c92a59e/charset_normalizer-3.5.2-cp312-cp312-macosx_10_13_universal2.whl",
+   "reason": "PyPI wheel charset-normalizer 3.5.2 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_idna": {
+   "class": "download",
+   "name": "idna-3.20-py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl",
+   "reason": "PyPI wheel idna 3.20 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_markdown2": {
+   "class": "download",
+   "name": "markdown2-2.5.5-py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/43/af/4b3891eb0a49d6cfd5cbf3e9bf514c943afc2b0f13e2c57cc57cd88ecc21/markdown2-2.5.5-py3-none-any.whl",
+   "reason": "PyPI wheel markdown2 2.5.5 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_packaging": {
+   "class": "download",
+   "name": "packaging-26.3-py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl",
+   "reason": "PyPI wheel packaging 26.3 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_py_applescript": {
+   "class": "download",
+   "name": "py_applescript-1.0.3-py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/9b/f6/fed1fb7eb1603ad50accbb5c4e1f0c5f8f7d164acd2619f062d20c2a7858/py_applescript-1.0.3-py3-none-any.whl",
+   "reason": "PyPI wheel py-applescript 1.0.3 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_py_sip_xnu": {
+   "class": "download",
+   "name": "py_sip_xnu-1.0.4-py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/69/4e/d29c149199d98e79089f63dcf740f0dea44cf78e982b4e215fe710203e50/py_sip_xnu-1.0.4-py3-none-any.whl",
+   "reason": "PyPI wheel py-sip-xnu 1.0.4 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_pyobjc_core": {
+   "class": "download",
+   "name": "pyobjc_core-12.2.2-cp312-cp312-macosx_10_13_universal2.whl",
+   "url": "https://files.pythonhosted.org/packages/86/b2/bbf7f049880ab40d110e66f25122342a1f6c98d6fe3c59bb98985503c660/pyobjc_core-12.2.2-cp312-cp312-macosx_10_13_universal2.whl",
+   "reason": "PyPI wheel pyobjc-core 12.2.2 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_pyobjc_framework_applescriptkit": {
+   "class": "download",
+   "name": "pyobjc_framework_applescriptkit-12.2.2-py2.py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/d3/d3/648c25c045c10404b91dd670943574bee5f4d1e8c41c7917f4ec7c990b32/pyobjc_framework_applescriptkit-12.2.2-py2.py3-none-any.whl",
+   "reason": "PyPI wheel pyobjc-framework-AppleScriptKit 12.2.2 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_pyobjc_framework_applescriptobjc": {
+   "class": "download",
+   "name": "pyobjc_framework_applescriptobjc-12.2.2-py2.py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/1a/44/a15a313c94d2e0f1793a71783120d0c1d5cf9d5f8e2a6c3f15f682b63cb1/pyobjc_framework_applescriptobjc-12.2.2-py2.py3-none-any.whl",
+   "reason": "PyPI wheel pyobjc-framework-AppleScriptObjC 12.2.2 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_pyobjc_framework_cocoa": {
+   "class": "download",
+   "name": "pyobjc_framework_cocoa-12.2.2-cp312-cp312-macosx_10_13_universal2.whl",
+   "url": "https://files.pythonhosted.org/packages/fd/2f/b67e73d8bc367e03fe7861cd9c49fff9dcfa6db83bc0630c0adcfb25b7fa/pyobjc_framework_cocoa-12.2.2-cp312-cp312-macosx_10_13_universal2.whl",
+   "reason": "PyPI wheel pyobjc-framework-Cocoa 12.2.2 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_requests": {
+   "class": "download",
+   "name": "requests-2.34.2-py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl",
+   "reason": "PyPI wheel requests 2.34.2 (third-party; size checked), unpacked into python_site"
+  },
+  "python_site_urllib3": {
+   "class": "download",
+   "name": "urllib3-2.8.0-py3-none-any.whl",
+   "url": "https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl",
+   "reason": "PyPI wheel urllib3 2.8.0 (third-party; size checked), unpacked into python_site"
   }
  }
 }

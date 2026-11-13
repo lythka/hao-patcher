@@ -18,7 +18,8 @@ in pipeline/inputs/golden/BUILD, then the donor build, then common.
 Each row has two classes. By content (pipeline/release-classes.json, with a reason per row):
   ours          our own bytes: published as a release asset, a file row as the file, a folder row as one
                 deterministic tar (sorted, mtime 0, owner 0, modes 0755/0644, no compression) of the listed files
-  made-on-mac   made from Apple's files on the user's Mac (producer, input rows); never published
+  made-on-mac   made on the user's Mac from Apple's files or third-party downloads (producer, input rows); never
+                published
   download      Apple or third-party bytes the user's Mac fetches by url, size and sha256 (tools/acquire)
   harvested     made on a running laptop (caches, seeds): never shipped; the target makes its own at first boot
   in-checkout   a tracked file of hao-patcher, delivered with the source at the release commit

@@ -96,6 +96,12 @@ class PythonSite(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'unsafe entry'):
             SITE['make'](self.root / 'unsafe', [self.lock])
 
+    @unittest.skipUnless((TOP / 'store/packages/pypi').is_dir(), 'no store/packages/pypi here')
+    def test_the_common_row_is_what_the_wheel_rows_make(self):
+        rows = LOCK['rows'](str(TOP / 'pipeline/inputs/common'))
+        self.assertGreater(len([r for r in rows if r.startswith('python_site_')]), 0)
+        self.assertEqual([], SITE['check'](rows['python_site'][1], [TOP / 'pipeline/inputs/common']))
+
 
 if __name__ == '__main__':
     unittest.main()
