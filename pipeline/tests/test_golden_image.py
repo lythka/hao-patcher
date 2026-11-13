@@ -163,6 +163,33 @@ class GoldenImageTests(unittest.TestCase):
         self.assertIn('GRP=DATA-UUID',(work/'uuids.env').read_text())
         self.assertEqual(a[-1],['hdiutil','detach','/dev/disk70'])
 
+    def test_overlay_plan_replaces_those_hooks_at_their_turn(self):
+        # golden-run --from-overlays: selectors and the esp post install from the overlays, every other recipe runs
+        plan=self.root/'overlay-plan.json'
+        modes={'darwin27-kernel':'hook','golden-gate-userspace':'hook','hao':'hook','selectors':'overlay',
+               'metal':'hook','esp':'overlay'}
+        plan.write_text(json.dumps({'format':1,'steps':[dict(name=n,mode=m,files=[]) for n,m in modes.items()]}))
+        self.config['overlays']=dict(plan=str(plan),files='/share/overlay-files',installer='/staged/golden-overlays.py',
+                                     livepatch='/staged/livepatch.py')
+        record=golden.assemble(self.config,self.fake);a=self.commands()
+        installs=[x for x in a if x[:3]==[self.config['python'],'-I','/staged/golden-overlays.py']]
+        self.assertEqual([x[x.index('--recipe')+1] for x in installs],['selectors','esp'])
+        work=Path(self.config['work'])
+        self.assertEqual(installs[0][3:6],['install',str(plan),'/share/overlay-files'])
+        self.assertIn('system='+str(work/'mnt/system'),installs[0]);self.assertIn('data='+str(work/'mnt/data'),installs[0])
+        self.assertIn('esp='+str(work/'mnt/esp'),installs[1])
+        self.assertEqual(installs[0][installs[0].index('--record')+1],str(work/'overlays/selectors.json'))
+        hooks={h['name']:h['kc_hook'] for h in self.config['hooks']}
+        self.assertFalse(any(hooks['selectors'] in x for x in a))                    # its hook does not run
+        self.assertFalse(any(self.config['posts'][0]['script'] in x for x in a))      # nor the post's apply.sh
+        at=lambda p:next(i for i,x in enumerate(a) if p(x))
+        selectors=at(lambda x:x in installs[:1])
+        self.assertLess(at(lambda x:hooks['hao'] in x),selectors);self.assertLess(selectors,at(lambda x:hooks['metal'] in x))
+        self.assertLess(at(lambda x:x[:2]==['bless','--mount']),at(lambda x:x in installs[1:]))   # posts: after the snapshot
+        steps=[row['name'] for row in record['steps']]
+        self.assertIn('overlay selectors',steps);self.assertIn('overlay esp',steps);self.assertNotIn('recipe selectors',steps)
+        self.assertEqual(record['status'],'assembled')
+
     def test_hardware_failure_stops_required_later_components_and_detaches(self):
         self.fake.fail=lambda a:self.config['hardware']['tool'] in a
         with self.assertRaises(subprocess.CalledProcessError):golden.assemble(self.config,self.fake)

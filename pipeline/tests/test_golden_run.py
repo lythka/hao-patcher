@@ -50,6 +50,29 @@ class GoldenRun(unittest.TestCase):
             (path/('apply.sh' if stage=='post' else 'hook.sh' if name in hook_sh else 'kc-hook.sh')).touch()
         return share
 
+    def test_from_overlays_config_and_system_check(self):
+        rows=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace'),('post','post-one')]
+        with tempfile.TemporaryDirectory() as folder:
+            share=self.share(Path(folder)/'share',rows)
+            recipe=dict(size_bytes=80,name='GG',golden_build='26B131',donor_build='25G342')
+            self.assertNotIn('overlays',RUN['guest_config'](recipe,share,'/guest/job'))
+            config=RUN['guest_config'](recipe,share,'/guest/job',overlays=True)
+            self.assertEqual(config['overlays'],dict(plan='/private/var/ssdshare/overlay-plan.json',
+                                                     files='/private/var/ssdshare/overlay-files',
+                                                     installer='/guest/job/source/golden-overlays.py',
+                                                     livepatch='/guest/job/source/livepatch.py'))
+            # the host Golden Gate root must be the build the assembly makes
+            import plistlib
+            system=Path(folder)/'fs/System/Library/CoreServices';system.mkdir(parents=True)
+            (system/'SystemVersion.plist').write_bytes(plistlib.dumps({'ProductBuildVersion':'26A428'}))
+            with self.assertRaisesRegex(ValueError,'is build 26A428, the assembly builds 26B131'):
+                RUN['prepare_overlays'](recipe,share,Path(folder),Path(folder),share,dict(system=Path(folder)/'fs',store=Path(folder)/'s'))
+        for argv in (['golden-run','a.json','--repo','r','--from-overlays'],
+                     ['golden-run','a.json','--repo','r','--overlay-system','/x']):
+            with mock.patch.object(sys,'argv',argv),contextlib.redirect_stderr(io.StringIO()) as err:
+                with self.assertRaises(SystemExit):RUN['main']()
+            self.assertIn('overlay',err.getvalue())
+
     def test_boot_efi_archive_carries_opencore_and_oclp_licenses(self):
         import zipfile
         with tempfile.TemporaryDirectory() as folder:

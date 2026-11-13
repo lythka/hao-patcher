@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""golden-run RECIPE --repo EXPERIMENTAL_IMAGE_REPOSITORY: GG-first assembly in an isolated VZ builder."""
+"""golden-run RECIPE --repo EXPERIMENTAL_IMAGE_REPOSITORY: GG-first assembly in an isolated VZ builder.
+
+Opt-in: --from-overlays --overlay-system ROOT materialises the set on the host first (pipeline/materialize.py, its
+edit-engine store in store/cache/edit-engine-store, or --overlay-store, so unchanged specs and inputs are reused) and
+plans which recipes install their files from the overlays instead of running their hooks (pipeline/overlays.py);
+ROOT is the build's Golden Gate file system (its filesystem.dmg attached read-only), whose files the edits start
+from. Every other recipe, and every step only the target can make, runs its hook as without the flag."""
 import argparse
 from contextlib import contextmanager
 import datetime
@@ -94,7 +100,7 @@ def dev_build(names, patches=TOP/'patches'):
                for n in names if (patches/n/'patch.json').is_file())
 
 
-def guest_config(recipe, share, local):
+def guest_config(recipe, share, local, overlays=False):
     rows = set_order(share)
     hooks = [(name, folder) for stage, name, folder in rows if stage == 'oclp-hook']
     selected = dict(hooks)
@@ -114,7 +120,48 @@ def guest_config(recipe, share, local):
                 posts=[dict(name=name,script=local+'/post/'+folder+'/apply.sh',folder=local+'/post/'+folder)
                        for stage,name,folder in rows if stage=='post'],
                 environment=dict(PYTHONPATH=local+'/site',PYTHONDONTWRITEBYTECODE='1',TMPDIR=local+'/tmp',S=GUEST,OCLP=GUEST+'/oclp',
-                                 IMAGE_DEV_BUILD='1' if dev_build([name for _,name,_ in rows]) else '0'))
+                                 IMAGE_DEV_BUILD='1' if dev_build([name for _,name,_ in rows]) else '0'),
+                **(dict(overlays=dict(plan=GUEST+'/overlay-plan.json',files=GUEST+'/overlay-files',
+                                      installer=local+'/source/golden-overlays.py',
+                                      livepatch=local+'/source/livepatch.py')) if overlays else {}))
+
+
+def system_build(root):
+    """ProductBuildVersion of the system root ROOT (a mounted file system), or None."""
+    import plistlib
+    path=Path(root)/'System/Library/CoreServices/SystemVersion.plist'
+    return plistlib.loads(path.read_bytes()).get('ProductBuildVersion') if path.is_file() else None
+
+
+def prepare_overlays(recipe, share, work, record, source, options):
+    """Materialise the set, plan the overlay installs for SHARE/patches.txt and stage them on the share.
+    OPTIONS: system (the Golden Gate root), store, hooks (recipes kept on their hooks). Returns the record."""
+    system=Path(options['system']).resolve()
+    if system_build(system)!=recipe['golden_build']:
+        raise ValueError('--overlay-system %s is build %s, the assembly builds %s'%(system,system_build(system),recipe['golden_build']))
+    materialize=runpy.run_path(str(TOP/'pipeline/materialize.py'))
+    overlays=runpy.run_path(str(TOP/'pipeline/overlays.py'))
+    out=work/'overlays';store=Path(options['store']).resolve()
+    results=lambda:sum(1 for _ in store.glob('results/*.json'))
+    before=results();started=time.monotonic()
+    report,ledger=materialize['run'](str(TOP/'pipeline/sets'/(recipe['patch_set']+'.txt')),
+                                     str(TOP/'pipeline/targets'/(recipe['target']+'.json')),recipe['donor_build'],
+                                     str(out),str(store),str(system),golden=recipe['golden_build'])
+    made=time.monotonic()
+    plan=overlays['schedule'](overlays['read_rows'](share/'patches.txt'),ledger,report,overlays['load_manifests'](out),
+                              force_hook=set(options.get('hooks',())),links=overlays['firmlinks'](system))
+    write(share/'overlay-plan.json',plan);shutil.copy2(share/'overlay-plan.json',record/'overlay-plan.json')
+    shutil.copy2(out/'report.json',record/'overlay-report.json');shutil.copy2(out/'deferred.json',record/'overlay-deferred.json')
+    staged=overlays['stage_files'](plan,out,share/'overlay-files')
+    for files in out.glob('*/files'):shutil.rmtree(files)   # staged files are links; the manifests and report stay
+    shutil.copy2(TOP/'pipeline/stages/golden-overlays.py',source/'golden-overlays.py')
+    shutil.copy2(TOP/'tools/hao/src/livepatch.py',source/'livepatch.py')
+    print(overlays['render'](plan),flush=True)
+    counts={}
+    for r in report:counts[r['outcome']]=counts.get(r['outcome'],0)+1
+    return dict(system=str(system),store=str(store),materialize=counts,plan=plan['counts'],staged_bytes=staged,
+                materialize_seconds=round(made-started,1),plan_seconds=round(time.monotonic()-made,1),
+                store_results=dict(before=before,new=results()-before),hooks=sorted(options.get('hooks',())))
 
 
 def job_script(local, share=GUEST, owner='root:wheel', workspace=None):
@@ -208,7 +255,7 @@ def skipped_groups(recipe, skip_optional=()):
     return sorted(set(groups)|set(skip_optional))
 
 
-def run(recipe_path, repository, work=None, record=None, base=None, timeout=14400, skip_optional=()):
+def run(recipe_path, repository, work=None, record=None, base=None, timeout=14400, skip_optional=(), overlays=None):
     recipe_path = Path(recipe_path).resolve(); recipe=json.loads(recipe_path.read_text())
     if recipe['schema'] != 1:
         raise ValueError('unsupported Golden assembly recipe')
@@ -288,7 +335,9 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
                      '--target',pipeline/'targets'/(recipe['target']+'.json'),
                      '--revision',recipe['oclp'],'--opencore',lockrows['path'](str(lock_of('opencore_debug')),'opencore_debug'),
                      '--out',source/'esp','--record',record/'base-efi.json'])
-            config=guest_config(recipe,share,local);write(share/'guest-config.json',config)
+            if overlays:
+                state['overlays']=prepare_overlays(recipe,share,work,record,source,overlays);write(record/'build.json',state)
+            config=guest_config(recipe,share,local,overlays=bool(overlays));write(share/'guest-config.json',config)
             shutil.copy2(share/'guest-config.json',record/'guest-config.json')
             for name in ('patches.txt','MANIFEST.txt','profile.json'):
                 shutil.copy2(share/name,record/name)
@@ -405,14 +454,27 @@ def main():
     parser.add_argument('--timeout',type=int,default=14400)
     parser.add_argument('--skip-optional',action='append',default=[],metavar='GROUP',
                         help='leave out the optional patches of GROUP (e.g. caches) even when their inputs are there')
+    parser.add_argument('--from-overlays',action='store_true',
+                        help='install declared files from the materialised overlays instead of their recipes\' hooks')
+    parser.add_argument('--overlay-system',type=Path,metavar='ROOT',
+                        help='the build\'s Golden Gate file system (read-only), for --from-overlays')
+    parser.add_argument('--overlay-store',type=Path,default=TOP/'store/cache/edit-engine-store',
+                        help='edit-engine artifact store kept between builds (default store/cache/edit-engine-store)')
+    parser.add_argument('--overlay-hook',action='append',default=[],metavar='NAME',
+                        help='keep recipe NAME on its hook with --from-overlays')
     args=parser.parse_args()
+    overlays=None
+    if args.from_overlays:
+        if not args.overlay_system:parser.error('--from-overlays needs --overlay-system ROOT')
+        overlays=dict(system=args.overlay_system,store=args.overlay_store,hooks=args.overlay_hook)
+    elif args.overlay_system or args.overlay_hook:parser.error('--overlay-system and --overlay-hook need --from-overlays')
     signal.signal(signal.SIGTERM,lambda *_:(_ for _ in ()).throw(KeyboardInterrupt('terminated')))
     if args.capture_record:
-        if args.recipe or args.repo or args.skip_optional:parser.error('capture-record does not take a recipe, repository or --skip-optional')
+        if args.recipe or args.repo or args.skip_optional or overlays:parser.error('capture-record does not take a recipe, repository or --skip-optional')
         capture_record(args.capture_record)
     else:
         if not args.recipe or not args.repo:parser.error('recipe and --repo are required')
-        run(args.recipe,args.repo,args.work,args.record,args.base,args.timeout,args.skip_optional)
+        run(args.recipe,args.repo,args.work,args.record,args.base,args.timeout,args.skip_optional,overlays)
 
 
 if __name__=='__main__':main()

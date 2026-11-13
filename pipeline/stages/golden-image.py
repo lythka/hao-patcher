@@ -9,7 +9,10 @@ passes DiskTarget's checks, with confirm_disk), a new work directory, size_bytes
 pristine_script, kdk_preparer, payload (filesystem/os/app/rosetta.dmg), kernel, kdk, fl,
 donor_tool, donors {native,extensions,boot,driverkit,recovery}, esp (tree),
 hardware {tool,artifact}, hooks [{name,kc_hook}] in set order, posts
-[{name,script,folder}] in set order, and environment. Staged hook folders already
+[{name,script,folder}] in set order, environment, and optionally overlays
+{plan,files,installer,livepatch} (golden-run --from-overlays: a recipe the plan
+marks "overlay" has its files installed by golden-overlays.py at its turn in
+set order instead of running its hook or apply.sh). Staged hook folders already
 contain their declared input files. The host runner owns input selection/staging,
 source identities and the set-order rules (see pipeline/golden-run).
 
@@ -263,6 +266,22 @@ class Assembler:
         self.environment = dict(os.environ, **config['environment'])
         self.environment['OCLP_PYTHON'] = config['python']
         self.steps = []
+        self.plan = None
+        if config.get('overlays'):
+            self.plan = {s['name']: s for s in json.loads(Path(config['overlays']['plan']).read_text())['steps']}
+
+    def from_overlays(self, name):
+        """Whether the overlay plan installs NAME's files instead of running its hook."""
+        return bool(self.plan) and self.plan.get(name, {}).get('mode') == 'overlay'
+
+    def install_overlay(self, name):
+        o = self.config['overlays']
+        record = self.work/'overlays'/(name+'.json')
+        record.parent.mkdir(mode=0o755, exist_ok=True)
+        roots = [a for key in ('system','data','esp') if key in self.mounted
+                 for a in ('--root',key+'='+str(self.mounts[key]))]
+        self.run(self.config['python'],'-I',o['installer'],'install',o['plan'],o['files'],'--recipe',name,
+                 '--livepatch',o['livepatch'],*roots,'--record',record)
 
     def run(self, *args, capture=False, env=None):
         return self.commands.run(args, env=self.environment if env is None else env, capture=capture)
@@ -385,8 +404,9 @@ class Assembler:
                  '--report',self.work/'hardware.json')
 
     def recipes(self):
-        """Every oclp-hook recipe of the set, in set order, each through its own src/kc-hook.sh SYSTEM.
-        golden-run guarantees darwin27-kernel then golden-gate-userspace come first; the environment
+        """Every oclp-hook recipe of the set, in set order, each through its own src/kc-hook.sh SYSTEM, or, when
+        the overlay plan says so, by installing its files from the overlays (install_overlay). golden-run
+        guarantees darwin27-kernel then golden-gate-userspace come first; the environment
         carries the runner-only facts those two need (volume UUIDs, donor DriverKit artifact and tool) and the native
         donor artifact golden-gate-native-identities reads Apple originals from."""
         c = self.config
@@ -399,6 +419,9 @@ class Assembler:
         # drop it before recipes walk System (snapshot drops it again).
         self.run('rm','-rf',self.mounts['system']/'.Spotlight-V100')
         for hook in c['hooks']:
+            if self.from_overlays(hook['name']):
+                self.step('overlay '+hook['name'],lambda h=hook:self.install_overlay(h['name']))
+                continue
             self.step('recipe '+hook['name'],lambda h=hook:self.run('sh','-eu',h['kc_hook'],self.mounts['system'],env=environment))
             if hook['name'] == 'darwin27-kernel':
                 # Keep the collection exactly as darwin27-kernel linked it, before later recipes:
@@ -440,6 +463,9 @@ class Assembler:
         environment = dict(self.environment, SYS=str(self.mounts['system']),DATA=str(self.mounts['data']),
                            PRE=str(self.mounts['preboot']),REC=str(self.mounts['recovery']),ESP=str(self.mounts['esp']))
         for post in self.config['posts']:
+            if self.from_overlays(post['name']):
+                self.step('overlay '+post['name'],lambda p=post:self.install_overlay(p['name']))
+                continue
             output = self.work/'post'/post['name']
             output.mkdir(mode=0o755,parents=True,exist_ok=True)
             self.step('post '+post['name'],lambda p=post,o=output:self.run('sh','-eu',p['script'],

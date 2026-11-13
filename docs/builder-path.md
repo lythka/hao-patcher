@@ -42,9 +42,12 @@ its declarations. Moving an input row clears that proof.
 
 ## Not done yet
 
-- **Installing from these pieces.** Images are still built by the recipes' own hooks. The pieces above are proven
-  equal to them on real inputs, not yet used in their place, except the kernel binder: hao-opencore installs its
-  repairs (equal to the recorded ones on every recorded 26B131 collection; not yet through a VM build or a boot).
+- **Installing from these pieces.** Images are still built by the recipes' own hooks by default. `golden-run
+  --from-overlays` (opt-in, [building](building.md#installing-from-the-overlays-opt-in)) installs the files of every
+  recipe whose declarations are all made on the host from the overlays instead (12 of the 20 recipes of
+  `dev-bs-test`, 837 files); the rest, and everything made on the target, still run their hooks. Not yet through a
+  VM build: its comparison with a hook build is the next step. The kernel binder is used: hao-opencore installs its
+  repairs (equal to the recorded ones on every recorded 26B131 collection; not yet through a boot).
 - **The USB installer:** the Recovery-on-a-stick launcher, disk layout on the target, and kernel collections linked
   and bound there.
 - **A first release.** Inputs built from uncommitted trees or harvested from a running laptop block a cut until

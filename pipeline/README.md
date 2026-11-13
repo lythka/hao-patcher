@@ -10,6 +10,7 @@ covers prerequisites, commands, output and validation.
 | `golden-run` | Host staging, isolated VM execution and image capture |
 | `stages/golden-*.py`, `stages/golden-pristine.sh` | Guest filesystem and image assembly |
 | `patches.py` | Ordered patch plan and recipe validation |
+| `materialize.py`, `overlays.py` | Declared files made into pack overlays; with `golden-run --from-overlays`, which recipes install from them instead of their hooks, and the image tree comparison |
 | `inputs/`, `targets/`, `sets/` | Input rows, hardware profile and patch sets |
 | `lock.py` | Reads input rows and target files; cache keys for `run` |
 | `vm/` | Maintenance VM lifecycle |

@@ -22,7 +22,11 @@ hao.stamp, files the hook generates) and "unresolved" when its source isn't foun
 guessed. A deferred path also lists what it comes after on the target: the installed files its external op reads
 (hao.stamp, kc.bind: the linked BootKC) and the declaration's "after" ("overlays": every overlay file installed first, e.g.
 usr/lib/hao/native-identities, which is keyed on the CDHashes of the files as installed). DIR/report.json lists every
-path's outcome; DIR/deferred.json lists the deferred paths in an order that satisfies those dependencies.
+path's outcome; DIR/deferred.json lists the deferred paths in an order that satisfies those dependencies. A made
+path's report entry also names its writers in set order, the files it made ("paths") and, as "base", the target
+file it starts from or replaces ({path, sha256, edited}), so an image build installing the overlays
+(pipeline/overlays.py, golden-run --from-overlays) can check it finds that file. A file from a tar member keeps the
+member's "mtime" in the manifest unless its declaration gives install attributes.
 
 Signatures: the materialiser signs with the host's codesign, which reserves no extra space after the blobs; the
 builder VM's codesign pads each slice's signature with about 18 KB of zeros. Such a file differs from the image's in
@@ -69,6 +73,7 @@ class Sources:
         self.system = system                       # Golden Gate's own system root
         self.tahoe_roots = list(tahoe_roots)       # donor payload roots, each rooted at /
         self._tars = {}                            # archive path -> {member name: TarInfo}
+        self._open = {}                            # archive path -> open TarFile, read through once
 
     @classmethod
     def from_repo(cls, assembly_rows, system=None):
@@ -115,12 +120,22 @@ class Sources:
             return self.row_file(src['row'], src.get('source') or '', src.get('source'))
         return self.base(src['path'], src['kind'])
 
-    def _members(self, archive):
+    def _tar(self, archive):
+        """The open TarFile of ARCHIVE, indexed once (a harvest tar holds thousands of members)."""
         key = str(archive)
-        if key not in self._tars:
-            with tarfile.open(archive) as t:
-                self._tars[key] = {m.name[2:] if m.name.startswith('./') else m.name: m for m in t.getmembers()}
-        return self._tars[key]
+        if key not in self._open:
+            t = self._open[key] = tarfile.open(archive)
+            self._tars[key] = {m.name[2:] if m.name.startswith('./') else m.name: m for m in t.getmembers()}
+        return self._open[key]
+
+    def close(self):
+        for t in self._open.values():
+            t.close()
+        self._open, self._tars = {}, {}
+
+    def _members(self, archive):
+        self._tar(archive)
+        return self._tars[str(archive)]
 
     def row_file(self, row, path, source=None):
         """The bytes a whole-file origin installs: SOURCE inside the row when declared, the row itself when it is a
@@ -133,11 +148,12 @@ class Sources:
             archive, _, member = source.partition('!')
             if member:
                 try:
-                    with tarfile.open(src / archive) as t:
-                        f = t.extractfile(member) or t.extractfile('./' + member)
-                        if f is None:
-                            raise KeyError(member)
-                        return f.read()
+                    t = self._tar(src / archive)
+                    info = self._members(src / archive).get(member)
+                    f = t.extractfile(info) if info is not None else None
+                    if f is None:
+                        raise KeyError(member)
+                    return f.read()
                 except (OSError, KeyError, tarfile.TarError) as x:
                     raise Unresolved('row %s: no %s in %s (%s)' % (row, member, archive, x))
             if (src / source).is_file():
@@ -152,8 +168,9 @@ class Sources:
 
     def member_attrs(self, row, source):
         """(attributes, folders) of a tar member SOURCE ("ARCHIVE!MEMBER") of ROW, as `tar -xp --numeric-owner`
-        installs it: {'mode', 'owner': 'UID:GID'} and {folder: same} for every folder above it the tar holds
-        (relative to the tar's root, which is the install root). None, {} for anything that is not a tar member."""
+        installs it: {'mode', 'owner': 'UID:GID', 'mtime'} (the member's modification time, which `tar -x` keeps)
+        and {folder: {'mode', 'owner'}} for every folder above it the tar holds (relative to the tar's root, which is
+        the install root). None, {} for anything that is not a tar member."""
         archive, _, member = (source or '').partition('!')
         if not member or not self.rows.get(row):
             return None, {}
@@ -168,7 +185,7 @@ class Sources:
             if m is not None and m.isdir():
                 dirs[parent] = attrs(m)
             parent = os.path.dirname(parent)
-        return attrs(info), dirs
+        return dict(attrs(info), mtime=int(info.mtime)), dirs
 
     def row_tree(self, row, path, source=None):
         src = self.rows.get(row)
@@ -208,9 +225,11 @@ def external_after(spec):
     return out
 
 
-def compose(entry, root, sources, store, repo):
+def compose(entry, root, sources, store, repo, facts=None):
     """{path: bytes} for one ledger entry (a tree origin yields many paths). Edited files are signed once, after
-    the last edit, as the last signing spec says."""
+    the last edit, as the last signing spec says. FACTS (a dict) gets 'base': {'path', 'sha256'} of the file on the
+    target the first edit starts from (Golden Gate's, a donor's or OCLP's), when the composition read one."""
+    facts = {} if facts is None else facts
     data, original, signing = None, None, None
     after = [a for w in entry['writers'] for a in (w.get('after') or [])]
     for w in entry['writers']:
@@ -238,8 +257,10 @@ def compose(entry, root, sources, store, repo):
                 data = sources.row_file(inp['row'], entry['path'])
             elif inp:
                 data = sources.base(inp['path'], inp['kind'])
+                facts['base'] = {'path': inp['path'], 'sha256': hashlib.sha256(data).hexdigest()}
             else:
                 data = sources.base(entry['path'], entry['base']['kind'])
+                facts['base'] = {'path': entry['path'], 'sha256': hashlib.sha256(data).hexdigest()}
         original = data if original is None else original
         data, _ = ENGINE.apply_stored(spec, data, store, repo=str(repo))
         signing = spec.get('sign') or signing
@@ -258,6 +279,16 @@ def origin_attrs(entry, sources):
         return sources.member_attrs(last['origin']['row'], last.get('source'))
     except (OSError, tarfile.TarError):
         return None, {}
+
+
+def replaces(entry, sources):
+    """{'base': {'path', 'sha256', 'edited': False}} for a whole file that replaces one a layer installed (what the
+    recipe's hook expects to find there), or {} when no layer has it or it can't be read here."""
+    try:
+        data = sources.base(entry['path'], entry['base']['kind'])
+    except (Unresolved, Deferred, OSError):
+        return {}
+    return {'base': {'path': entry['path'], 'sha256': hashlib.sha256(data).hexdigest(), 'edited': False}}
 
 
 def deferred_order(deferred):
@@ -280,6 +311,13 @@ def deferred_order(deferred):
 
 
 def materialize(ledger, root, sources, out, store_dir, pack_of, phase_of, *, repo=TOP, on_event=None, only=None):
+    try:
+        return _materialize(ledger, root, sources, out, store_dir, pack_of, phase_of, repo, on_event, only)
+    finally:
+        sources.close()
+
+
+def _materialize(ledger, root, sources, out, store_dir, pack_of, phase_of, repo, on_event, only):
     emit = on_event or (lambda e: None)
     out = Path(out)
     store = STORE.Store(store_dir)
@@ -289,8 +327,9 @@ def materialize(ledger, root, sources, out, store_dir, pack_of, phase_of, *, rep
             continue
         last = entry['writers'][-1]['recipe']
         pack = pack_of(last)
+        facts = {}
         try:
-            files = compose(entry, root, sources, store, repo)
+            files = compose(entry, root, sources, store, repo, facts)
         except Deferred as x:
             report.append({'path': path, 'outcome': 'deferred', 'reason': str(x), 'pack': pack, 'recipe': last,
                            'after': x.after})
@@ -319,9 +358,16 @@ def materialize(ledger, root, sources, out, store_dir, pack_of, phase_of, *, rep
                                      ('0755' if data[:4] in MACHO else '0644'),
                              'owner': install.get('owner') or member.get('owner') or 'root:wheel',
                              'flags': install.get('flags', [])}
+            if not install.get('mode') and member.get('mtime') is not None:
+                m['files'][p]['mtime'] = member['mtime']       # as `tar -x` leaves it
         for d, attrs in dirs.items():
             m.setdefault('dirs', {})[d] = attrs
-        r = {'path': path, 'outcome': 'made', 'files': len(files), 'pack': pack}
+        r = {'path': path, 'outcome': 'made', 'files': len(files), 'pack': pack, 'recipe': last,
+             'writers': [w['recipe'] for w in entry['writers']], 'paths': sorted(files)}
+        if facts.get('base'):
+            r['base'] = dict(facts['base'], edited=True)      # the bytes the first edit reads must be these
+        elif len(files) == 1 and path in files:
+            r.update(replaces(entry, sources))
         if own:
             r['declared_separately'] = own
         report.append(r)
@@ -336,17 +382,34 @@ def materialize(ledger, root, sources, out, store_dir, pack_of, phase_of, *, rep
     return report
 
 
-def repo_rows(build):
-    """{row: path} from pipeline/inputs/golden/*, pipeline/inputs/BUILD and pipeline/inputs/common, first wins."""
+def repo_rows(build, golden=None):
+    """{row: path} from pipeline/inputs/golden/* (only golden/GOLDEN when given, as golden-run reads it),
+    pipeline/inputs/BUILD and pipeline/inputs/common, first wins."""
     lock = runpy.run_path(str(TOP / 'pipeline' / 'lock.py'))
     rows = {}
     for folder in (TOP / 'pipeline/inputs/golden', TOP / 'pipeline/inputs' / build, TOP / 'pipeline/inputs/common'):
-        for sub in ([folder / d for d in sorted(os.listdir(folder))] if folder.name == 'golden' and folder.is_dir()
-                    else [folder]):
+        for sub in (([folder / golden] if golden else [folder / d for d in sorted(os.listdir(folder))])
+                    if folder.name == 'golden' and folder.is_dir() else [folder]):
             if sub.is_dir():
                 for r, (_, path) in lock['rows'](str(sub)).items():
                     rows.setdefault(r, path)
     return rows
+
+
+def run(setfile, target, build, out, store=None, system=None, packs='auto', only=None, golden=None):
+    """(report, ledger) of materialising SET for TARGET and BUILD into OUT, as the command line does."""
+    patches = runpy.run_path(str(TOP / 'pipeline' / 'patches.py'))
+    ledger_mod = runpy.run_path(str(TOP / 'pipeline' / 'ledger.py'))
+    defs = patches['load_packs']()
+    selected = patches['detect_packs'](target, defs) if packs == 'auto' else packs.split(',')
+    ledger = ledger_mod['build'](setfile, target, build)
+    rows = repo_rows(build, golden)
+    member = {r: n for n, d in defs.items() for r in d.get('recipes', [])}
+    pack_of = lambda recipe: member.get(recipe) if member.get(recipe) in selected else None
+    phase_of = lambda pack: defs[pack]['phase']
+    report = materialize(ledger, TOP / 'patches', Sources.from_repo(rows, system), out,
+                         store or str(Path(out) / 'store'), pack_of, phase_of, only=set(only) if only else None)
+    return report, ledger
 
 
 def main(argv):
@@ -355,20 +418,10 @@ def main(argv):
     p.add_argument('set'); p.add_argument('target'); p.add_argument('build')
     p.add_argument('--out', required=True); p.add_argument('--store'); p.add_argument('--system')
     p.add_argument('--packs', default='auto'); p.add_argument('--json', action='store_true')
+    p.add_argument('--golden', metavar='BUILD', help='read Golden Gate rows from pipeline/inputs/golden/BUILD only')
     p.add_argument('--only', action='append', metavar='PATH', help='make only this declared path (repeatable)')
     a = p.parse_args(argv)
-    patches = runpy.run_path(str(TOP / 'pipeline' / 'patches.py'))
-    ledger_mod = runpy.run_path(str(TOP / 'pipeline' / 'ledger.py'))
-    defs = patches['load_packs']()
-    selected = patches['detect_packs'](a.target, defs) if a.packs == 'auto' else a.packs.split(',')
-    ledger = ledger_mod['build'](a.set, a.target, a.build)
-    rows = repo_rows(a.build)
-    member = {r: n for n, d in defs.items() for r in d.get('recipes', [])}
-    pack_of = lambda recipe: member.get(recipe) if member.get(recipe) in selected else None
-    phase_of = lambda pack: defs[pack]['phase']
-    report = materialize(ledger, TOP / 'patches', Sources.from_repo(rows, a.system), a.out,
-                         a.store or str(Path(a.out) / 'store'), pack_of, phase_of,
-                         only=set(a.only) if a.only else None)
+    report, _ = run(a.set, a.target, a.build, a.out, a.store, a.system, a.packs, a.only, a.golden)
     counts = {}
     for r in report:
         counts[r['outcome']] = counts.get(r['outcome'], 0) + 1

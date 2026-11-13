@@ -66,7 +66,7 @@ on top of the previous ones. Layers 1–6 are the same for every set.
 | 4 | `golden-finalize` | 27's Data template and firmlinks; Tahoe and KDK Intel kexts; Darwin 27 x86_64 kernel; Tahoe native roots | 27 has no Intel kexts and lacks some x86_64 code. Later layers read the kernel |
 | 5 | `boot-and-esp` | Tahoe Intel Preboot/Recovery files; OpenCore ESP (`build-efi.py`) | 27 has no Intel boot files |
 | 6 | `hardware` | OCLP overlay: HD 4000 Metal/OpenGL, wireless, audio | Checks the kernel's Darwin version |
-| 7 | `recipes` | Each `oclp-hook` entry's `src/kc-hook.sh`, in set order, System writable | |
+| 7 | `recipes` | Each `oclp-hook` entry's `src/kc-hook.sh` (or, with `--from-overlays`, its files from the overlays), in set order, System writable | |
 | 8 | `snapshot` | Preboot update, bless, System snapshot | |
 | 9 | `posts` | Each `post` entry's `apply.sh`, in set order, System read-only | |
 | 10 | `efi-bundle` | Final ESP and manifest | |
@@ -88,6 +88,31 @@ what it adds and why.
   edit their output);
 - no recipe uses `src/hook.sh`;
 - no `oclp-hook` entry follows a `post` entry.
+
+### Installing from the overlays (opt-in)
+
+```sh
+python3.14 -I pipeline/golden-run pipeline/assemblies/dev-26B131.json --repo /path/to/image-repository \
+  --from-overlays --overlay-system /path/to/golden-gate-fs
+```
+
+`--overlay-system` is the build's Golden Gate file system (its `filesystem.dmg` attached read-only): the edits
+start from its files. Before the VM starts, the host materialises the set
+([`materialize.py`](../pipeline/materialize.py); the edit-engine store is kept in `store/cache/edit-engine-store`,
+`--overlay-store` to change it) and [`overlays.py`](../pipeline/overlays.py) plans, in set order, which recipes
+install their files from the overlays instead of running their hook or `apply.sh`: those whose every declared
+file was made on the host. A recipe with anything made on the target (kernel collections, the cryptex, HaoExec's
+stamp, `kc.bind`, generated records, native-identities), without declarations, or writing a file before such a
+recipe edits it, runs its hook as before. `--overlay-hook NAME` keeps one more on its hook. The guest installs
+each recipe's files at its turn ([`golden-overlays.py`](../pipeline/stages/golden-overlays.py)): staged sha256
+checked, the file an edit starts from checked, mode, owner and flags (and a tar member's mtime) as the manifest
+says. The build record keeps `overlay-plan.json`, `overlay-report.json` and the timings (`build.json`
+`overlays`). Without the flag nothing changes.
+
+Before trusting such a build, compare it with a hook build of the same commit (`pipeline/overlays.py tree` on
+each image's volumes, mounted read-only, then `overlays.py compare`): only signature-only differences (files
+signed on the host have other CDHashes), native-identities' observed CDHashes, and what differs between two hook
+builds anyway may remain.
 
 ### Output
 

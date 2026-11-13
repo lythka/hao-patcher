@@ -1,5 +1,6 @@
 """pipeline/materialize.py: each declared file made once into pack overlays that hao patch applies.
 python3.14 -I -B -m unittest discover -s pipeline/tests -k materialize"""
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -102,9 +103,20 @@ class Materialize(unittest.TestCase):
                     {'k.json': {'format': 1, 'path': 'System/Library/KernelCollections/BootKernelExtensions.kc',
                                 'origin': {'kind': 'hao'}, 'edits': [{'id': 'link', 'kind': 'op', 'op': 'kc.link',
                                                                       'args': {}, 'reason': 'x'}]}})
+        (self.d / 'system/usr/lib/libold.dylib').write_bytes(b'old library')
+        self.recipe('whole', [{'path': 'usr/lib/libold.dylib', 'origin': {'kind': 'hao', 'row': 'one'}},
+                              {'path': 'usr/lib/one.dylib', 'origin': {'kind': 'hao', 'row': 'one'}}])
         report, out = self.run_all()
         self.assertEqual((out / 'base/files/usr/lib/libz.dylib').read_bytes(), b'Golden gate libz')
         self.assertIn('kc.link', report['System/Library/KernelCollections/BootKernelExtensions.kc']['reason'])
+        # what an image build installing the overlays checks it finds first (pipeline/overlays.py)
+        sha = lambda b: hashlib.sha256(b).hexdigest()
+        z = report['usr/lib/libz.dylib']
+        self.assertEqual((z['writers'], z['paths'], z['recipe']), (['sys'], ['usr/lib/libz.dylib'], 'sys'))
+        self.assertEqual(z['base'], {'path': 'usr/lib/libz.dylib', 'sha256': sha(b'golden gate libz'), 'edited': True})
+        self.assertEqual(report['usr/lib/libold.dylib']['base'],
+                         {'path': 'usr/lib/libold.dylib', 'sha256': sha(b'old library'), 'edited': False})
+        self.assertNotIn('base', report['usr/lib/one.dylib'])                 # a new file
 
     def test_store_reuse_and_hao_patch_applies_the_overlay(self):
         self.recipe('hello', [{'path': METAL, 'edits': 'edits/m.json'}], {'m.json': literal('one', '0x0', '01', 'AA')})
@@ -160,7 +172,7 @@ class Materialize(unittest.TestCase):
                 t.addfile(info)
             data = b'index'
             info = tarfile.TarInfo('private/var/zz/C/store.index'); info.size = len(data)
-            info.mode, info.uid, info.gid = 0o600, 248, 248
+            info.mode, info.uid, info.gid, info.mtime = 0o600, 248, 248, 1700000000
             t.addfile(info, io.BytesIO(data))
         self.recipe('caches', [
             {'path': 'private/var/zz/C/store.index', 'origin': {'kind': 'hao', 'row': 'caches'},
@@ -174,6 +186,8 @@ class Materialize(unittest.TestCase):
         self.assertEqual(m['dirs'], {'private': {'mode': '0755', 'owner': '0:0'},
                                      'private/var/zz': {'mode': '0711', 'owner': '0:0'},
                                      'private/var/zz/C': {'mode': '0700', 'owner': '248:248'}})
+        self.assertEqual(m['files']['private/var/zz/C/store.index']['mtime'], 1700000000)   # tar -x keeps it
+        self.assertNotIn('mtime', m['files']['private/var/c/store.index'])           # installed with `install`
         self.assertEqual(m['files']['private/var/c/store.index']['mode'], '0640')       # a declaration wins
         self.assertEqual(m['files']['private/var/c/store.index']['owner'], 'root:admin')
         # hao patch puts them in place with those attributes (owners recorded: the test does not run as root)
