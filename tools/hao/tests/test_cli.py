@@ -55,8 +55,9 @@ class FakeMac:
     """sysctl/ioreg/diskutil/df answers; ROOT_DEVICE is where / lives; DF maps a source to its device."""
 
     def __init__(self, model='MacBookPro9,2', board=b'Mac-6F01561E16C75D06\0', machine='x86_64', devices=None,
-                 root_device='disk1s5s1'):
+                 root_device='disk1s5s1', uid=501, csr=0, boot_args=''):
         self.model, self.board, self.machine = model, board, machine
+        self.uid, self.csr, self.boot_args = uid, csr, boot_args
         self.devices = LAPTOP_PCI if devices is None else devices
         self.root_device = root_device
         self.df = {}
@@ -72,7 +73,15 @@ class FakeMac:
             return subprocess.CompletedProcess(argv, 1, b'', b'')
         return subprocess.CompletedProcess(argv, 0, out, b'')
 
+    def euid(self):
+        return self.uid
+
+    def csr_config(self):
+        return self.csr
+
     def answer(self, argv):
+        if argv == ['nvram', 'boot-args']:
+            return ('boot-args\t%s\n' % self.boot_args).encode() if self.boot_args else None
         if argv[:2] == ['sysctl', '-n']:
             return {'hw.model': self.model, 'machdep.cpu.brand_string': 'Intel(R) Core(TM) i7-3615QM CPU @ 2.30GHz',
                     'hw.memsize': str(16 * GiB)}[argv[2]].encode()
@@ -330,18 +339,91 @@ class BuilderTest(unittest.TestCase):
 
     def test_writes_stop_before_anything(self):
         host = FakeMac(root_device='disk9s1')
+        ran = []
         for fn, disk in ((BUILD.build_disk, 'disk5'), (BUILD.create_installer, 'disk4')):
             c, _ = console('quiet', answer='nope')
             a = ns(model='MacBookPro9,2', disk=disk, dry_run=False, minimum_bytes=10**9)
             with self.assertRaises(CON.Stopped) as x:
-                fn(a, c, host)
+                fn(a, c, host, **({'run': ran.append} if fn is BUILD.build_disk else {}))
             self.assertEqual(x.exception.what, 'not confirmed')
-            c, _ = console('quiet')
-            a.confirm = 'disk5' if disk == 'disk5' else 'ERASE'
-            with self.assertRaises(CON.Stopped) as x:
-                fn(a, c, host)
-            self.assertIn('cannot write yet', x.exception.what)
+        c, _ = console('quiet')
+        a = ns(model='MacBookPro9,2', disk='disk4', dry_run=False, minimum_bytes=10**9, confirm='ERASE')
+        with self.assertRaises(CON.Stopped) as x:
+            BUILD.create_installer(a, c, host)
+        self.assertIn('cannot write yet', x.exception.what)
+        self.assertEqual(ran, [])
         self.assertFalse(any(x in c for c in host.calls for x in ('eraseDisk', 'partitionDisk', 'unmountDisk')))
+
+    RELAXED = dict(uid=0, csr=0x803, boot_args='-no_compat_check amfi_get_out_of_my_way=1')
+
+    def test_build_disk_refuses_an_everyday_mac(self):
+        # confirmed, but not root / SIP on / AMFI strict: stops before staging or writing anything
+        for env, why in ((dict(), 'root'), (dict(self.RELAXED, csr=0), 'filesystem protection'),
+                         (dict(self.RELAXED, boot_args='-v'), 'AMFI')):
+            host = FakeMac(root_device='disk9s1', **env)
+            c, _ = console('quiet')
+            ran = []
+            a = ns(model='MacBookPro9,2', disk='disk5', dry_run=False, confirm='disk5')
+            with self.assertRaises(CON.Stopped) as x:
+                BUILD.build_disk(a, c, host, run=ran.append)
+            self.assertIn(why, x.exception.what)
+            self.assertIn('nothing was written', x.exception.untouched)
+            self.assertEqual(ran, [])
+
+    def fake_run(self, rc=0):
+        ran = []
+        def run(cmd):
+            ran.append([str(x) for x in cmd])
+            if '--stage-kit' in cmd:
+                kit = Path(cmd[cmd.index('--work') + 1]) / 'share'
+                kit.mkdir(parents=True)
+                (kit / 'kit.json').write_text('{}')
+            return rc if cmd[0] == 'sh' else 0
+        return ran, run
+
+    def test_build_disk_stages_assembles_external_and_collects(self):
+        host = FakeMac(root_device='disk9s1', **self.RELAXED)
+        with tempfile.TemporaryDirectory() as d:
+            c, out = console('files')
+            ran, run = self.fake_run()
+            a = ns(model='MacBookPro9,2', disk='/dev/disk5', dry_run=False, confirm='disk5', work=d)
+            self.assertEqual(BUILD.build_disk(a, c, host, run=run), 0)
+            stage, assemble, collect = ran
+            self.assertIn('--stage-kit', stage)
+            self.assertEqual(assemble[0], 'sh')
+            self.assertTrue(assemble[1].endswith('/share/assembly-source/golden-assemble.sh'))
+            self.assertEqual(assemble[3:], [str(Path(d).resolve() / 'local'), '--disk', 'disk5',
+                                            '--confirm-disk', 'disk5', '--external'])
+            self.assertIn('--collect-kit', collect)
+            self.assertIn('built on /dev/disk5', out.getvalue())
+
+    def test_build_disk_failed_assembly_stops(self):
+        host = FakeMac(root_device='disk9s1', **self.RELAXED)
+        with tempfile.TemporaryDirectory() as d:
+            c, _ = console('quiet')
+            ran, run = self.fake_run(rc=3)
+            a = ns(model='MacBookPro9,2', disk='disk5', dry_run=False, confirm='disk5', work=d)
+            with self.assertRaises(CON.Stopped) as x:
+                BUILD.build_disk(a, c, host, run=run)
+            self.assertIn('failed (exit 3)', x.exception.what)
+            self.assertEqual(2, len(ran))   # staged and assembled; nothing collected
+
+    def test_install_needs_a_kit_and_uses_it_on_the_internal_disk(self):
+        host = FakeMac(root_device='disk9s1', **self.RELAXED)
+        c, _ = console('quiet')
+        with self.assertRaises(CON.Stopped) as x:
+            BUILD.install(ns(disk='disk0', dry_run=False, confirm='ERASE'), c, host, run=lambda cmd: 0)
+        self.assertEqual('no kit named', x.exception.what)
+        with tempfile.TemporaryDirectory() as d:
+            kit = Path(d) / 'kit'; kit.mkdir(); (kit / 'kit.json').write_text('{}')
+            c, out = console('quiet')
+            ran, run = self.fake_run()
+            a = ns(disk='disk0', dry_run=False, confirm='ERASE', kit=str(kit))
+            self.assertEqual(BUILD.install(a, c, host, run=run), 0)
+            (assemble,) = ran
+            self.assertEqual(assemble[2], str(kit.resolve()))
+            self.assertEqual(assemble[-4:], ['--disk', 'disk0', '--confirm-disk', 'disk0'])
+            self.assertTrue(assemble[3].startswith(str(Path(d).resolve() / 'hao-install-')))
 
     def test_install_detects_this_mac(self):
         c, out = console('edits')

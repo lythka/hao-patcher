@@ -77,8 +77,8 @@ and reused between builds, keyed on their inputs and on the builder's tools.
 | `hao detect` | the Mac, its devices and packs | works |
 | `hao fetch` / `hao verify` | pinned downloads; checks an installed system against its manifests | works |
 | `hao create-installer` | on any Mac: download, unpack, prepare packs, write the USB stick | checks and plan only; writing the stick is not built |
-| `hao install` | on the target, from the stick: lay out the disk, copy macOS, add Intel support, apply packs, link the kernel, seal, make it bootable | every step exists in the image build; running it outside the builder VM comes with the kit |
-| `hao build-disk` | the same assembly onto an external SSD | checks and plan only, as `install` |
+| `hao install` | on the target, from the stick: lay out the disk, copy macOS, add Intel support, apply packs, link the kernel, seal, make it bootable | builds from the stick's kit in a Recovery that relaxes SIP and AMFI; host tests only, not yet run onto a real disk |
+| `hao build-disk` | the same assembly onto an external SSD | stages the kit and builds onto the SSD, under the same conditions as `install`; host tests only |
 | `hao build-image` | an image file, for development | works, in the builder VM |
 | `hao patch` / `--revert` | live updates of packs on the running Mac, undone by snapshot | works on a folder; on the running Mac it waits for a laptop proof of snapshot and revert |
 | `hao explain` / `hao inspect` | where a file came from and each change made to it | works |
@@ -97,8 +97,8 @@ why it matters, what was left untouched and what to do next.
   hao-opencore installs its repairs (equal to the recorded ones on every recorded 26B131 collection). IntelCommpage
   r42 reads its collection addresses from the table the binder writes; it passed a VM build and a QEMU boot, not
   yet the laptop.
-- **The kit**, then `hao install` and `hao build-disk` writing through it, proven first in the Tahoe Recovery on the
-  laptop.
+- **The kit's first real run:** `hao install` or `hao build-disk` from a kit, first in the Tahoe Recovery on the
+  laptop, with no virtual machine involved.
 - **The USB installer:** the Recovery-on-a-stick launcher in Golden Gate's Recovery. Its riskiest unknowns (bundled
   Python, kmutil and the binder, cryptex sealing, volume groups and firmlinks) pass in the laptop's Tahoe Recovery
   ([`tools/recovery-spikes`](../tools/recovery-spikes/README.md)); they run again in Golden Gate's.

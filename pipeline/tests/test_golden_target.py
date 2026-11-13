@@ -200,7 +200,8 @@ class DiskTargetTests(unittest.TestCase):
                          'a refused disk saw only reads')
         record = json.loads((Path(self.config['work'])/'build.json').read_text())
         self.assertEqual(record['status'], 'failed')
-        self.assertEqual(record['target'], dict(kind='disk', disk=self.config['disk'], minimum_bytes=32768, accepted=False))
+        self.assertEqual(record['target'], dict(kind='disk', disk=self.config['disk'], policy=self.config.get('disk_policy', 'internal'),
+                                                minimum_bytes=32768, accepted=False))
         return commands
 
     def test_eligible_disk_runs_the_image_layers_on_the_disk(self):
@@ -208,7 +209,7 @@ class DiskTargetTests(unittest.TestCase):
         record = self.assemble(fake)
         commands = [row['command'] for row in fake.entries]
         self.assertEqual(record['status'], 'assembled')
-        self.assertEqual(record['target'], dict(kind='disk', disk='/dev/disk70', minimum_bytes=32768, accepted=True))
+        self.assertEqual(record['target'], dict(kind='disk', disk='/dev/disk70', policy='internal', minimum_bytes=32768, accepted=True))
         self.assertIsNone(record['attached_device'])
         start = commands.index(['diskutil', 'partitionDisk', '/dev/disk70', 'GPT', 'APFS', 'Golden', '100%'])
         root = str(self.case.root)
@@ -259,6 +260,30 @@ class DiskTargetTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.setUp()
                 self.refused('removable', info=dict(ELIGIBLE, **{key: True}))
+
+    def test_external_policy_takes_an_external_usb_ssd(self):
+        # hao build-disk: the user's external SSD; the eligible internal disk itself is refused
+        self.config['disk_policy'] = 'external'
+        external = dict(ELIGIBLE, Internal=False, BusProtocol='USB', Ejectable=True)
+        fake = DiskCommands(self.config, info=external)
+        record = self.assemble(fake)
+        self.assertEqual('assembled', record['status'])
+        self.assertEqual('external', record['target']['policy'])
+
+    def test_external_policy_refuses_the_internal_disk(self):
+        self.config['disk_policy'] = 'external'
+        self.refused('internal: this build writes only to an external disk')
+
+    def test_external_policy_still_refuses_the_running_system_and_virtual_disks(self):
+        self.config['disk_policy'] = 'external'
+        external = dict(ELIGIBLE, Internal=False, BusProtocol='USB')
+        self.refused('holds the running system', info=external, root='disk70s1')
+        self.setUp(); self.config['disk_policy'] = 'external'
+        self.refused('virtual', info=dict(external, VirtualOrPhysical='Virtual'))
+
+    def test_unknown_policy(self):
+        with self.assertRaises(ValueError):
+            golden.DiskTarget('disk70', 1, Path('/m'), policy='either')
 
     def test_usb_disk(self):
         self.refused('USB', info=dict(ELIGIBLE, BusProtocol='USB'))

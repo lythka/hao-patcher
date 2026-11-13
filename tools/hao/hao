@@ -24,11 +24,15 @@
   hao verify [ROOT] [--manifests DIR|FILE]...                 every installed pack file against its manifest
   hao build-image REPO (--model M | --profile F) [--assembly NAME] [--overlay-system ROOT] [--dry-run]
         assemble an image in the builder VM (pipeline/golden-run), committed to the image repository REPO
-  hao build-disk /dev/diskN (--model M | --profile F) [--dry-run] [--confirm diskN]   (sudo; external SSD)
+  hao build-disk /dev/diskN (--model M | --profile F) [--kit KIT] [--work DIR] [--local DIR] [--dry-run]
+        [--confirm diskN]   (sudo; an external SSD) stage the kit (or take KIT) and build macOS 27 onto the disk
+  hao install /dev/diskN --kit KIT [--profile F] [--local DIR] [--dry-run] [--confirm ERASE]
+        (on the target, from the installer's Recovery) build macOS 27 from the stick's kit onto this Mac's disk
+        Both need root, SIP's filesystem protection off and AMFI relaxed, as the installer's Recovery starts; on a
+        Mac's everyday macOS they stop before writing. LOCAL (default WORK/local) holds the assembly's copies and
+        logs and must not be on the disk being erased.
   hao create-installer /dev/diskN (--model M | --profile F) [--dry-run] [--confirm ERASE]  (sudo; USB stick)
-  hao install /dev/diskN [--profile F] [--dry-run] [--confirm ERASE]  (on the target, from the stick's Recovery)
-        build-disk, create-installer and install check the disk and show their plan; their disk steps wait for
-        the relocatable kit (workflow plan step 16) and stop, before writing, until it exists.
+        checks the stick and shows its plan; writing the stick is not built yet.
 
 Detail levels for every command: --quiet, default, --show (files), --show-edits (edits), --log json.
 
@@ -323,6 +327,12 @@ def builder_args(q, disk=True):
     CON.add_level_flags(q)
 
 
+def kit_args(q):
+    q.add_argument('--kit', help='a staged kit folder (golden-run --stage-kit; on the stick for install)')
+    q.add_argument('--work', help='build folder (default ~/Library/Caches/hao/builds/DATE)')
+    q.add_argument('--local', help='the assembly\'s writable folder (default WORK/local), not on the erased disk')
+
+
 def main():
     p = argparse.ArgumentParser(prog='hao', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='action', required=True)
@@ -358,12 +368,12 @@ def main():
     q.add_argument('--overlay-system'); q.add_argument('--overlay-store')
     q.add_argument('--allow-unresolved-swaps', action='store_true', help='build although live swaps are unresolved')
     q.set_defaults(fn=guarded(lambda a, c: BUILD.build_image(a, c)))
-    q = sub.add_parser('build-disk'); builder_args(q)
+    q = sub.add_parser('build-disk'); builder_args(q); kit_args(q)
     q.set_defaults(fn=guarded(lambda a, c: BUILD.build_disk(a, c, MAC.SystemHost())))
     q = sub.add_parser('create-installer'); builder_args(q)
     q.add_argument('--minimum-bytes', type=int, default=32 * 10 ** 9)
     q.set_defaults(fn=guarded(lambda a, c: BUILD.create_installer(a, c, MAC.SystemHost())))
-    q = sub.add_parser('install'); builder_args(q)
+    q = sub.add_parser('install'); builder_args(q); kit_args(q)
     q.set_defaults(fn=guarded(lambda a, c: BUILD.install(a, c, MAC.SystemHost())))
     a = p.parse_args()
     return a.fn(a)

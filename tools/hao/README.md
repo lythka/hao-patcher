@@ -35,13 +35,20 @@ hao install /dev/diskN [--dry-run]              # on the target, from the stick'
   every pack the target detects; a profile with other packs is refused (golden-run has no pack choice yet). It stops
   while a fix proven by a live swap on the laptop is in no recipe (`pipeline/swaps.py`, below the list);
   `--allow-unresolved-swaps` builds anyway.
-- **build-disk**, **create-installer**, **install** (`src/builder.py`) resolve the same plan and check the disk with
-  `src/disks.py` (ssdinstall's checks: whole, physical disk, not the running system's or the inputs', big enough;
-  `external` for build-disk and the stick, `internal` for install), then ask for the typed confirmation (`--confirm`
-  gives it ahead). Their disk steps are not wired yet: after the checks they stop before writing anything, until the
-  relocatable kit exists (golden-run's staged inputs and guest config relative to a kit folder, plus an x86_64 Python;
-  workflow plan step 16). Our dev host never runs them against its own disks: they run in the builder VM or on the
-  laptop.
+- **build-disk** and **install** (`src/builder.py`) resolve the same plan and check the disk with `src/disks.py`
+  (ssdinstall's checks: whole, physical disk, not the running system's or the inputs', big enough; `external` for
+  build-disk, `internal` for install), then ask for the typed confirmation (`--confirm` gives it ahead). Then they
+  build from the relocatable kit (`pipeline/kit.py`, workflow plan step 16): build-disk stages it
+  (`golden-run --stage-kit`, or takes `--kit`), install takes the stick's (`--kit`, required); both run
+  `pipeline/stages/golden-assemble.sh` onto the disk, where golden-image.py's DiskTarget checks it again under the
+  same policy, and build-disk keeps the sealed cryptex images for the next build (`golden-run --collect-kit`).
+  Before staging anything they need what the builder VM gives the assembly: root, SIP's filesystem protection off
+  (`CSR_ALLOW_UNRESTRICTED_FS`) and AMFI relaxed (`amfi_get_out_of_my_way=1`, or the NetBoot Recovery's
+  `amfi=0x80`), because the build makes firmlinks with an ad hoc entitled tool. The installer's Recovery starts that
+  way; on a Mac's everyday macOS they stop before writing and say so. Our dev host never runs them against its own
+  disks: they run in the builder VM or on the laptop.
+- **create-installer** checks the stick and shows its plan; writing the stick (Recovery, launcher, kit partition)
+  is not built yet, so it stops after the checks.
 
 ## hao patch
 

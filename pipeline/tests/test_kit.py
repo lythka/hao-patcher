@@ -76,6 +76,11 @@ class Kit(unittest.TestCase):
             config = KIT['render'](kit, '/k', '/l', disk='disk9', confirm_disk='disk9')
             self.assertEqual(('disk9', 'disk9'), (config['disk'], config['confirm_disk']))
             self.assertNotIn('image', config)
+            self.assertEqual('internal', config['disk_policy'])
+            config = KIT['render'](kit, '/k', '/l', disk='disk9', confirm_disk='disk9', disk_policy='external')
+            self.assertEqual('external', config['disk_policy'])
+            with self.assertRaises(ValueError):
+                KIT['render'](kit, '/k', '/l', disk='disk9', confirm_disk='disk9', disk_policy='any')
 
     def test_local_inside_the_kit_is_refused(self):
         with tempfile.TemporaryDirectory() as folder:
