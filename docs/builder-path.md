@@ -2,8 +2,9 @@
 
 Where hao-patcher is going, and which parts already exist. Today an image is built on the maintainer's Mac
 inside an arm64 builder VM (`docs/building.md`). The goal is a release a user downloads and runs on their own Mac,
-with no VM, no Apple silicon and no second machine. It makes a USB installer that installs macOS 27 on an Intel Mac,
-and anyone can read what each patch changes and why.
+with no VM, no Apple silicon and no second machine. It makes either a USB installer that installs macOS 27 on an Intel
+Mac through its Recovery, or a complete macOS 27 disk built straight onto an external SSD that the Intel Mac boots
+as is. Anyone can read what each patch changes and why.
 
 ## Principles
 
