@@ -20,14 +20,14 @@
 #
 # Environment: LAPTOP_SSH (default $HOME/hao-tools/tools/laptop-ssh, with its LAPTOP/LAPTOP_KEY), PY_TGZ (the
 # x86_64 python-build-standalone archive, sha256 below), EVIDENCE (default
-# $HOME/hao-research/store/evidence/hao-9a-YYYYMMDD), LOCK (default $HOME/mac-image/store/tmp/laptop.lock).
+# $repo/store/runs/hao-9a-YYYYMMDD), LOCK (default $HOME/mac-image/store/tmp/laptop.lock).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../../.." && pwd)
 ssh_tool=${LAPTOP_SSH:-$HOME/hao-tools/tools/laptop-ssh}
 py_tgz=${PY_TGZ:-$repo/store/artifacts/python-x86_64-3.12.14-20261109-0d6a4a299908/cpython-3.12.14+20260924-x86_64-apple-darwin-install_only.tar.gz}
 py_sha=0d6a4a299908123f00bc844df737603f047ff9eba14fda6cad83f3cf3cb3a2af
-evidence=${EVIDENCE:-$HOME/hao-research/store/evidence/hao-9a-$(date +%Y%m%d)}
+evidence=${EVIDENCE:-$repo/store/runs/hao-9a-$(date +%Y%m%d)}
 lock=${LOCK:-$HOME/mac-image/store/tmp/laptop.lock}
 W=/private/var/tmp/hao-9a                 # on the laptop
 HAO="$W/python/bin/python3 -I $W/hao/hao patch"
