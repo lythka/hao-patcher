@@ -88,13 +88,20 @@ def check(assembly_path, store, here=False):
             problems.append('%s: no input row names it' % name)
             continue
         below = in_store(relative)
-        if below is not None and not (Path(store) / below).exists():
-            problems.append('%s: missing (%s)' % (name, below))
+        if below is None:
+            # a tracked file of this checkout (the commit pins it): lock.py checks it where it is
+            try:
+                lock['path'](str(folder), name)
+            except SystemExit as e:
+                problems.append('%s: %s' % (name, e))
             continue
-        try:
-            lock['path'](str(folder), name)
-        except SystemExit as e:
-            problems.append('%s: %s' % (name, e))
+        # every other row is checked inside STORE, the folder named, not this checkout's store/ (a fresh clone
+        # has none until build-image --assets links it)
+        where = Path(store) / below
+        if not where.exists():
+            problems.append('%s: missing (%s)' % (name, below))
+        elif sha != '-' and lock['row_sha256'](str(where)) != sha:
+            problems.append('%s: %s is not %s' % (name, below, sha))
     if here:
         a = json.loads(Path(assembly_path).read_text())
         tar = Path(store) / 'oclp-source' / (a['oclp'] + '.tar')

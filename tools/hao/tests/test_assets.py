@@ -57,12 +57,14 @@ class Assets(unittest.TestCase):
 
             def path(folder, name):
                 raise SystemExit('%s: wrong sha256' % name)
-            with mock.patch.object(ASSETS, '_lock', return_value={'path': path}):
+            lock = {'path': path, 'row_sha256': lambda p: '0' * 64}
+            with mock.patch.object(ASSETS, '_lock', return_value=lock):
                 problems = ASSETS.check('assembly.json', store)
             self.assertIn('a_folder: missing (artifacts/b)', problems)
             self.assertIn('builder: missing vm/base', problems)
             self.assertIn('unnamed: no input row names it', problems)
-            self.assertTrue(any(p.startswith('a_file: a_file: wrong sha256') for p in problems), problems)
+            self.assertIn('a_file: artifacts/a/a.dylib is not %s' % ('f' * 64), problems)
+            self.assertIn('tracked: tracked: wrong sha256', problems)   # a checkout file: lock.py where it is
 
 
 def console():
@@ -178,6 +180,27 @@ class OclpArchive(unittest.TestCase):
                 (store / 'oclp-source/abc123.commit').write_text('abc123full\n')
                 self.assertEqual([], ASSETS.check(asm, store, here=True))
                 self.assertEqual(len(ASSETS.TOOLS), len(ASSETS.check(asm, store)))   # the VM build wants the VM
+
+
+class CheckAFolder(unittest.TestCase):
+    def test_rows_are_checked_inside_the_named_folder_not_this_checkouts_store(self):
+        # a fresh clone has no store/: check must hash the rows where the assets folder holds them
+        import hashlib
+        with tempfile.TemporaryDirectory() as d:
+            store = Path(d) / 'assets'
+            (store / 'artifacts/a').mkdir(parents=True); (store / 'artifacts/a/a.dylib').write_bytes(b'x')
+            for tool in ASSETS.TOOLS:
+                (store / tool).mkdir(parents=True)
+            good = hashlib.sha256(b'x').hexdigest()
+
+            def rows(*_):
+                return [('a_file', Path('/lock'), good, 'store/artifacts/a/a.dylib')]
+            lock = {'row_sha256': lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest(),
+                    'path': lambda *a: (_ for _ in ()).throw(AssertionError('must not read this checkout'))}
+            with mock.patch.object(ASSETS, 'rows', rows), mock.patch.object(ASSETS, '_lock', return_value=lock):
+                self.assertEqual([], ASSETS.check('a.json', store))
+                (store / 'artifacts/a/a.dylib').write_bytes(b'y')
+                self.assertEqual(['a_file: artifacts/a/a.dylib is not %s' % good], ASSETS.check('a.json', store))
 
 
 if __name__ == '__main__':
