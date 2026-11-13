@@ -39,8 +39,9 @@ Not done yet:
   with a named snapshot, revert to it) refuses to run until the step 9a laptop run proves it. That includes
   whether the previous snapshot survives. Until then ROOT is a folder: a fixture, or a volume the operator
   mounted.
-- **Overlays.** They are produced by hand or by tests. The host materialiser that writes them from edit specs
-  and the artifact store comes with the release tooling (plan step 13).
+- **Deferred steps.** Overlays come from `pipeline/materialize.py`. What only the target can make (kernel
+  collections, the cryptex, HaoExec's stamp, native-identities after the overlays) is listed in order in
+  `deferred.json`; nothing runs those steps yet.
 - **Signing on end users' Macs.** Replaced files load on the dev image because it boots with
   `amfi_get_out_of_my_way=1`. That is open for the owner.
 
