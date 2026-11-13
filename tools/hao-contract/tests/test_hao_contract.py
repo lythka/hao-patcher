@@ -156,6 +156,56 @@ class Names(Repo):
         self.assertEqual(self.contract({'kind': 'hygiene'}), [])
 
 
+class Release(unittest.TestCase):
+    def setUp(self):
+        self.d = Path(tempfile.mkdtemp())
+        (self.d / 'libhao.dylib').write_bytes(b'lib')
+        self.r = {
+            'contract_version': 1, 'release': '27.2.1-26B131.0', 'prerelease': True, 'proven_models': ['MacBookPro9,2'],
+            'assembly': 'mbp92-26B131', 'golden_build': '26B131', 'donor_build': '25G342', 'oclp': 'a' * 7,
+            'hao_patcher': 'b' * 7, 'hao_runtime': 'c' * 7,
+            'downloads': [{'row': 'kdk', 'name': 'KDK.dmg', 'url': 'https://example.invalid/KDK.dmg', 'size': 1,
+                           'sha256': '1' * 64}],
+            'assets': [{'row': 'hao_runtime', 'file': 'libhao.dylib', 'url': C['URL_PREFIX'] + '/27.2.1-26B131.0/libhao.dylib',
+                        'size': 3, 'sha256': sha(b'lib'), 'commit': 'c' * 7, 'format': 'file'}],
+            'made_on_mac': [{'row': 'tahoe_boot_donors', 'producer': 'tools/donors', 'inputs': ['kdk']}],
+            'harvested': ['icon_caches'], 'expected': {'image': '2' * 64}}
+
+    def check(self, stage=True):
+        (self.d / 'release.json').write_text(json.dumps(self.r))
+        return C['check_release_file'](self.d / 'release.json', self.d if stage else None)
+
+    def test_good_release_and_stage(self):
+        self.assertEqual(self.check(), [])
+
+    def test_seeded_violations(self):
+        a = self.r['assets'][0]
+        a['url'] = C['URL_PREFIX'] + '/27.2.1-26B131.1/libhao.dylib'               # another tag
+        del self.r['downloads'][0]['sha256']                                         # unpinned download
+        self.r['made_on_mac'].append({'row': 'hao_runtime', 'producer': ''})          # both, and no producer
+        self.r['harvested'].append('tahoe_boot_donors')
+        (self.d / 'stray.bin').write_bytes(b'x')
+        bad = '\n'.join(self.check())
+        for want in ('asset hao_runtime url', 'download kdk lacks sha256', 'made_on_mac hao_runtime names no producer',
+                     'row hao_runtime is in assets and made_on_mac', 'row tahoe_boot_donors is in made_on_mac and harvested',
+                     'stray.bin is staged but not an asset'):
+            self.assertIn(want, bad)
+
+    def test_staged_file_must_match(self):
+        (self.d / 'libhao.dylib').write_bytes(b'LIB')
+        self.assertEqual(self.check(), ['release: staged libhao.dylib does not match its sha256'])
+        self.assertEqual(self.check(stage=False), [])
+        (self.d / 'libhao.dylib').unlink()
+        self.assertIn('is not staged', self.check()[0])
+
+    def test_name_and_version(self):
+        self.r['release'] = 'v0.1.0'
+        self.r['contract_version'] = 2
+        bad = '\n'.join(self.check(stage=False))
+        self.assertIn("name 'v0.1.0' is not MACOS-BUILD.N", bad)
+        self.assertIn('contract_version 2', bad)
+
+
 class Schemas(unittest.TestCase):
     """The published schemas name the same fields and kinds the checker enforces."""
     ROOT = Path(__file__).resolve().parents[1] / 'schemas'
@@ -175,6 +225,15 @@ class Schemas(unittest.TestCase):
         self.assertEqual(item['properties']['input_kind']['enum'], list(C['INPUT_KINDS']))
         per_kind = {r['if']['properties']['input_kind']['const']: tuple(r['then']['required']) for r in item['allOf']}
         self.assertEqual(per_kind, C['INPUT_KINDS'])
+
+    def test_release_fields(self):
+        s = self.load('release.schema.json')
+        self.assertEqual(tuple(s['required']), C['RELEASE_FIELDS'])
+        items = {k: s['properties'][k]['items'] for k in ('downloads', 'assets')}
+        self.assertEqual(tuple(items['downloads']['required']), C['DOWNLOAD_FIELDS'])
+        self.assertEqual(tuple(items['assets']['required']), C['ASSET_FIELDS'])
+        self.assertEqual(tuple(items['assets']['properties']['format']['enum']), C['ASSET_FORMATS'])
+        self.assertTrue(C['RELEASE_NAME'].match('27.2.1-26B131.0'))
 
     def test_payload_fields(self):
         self.assertEqual(tuple(self.load('payload-manifest.schema.json')['required']), C['PAYLOAD_FIELDS'])

@@ -1,0 +1,47 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://github.com/lythka/hao-patcher/tools/hao-contract/schemas/release.schema.json",
+ "title": "release.json",
+ "description": "A hao release: what the user's Mac downloads (Apple and third-party files), our own files published as release assets, the rows the user's Mac makes from Apple files, and the output hashes of the proven build. Checked by hao_contract.py release.",
+ "type": "object",
+ "required": ["contract_version", "release", "prerelease", "proven_models", "assembly", "golden_build", "donor_build",
+              "oclp", "hao_patcher", "hao_runtime", "downloads", "assets", "made_on_mac", "harvested", "expected"],
+ "properties": {
+  "contract_version": {"const": 1},
+  "release": {"type": "string", "pattern": "^\\d+(\\.\\d+){1,2}-\\d{2}[A-Z]\\d{2,4}[a-z]?\\.\\d+$",
+              "description": "MACOS-BUILD.N, e.g. 27.2.1-26B131.0; also the release tag"},
+  "prerelease": {"type": "boolean"},
+  "proven_models": {"type": "array", "items": {"type": "string"}},
+  "assembly": {"type": "string"},
+  "golden_build": {"type": "string"},
+  "donor_build": {"type": "string"},
+  "oclp": {"type": "string", "description": "commit"},
+  "hao_patcher": {"type": "string", "description": "commit"},
+  "hao_runtime": {"type": "string", "description": "commit"},
+  "downloads": {"type": "array", "items": {
+   "type": "object", "required": ["row", "name", "url", "size", "sha256"],
+   "properties": {
+    "row": {"type": "string"}, "name": {"type": "string"},
+    "url": {"type": "string", "pattern": "^https://"},
+    "size": {"type": "integer", "minimum": 0},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}},
+  "assets": {"type": "array", "items": {
+   "type": "object", "required": ["row", "file", "url", "size", "sha256", "commit", "format"],
+   "properties": {
+    "row": {"type": "string"},
+    "file": {"type": "string", "pattern": "^[^/]+$"},
+    "url": {"type": "string", "description": "https://github.com/lythka/hao-assets/releases/download/<release>/<file>"},
+    "size": {"type": "integer", "minimum": 0},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string"},
+    "format": {"enum": ["file", "tar"]}}}},
+  "made_on_mac": {"type": "array", "items": {
+   "type": "object", "required": ["row", "producer"], "not": {"required": ["url"]},
+   "properties": {
+    "row": {"type": "string"},
+    "producer": {"type": "string", "minLength": 1},
+    "inputs": {"type": "array", "items": {"type": "string"}}}}},
+  "harvested": {"type": "array", "items": {"type": "string"}},
+  "expected": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+ }
+}

@@ -4,6 +4,7 @@
 
   hao_contract.py check REPO            run the checks REPO/contract.json names; one line per problem, exit 1
   hao_contract.py message FILE          the hygiene check on one commit message (a commit-msg hook); exit 1
+  hao_contract.py release FILE [DIR]    check a release.json, and with DIR every asset file staged there; exit 1
   hao_contract.py lock REPO GLOB... --os-build B [--input-kind K] [--sdk-build S] [--cache-uuid U] [--format F]
                                         print a generated.lock for the files GLOB matches (review, then commit)
   hao_contract.py stamps REPO GLOB...   the OS build stamped in each generated file's header
@@ -25,6 +26,11 @@ check is one of
   {"kind": "payload", "manifest": PATH, "os_build": B, "layout_version": N}
         a hao-runtime payload-manifest.json: clean, the declared OS build and install-layout version, and every
         listed file present with its sha256
+  {"kind": "release", "release": PATH, "dir": PATH, "url_prefix": URL}
+        a release.json (schemas/release.schema.json): every download and asset has url, size and sha256; asset urls
+        are URL_PREFIX/<release>/<file> (default the hao-assets releases); no row is both an asset and made on the
+        user's Mac, and no harvested row ships; every made-on-Mac row names its producer. With dir, every asset
+        file is there with its size and sha256, and nothing else is
 Standard library only, so each repo can vendor a pinned copy.
 """
 import fnmatch
@@ -36,7 +42,7 @@ import re
 import subprocess
 import sys
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 CONTRACT_VERSION = 1
 HOME = ('home folder', re.compile('/' r'Users/(?!Shared\b)[A-Za-z]'))   # built from parts: no self-match
 
@@ -210,7 +216,113 @@ def check_payload(repo, c):
     return bad
 
 
-CHECKS = {'hygiene': check_hygiene, 'generated-lock': check_lock, 'payload': check_payload}
+RELEASE_FIELDS = ('contract_version', 'release', 'prerelease', 'proven_models', 'assembly', 'golden_build',
+                  'donor_build', 'oclp', 'hao_patcher', 'hao_runtime', 'downloads', 'assets', 'made_on_mac',
+                  'harvested', 'expected')
+DOWNLOAD_FIELDS = ('row', 'name', 'url', 'size', 'sha256')
+ASSET_FIELDS = ('row', 'file', 'url', 'size', 'sha256', 'commit', 'format')
+ASSET_FORMATS = ('file', 'tar')
+URL_PREFIX = 'https://github.com/lythka/hao-assets/releases/download'
+RELEASE_NAME = re.compile(r'^\d+(\.\d+){1,2}-\d{2}[A-Z]\d{2,4}[a-z]?\.\d+$')
+HEX64 = re.compile(r'^[0-9a-f]{64}$')
+
+
+def check_release_file(path, stage=None, url_prefix=URL_PREFIX):
+    """Problems with a release.json and, given stage (a folder), with the asset files staged in it."""
+    path = Path(path)
+    if not path.is_file():
+        return ['release: %s is missing' % path]
+    try:
+        r = json.loads(path.read_text())
+    except ValueError as x:
+        return ['release: %s is not JSON (%s)' % (path.name, x)]
+    bad = ['release: lacks %s' % f for f in RELEASE_FIELDS if f not in r]
+    if bad:
+        return bad
+    if r['contract_version'] != CONTRACT_VERSION:
+        bad.append('release: contract_version %r, this checker is %d' % (r['contract_version'], CONTRACT_VERSION))
+    name = r['release']
+    if not isinstance(name, str) or not RELEASE_NAME.match(name):
+        bad.append('release: name %r is not MACOS-BUILD.N (e.g. 27.2.1-26B131.0)' % name)
+    if not isinstance(r['prerelease'], bool):
+        bad.append('release: prerelease must be true or false')
+
+    def pinned(kind, e, fields):
+        label = '%s %s' % (kind, e.get('row', '?'))
+        out = ['release: %s lacks %s' % (label, f) for f in fields if f not in e or e[f] in (None, '')]
+        if out:
+            return out
+        if not isinstance(e['size'], int) or isinstance(e['size'], bool) or e['size'] < 0:
+            out.append('release: %s size %r is not a byte count' % (label, e['size']))
+        if not HEX64.match(str(e['sha256'])):
+            out.append('release: %s sha256 is not 64 lowercase hex digits' % label)
+        if not str(e['url']).startswith('https://'):
+            out.append('release: %s url is not https' % label)
+        return out
+
+    rows = {}
+    for e in r['downloads']:
+        bad += pinned('download', e, DOWNLOAD_FIELDS)
+        rows.setdefault(e.get('row'), []).append('downloads')
+    files = set()
+    for e in r['assets']:
+        b = pinned('asset', e, ASSET_FIELDS)
+        bad += b
+        rows.setdefault(e.get('row'), []).append('assets')
+        if b:
+            continue
+        if e['format'] not in ASSET_FORMATS:
+            bad.append('release: asset %s format %r is not one of %s' % (e['row'], e['format'], ', '.join(ASSET_FORMATS)))
+        if '/' in e['file'] or e['file'] in ('', '.', '..'):
+            bad.append('release: asset %s file %r is not a plain file name' % (e['row'], e['file']))
+        if e['file'] in files:
+            bad.append('release: asset file %s is listed twice' % e['file'])
+        files.add(e['file'])
+        want = '%s/%s/%s' % (url_prefix.rstrip('/'), name, e['file'])
+        if e['url'] != want:
+            bad.append('release: asset %s url %s is not %s' % (e['row'], e['url'], want))
+    for e in r['made_on_mac']:
+        rows.setdefault(e.get('row'), []).append('made_on_mac')
+        if not e.get('producer'):
+            bad.append('release: made_on_mac %s names no producer' % e.get('row', '?'))
+        if e.get('url'):
+            bad.append('release: made_on_mac %s has a url: it is made on the user\'s Mac, never uploaded' % e.get('row'))
+        if not isinstance(e.get('inputs', []), list):
+            bad.append('release: made_on_mac %s inputs is not a list' % e.get('row'))
+    for row in r['harvested']:
+        rows.setdefault(row, []).append('harvested')
+    for row, where in sorted(rows.items(), key=lambda x: str(x[0])):
+        if row is None:
+            bad.append('release: an entry in %s has no row' % where[0])
+        elif len(where) > 1:
+            bad.append('release: row %s is in %s' % (row, ' and '.join(where)))
+    if not isinstance(r['expected'], dict) or not all(HEX64.match(str(v)) for v in r['expected'].values()):
+        bad.append('release: expected must map each step to a sha256')
+    if stage is not None:
+        stage = Path(stage)
+        for e in r['assets']:
+            f = stage / str(e.get('file', ''))
+            if not e.get('file') or not f.is_file():
+                bad.append('release: asset %s is not staged in %s' % (e.get('file'), stage))
+            elif f.stat().st_size != e.get('size'):
+                bad.append('release: staged %s is %d bytes, release.json says %s' % (e['file'], f.stat().st_size,
+                                                                                    e.get('size')))
+            elif sha256(f) != e.get('sha256'):
+                bad.append('release: staged %s does not match its sha256' % e['file'])
+        extra = sorted(p.name for p in stage.iterdir() if p.is_file() and p.name not in files and p != path
+                       and p.name != path.name and not p.name.startswith('.'))
+        bad += ['release: %s is staged but not an asset (it would not be uploaded)' % n for n in extra]
+    return bad
+
+
+def check_release(repo, c):
+    base = Path(repo)
+    resolve = lambda p: Path(p) if os.path.isabs(p) else base / p
+    return check_release_file(resolve(c['release']), resolve(c['dir']) if c.get('dir') else None,
+                              c.get('url_prefix', URL_PREFIX))
+
+
+CHECKS = {'hygiene': check_hygiene, 'generated-lock': check_lock, 'payload': check_payload, 'release': check_release}
 
 
 def check(repo):
@@ -235,6 +347,10 @@ def main(argv):
         bad = check_message(Path(argv[1]).read_text(errors='replace'))
         for b in bad:
             print(b, file=sys.stderr)
+        return 1 if bad else 0
+    if argv[:1] == ['release'] and len(argv) in (2, 3):
+        bad = check_release_file(argv[1], argv[2] if len(argv) == 3 else None)
+        print('\n'.join(bad) or 'hao-contract: %s is a well-formed release' % argv[1])
         return 1 if bad else 0
     if len(argv) >= 2 and argv[0] == 'check':
         bad = check(argv[1])
