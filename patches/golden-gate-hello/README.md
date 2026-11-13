@@ -23,12 +23,18 @@ under macOS 27 (Golden Gate; 26A428 and 26B131).
 `edit-metal.py` checks every byte it replaces and stops on any other wrapper. The same edits are declared in
 [`edits/metal.json`](edits/metal.json) for [tools/edit-engine](../../tools/edit-engine/README.md), anchored on the
 wrapper's symbols; `tests/test_edits.py` proves the engine writes the same bytes as the script. The image needs AMFI relaxed
-(`amfi_get_out_of_my_way=1`, set by [hao-opencore](../hao-opencore/README.md)). The `libhelloblur` row is a prebuilt
-artifact; its builder is not part of this repository.
+(`amfi_get_out_of_my_way=1`, set by [hao-opencore](../hao-opencore/README.md)).
+
+## Source
+The `libhelloblur` row is built by [`build/`](build/README.md) from `build/src/hello_blurcache.m` (`build/make.sh`:
+x86_64, macOS 13, `MacOSX26.sdk`, install name `/usr/lib/libhelloblur.dylib`, ad hoc signed as `local.libhelloblur`).
+A rebuild with today's linker differs from the row's file only in the linker version, the UUID and the ad hoc
+signature; `build/compare.py` checks that, and `pipeline/reproductions.json` records it.
 
 ## Verify
 ```sh
 python3.14 -I -B -m unittest discover -s patches/golden-gate-hello/tests   # HELLO_OCLP_METAL=PATH adds OCLP's wrapper
+python3.14 -I -B -m unittest discover -s patches/golden-gate-hello/build/tests   # HELLOBLUR_REFERENCE=PATH adds the row's file
 ```
 Boot with NVRAM `prev-lang:kbd` cleared so the Mac starts at the Language Chooser: hello draws there, then Welcome in
 Setup Assistant, with no MTLCompilerService crash report. The hook log lists the SHA-256 of the three files.
@@ -38,6 +44,7 @@ NEEDS VALIDATION: on a MacBookPro9,2 the Language Chooser played hello and MTLCo
 without a crash; frame rate on the HD 4000 and `textFragment_watchPreview` are untested.
 
 ## Revisions
+- r6 2026-11-12 The `libhelloblur` source and builder are in `build/` (from the hello-render recipe); the row and the hook are unchanged.
 - r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on Metal, the hello library (0644) and libhelloblur), as the hook sets them, so overlays carry them; the hook is unchanged.
 - r4 2026-11-12 Declare the Metal wrapper edits in `edits/metal.json` and the three files in `patch.json` `files`; the hook is unchanged.
 - r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Recipe unchanged.

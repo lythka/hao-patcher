@@ -62,7 +62,7 @@ Revision r5, status experiment. [Recipe](../patches/golden-gate-font-registry/RE
 
 ## golden-gate-hello
 
-Revision r5, status experiment. [Recipe](../patches/golden-gate-hello/README.md)
+Revision r6, status experiment. [Recipe](../patches/golden-gate-hello/README.md)
 
 - `System/Library/Frameworks/Metal.framework/Versions/A/Metal`: from OCLP · Metal 3802 Common; 3 edits, applied by the installer, then signed: ad hoc, once, identifier Metal. Installed mode 0755, owner root:wheel, flags restricted.
   1. `hello-not-skipped`: literal near _fake_LCAUtilities_shouldSkipHello (within 64 bytes), 11 bytes, `B0 01 0F BE C0 48 83 C4 10 5D C3` → `B0 00 0F BE C0 48 83 C4 10 5D C3` (`mov al,1` → `mov al,0`).
