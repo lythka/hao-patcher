@@ -267,13 +267,15 @@ def class_stub(name, objs):
     decls = [o for o in objs if o.get('kind') == 'ObjCInterfaceDecl' and o.get('name') == name]
     if not decls:
         return None
-    methods, props, protocols, seen, superclass = [], [], set(), set(), None
+    methods, props, protocols, seen, superclass, resettable = [], [], set(), set(), None, {}
     for d in decls:
         protocols |= {p.get('name') for p in d.get('protocols', [])}
         superclass = superclass or (d.get('super') or {}).get('name')
         for c in d.get('inner', []):
             if c.get('kind') == 'ObjCPropertyDecl':
                 props.append(c['name'])
+                if c.get('null_resettable') and not c.get('class'):
+                    resettable[c['name']] = c['type'].get('desugaredQualType', c['type']['qualType'])
             elif c.get('kind') == 'ObjCMethodDecl' and not c.get('isImplicit'):
                 key = ('-' if c.get('instance') else '+') + c['name']
                 if key not in seen:
@@ -284,6 +286,11 @@ def class_stub(name, objs):
         accessors |= {'-' + p, '-set%s%s:' % (p[:1].upper(), p[1:])}
     lines = ['@implementation %s' % name]
     lines += ['@synthesize %s = _%s;' % (p, p) for p in dict.fromkeys(props)]
+    # null_resettable: the getter never answers nil; a nil value (never set, or reset) becomes a default instance
+    for p, t in resettable.items():
+        cls = re.sub(r'\b(_Nullable|_Nonnull|_Null_unspecified|__kindof)\b', '', t).replace('*', '').strip()
+        if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', cls):
+            lines.append('- (%s *)%s {\n    if (!_%s) _%s = [[%s alloc] init];\n    return _%s;\n}' % (cls, p, p, p, cls, p))
     if 'NSCopying' in protocols:
         lines.append('- (id)copyWithZone:(NSZone *)zone {\n    return [self retain];\n}')
     for m in methods:

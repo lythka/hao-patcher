@@ -61,6 +61,10 @@ int metalold_marker = 1;
 @implementation HaoMTLIOAccelDevice
 - (unsigned long long)registryID { return 0x1234; }
 @end
+@interface MTLRenderPassDepthAttachmentDescriptor : NSObject @end
+@implementation MTLRenderPassDepthAttachmentDescriptor @end
+@interface MTLRenderPassStencilAttachmentDescriptor : NSObject @end
+@implementation MTLRenderPassStencilAttachmentDescriptor @end
 @interface HaoNSProcessInfo : NSObject @end
 @implementation HaoNSProcessInfo @end
 
@@ -144,6 +148,12 @@ int main(int argc, char **argv) {
         printf("render4 super=%s responds=%d\n", class_getName(class_getSuperclass(rp)),
                (int)[p respondsToSelector:NSSelectorFromString(@"reset")]);
         ((void (*)(id, SEL))objc_msgSend)(p, NSSelectorFromString(@"reset"));
+        Class rpd = (Class)dlsym(h, "OBJC_CLASS_$_MTL4RenderPassDescriptor");
+        id pass = [[rpd alloc] init];
+        id depth1 = [pass valueForKey:@"depthAttachment"];
+        [pass setValue:nil forKey:@"depthAttachment"];
+        id depth2 = [pass valueForKey:@"depthAttachment"];
+        printf("resettable=%d,%d same=%d\n", depth1 != nil, depth2 != nil, depth1 == depth2);
         NSString *const *domain = (NSString *const *)dlsym(RTLD_DEFAULT, "MTLLogStateErrorDomain");
         printf("domain=%s old=%d\n", domain ? [*domain UTF8String] : "missing", dlsym(RTLD_DEFAULT, "metalold_marker") != 0);
     }
@@ -266,7 +276,8 @@ class Wrapper(unittest.TestCase):
         clang('-dynamiclib', '-fno-objc-arc', '-framework', 'Foundation', '-install_name', METALOLD_ID,
               cls.d / 'old.m', '-o', old / 'MetalOld.dylib')
         subprocess.run(['codesign', '-f', '-s', '-', old / 'MetalOld.dylib'], check=True, capture_output=True)
-        cls.spec = {'classes': ['MTLResidencySetDescriptor', 'MTL4PipelineDescriptor', 'MTL4RenderPipelineDescriptor'],
+        cls.spec = {'classes': ['MTLResidencySetDescriptor', 'MTL4PipelineDescriptor', 'MTL4RenderPipelineDescriptor',
+                                'MTL4RenderPassDescriptor', 'MTL4StaticLinkingDescriptor'],
                     'functions': [], 'data': ['MTLLogStateErrorDomain'],
                     'ivars': ['_OBJC_IVAR_$_HaoOldIvars._b', '_OBJC_IVAR_$_HaoOldIvars._missing',
                               '_OBJC_IVAR_$__MTL4CommandBuffer._labelTraceID']}
@@ -296,6 +307,7 @@ class Wrapper(unittest.TestCase):
         r = subprocess.run([str(self.d / 'p'), str(self.d / 'build/Metal')], capture_output=True,
                            text=True, env=env)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('resettable=1,1', r.stdout)              # null_resettable: never nil, nil resets to a default
         self.assertIn('image=ours', r.stdout)                       # our stubs, not the host's Metal
         self.assertIn('residency label=heap capacity=64 copy=heap', r.stdout)
         self.assertIn('render4 super=MTL4PipelineDescriptor responds=1', r.stdout)
