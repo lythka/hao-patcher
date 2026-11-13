@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""Stage A0 of the Golden Gate Recovery: the 27.2.1 BaseSystem on this repo's Intel boot path, for QEMU.
+
+usage: a0 build [--system-image IMG] [--out DIR] [--grow SIZE] [--timeout S] [--keep-vm]
+       a0 esp OUT_DIR
+
+build: in an isolated builder VM clone (pipeline/vm, the builder lock store/tmp/builder.lock taken as golden-run takes
+       it), src/guest_a0.py makes the BaseSystem from row golden_gate_basesystem (26B131) in the Tahoe BaseSystem's
+       container (row unpack of 25G342) with the main image's x86_64 files, kernel collections, x86_64 shared cache
+       and hao (IMG, default store/images/mbp92-26B131-tested/work/disk.img, an APFS clone of it attached read-only).
+       OUT (default store/recovery/gg-a0-STAMP): BaseSystem.dmg, disk.img (the container as a raw disk),
+       dmgdisk.img (an HFS+ disk holding com.apple.recovery.boot/BaseSystem.dmg), machos.json, a0.json, a0.log and
+       build.json (inputs, system image, commit). The run record is store/runs/gg-recovery-a0-STAMP.
+esp:   OUT_DIR/EFI = row qemu_esp_hao (26B131) with Misc.Security.DmgLoading Any and a 5 s picker timeout, for
+       `tools/qemu-vm/qemu-vm start --image OUT/disk.img|dmgdisk.img --esp OUT_DIR`.
+Never formats or mounts anything on the host; every disk operation runs in the guest.
+"""
+import argparse, datetime, hashlib, json, os, plistlib, runpy, shutil, subprocess, sys, tarfile, time, uuid
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+TOP = HERE.parents[1]
+P = TOP / 'pipeline'
+STORE = (TOP / 'store').resolve()
+GUEST = '/private/var/ssdshare'
+GOLDEN, DONOR, COMMON = P / 'inputs/golden/26B131', P / 'inputs/25G342', P / 'inputs/common'
+DEFAULT_IMAGE = STORE / 'images/mbp92-26B131-tested/work/disk.img'
+WORKSPACE_BYTES = 96 * 2**30
+lock = runpy.run_path(str(P / 'lock.py'))
+
+
+def row(name, *locks):
+    for d in locks:
+        if (d / name).is_file():
+            return d, Path(lock['path'](str(d), name))
+    sys.exit('a0: no row %s in %s' % (name, ', '.join(map(str, locks))))
+
+
+def digest(p):
+    h = hashlib.sha256()
+    with open(p, 'rb') as f:
+        for b in iter(lambda: f.read(1 << 20), b''):
+            h.update(b)
+    return h.hexdigest()
+
+
+def sh(*args, **kw):
+    args = [str(a) for a in args]
+    print('+ ' + ' '.join(args), flush=True)
+    return subprocess.run(args, check=True, **kw)
+
+
+def job_script(stamp):
+    name = 'gga0-' + stamp
+    return '''set -u
+umask 022
+G=%s
+install -d -m 755 "$G/out"
+exec >"$G/out/a0.log" 2>&1
+rc=0
+"$G/py/bin/python3.12" -I "$G/golden-workspace.py" --size-bytes %d --mount /Volumes/%s --name %s \
+    --record "$G/out/workspace.json" --source-sha256 %s || rc=$?
+[ "$rc" != 0 ] || GROW="$(cat "$G/grow")" "$G/py/bin/python3.12" -I "$G/guest_a0.py" "$G" /Volumes/%s || rc=$?
+sync
+printf '%%s\\n' "$rc" > "$G/out/result.new"
+mv "$G/out/result.new" "$G/out/result"
+''' % (GUEST, WORKSPACE_BYTES, name, name, digest(P / 'stages/golden-workspace.py'), name)
+
+
+def image_record(image):
+    """The golden-run record that committed IMG's repository, if any."""
+    repo = Path(image).resolve().parents[1]
+    best = None
+    for b in sorted((STORE / 'runs').glob('golden-*/build.json')):
+        try:
+            r = json.loads(b.read_text())
+        except ValueError:
+            continue
+        if r.get('repository') == str(repo) and r.get('status') == 'committed':
+            best = dict(record=str(b.parent), commit=r.get('commit'), dirty=r.get('dirty'))
+    return best
+
+
+def build(a):
+    gr = runpy.run_path(str(P / 'golden-run'))
+    stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6]
+    job = 'gg-recovery-a0-' + stamp
+    work, record = STORE / 'tmp' / job, STORE / 'runs' / job
+    out = Path(a.out).resolve() if a.out else STORE / 'recovery' / ('gg-a0-' + stamp)
+    image = Path(a.system_image).resolve()
+    if not image.is_file():
+        sys.exit('a0: no system image %s' % image)
+    if out.exists():
+        sys.exit('a0: %s exists' % out)
+    rows = {}
+    for name, locks in (('golden_gate_basesystem', (GOLDEN,)), ('unpack', (DONOR,)), ('python_arm64', (COMMON,)),
+                        ('test_host_key', (COMMON,)), ('test_authorized_key', (COMMON,))):
+        d, p = row(name, *locks)
+        rows[name] = dict(lock=str(d.relative_to(TOP)), path=str(p), row=(d / name).read_text())
+    tahoe = Path(rows['unpack']['path']) / 'out/BaseSystem-x86_64.dmg'
+    work.mkdir(parents=True); record.mkdir(parents=True)
+    share = work / 'share'; share.mkdir()
+    state = dict(unit='tools/gg-recovery', operation='a0', date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                 commit=subprocess.check_output(['git', '-C', str(TOP), 'rev-parse', 'HEAD'], text=True).strip(),
+                 dirty=bool(subprocess.check_output(['git', '-C', str(TOP), 'status', '--porcelain'], text=True).strip()),
+                 inputs=rows, tahoe_basesystem=dict(path=str(tahoe), sha256=digest(tahoe)),
+                 system_image=dict(path=str(image), size=image.stat().st_size, mtime=image.stat().st_mtime,
+                                   built_by=image_record(image)),
+                 grow=a.grow, work=str(work), out=str(out), status='staging')
+    (record / 'build.json').write_text(json.dumps(state, indent=2) + '\n')
+    vm = None; started = False
+    with gr['builder_lock'](STORE / 'tmp/builder.lock', job + ' pid=' + str(os.getpid())):
+        try:
+            (share / 'in').mkdir()
+            sh('cp', '-c', rows['golden_gate_basesystem']['path'], share / 'in/gg.dmg')
+            sh('cp', '-c', tahoe, share / 'in/tahoe.dmg')
+            py = STORE / 'cache/python/arm64'
+            if not (py / 'python/bin/python3.12').is_file():
+                shutil.rmtree(py, ignore_errors=True); py.mkdir(parents=True)
+                with tarfile.open(rows['python_arm64']['path']) as t:
+                    t.extractall(py, filter='tar')
+            sh('ditto', py / 'python', share / 'py')
+            shutil.copytree(HERE / 'src/access', share / 'access')
+            shutil.copyfile(rows['test_host_key']['path'], share / 'access/ssh_host_ed25519_key')
+            shutil.copyfile(rows['test_authorized_key']['path'], share / 'access/authorized_keys')
+            shutil.copyfile(HERE / 'src/guest_a0.py', share / 'guest_a0.py')
+            shutil.copyfile(P / 'stages/golden-workspace.py', share / 'golden-workspace.py')
+            (share / 'grow').write_text(a.grow + '\n')
+            state['source_files'] = {str(p.relative_to(HERE)): digest(p) for p in sorted(HERE.rglob('*'))
+                                     if p.is_file() and '__pycache__' not in p.parts}
+            sh('cp', '-c', image, work / 'system.img')
+            gr['create_workspace_image'](work / 'workspace.img', WORKSPACE_BYTES)
+            clone = sh(sys.executable, '-I', P / 'vm/clones.py', 'clone', job, '--base', STORE / 'vm/base',
+                       capture_output=True, text=True)
+            vm = Path(json.loads(clone.stdout)['vm']); state['vm'] = str(vm)
+            env = dict(os.environ, VMBIN=os.environ.get('VMBIN', str(STORE / 'vm/bin')), VMCTL=str(P / 'vm/vmctl'))
+            started = True
+            sh(sys.executable, '-I', P / 'vm/clones.py', 'start', vm, share, '--usb', str(work / 'system.img') + ':ro',
+               '--usb', work / 'workspace.img', env=env)
+            script = job_script(stamp)
+            (record / 'guest-job.sh').write_text(script)
+            reply = sh(P / 'vm/vmctl', vm, 'exec', '(\n' + script + '\n) >/dev/null 2>&1 </dev/null & echo started',
+                       capture_output=True, text=True, env=env)
+            if reply.stdout.strip() != 'started':
+                raise RuntimeError('guest start reply uncertain: %r' % reply.stdout)
+            state['status'] = 'building'; (record / 'build.json').write_text(json.dumps(state, indent=2) + '\n')
+            o, seen, deadline = share / 'out', 0, time.monotonic() + a.timeout
+            while not (o / 'result').is_file():
+                if time.monotonic() > deadline:
+                    raise TimeoutError('no guest result after %d s; log %s' % (a.timeout, o / 'a0.log'))
+                if (o / 'a0.log').is_file():
+                    with open(o / 'a0.log') as f:
+                        f.seek(seen); text = f.read(); seen = f.tell()
+                    print(text, end='', flush=True)
+                time.sleep(10)
+            with open(o / 'a0.log') as f:
+                f.seek(seen); print(f.read(), end='', flush=True)
+            rc = int((o / 'result').read_text())
+            state['guest'] = json.loads((o / 'a0.json').read_text()) if (o / 'a0.json').is_file() else None
+            if rc:
+                raise RuntimeError('guest failed (%d); log %s' % (rc, o / 'a0.log'))
+            sh('zsh', P / 'vm/stop.sh', vm, env=env); started = False
+            out.mkdir(parents=True)
+            for f in o.iterdir():
+                if f.name not in ('result',):
+                    os.rename(f, out / f.name)
+            state['outputs'] = {f.name: dict(size=f.stat().st_size) for f in sorted(out.iterdir())}
+            state['outputs']['BaseSystem.dmg']['sha256'] = digest(out / 'BaseSystem.dmg')
+            state['status'] = 'built'
+        except BaseException as e:
+            state.update(status='failed', error=str(e))
+            raise
+        finally:
+            if started:
+                try:
+                    sh('zsh', P / 'vm/stop.sh', vm, env=env)
+                except Exception as e:
+                    state['stop_error'] = str(e)
+            for f in ('a0.log', 'a0.json', 'machos.json', 'workspace.json'):   # before the work folder goes
+                for d in (share / 'out', out):
+                    if (d / f).is_file():
+                        shutil.copy2(d / f, record / f)
+                        break
+            if vm and not a.keep_vm and state.get('status') == 'built':
+                sh(sys.executable, '-I', P / 'vm/clones.py', 'remove-clone', job)
+                state['vm_removed'] = True
+            if state.get('status') == 'built':   # the record and OUT hold everything kept; the work folder goes
+                shutil.rmtree(work, ignore_errors=True)
+            (record / 'build.json').write_text(json.dumps(state, indent=2) + '\n')
+            (out / 'build.json').write_text(json.dumps(state, indent=2) + '\n') if out.is_dir() else None
+    print('A0 BaseSystem: %s\nRecord: %s' % (out, record))
+
+
+def esp(a):
+    _, src = row('qemu_esp_hao', GOLDEN)
+    dest = Path(a.out_dir).resolve()
+    if dest.exists():
+        sys.exit('a0: %s exists' % dest)
+    shutil.copytree(Path(src) / 'EFI', dest / 'EFI', ignore=shutil.ignore_patterns('._*', '.DS_Store'))
+    cfg = dest / 'EFI/OC/config.plist'
+    c = plistlib.loads(cfg.read_bytes())
+    configure(c)
+    cfg.write_bytes(plistlib.dumps(c))
+    (dest / 'esp.json').write_text(json.dumps(dict(unit='tools/gg-recovery', operation='esp', row='qemu_esp_hao',
+                                                   source=str(src), config_sha256=digest(cfg)), indent=2) + '\n')
+    print(dest)
+
+
+def configure(c):
+    """OpenCore changes for the A0 boot: the unsigned BaseSystem.dmg loads (DmgLoading Any, as stages/netrec.sh), the
+    Recovery entry is shown (HideAuxiliary off) and the picker waits 5 s."""
+    c['Misc']['Security']['DmgLoading'] = 'Any'
+    c['Misc']['Boot']['HideAuxiliary'] = False
+    c['Misc']['Boot']['Timeout'] = 5
+    return c
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    s = ap.add_subparsers(dest='cmd', required=True)
+    b = s.add_parser('build')
+    b.add_argument('--system-image', default=str(DEFAULT_IMAGE))
+    b.add_argument('--out')
+    b.add_argument('--grow', default='20g')
+    b.add_argument('--timeout', type=int, default=7200)
+    b.add_argument('--keep-vm', action='store_true')
+    e = s.add_parser('esp')
+    e.add_argument('out_dir')
+    a = ap.parse_args()
+    {'build': build, 'esp': esp}[a.cmd](a)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,4 @@
+# 27.2.1 (26B131) BaseSystem: the restore IPSW's 022-22150-178.dmg.aea (the BaseSystem every BuildManifest identity
+# names) decrypted with `ipsw fw aea`; UDRO, one APFS volume "macOS Base System", arm64e only. Source tree of the
+# Golden Gate Recovery experiments (tools/gg-recovery).
+8afd4a285b7379c7ad0680df8a211f438a7569ddf6e504356d93afdec9244de1 store/inputs/basesystem-26B131/022-22150-178.dmg

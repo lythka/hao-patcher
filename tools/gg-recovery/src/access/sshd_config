@@ -1,0 +1,9 @@
+HostKey /usr/local/a0/ssh_host_ed25519_key
+AuthorizedKeysFile /usr/local/a0/authorized_keys
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UsePAM no
+UseDNS no
+LogLevel VERBOSE
