@@ -36,6 +36,9 @@ build/
 *.trace/
 *.sqlite
 dyld_shared_cache_*
+# Generated on the user's machine from Apple binaries (carries Apple's private type encodings); make.py writes it
+# to its own work folder, this keeps a hand-run abi.py --out out of git too.
+tools/metal-adapter/src/layouts.inc
 tools/ssdpush/ssdpush-agent-*
 
 # Python and macOS.
