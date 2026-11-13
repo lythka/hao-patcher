@@ -155,7 +155,8 @@ On the image, OCLP's HD 4000 driver carries two weak dylibs (`/usr/lib/libmetal-
 from [metalold-selectors](../../patches/metalold-selectors/README.md)); they load into the adapter's process with the
 driver. The framebuffer dylib hooks the device's render pipeline factories and asks every render pipeline for
 argument reflection, so on the laptop every render case goes through 27's reflection reader, with or without
-`HAO_REFLECTION`. `system.txt` records both dylibs and the driver's load commands.
+`HAO_REFLECTION`. `system.txt` records both dylibs and whether the driver names them (by `grep`: `otool`
+would ask to install the developer tools on the laptop).
 
 | run | Metal in the process | compile path | device |
 |---|---|---|---|

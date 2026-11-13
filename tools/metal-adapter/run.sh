@@ -52,8 +52,11 @@ OCLP=(
   /usr/bin/plutil -p $SL/Frameworks/Metal.framework/Versions/A/XPCServices/MTLCompilerService.xpc/Contents/version.plist 2>&1
   print "\n== bundle symlinks resolve to"
   ls -la $B/fw/Metal.framework/Versions/A/ $B/fw/Metal.framework/Versions/A/XPCServices/ 2>&1
-  print "\n== the HD 4000 driver's load commands (weak: the image's framebuffer and selector dylibs)"
-  /usr/bin/otool -L $SL/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver 2>&1
+  # the image's weak dylibs, loaded with the driver (no otool: without the developer tools it opens an install dialog)
+  print "\n== dylib paths the HD 4000 driver names"
+  for l in /usr/lib/libmetal-framebuffer.dylib /usr/lib/libmetalold-selectors.dylib; do
+    print "$l: $(/usr/bin/grep -c -a -F $l $SL/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver 2>&1)"
+  done
   print "\n== IOAccelerator Metal plugin"
   /usr/sbin/ioreg -r -c IOAccelerator -d 1 -l 2>/dev/null | grep -E '"(MetalPluginName|MetalPluginClassName|IOClass|model)"'
 } > $R/system.txt 2>&1
