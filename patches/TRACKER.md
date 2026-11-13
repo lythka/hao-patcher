@@ -20,11 +20,11 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-live-text-shared | r5 | oclp-hook | experiment |  | x |  |  |  | **needs** | r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on libhellobl |
 | golden-gate-metal-framebuffer | r6 | oclp-hook | experiment |  | x | x |  |  | **needs** | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the driver |
 | golden-gate-metal-libraries | r19 | oclp-hook | experiment |  | x | x |  |  | **needs** | r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/t |
-| golden-gate-native-identities | r3 | oclp-hook | experiment |  | x | x |  |  | ok (r1) | r3 2026-11-12 Declare that its files are made on the target after every overlay file is installed (`"after": [ |
+| golden-gate-native-identities | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-13 `native_identities.py` reads each executable's headers and code signature only, and a slice's by |
 | golden-gate-root-launchservices | r1 | post | experiment | boot-seeds |  |  |  |  | **needs** | r1 2026-11-12 New: install root's LaunchServices store and auth.db from a builder boot of the same image (row  |
 | golden-gate-shader-caches | r13 | post | experiment | caches | x |  |  |  | **needs** | r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) f |
 | golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
-| golden-gate-userspace | r63 | oclp-hook | experiment |  | x | x |  |  | **needs** | r63 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runt |
+| golden-gate-userspace | r64 | oclp-hook | experiment |  | x | x |  |  | **needs** | r64 2026-11-13 Split the cryptex image build into `src/cryptex.py` and reuse a sealed OS/App image pair built  |
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
 | hao-opencore | r48 | post | experiment |  | x | x |  |  | **needs** | r48 2026-11-12 Input rows `kernel_repair_efi`, `kernel_repair_binding` and `intel_commpage_abi` (26B131) now n |
 | hao-runtime | r70 | oclp-hook | experiment |  | x | x |  |  | **needs** | r70 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runt |

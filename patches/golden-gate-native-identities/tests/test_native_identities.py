@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE/'src'))
@@ -109,6 +110,111 @@ class NativeIdentitiesTests(unittest.TestCase):
         # non-adhoc-looking signature is not constructible here, so check the verifier directly.
         self.assertTrue(ni.verify(TRUE)[0])
         self.assertFalse(ni.verify(self.system/'usr/bin/kept')[0])
+
+
+def whole_file(path):
+    """x86_64_signature's result computed the way r1-r3 did, from the whole file's bytes."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        return None
+    if data[:4] not in (b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe', b'\xca\xfe\xba\xbf'):
+        return None
+    for cpu, offset, size in ni.slices(data):
+        if cpu == ni.CPU_X86_64:
+            return ni.signature(data, offset, size), offset, size
+    return None
+
+
+def whole_scan(system, sources):
+    """scan() reading every candidate whole, as before the header-only read."""
+    with mock.patch.object(ni, 'x86_64_signature', whole_file), \
+            mock.patch.object(ni, 'slice_bytes', lambda path, found: Path(path).read_bytes()[found[1]:found[1] + found[2]]):
+        return ni.scan(system, sources)
+
+
+class HeaderOnlyRead(unittest.TestCase):
+    """The scan reads each executable's headers and code signature only; its results are those of reading the whole
+    file. With NATIVE_IDENTITIES_SYSTEM=ROOT and NATIVE_IDENTITIES_SOURCES=ROOT:ROOT (a built image's System mounted
+    read-only and the sources its record names: the pristine 27.x System, the native donors' payload/system), the
+    whole scan of a real System gives the same rows and skips both ways."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='native-identities-read-')
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_same_signature_as_the_whole_file(self):
+        thin = self.root/'thin'
+        subprocess.run(['lipo', str(TRUE), '-thin', 'x86_64', '-output', str(thin)], check=True)
+        adhoc = self.root/'adhoc'
+        shutil.copy(TRUE, adhoc)
+        resign(adhoc, 'com.example.adhoc')
+        files = [TRUE, FALSE, thin, adhoc]
+        data = thin.read_bytes()
+        for n, cut in enumerate((16, 31, 32, 200, len(data) // 2, len(data) - 1)):
+            (self.root/f'cut{n}').write_bytes(data[:cut])          # truncated: header, load commands, signature
+            files.append(self.root/f'cut{n}')
+        (self.root/'text').write_bytes(b'#!/bin/sh\n' * 1000)
+        files.append(self.root/'text')
+        for path in files:
+            with self.subTest(path=path.name):
+                try:
+                    want = whole_file(path)
+                except Exception as error:          # the whole-file read raised: the header-only read raises too
+                    with self.assertRaises(type(error)):
+                        ni.x86_64_signature(path)
+                    continue
+                self.assertEqual(ni.x86_64_signature(path), want)
+                if want:
+                    self.assertEqual(ni.x86_64(path)[1], path.read_bytes()[want[1]:want[1] + want[2]])
+
+    def test_reads_headers_and_signature_only(self):
+        big = self.root/'big'
+        (self.root/'big.c').write_text('static const char pad[4 << 20] = {1};\n'
+                                       'int main(int c, char **v) { return pad[c] + (v != 0); }\n')
+        subprocess.run(['clang', '-arch', 'x86_64', '-O1', str(self.root/'big.c'), '-o', str(big)],
+                       check=True, capture_output=True)
+        resign(big, 'com.example.big')
+        data = big.read_bytes()
+        self.assertGreater(len(data), 4 << 20)
+        sig = ni.x86_64_signature(big)[0]
+        read = []
+        real = open
+
+        def counting(path, mode='r', *args, **kwargs):
+            stream = real(path, mode, *args, **kwargs)
+            original = stream.read
+            stream.read = lambda n=-1: read.append(len(chunk := original(n))) or chunk
+            return stream
+        with mock.patch('builtins.open', counting):
+            self.assertEqual(ni.x86_64_signature(big)[0], sig)
+        # 4 KiB of headers, the signature blob (32 bytes of hashes per 4 KiB page, so under 1% of the file)
+        self.assertLess(sum(read), 4096 + 4096 + len(data) // 100)
+
+    def test_scan_matches_the_whole_file_scan(self):
+        system, source = self.root/'system', self.root/'source'
+        for folder in (system/'usr/bin', source/'usr/bin'):
+            folder.mkdir(parents=True)
+        shutil.copy(TRUE, source/'usr/bin/kept')
+        shutil.copy(TRUE, system/'usr/bin/kept')
+        resign(system/'usr/bin/kept', 'com.apple.true')
+        shutil.copy(FALSE, system/'usr/bin/orphan')
+        resign(system/'usr/bin/orphan', 'com.apple.false')
+        (system/'usr/bin/link').symlink_to('kept')
+        self.assertEqual(ni.scan(system, [source]), whole_scan(system, [source]))
+        self.assertEqual(len(ni.scan(system, [source])[0]), 1)
+
+    @unittest.skipUnless(os.environ.get('NATIVE_IDENTITIES_SYSTEM') and os.environ.get('NATIVE_IDENTITIES_SOURCES'),
+                         'set NATIVE_IDENTITIES_SYSTEM and NATIVE_IDENTITIES_SOURCES (a built image, read-only)')
+    def test_real_system(self):
+        system = Path(os.environ['NATIVE_IDENTITIES_SYSTEM'])
+        sources = [Path(p) for p in os.environ['NATIVE_IDENTITIES_SOURCES'].split(':')]
+        rows, skipped = ni.scan(system, sources)
+        self.assertEqual((rows, skipped), whole_scan(system, sources))
+        self.assertTrue(rows)
 
 
 if __name__ == '__main__':

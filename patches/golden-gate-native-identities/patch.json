@@ -1,5 +1,5 @@
 {
-  "revision": 3,
+  "revision": 4,
   "stage": "oclp-hook",
   "applies": {
     "models": [
@@ -14,9 +14,7 @@
     "golden_gate_userspace"
   ],
   "status": "experiment",
-  "validated": true,
-  "validated_revision": 1,
-  "validated_digest": "018557620bface2ec2b33e5ba2fc2aa44762fa7d89394216b5d99bfa0ed69786",
+  "validated": false,
   "files": [
     {
       "path": "usr/lib/hao/native-identities",

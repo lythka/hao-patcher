@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -7,6 +8,8 @@ from unittest.mock import patch
 spec = importlib.util.spec_from_file_location('golden_install', Path(__file__).resolve().parents[1]/'src/install.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+# install.py's cryptex image code is src/cryptex.py (install.py imports it, so it is the module install.py uses)
+cryptex = sys.modules['cryptex']
 
 
 class ReplaceTest(unittest.TestCase):
@@ -20,7 +23,7 @@ class ReplaceTest(unittest.TestCase):
                 (target/name).write_text(name); (target/name).chmod(mode & 0o777)
             outside = root/'outside'; outside.write_text('outside'); outside.chmod(0o600)
             (source/'link').symlink_to(outside); (target/'link').symlink_to(outside)
-            module.restore_special_modes(source, target)
+            cryptex.restore_special_modes(source, target)
             self.assertEqual((target/'login').stat().st_mode & 0o7777, 0o4555)
             self.assertEqual((target/'group').stat().st_mode & 0o7777, 0o2555)
             self.assertEqual(outside.stat().st_mode & 0o7777, 0o600)
@@ -44,8 +47,8 @@ class ReplaceTest(unittest.TestCase):
     def test_external_mps_plan_preserves_binary_edits_and_paths(self):
         cache = Path('/input/cache family')
         payload = '{"/input/cache family/dyld_shared_cache_x86_64.01": [[32,"00ff","aabb","repair"]]}'
-        with patch.object(module.subprocess, 'check_output', return_value=payload) as call:
-            result = module.matrix_plan(cache)
+        with patch.object(cryptex.subprocess, 'check_output', return_value=payload) as call:
+            result = cryptex.matrix_plan(cache)
         self.assertEqual(result, {cache/'dyld_shared_cache_x86_64.01': [(32, b'\x00\xff', b'\xaa\xbb', 'repair')]})
         args = call.call_args.args[0]
         self.assertEqual(args[-3:], ['mps-plan', '--cache', str(cache)])
@@ -54,8 +57,8 @@ class ReplaceTest(unittest.TestCase):
     def test_external_audio_plan_resolves_subcache_and_binary_edit(self):
         cache = Path('/input/cache family')
         payload = '{"dyld_shared_cache_x86_64.03": [[563,"ff158738771e","660f1f440000","no-console repair"]]}'
-        with patch.object(module.subprocess, 'check_output', return_value=payload) as call:
-            result = module.audio_plan(cache)
+        with patch.object(cryptex.subprocess, 'check_output', return_value=payload) as call:
+            result = cryptex.audio_plan(cache)
         self.assertEqual(result, {cache/'dyld_shared_cache_x86_64.03': [
             (563, bytes.fromhex('ff158738771e'), bytes.fromhex('660f1f440000'), 'no-console repair')]})
         args = call.call_args.args[0]
@@ -72,14 +75,14 @@ class ReplaceTest(unittest.TestCase):
             inode = anchor.stat().st_ino
             (anchor/'obsolete').write_text('old')
             (source/'usr/share/snmp/new').write_text('Golden Gate')
-            original_remove = module.remove
+            original_remove = cryptex.remove
 
             def guarded_remove(path):
                 self.assertFalse(path == anchor or path in anchor.parents)
                 original_remove(path)
 
-            with patch.object(module, 'remove', guarded_remove):
-                module.replace_tree(source, target, set(), anchors={'usr/share/snmp'})
+            with patch.object(cryptex, 'remove', guarded_remove):
+                cryptex.replace_tree(source, target, set(), anchors={'usr/share/snmp'})
             self.assertEqual(anchor.stat().st_ino, inode)
             self.assertFalse((anchor/'obsolete').exists())
             self.assertEqual((anchor/'new').read_text(), 'Golden Gate')
@@ -99,7 +102,7 @@ class ReplaceTest(unittest.TestCase):
             (target/'System/obsolete').write_text('old')
             (source/'System/new-service').write_text('Golden Gate')
             (source/'etc').symlink_to('private/etc')
-            module.replace_tree(source, target, {'System/Extensions', 'Library'})
+            cryptex.replace_tree(source, target, {'System/Extensions', 'Library'})
             self.assertEqual((target/'System/Extensions/driver').read_text(), 'target')
             self.assertEqual((data/'untouched').read_text(), 'firmlink target')
             self.assertFalse((target/'System/obsolete').exists())
@@ -113,4 +116,4 @@ class ReplaceTest(unittest.TestCase):
             (root/'elsewhere').mkdir()
             (root/'target').symlink_to(root/'elsewhere')
             with self.assertRaisesRegex(ValueError, 'ancestor is a symlink'):
-                module.replace_tree(root/'source', root/'target', {'kept'})
+                cryptex.replace_tree(root/'source', root/'target', {'kept'})

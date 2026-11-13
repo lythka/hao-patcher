@@ -251,6 +251,30 @@ installer runs later on the System volume, where those paths are empty graft poi
 hash, bound Info.plist and seal, merged hash) and fails if any entry of that cryptex is not embedded. A payload built
 without the cryptexes (the 26A428 one) has no such entries: nothing changes.
 
+### Cryptex cache
+Building and sealing the two cryptex images is most of this recipe's 5.7 minutes on 26B131. The
+image code is `src/cryptex.py` (`build_os_image`, `build_app_image`); `install.py` does the rest (compat libraries,
+WindowServer, disabled jobs, the record) and installs the images. `src/cryptex_cache.py` keys an image pair on
+everything that decides its bytes:
+- the rows `cryptex.py` reads (`golden_gate_userspace`, `codeid_carrier`, `hao_runtime`) and the assembly's DriverKit
+  donor row, each by its row identity (`pipeline/lock.py` `key_line`) plus the content of the folder's small
+  top-level files (manifests, build records);
+- the code: `cryptex.py`, every module of this folder it imports (found from its imports; `install.py` is not one),
+  `cryptex_cache.py`, everything under `build/` (the native cache repairs) and `tools/tahoe-donors`;
+- the builder: its macOS build, `newfs_apfs`, `apfs_prepare_cryptex` and Python.
+
+`pipeline/golden-run` writes the first two parts (`host_lines`) to the share's `cryptex-cache/key.json` and clones each
+`store/cache/cryptex/KEY/` entry with the same host lines into `cryptex-cache/in/`; the guest adds its builder lines.
+With `--cryptex-cache` (the runner's `GOLDEN_CRYPTEX_CACHE`) `install.py` copies a matching entry's images to Preboot,
+keeping their holes, and uses them only if their sha256 and size match the entry; otherwise it builds them and writes
+the pair to `cryptex-cache/out/KEY/`, which golden-run checks again (sha256) and keeps (the two newest entries, about 13
+GB each). A reused pair is byte for byte the stored one, and `golden-gate-userspace.json` records the same
+`cryptex` counts (including the stored image's seal line) as the build that made it. The outcome (`hit`, `miss`,
+`stored`, `corrupt`) is in the build record (`build.json` `cryptex_cache`), not in the image. Without the option, or
+with `golden-run --no-cryptex-cache`, the images are built every time as before. A sealed image is not reproducible
+(each build has its own volume UUID and seal), so images built from the same key in two builds differ; images reused
+from the cache are identical.
+
 ## Verify
 ```sh
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests
@@ -260,6 +284,9 @@ python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/build/tests
 # code identity carrier: HAO_RUNTIME = hao-runtime checkout (runs it); CODEID_CACHE = an image cache folder (plans it)
 HAO_RUNTIME=... CODEID_CACHE=.../System/Library/dyld python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests -k codeid
+# cryptex cache: CRYPTEX_CACHE_IMAGE = a built sealed os.dmg (read-only), CRYPTEX_CACHE_SCRATCH = a folder with room
+CRYPTEX_CACHE_IMAGE=.../cryptex1/current/os.dmg python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests -k cryptex_cache
+python3.14 -I patches/golden-gate-userspace/src/cryptex_cache.py key patches/golden-gate-userspace/src   # the code lines
 # declarations (tests/test_edits.py): USERSPACE_X86_CACHE, USERSPACE_ARM_CACHE, USERSPACE_CODEID_CARRIER,
 #   USERSPACE_SYSTEM_ROOT, USERSPACE_OCLP_IO80211, USERSPACE_OCLP_WIFIP2P, USERSPACE_DONOR_COREWIFI,
 #   USERSPACE_DONOR_WINDOWSERVER, HAO_RUNTIME_PAYLOAD, GOLDEN_OS_CRYPTEX, GOLDEN_APP_CRYPTEX (each described in the file)
@@ -283,7 +310,9 @@ creation logs in automatically (authd accepts loginwindow's `FUSAutologinDataKey
 unlisted ad hoc one.
 
 ## Validation
-NEEDS VALIDATION: the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r58 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
+NEEDS VALIDATION: r64 moves the image code into `src/cryptex.py` and adds the cryptex cache; the images it builds are
+made by the same code as r63, and a reused one equals the stored one (host tests, including a 26 GB image from a
+built 26B131 image). A VM build with a warm cache and a boot of it are the open checks. Before that, the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r58 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
 
 Laptop 2026-11-12, image d131d5b (26B131): r58 boots to a logged-in desktop (automatic login); Stocks, News, Photos and Podcasts run. Weather.app still aborts in hao (see hao-runtime). Image 7d0b612 (r57) booted the same way on 2026-11-11.
 Laptop 2026-11-11, image 4d1c48c (26B131): r46 Setup's own Wi-Fi join, r47 Spotlight without the Swift SIGBUS, r48 automatic login, r49 Safari; r51's Tahoe CoreWiFi auto-joins live and at boot; r52's hao 790720d fixes rapportd and Control Center live. Not yet exercised: the u3 units' Weather/Photos cases, SearchHelper's own identity.
@@ -310,6 +339,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r64 2026-11-13 Split the cryptex image build into `src/cryptex.py` and reuse a sealed OS/App image pair built earlier from the same inputs, code and builder tools (`src/cryptex_cache.py`, `--cryptex-cache` from golden-run's `GOLDEN_CRYPTEX_CACHE`); without it the hook builds the images as before.
 - r63 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runtime-26B131-20261112-0a2c2aad4755). No recipe change.
 - r62 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on the three wrappers, their renamed originals, CoreWiFi and the two job plists, as `src/install.py` leaves them) and where WindowServer's entitlements come from (`edits/windowserver-27-identity.json` `sign.entitlements_from`: the 27.x WindowServer, as `resign_with_entitlements` signs it); the hook is unchanged.
 - r61 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runtime-26B131-20261112-273ba980b829). No recipe change.

@@ -83,6 +83,12 @@ lists those programs with their Apple originals for the carrier. Recipes get `TA
 `TAHOE_DONOR_TOOL` and `TAHOE_NATIVE_ARTIFACT` from the runner. Each set entry has a comment saying
 what it adds and why.
 
+The sealed OS and App cryptex images are kept between builds in `store/cache/cryptex` (the two newest, about 13 GB
+each). Their key covers the rows they are made from, the code that makes them and the builder's APFS tools
+([golden-gate-userspace](../patches/golden-gate-userspace/README.md), "Cryptex cache"); a build with the same key
+copies them (sha256-checked) instead of rebuilding. `build.json` `cryptex_cache` says `hit`, `miss` or `stored`;
+`--no-cryptex-cache` always builds them.
+
 `golden-run` refuses a set unless:
 - the first two entries are `darwin27-kernel`, then `golden-gate-userspace` (later recipes
   edit their output);

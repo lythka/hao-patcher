@@ -30,6 +30,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -66,18 +67,59 @@ def slices(data):
     return []
 
 
+class Slice:
+    """One slice's bytes, data[offset:offset + size] of the whole file, read on demand: a range is served from the
+    loaded prefix (the header and load commands) or read from the open file, so a signature costs the header, the
+    load commands and the code signature blob instead of the whole file. get(start, stop) is exactly piece[start:stop]
+    of the slice's bytes (cut to the slice and to the file)."""
+
+    def __init__(self, stream, length, offset, size, prefix=4096):
+        self.stream, self.offset = stream, offset
+        self.size = max(0, min(offset + size, length) - offset) if offset < length else 0
+        self.prefix = self.read(0, min(prefix, self.size))
+
+    @classmethod
+    def of_bytes(cls, data, offset, size):
+        piece = cls.__new__(cls)
+        piece.stream, piece.offset, piece.prefix = None, 0, data[offset:offset + size]
+        piece.size = len(piece.prefix)
+        return piece
+
+    def read(self, start, stop):
+        start, stop = min(start, self.size), min(stop, self.size)
+        if stop <= start:
+            return b''
+        self.stream.seek(self.offset + start)
+        return self.stream.read(stop - start)
+
+    def get(self, start, stop):
+        if stop <= len(self.prefix) or self.stream is None:
+            return self.prefix[start:stop]
+        return self.read(start, stop)
+
+    def load(self, stop):
+        """Keep [0, stop) in memory (the load commands, read once)."""
+        if self.stream is not None and stop > len(self.prefix):
+            self.prefix = self.read(0, stop)
+
+
 def signature(data, offset, size):
     """dict(filetype, adhoc, cdhash, identifier, limit) of a 64-bit slice, or None if unsigned/unsupported."""
-    piece = data[offset:offset + size]
-    if len(piece) < 32 or piece[:4] != b'\xcf\xfa\xed\xfe':
+    return slice_signature(Slice.of_bytes(data, offset, size))
+
+
+def slice_signature(piece):
+    """signature() of a Slice: reads its header, load commands and LC_CODE_SIGNATURE blob only."""
+    if piece.size < 32 or piece.get(0, 4) != b'\xcf\xfa\xed\xfe':
         return None
-    filetype, count = struct.unpack_from('<II', piece, 12)
+    filetype, count, commands = struct.unpack_from('<III', piece.get(12, 24))
+    piece.load(32 + commands)
     at, blob = 32, None
     for _ in range(count):
-        command, length = struct.unpack_from('<II', piece, at)
+        command, length = struct.unpack_from('<II', piece.get(at, at + 8))
         if command == 0x1d:                             # LC_CODE_SIGNATURE
-            dataoff, datasize = struct.unpack_from('<II', piece, at + 8)
-            blob = piece[dataoff:dataoff + datasize]
+            dataoff, datasize = struct.unpack_from('<II', piece.get(at + 8, at + 16))
+            blob = piece.get(dataoff, dataoff + datasize)
         if length < 8:
             return None
         at += length
@@ -106,18 +148,41 @@ def signature(data, offset, size):
 
 def x86_64(path):
     """(slice signature, slice bytes) of the file's x86_64 slice, or (None, None)."""
+    found = x86_64_signature(path)
+    if found is None:
+        return None, None
+    return found[0], slice_bytes(path, found)
+
+
+def x86_64_signature(path):
+    """(signature or None, offset, size) of the file's x86_64 slice, or None: x86_64() without reading the slice.
+
+    Reads the fat header, the slice's Mach-O header and load commands and its code signature blob, nothing else; the
+    slice's bytes (slice_bytes) are read only for a program that has an original to compare with."""
     try:
         with open(path, 'rb') as stream:
-            if stream.read(4) not in (b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe', b'\xca\xfe\xba\xbf'):
-                return None, None
-            stream.seek(0)
-            data = stream.read()
+            head = stream.read(4096)
+            if head[:4] not in (b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe', b'\xca\xfe\xba\xbf'):
+                return None
+            length = os.fstat(stream.fileno()).st_size
+            if head[:4] == b'\xcf\xfa\xed\xfe':
+                found = [(struct.unpack_from('<i', head, 4)[0], 0, length)]
+            else:
+                found = slices(head)                    # a fat header (at most 32 entries) fits in 4 KiB
+            for cpu, offset, size in found:
+                if cpu == CPU_X86_64:
+                    return slice_signature(Slice(stream, length, offset, size)), offset, size
     except OSError:
-        return None, None
-    for cpu, offset, size in slices(data):
-        if cpu == CPU_X86_64:
-            return signature(data, offset, size), data[offset:offset + size]
-    return None, None
+        return None
+    return None
+
+
+def slice_bytes(path, found):
+    """The x86_64 slice's bytes, data[offset:offset + size] of the whole file, for x86_64_signature's result."""
+    _, offset, size = found
+    with open(path, 'rb') as stream:
+        piece = Slice(stream, os.fstat(stream.fileno()).st_size, offset, size, prefix=0)
+        return piece.read(0, piece.size)
 
 
 def same_program(observed, reference, limit):
@@ -141,7 +206,8 @@ def listed_stubs(system):
 
 
 def candidates(system):
-    """Relative paths of executables in SYSTEM whose x86_64 slice is an ad hoc signed MH_EXECUTE."""
+    """(relative path, signature, slice) of the executables in SYSTEM whose x86_64 slice is an ad hoc signed
+    MH_EXECUTE; slice is x86_64_signature's result (slice_bytes reads the bytes when they are needed)."""
     system = Path(system)
     skip = {system/ORIGINALS}
     for folder, dirs, names in os.walk(system):
@@ -153,18 +219,21 @@ def candidates(system):
                 info = path.lstat()
             except OSError:
                 continue
-            if not (info.st_mode & 0o111) or not path.is_file() or path.is_symlink() or info.st_size < 4096:
+            # a regular file by lstat: is_file() and not is_symlink(), without two more stat calls
+            if not (info.st_mode & 0o111) or not stat.S_ISREG(info.st_mode) or info.st_size < 4096:
                 continue
-            sig, body = x86_64(path)
+            found = x86_64_signature(path)
+            sig = found and found[0]
             if sig and sig['filetype'] == 2 and sig['adhoc']:
-                yield path.relative_to(system).as_posix(), sig, body
+                yield path.relative_to(system).as_posix(), sig, found
 
 
 def scan(system, sources):
     """(rows, skipped): rows = [dict(path, observed, reference, source, same)], skipped = {path: reason}."""
     stubs = listed_stubs(system)
     rows, skipped = [], {}
-    for rel, sig, body in candidates(system):
+    system = Path(system)
+    for rel, sig, found in candidates(system):
         if sig['cdhash'] in stubs:
             skipped[rel] = 'hao stub (stub-identities)'
             continue
@@ -173,7 +242,8 @@ def scan(system, sources):
             original = Path(source)/rel
             if not original.is_file() or original.is_symlink():
                 continue
-            ref, ref_body = x86_64(original)
+            ref_found = x86_64_signature(original)
+            ref = ref_found and ref_found[0]
             if not ref:
                 reasons.append(f'{source}: no signed x86_64 slice')
             elif ref['adhoc']:
@@ -183,7 +253,8 @@ def scan(system, sources):
             elif ref['cdhash'] == sig['cdhash']:
                 reasons.append(f'{source}: same cdhash')
             else:
-                same, measure = same_program(body, ref_body, ref['limit'])
+                same, measure = same_program(slice_bytes(system/rel, found), slice_bytes(original, ref_found),
+                                             ref['limit'])
                 if not same:
                     reasons.append(f'{source}: another program ({measure} code blocks unchanged)')
                     continue

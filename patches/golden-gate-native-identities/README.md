@@ -34,6 +34,12 @@ the original slice's. Programs in `stub-identities` and programs without such an
 `System/Library/CoreServices/golden-gate-native-identities.json` names each with the reason. A program that is still
 Apple-signed is not touched and needs no row.
 
+The walk reads only what a decision needs: for every executable of at least 4 KiB, the fat header, the x86_64 slice's
+Mach-O header and load commands and its code signature blob (the CodeDirectory gives the cdhash, the identifier, the
+flags and the CMS blob); the whole slice of the observed program and of its original is read only for the 90%
+comparison, which only programs with a matching Apple-signed original reach. On the 26B131 image that is 172 MB
+instead of 7.4 GB (6,500 executables, 4 compared), with the same rows and the same skips as reading every file whole.
+
 On the 26B131 inputs the expected rows are WindowServer (original: Tahoe's, from the native donors), `corespotlightd`
 and `managedcorespotlightd` (originals: 27.2.1's universal programs). A host simulation of the WindowServer and
 `corespotlightd` edits against those inputs gave both rows (307/317 and 1501/1501 pieces unchanged).
@@ -63,12 +69,22 @@ each `usr/lib/hao/originals/...` copy passes `codesign --verify --arch x86_64 -R
 passes on the image (codesign checks through the image's Security.framework, so through the carrier), where the
 same file fails on any other Mac.
 
+The header-only read is checked against a whole-file read on fixtures (thin, fat, ad hoc, truncated at every
+header boundary) and, with `NATIVE_IDENTITIES_SYSTEM=ROOT NATIVE_IDENTITIES_SOURCES=ROOT:ROOT` (a built image's System
+mounted read-only and its record's two sources), on a real System:
+`python3.14 -I -B -m unittest discover -s patches/golden-gate-native-identities/tests -k test_real_system`.
+
 ## Validation
-Laptop 2026-11-11, image 4d1c48c (26B131): Setup's automatic login after account creation is authorized in 16 s (system.login.console with the auto-login mechanism).
+NEEDS VALIDATION: r4 reads headers and signatures instead of whole files. On the exported 26B131 image (System
+read-only, the record's two sources) its scan equals r3's byte for byte (rows and skips), the list it gives equals the
+image's `/usr/lib/hao/native-identities`, and all 11,517 Mach-O files of that System and the pristine 27.2.1 System
+give the same signature and slice bytes; the hook is otherwise unchanged. A VM build with it is the open check.
+r1: laptop 2026-11-11, image 4d1c48c (26B131): Setup's automatic login after account creation is authorized in 16 s (system.login.console with the auto-login mechanism).
 Earlier: Host tests pass and a host simulation of the 26B131 WindowServer and `corespotlightd` edits gives
 their rows. No image has been built with this recipe.
 
 ## Revisions
+- r4 2026-11-13 `native_identities.py` reads each executable's headers and code signature only, and a slice's bytes only for the 90% comparison (172 MB instead of 7.4 GB on 26B131); same rows, skips and list.
 - r3 2026-11-12 Declare that its files are made on the target after every overlay file is installed (`"after": ["overlays"]`): the list is keyed on the CDHashes of the files as installed; the hook is unchanged. Keeps r1's validation: what it installs is unchanged (validated_digest).
 - r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.json `files`; the hook is unchanged.
 - r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the native-identities list, replacing golden-gate-code-identity's map and per-daemon interposer.

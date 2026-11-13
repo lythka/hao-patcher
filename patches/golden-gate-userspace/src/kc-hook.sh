@@ -9,10 +9,11 @@
 #   kc-hook.sh SYSTEM_MOUNT     env OCLP_PYTHON GRP PBU, and from golden-image.py (runner-only facts):
 #     TAHOE_DRIVERKIT_ARTIFACT  the assembly's tahoe_driverkit_donors artifact
 #     TAHOE_DONOR_TOOL          tools/tahoe-donors/make, which installs it into the cryptex
+#     GOLDEN_CRYPTEX_CACHE      optional: the share's cryptex cache folder (golden-run), see src/cryptex_cache.py
 set -eu
 S=${1:?System mount}; H=$(cd "$(dirname "$0")" && pwd)
 "${OCLP_PYTHON:?}" -I "$H/install.py" "$S" "$H/inputs/golden_gate_userspace" "$H/inputs/display_state_shim" \
     "$H/inputs/io80211_compat" "$H/inputs/wifip2p_compat" "$H/inputs/corewifi_compat" \
     --driverkit-artifact "${TAHOE_DRIVERKIT_ARTIFACT:?set by golden-image.py}" \
     --donor-tool "${TAHOE_DONOR_TOOL:?set by golden-image.py}" \
-    --hao-runtime "$H/inputs/hao_runtime"
+    --hao-runtime "$H/inputs/hao_runtime" ${GOLDEN_CRYPTEX_CACHE:+--cryptex-cache "$GOLDEN_CRYPTEX_CACHE"}

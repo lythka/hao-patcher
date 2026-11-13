@@ -73,6 +73,59 @@ class GoldenRun(unittest.TestCase):
                 with self.assertRaises(SystemExit):RUN['main']()
             self.assertIn('overlay',err.getvalue())
 
+    def test_cryptex_cache_stages_matching_entries_and_keeps_new_ones(self):
+        """prepare_cryptex_cache: key.json from the staged recipe, rows and donor tool; only entries with the same host
+        lines are cloned into in/. collect_cryptex_cache: a new out/ entry is checked and moved into the store, a
+        damaged one stops, and the store keeps the newest entries."""
+        rows=[('oclp-hook','darwin27-kernel'),('oclp-hook','golden-gate-userspace')]
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);share=self.share(root/'share',rows)
+            staged=share/'hooks/02-golden-gate-userspace'
+            for f in (TOP/'patches/golden-gate-userspace/src').glob('*.py'):shutil.copy2(f,staged/f.name)
+            (share/'assembly-source/tahoe-donors').mkdir(parents=True);(share/'assembly-source/tahoe-donors/make').write_text('t')
+            lock=root/'lock';lock.mkdir()
+            for name in ('golden_gate_userspace','codeid_carrier','hao_runtime','tahoe_driverkit_donors'):
+                (root/'store/artifacts'/name).mkdir(parents=True)
+                (root/'store/artifacts'/name/'build.json').write_text('{"name": "%s"}'%name)
+                (lock/name).write_text('- %s\n'%(root/'store/artifacts'/name))
+            lockrows=runpy.run_path(str(TOP/'pipeline/lock.py'))
+            store=root/'cache';recipe=dict(inputs=dict(driverkit='tahoe_driverkit_donors'))
+            record=RUN['prepare_cryptex_cache'](recipe,share,store,lockrows,(lock,))
+            key=json.loads((share/'cryptex-cache/key.json').read_text())
+            self.assertEqual((record['host_key'],record['staged']),(key['host_key'],[]))
+            self.assertTrue(any(l.startswith('source cryptex.py ') for l in key['host_lines']))
+            self.assertFalse(any(' install.py ' in l for l in key['host_lines']))
+            self.assertIn('codeid_carrier file build.json',' '.join(key['host_lines']))
+            # the guest stored an entry: checked and moved into the store
+            out=share/'cryptex-cache/out/k1';out.mkdir(parents=True)
+            (out/'os.dmg').write_bytes(b'os');(out/'app.dmg').write_bytes(b'app')
+            files={n:dict(sha256=RUN['digest'](out/n),size=len((out/n).read_bytes())) for n in ('os.dmg','app.dmg')}
+            (out/'entry.json').write_text(json.dumps(dict(lines=key['host_lines']+['builder x'],files=files)))
+            (share/'cryptex-cache/result.json').write_text(json.dumps(dict(key='k1',outcome='stored')))
+            done=RUN['collect_cryptex_cache'](share,store,dict(record))
+            self.assertEqual((done['stored']['key'],done['result']['outcome'],done['pruned']),('k1','stored',[]))
+            self.assertEqual((store/'k1/os.dmg').read_bytes(),b'os')
+            # the next build stages it; an entry of other inputs is not staged
+            other=store/'k0';other.mkdir()
+            (other/'entry.json').write_text(json.dumps(dict(lines=['schema other'],files={})))
+            shutil.rmtree(share/'cryptex-cache')
+            self.assertEqual(RUN['prepare_cryptex_cache'](recipe,share,store,lockrows,(lock,))['staged'],['k1'])
+            self.assertEqual((share/'cryptex-cache/in/k1/os.dmg').read_bytes(),b'os')
+            # a damaged new entry stops
+            bad=share/'cryptex-cache/out/k2';bad.mkdir(parents=True)
+            (bad/'os.dmg').write_bytes(b'xx')
+            (bad/'entry.json').write_text(json.dumps(dict(files={'os.dmg':files['os.dmg']})))
+            with self.assertRaisesRegex(RuntimeError,'the guest recorded'):RUN['collect_cryptex_cache'](share,store,{})
+            shutil.rmtree(bad)
+            # keep the newest: k1 was used last
+            (share/'cryptex-cache/result.json').write_text(json.dumps(dict(key='k1',outcome='hit')))
+            os.utime(other/'entry.json',(time.time()+60,)*2)
+            self.assertEqual(RUN['collect_cryptex_cache'](share,store,{},keep=1)['pruned'],['k0'])
+            self.assertEqual(sorted(p.name for p in store.iterdir()),['k1'])
+            config=RUN['guest_config'](dict(size_bytes=80,name='GG'),share,'/guest/job',cryptex_cache=True)
+            self.assertEqual(config['cryptex_cache'],'/private/var/ssdshare/cryptex-cache')
+            self.assertNotIn('cryptex_cache',RUN['guest_config'](dict(size_bytes=80,name='GG'),share,'/guest/job'))
+
     def test_boot_efi_archive_carries_opencore_and_oclp_licenses(self):
         import zipfile
         with tempfile.TemporaryDirectory() as folder:

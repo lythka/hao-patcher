@@ -12,7 +12,9 @@ hardware {tool,artifact}, hooks [{name,kc_hook}] in set order, posts
 [{name,script,folder}] in set order, environment, and optionally overlays
 {plan,files,installer,livepatch} (golden-run --from-overlays: a recipe the plan
 marks "overlay" has its files installed by golden-overlays.py at its turn in
-set order instead of running its hook or apply.sh). Staged hook folders already
+set order instead of running its hook or apply.sh), and optionally cryptex_cache
+(the share's folder golden-gate-userspace reuses its sealed cryptex images from,
+GOLDEN_CRYPTEX_CACHE in its environment). Staged hook folders already
 contain their declared input files. The host runner owns input selection/staging,
 source identities and the set-order rules (see pipeline/golden-run).
 
@@ -412,6 +414,9 @@ class Assembler:
         c = self.config
         environment = dict(self.environment, TAHOE_DRIVERKIT_ARTIFACT=str(c['donors']['driverkit']),
                            TAHOE_DONOR_TOOL=str(c['donor_tool']), TAHOE_NATIVE_ARTIFACT=str(c['donors']['native']))
+        if c.get('cryptex_cache'):
+            # golden-gate-userspace reuses or stores its sealed cryptex images there (golden-run, cryptex_cache.py)
+            environment['GOLDEN_CRYPTEX_CACHE'] = str(c['cryptex_cache'])
         for hook in c['hooks']:
             if not hook.get('kc_hook'):
                 raise ValueError('set entry has no src/kc-hook.sh: '+hook['name'])

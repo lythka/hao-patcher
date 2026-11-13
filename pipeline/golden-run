@@ -5,7 +5,11 @@ Opt-in: --from-overlays --overlay-system ROOT materialises the set on the host f
 edit-engine store in store/cache/edit-engine-store, or --overlay-store, so unchanged specs and inputs are reused) and
 plans which recipes install their files from the overlays instead of running their hooks (pipeline/overlays.py);
 ROOT is the build's Golden Gate file system (its filesystem.dmg attached read-only), whose files the edits start
-from. Every other recipe, and every step only the target can make, runs its hook as without the flag."""
+from. Every other recipe, and every step only the target can make, runs its hook as without the flag.
+
+golden-gate-userspace's sealed cryptex images are kept in store/cache/cryptex, keyed on everything that decides their
+bytes (its src/cryptex_cache.py), and copied instead of rebuilt when a build has the same key; --no-cryptex-cache
+always builds them."""
 import argparse
 from contextlib import contextmanager
 import datetime
@@ -100,7 +104,65 @@ def dev_build(names, patches=TOP/'patches'):
                for n in names if (patches/n/'patch.json').is_file())
 
 
-def guest_config(recipe, share, local, overlays=False):
+CRYPTEX_CACHE_KEEP = 2   # entries kept in store/cache/cryptex (about 13 GB each), the newest first
+
+
+def userspace_folder(share):
+    """SHARE/hooks/NN-golden-gate-userspace, the staged recipe."""
+    return share/'hooks'/dict((name, folder) for _, name, folder in set_order(share))['golden-gate-userspace']
+
+
+def prepare_cryptex_cache(recipe, share, store, lockrows, locks):
+    """Write SHARE/cryptex-cache/key.json (the host part of golden-gate-userspace's cryptex key, its
+    src/cryptex_cache.py) and clone every entry of STORE (store/cache/cryptex) with that host key into in/KEY/,
+    where the guest finds the one whose full key (with its tool lines) matches. Returns the record for build.json."""
+    folder=userspace_folder(share)
+    cache=runpy.run_path(str(folder/'cryptex_cache.py'))
+    def row(name):
+        lock=next(Path(l) for l in locks if (Path(l)/name).is_file())
+        return lockrows['key_line']('row:'+name,str(TOP/'store'),[str(l) for l in locks]),lockrows['rows'](str(lock))[name][1]
+    lines=cache['host_lines'](folder,{name:row(name) for name in cache['ROWS']},row(recipe['inputs']['driverkit']),
+                              share/'assembly-source/tahoe-donors')
+    host_key=cache['key_of'](lines)
+    out=share/'cryptex-cache';(out/'in').mkdir(parents=True)
+    write(out/'key.json',dict(host_key=host_key,host_lines=lines))
+    staged=[]
+    for entry in sorted(Path(store).glob('*/entry.json')) if Path(store).is_dir() else []:
+        data=json.loads(entry.read_text())
+        if data.get('lines',[])[:len(lines)]!=lines:continue
+        target=out/'in'/entry.parent.name
+        # APFS clones: free, and the guest's copy can never write into the store
+        subprocess.run(['cp','-cR',str(entry.parent),str(target)],check=True)
+        staged.append(entry.parent.name)
+    return dict(host_key=host_key,staged=staged,store=str(store))
+
+
+def collect_cryptex_cache(share, store, record, keep=CRYPTEX_CACHE_KEEP):
+    """Read the guest's SHARE/cryptex-cache/result.json into RECORD; move a new entry from out/KEY/ into STORE after
+    checking its images' sha256 here, and keep the KEEP newest entries."""
+    out=share/'cryptex-cache'
+    if (out/'result.json').is_file():record['result']=json.loads((out/'result.json').read_text())
+    for entry in sorted((out/'out').glob('*/entry.json')) if (out/'out').is_dir() else []:
+        data=json.loads(entry.read_text());started=time.monotonic()
+        for name,want in data['files'].items():
+            got=dict(sha256=digest(entry.parent/name),size=(entry.parent/name).stat().st_size)
+            if got!=want:raise RuntimeError('cryptex cache: %s/%s is %s, the guest recorded %s'%(entry.parent,name,got,want))
+        Path(store).mkdir(parents=True,exist_ok=True)
+        target=Path(store)/entry.parent.name
+        if target.exists():shutil.rmtree(target)
+        os.rename(entry.parent,target);os.utime(target/'entry.json')
+        record['stored']=dict(key=target.name,check_seconds=round(time.monotonic()-started,1))
+    used=record.get('result',{}).get('key')
+    if used and (Path(store)/used/'entry.json').is_file():os.utime(Path(store)/used/'entry.json')   # newest: just used
+    # this build's entry first, then the most recently used or stored
+    entries=sorted(Path(store).glob('*/entry.json'),key=lambda p:(p.parent.name!=used,-p.stat().st_mtime)) if Path(store).is_dir() else []
+    record['pruned']=[]
+    for entry in entries[keep:]:
+        shutil.rmtree(entry.parent);record['pruned'].append(entry.parent.name)
+    return record
+
+
+def guest_config(recipe, share, local, overlays=False, cryptex_cache=False):
     rows = set_order(share)
     hooks = [(name, folder) for stage, name, folder in rows if stage == 'oclp-hook']
     selected = dict(hooks)
@@ -123,7 +185,8 @@ def guest_config(recipe, share, local, overlays=False):
                                  IMAGE_DEV_BUILD='1' if dev_build([name for _,name,_ in rows]) else '0'),
                 **(dict(overlays=dict(plan=GUEST+'/overlay-plan.json',files=GUEST+'/overlay-files',
                                       installer=local+'/source/golden-overlays.py',
-                                      livepatch=local+'/source/livepatch.py')) if overlays else {}))
+                                      livepatch=local+'/source/livepatch.py')) if overlays else {}),
+                **(dict(cryptex_cache=GUEST+'/cryptex-cache') if cryptex_cache else {}))
 
 
 def system_build(root):
@@ -255,7 +318,8 @@ def skipped_groups(recipe, skip_optional=()):
     return sorted(set(groups)|set(skip_optional))
 
 
-def run(recipe_path, repository, work=None, record=None, base=None, timeout=14400, skip_optional=(), overlays=None):
+def run(recipe_path, repository, work=None, record=None, base=None, timeout=14400, skip_optional=(), overlays=None,
+        cryptex_cache=True):
     recipe_path = Path(recipe_path).resolve(); recipe=json.loads(recipe_path.read_text())
     if recipe['schema'] != 1:
         raise ValueError('unsupported Golden assembly recipe')
@@ -337,7 +401,11 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
                      '--out',source/'esp','--record',record/'base-efi.json'])
             if overlays:
                 state['overlays']=prepare_overlays(recipe,share,work,record,source,overlays);write(record/'build.json',state)
-            config=guest_config(recipe,share,local,overlays=bool(overlays));write(share/'guest-config.json',config)
+            if cryptex_cache:
+                state['cryptex_cache']=prepare_cryptex_cache(recipe,share,store/'cache/cryptex',lockrows,
+                                                             (golden_lock,build_lock,common));write(record/'build.json',state)
+            config=guest_config(recipe,share,local,overlays=bool(overlays),cryptex_cache=cryptex_cache)
+            write(share/'guest-config.json',config)
             shutil.copy2(share/'guest-config.json',record/'guest-config.json')
             for name in ('patches.txt','MANIFEST.txt','profile.json'):
                 shutil.copy2(share/name,record/name)
@@ -356,6 +424,8 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
             output=share/'out-golden';rc=wait_job(output,timeout)
             if rc:raise RuntimeError('Golden guest failed with status '+str(rc)+'; inspect '+str(output))
             assembled(output);stop()
+            if cryptex_cache:
+                collect_cryptex_cache(share,store/'cache/cryptex',state['cryptex_cache']);write(record/'build.json',state)
             state['status']='capturing';write(record/'build.json',state)
             capture_workspace(state,output,command)
         except BaseException as error:
@@ -364,6 +434,9 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
         finally:
             try:stop()
             except Exception as error:state['stop_error']=str(error)
+            result=share/'cryptex-cache/result.json'
+            if cryptex_cache and 'cryptex_cache' in state and 'result' not in state['cryptex_cache'] and result.is_file():
+                state['cryptex_cache']['result']=json.loads(result.read_text())   # failed build: nothing is stored
             output=share/'out-golden'
             if output.exists():
                 record_output=record/'guest-output';record_output.mkdir(exist_ok=True)
@@ -462,6 +535,9 @@ def main():
                         help='edit-engine artifact store kept between builds (default store/cache/edit-engine-store)')
     parser.add_argument('--overlay-hook',action='append',default=[],metavar='NAME',
                         help='keep recipe NAME on its hook with --from-overlays')
+    parser.add_argument('--no-cryptex-cache',action='store_true',
+                        help='build golden-gate-userspace\'s sealed cryptex images even when store/cache/cryptex has '
+                             'them for the same inputs, code and builder tools (and store nothing)')
     args=parser.parse_args()
     overlays=None
     if args.from_overlays:
@@ -470,11 +546,12 @@ def main():
     elif args.overlay_system or args.overlay_hook:parser.error('--overlay-system and --overlay-hook need --from-overlays')
     signal.signal(signal.SIGTERM,lambda *_:(_ for _ in ()).throw(KeyboardInterrupt('terminated')))
     if args.capture_record:
-        if args.recipe or args.repo or args.skip_optional or overlays:parser.error('capture-record does not take a recipe, repository or --skip-optional')
+        if args.recipe or args.repo or args.skip_optional or overlays or args.no_cryptex_cache:parser.error('capture-record does not take a recipe, repository or --skip-optional')
         capture_record(args.capture_record)
     else:
         if not args.recipe or not args.repo:parser.error('recipe and --repo are required')
-        run(args.recipe,args.repo,args.work,args.record,args.base,args.timeout,args.skip_optional,overlays)
+        run(args.recipe,args.repo,args.work,args.record,args.base,args.timeout,args.skip_optional,overlays,
+            cryptex_cache=not args.no_cryptex_cache)
 
 
 if __name__=='__main__':main()
