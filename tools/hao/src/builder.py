@@ -35,6 +35,7 @@ from console import Stopped
 import detect as DETECT
 import disks as DISKS
 import macos as MAC
+import assets as ASSETS
 
 TOP = Path(__file__).resolve().parents[3]
 ASSEMBLIES = TOP / 'pipeline' / 'assemblies'
@@ -232,8 +233,45 @@ def golden_run_command(path, repo, overlay_system=None, store=None):
     return cmd
 
 
+def use_assets(a, c, path):
+    """--assets DIR: the clone's store/ is DIR (a link, made when the clone has none), and every row the build
+    reads must be there with its pinned hash before anything runs."""
+    folder = Path(a.assets).expanduser().resolve()
+    if not folder.is_dir():
+        raise Stopped('no assets folder at %s' % folder, untouched='nothing was built')
+    store = TOP / 'store'
+    if store.is_symlink() or store.exists():
+        if store.resolve() != folder:
+            raise Stopped('this checkout already has a store (%s), not %s' % (store.resolve(), folder),
+                          why='a build reads its inputs from one place',
+                          options=['use a fresh clone', 'or leave out --assets to build from the existing store'])
+    else:
+        store.symlink_to(folder)
+        c.item('store  -> %s' % folder, 'files')
+    problems = ASSETS.check(path, folder)
+    for p in problems:
+        c.item(p, 'quiet', ev='asset.problem', problem=p)
+    if problems:
+        raise Stopped('%d inputs are missing or wrong in %s' % (len(problems), folder),
+                      why='every input is pinned by hash; the build reads nothing else',
+                      untouched='nothing was built')
+    c.item('inputs  every row present, hashes checked', 'steps', ok=True)
+
+
+def export_image(a, c, repo, run=subprocess.call):
+    """--export FILE: the committed image as one raw disk image file (ssdimg export)."""
+    out = Path(a.export).expanduser().resolve()
+    cmd = [str(TOP / 'tools' / 'bin' / 'ssdimg'), '-C', str(repo), 'export', str(out)]
+    c.event('command', argv=cmd)
+    if run(cmd):
+        raise Stopped('exporting the image to %s failed' % out, options=['the image is committed in %s' % repo])
+    c.item('raw image  %s' % out, 'steps', ok=True)
+
+
 def build_image(a, c, run=subprocess.call):
     profile, path, asm, groups = resolve(a, c, 'build-image')
+    if getattr(a, 'assets', None):
+        use_assets(a, c, path)
     patches = runpy.run_path(str(TOP / 'pipeline' / 'patches.py'))
     full = _quiet(patches['detect_packs'], str(TOP / 'pipeline/targets' / (asm['target'] + '.json')))
     if sorted(full) != sorted(profile['packs']):
@@ -262,6 +300,8 @@ def build_image(a, c, run=subprocess.call):
     if rc:
         raise Stopped('golden-run failed (exit %d)' % rc, why='the image was not committed',
                       options=['the build record is in store/runs/ (golden-run prints its folder)'])
+    if getattr(a, 'export', None):
+        export_image(a, c, repo, run)
     c.done('image committed to %s' % repo, repo=str(repo))
     return 0
 

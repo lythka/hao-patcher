@@ -24,6 +24,12 @@
   hao verify [ROOT] [--manifests DIR|FILE]...                 every installed pack file against its manifest
   hao build-image REPO (--model M | --profile F) [--assembly NAME] [--overlay-system ROOT] [--dry-run]
         assemble an image in the builder VM (pipeline/golden-run), committed to the image repository REPO
+  hao assets make DIR (--model M) [--store STORE]           (development) the assets folder a fresh clone builds
+        from: every input row the release build reads, at its path below store/, plus the builder's tools, as
+        APFS clones; the stand-in for hao fetch plus the on-Mac producers until those run from the downloads
+  hao assets check DIR (--model M)                            every input present with its pinned hash
+        build-image --assets DIR links a fresh clone's store to DIR and checks it first; --export FILE also writes
+        the committed image as one raw disk image file
   hao build-disk /dev/diskN (--model M | --profile F) [--kit KIT] [--work DIR] [--local DIR] [--dry-run]
         [--confirm diskN]   (sudo; an external SSD) stage the kit (or take KIT) and build macOS 27 onto the disk
   hao install /dev/diskN --kit KIT [--profile F] [--local DIR] [--dry-run] [--confirm ERASE]
@@ -55,6 +61,7 @@ import console as CON    # noqa: E402
 import detect as DETECT  # noqa: E402
 import verify as VERIFY  # noqa: E402
 import builder as BUILD  # noqa: E402
+import assets as ASSETS  # noqa: E402
 
 ACQUIRE = REPO / 'tools' / 'acquire'
 CACHE = Path.home() / 'Library' / 'Caches' / 'hao'
@@ -327,6 +334,24 @@ def builder_args(q, disk=True):
     CON.add_level_flags(q)
 
 
+def cmd_assets(a, c):
+    path, _ = BUILD.assembly(a.assembly, BUILD.mac(a))
+    store = Path(a.store).expanduser().resolve() if a.store else (BUILD.TOP / 'store').resolve()
+    if a.op == 'make':
+        made = ASSETS.make(a.folder, path, store)
+        for what, where in made:
+            c.item('%-34s %s' % (what, where), 'files')
+        c.done('%d inputs and tools in %s' % (len(made), a.folder))
+        return 0
+    problems = ASSETS.check(path, Path(a.folder).expanduser().resolve())
+    for p in problems:
+        c.item(p, 'quiet', ev='asset.problem', problem=p)
+    if problems:
+        raise CON.Stopped('%d inputs are missing or wrong' % len(problems))
+    c.done('every input present with its pinned hash')
+    return 0
+
+
 def kit_args(q):
     q.add_argument('--kit', help='a staged kit folder (golden-run --stage-kit; on the stick for install)')
     q.add_argument('--work', help='build folder (default ~/Library/Caches/hao/builds/DATE)')
@@ -367,7 +392,14 @@ def main():
     q = sub.add_parser('build-image'); q.add_argument('out', metavar='REPO'); builder_args(q, disk=False)
     q.add_argument('--overlay-system'); q.add_argument('--overlay-store')
     q.add_argument('--allow-unresolved-swaps', action='store_true', help='build although live swaps are unresolved')
+    q.add_argument('--assets', help='the assets folder (every input, laid out as the store); a fresh clone builds from it')
+    q.add_argument('--export', help='also write the committed image as one raw disk image FILE')
     q.set_defaults(fn=guarded(lambda a, c: BUILD.build_image(a, c)))
+    q = sub.add_parser('assets', help='the assets folder a fresh clone builds from')
+    q.add_argument('op', choices=['make', 'check']); q.add_argument('folder')
+    q.add_argument('--store', help='make: the store to take the inputs from (default this checkout\'s)')
+    builder_args(q, disk=False)
+    q.set_defaults(fn=guarded(cmd_assets))
     q = sub.add_parser('build-disk'); builder_args(q); kit_args(q)
     q.set_defaults(fn=guarded(lambda a, c: BUILD.build_disk(a, c, MAC.SystemHost())))
     q = sub.add_parser('create-installer'); builder_args(q)
