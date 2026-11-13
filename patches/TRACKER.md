@@ -24,7 +24,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
 | golden-gate-userspace | r62 | oclp-hook | experiment |  | x | x |  |  | **needs** | r62 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on the three wrap |
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
-| hao-opencore | r43 | post | experiment |  | x | x |  |  | **needs** | r43 2026-11-12 Declare the HaoExec identity stamp: the executable is its own `files` entry with `edits/haoexec |
+| hao-opencore | r44 | post | experiment |  | x | x |  |  | **needs** | r44 2026-11-12 Boot-arg `auxKCAtBoot=false`: kernelmanagerd no longer tries (and fails) to build an Aux KC fro |
 | hao-runtime | r69 | oclp-hook | experiment |  | x | x |  |  | **needs** | r69 2026-11-12 Declare install attributes in patch.json `files` (`restricted` on usr/lib/dyld and usr/libexec/ |
 | metal-compiler-compat | r4 | oclp-hook | experiment |  | x |  |  |  | **needs** | r4 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the servic |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |

@@ -320,15 +320,15 @@ Revision r7, status experiment. [Recipe](../patches/golden-gate-windowserver-fil
 
 ## hao-opencore
 
-Revision r43, status experiment. [Recipe](../patches/hao-opencore/README.md)
+Revision r44, status experiment. [Recipe](../patches/hao-opencore/README.md)
 
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it; 4 edits, applied by the installer
   1. `debug-log-to-file`: plist.set Misc:Debug:Target = 65.
      OpenCore's DEBUG log goes to the file on the EFI partition only and nothing is printed on screen, so early-boot evidence can be collected from Recovery.
   2. `debug-log-info-lines`: plist.set Misc:Debug:DisplayLevel = 2147483714.
      The OpenCore file log also records informational lines, so it shows the result of each kernel patch.
-  3. `boot-args`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 ic_csr_internal=1".
-     The Intel Mac boots Darwin 27 with its Lilu-based drivers loading, PCID off, hao's arm64-only programs allowed to start and hao's crash lines on the console, the Intel commpage reporting Apple-internal CSR so OCLP's on-disk Metal loads, and a panic rebooting instead of waiting for a debugger.
+  3. `boot-args`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 ic_csr_internal=1 auxKCAtBoot=false".
+     The Intel Mac boots Darwin 27 with its Lilu-based drivers loading, PCID off, hao's arm64-only programs allowed to start and hao's crash lines on the console, the Intel commpage reporting Apple-internal CSR so OCLP's on-disk Metal loads, a panic rebooting instead of waiting for a debugger, and kernelmanagerd loading the System kernel collection without first trying, and failing, to build an auxiliary collection.
   4. `clear-boot-logging-overrides`: plist.set NVRAM:Delete:7C436110-AB2A-4BBB-A880-FE41995C9F82 = ["boot-args", "csr-active-config", "bootercfg", "bootercfg-once"].
      The next OpenCore boot deletes the firmware's boot logging overrides, so they cannot hide early-boot output.
 - `EFI/OC/Kexts/IntelCommpage.kext`: whole file from every file under it from hao · IntelCommpage.kext (row kernel_repair_efi). EFI/OC/Kexts/IntelCommpage.kext of the row, copied with ditto from the artifact src/repair_binding.py binds to this image's BootKC; the binder refuses unless its files are the row's, byte for byte.

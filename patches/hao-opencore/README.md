@@ -55,12 +55,34 @@ display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments
 | `hao_crash=1` | hao's crash lines on the console. |
 | `hao_nx_stats=1 hao_bridge_stats=1` | Dev builds only (`IMAGE_DEV_BUILD=1`, set by golden-run when the set has a status `dev` recipe such as `dev-access`): hao's NX fault tables and bridge statistics. They cost time on every translated native call. |
 | `ic_csr_internal=1` | IntelCommpage reports `CSR_ALLOW_APPLE_INTERNAL`. 27.0's x86_64 dyld scans the disk for shared-cache overrides only when `csr_check(0x10)` succeeds, and the booter drops that bit from NVRAM; without it OCLP's on-disk Metal and MetalOld never load. |
+| `auxKCAtBoot=false` | kernelmanagerd skips building an auxiliary kernel collection at boot and loads the System collection at once. 27's kmutil cannot build an x86_64 collection ("unsupported arch: x86_64 / Unsupported collection kind"), so the build of the only candidate, 27's codeless `AppleMobileDevice.kext` (from 27's Data template), failed at every boot and held the System collection, and with it the Capri framebuffer and WindowServer, back 18.5 s (23 s on the first boot). The codeless kext's personality still loads. Details: [Aux KC gate](#aux-kc-gate). |
 
 `-v`, `startup_debug=1` and `debug=0x100` are removed if the base config has them: early-boot evidence comes from
 the ESP log and the unified log, and without `debug=0x100` a panic reboots and leaves `aapl,panic-info` in NVRAM
 instead of waiting for a debugger.
 
 This patch has status `experiment` because of `amfi_get_out_of_my_way=1`; it is never part of a shipped set.
+
+## Aux KC gate
+
+FACT (bench `bench-mbp92-26B131-tested-20261112-204015`, image 8f5ddce, both boots, log `machTimestamp` s after the
+kernel): kernelmanagerd logs "performing auxiliary activation" (43.94 / 48.04), finds no
+`/Library/KernelCollections/AuxiliaryKernelExtensions.kc` and asks kernelmanager_helper to build one ("Attempting to
+clean up and build from approvals"). The helper is spawned for that request, starts (10 s), loads the Boot and System
+collections, finds `/Library/Apple/System/Library/Extensions/AppleMobileDevice.kext` as the only candidate and fails
+("building auxiliary kext collection failed ... unsupported arch: x86_64"). Only then (67.08 / 66.49) does kernelmanagerd
+log "Preparing collection load into kernel"; the kernel loads the System collection at 68.03 / 67.47 and the Capri
+framebuffer is published 0.3 s later.
+
+FACT (27.2's `/usr/libexec/kernelmanagerd`, KernelManagement_executables-514.40.8, the one the image runs): when the
+Aux collection does not load, kernelmanagerd reads the boot-arg `auxKCAtBoot` (lazy property `disableAuxKCAtBoot`,
+true when the value is `false`) and, if set, logs "AuxKC building is disabled during boot due to boot-arg. Proceeding
+without AuxKC." instead of "Attempting to clean up and build from approvals."; both branches continue at the same
+code. INFERRED: codeless personalities (AppleMobileDevice) are still sent with the System collection, as now.
+
+Not chosen: removing `AppleMobileDevice.kext` (kernelmanagerd sends the build request to the helper without looking at
+the candidates, so the helper start and collection loads would likely remain, and iPhone USB devices would lose
+`SupportsIPhoneOS`); a prebuilt Aux KC (kmutil refuses a collection of only codeless kexts).
 
 ## Inputs
 
@@ -81,6 +103,14 @@ the ESP's OpenCore log shows each repair and both kexts applied once. On the run
 `kmutil showloaded | grep -iE 'hao|commpage|Capri|HD4000|BCM5701'`, `sysctl kern.hao` after the first arm64-only
 exec, and the boot log line "HaoExec: arm64-only executables now run through /usr/libexec/hao".
 
+Aux KC gate (`auxKCAtBoot=false`): `sysctl kern.bootargs` has it; on every boot kernelmanagerd logs "AuxKC building is
+disabled during boot due to boot-arg" right after "performing auxiliary activation", with no "Attempting to clean up
+and build from approvals", no "couldn't construct deferred auxiliary collection" and no helper "beginning auxiliary
+kext collection build"; "Preparing collection load into kernel" follows within about a second (was 18.5 s, 23 s on
+the first boot), still with "Added codeless kext (force loaded) ... AppleMobileDevice.kext". Then check the next link:
+kernelmanager_helper is now spawned on demand for the OpenCore kexts' load reports (Lilu first), and its start
+(10 s in 8f5ddce) may hold IOKit quiet (bluetoothd "Done waiting for IOKitWaitQuiet()") and WindowServer.
+
 ### IOSurface regression probes
 
 IntelCommpage copies IOSurface property input into private pageable memory, because Tahoe's out-of-line property
@@ -99,7 +129,7 @@ must still die with VM guard flavor 13 (status 137), which shows the fix leaves 
 has a 15-second alarm. Finally load a website in Safari and scroll, navigate and reload.
 
 ## Validation
-NEEDS VALIDATION: the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r40 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
+NEEDS VALIDATION: r44 adds `auxKCAtBoot=false` (not booted yet; see Verify). the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r40 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
 
 Laptop 2026-11-12, image d131d5b (26B131, dev build): boots with r40 (hao d9ea9bd's HaoExec and stamp_identity.py); image 7d0b612 booted with r39 on 2026-11-11.
 Laptop 2026-11-11, image 4d1c48c (26B131, dev build): boots with r33; r34's HaoExec.kext and stamp_identity.py are byte-identical to r33's.
@@ -111,6 +141,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r44 2026-11-12 Boot-arg `auxKCAtBoot=false`: kernelmanagerd no longer tries (and fails) to build an Aux KC from the codeless AppleMobileDevice kext before loading the System KC, which cost 18.5 s per boot (23 s first boot).
 - r43 2026-11-12 Declare the HaoExec identity stamp: the executable is its own `files` entry with `edits/haoexec-identity.json` (external op `hao.stamp`, made on the target after the BootKC is linked, not re-signed), so an overlay never ships the unstamped copy; apply.sh is unchanged.
 - r42 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runtime-26B131-20261112-273ba980b829). No recipe change.
 - r41 2026-11-12 Declare the config keys with fixed values (edits/config.json) and the IntelCommpage and HaoExec kext folders in `patch.json` `files`; the recipe is unchanged.

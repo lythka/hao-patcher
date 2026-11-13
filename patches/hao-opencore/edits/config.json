@@ -47,9 +47,9 @@
      "7C436110-AB2A-4BBB-A880-FE41995C9F82",
      "boot-args"
     ],
-    "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 ic_csr_internal=1"
+    "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 ic_csr_internal=1 auxKCAtBoot=false"
    },
-   "reason": "the Intel Mac boots Darwin 27 with its Lilu-based drivers loading, PCID off, hao's arm64-only programs allowed to start and hao's crash lines on the console, the Intel commpage reporting Apple-internal CSR so OCLP's on-disk Metal loads, and a panic rebooting instead of waiting for a debugger"
+   "reason": "the Intel Mac boots Darwin 27 with its Lilu-based drivers loading, PCID off, hao's arm64-only programs allowed to start and hao's crash lines on the console, the Intel commpage reporting Apple-internal CSR so OCLP's on-disk Metal loads, a panic rebooting instead of waiting for a debugger, and kernelmanagerd loading the System kernel collection without first trying, and failing, to build an auxiliary collection"
   },
   {
    "id": "clear-boot-logging-overrides",

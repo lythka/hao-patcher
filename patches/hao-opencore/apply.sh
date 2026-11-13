@@ -52,7 +52,10 @@ dev=os.environ.get('IMAGE_DEV_BUILD')=='1'
 for arg in ('-lilubetaall', '-pmap_pcid_disable', 'amfi_get_out_of_my_way=1',
             'hao_crash=1') + (('hao_nx_stats=1', 'hao_bridge_stats=1') if dev else ()) + (
             # IntelCommpage reports CSR_ALLOW_APPLE_INTERNAL so 27.0's dyld honours OCLP's on-disk Metal roots.
-            'ic_csr_internal=1',):
+            'ic_csr_internal=1',
+            # kernelmanagerd skips the boot-time Aux KC build. 27's kmutil cannot build an x86_64 collection, so the
+            # build (of the codeless AppleMobileDevice) failed at every boot and held the System KC back ~18 s.
+            'auxKCAtBoot=false',):
     if arg not in args:args.append(arg)
 n['boot-args']=' '.join(args)
 # Keep boot.efi/OpenCore evidence on the ESP for collection from Recovery.
