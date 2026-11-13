@@ -364,9 +364,9 @@ Revision r7, status experiment. [Recipe](../patches/golden-gate-windowserver-fil
 
 ## hao-opencore
 
-Revision r48, status experiment. [Recipe](../patches/hao-opencore/README.md)
+Revision r49, status experiment. [Recipe](../patches/hao-opencore/README.md)
 
-- `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it; 5 edits, applied by the installer. Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (kc.bind reads it).
+- `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it; 6 edits, applied by the installer. Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (kc.bind reads it).
   1. `kernel-repairs`: kc.bind (applied by tools/kc-binder, against the target's linked BootKC).
      The Darwin 27 kernel starts on Ivy Bridge: the kernel repairs in Kernel.Patch (on 26B131: early VM range initialization, ascending early kernel-map bounds, the bootstrap physical-page alias code and its registration call) and the IntelCommpage.kext Kernel.Add entry, computed by tools/kc-binder from the BootKC this image links.
   2. `debug-log-to-file`: plist.set Misc:Debug:Target = 65.
@@ -377,6 +377,8 @@ Revision r48, status experiment. [Recipe](../patches/hao-opencore/README.md)
      The Intel Mac boots Darwin 27 with its Lilu-based drivers loading, PCID off, hao's arm64-only programs allowed to start and hao's crash lines on the console, the Intel commpage reporting Apple-internal CSR so OCLP's on-disk Metal loads, a panic rebooting instead of waiting for a debugger, and kernelmanagerd loading the System kernel collection without first trying, and failing, to build an auxiliary collection.
   5. `clear-boot-logging-overrides`: plist.set NVRAM:Delete:7C436110-AB2A-4BBB-A880-FE41995C9F82 = ["boot-args", "csr-active-config", "bootercfg", "bootercfg-once"].
      The next OpenCore boot deletes the firmware's boot logging overrides, so they cannot hide early-boot output.
+  6. `no-apple-debug`: plist.set Misc:Debug:AppleDebug = false.
+     A normal boot shows only the Apple logo (owner 2026-11-13): no boot.efi or apfs.efi debug lines; the OpenCore archive is the RELEASE build unless the assembly asks for debug.
 - `EFI/OC/Kexts/IntelCommpage.kext`: whole file from every file under it from hao · IntelCommpage.kext (row kernel_repair_efi). EFI/OC/Kexts/IntelCommpage.kext of the row, copied with ditto; src/kc_bind.py refuses unless its files are the ones the kernel_repair_binding profile lists; its __DATA,__ic_table (r42) must equal the table for this image's BootKC, or in binder-only mode is written for it (a kext without the table: every collection-dependent line of row intel_commpage_abi must hold).
 - `EFI/OC/Kexts/HaoExec.kext`: whole file from every file under it from hao · HaoExec.kext (row hao_runtime). The row's HaoExec.kext, copied with ditto; its executable is declared on its own below: stamp_identity.py (also from the row) stamps it for this image's BootKC.
 - `EFI/OC/Kexts/HaoExec.kext/Contents/MacOS/HaoExec`: from hao · HaoExec.kext's executable (row hao_runtime); 1 edit, applied by the installer. Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (hao.stamp reads it).

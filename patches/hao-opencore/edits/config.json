@@ -84,6 +84,20 @@
     ]
    },
    "reason": "the next OpenCore boot deletes the firmware's boot logging overrides, so they cannot hide early-boot output"
+  },
+  {
+   "id": "no-apple-debug",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {
+    "key": [
+     "Misc",
+     "Debug",
+     "AppleDebug"
+    ],
+    "value": false
+   },
+   "reason": "a normal boot shows only the Apple logo (owner 2026-11-13): no boot.efi or apfs.efi debug lines; the OpenCore archive is the RELEASE build unless the assembly asks for debug"
   }
  ]
 }

@@ -1,0 +1,3 @@
+# OpenCore 1.0.5 RELEASE archive from acidanthera/OpenCorePkg (https://github.com/acidanthera/OpenCorePkg/releases/tag/1.0.5).
+# The default for images: no early OpenCore text on screen. opencore_debug stays for diagnosis (assembly "opencore": "debug").
+2608743afe81001114a85b6fba6555edbc43813b82538e1f70220aeb0662d8be store/inputs/opencore-release-1.0.5/OpenCore-1.0.5-RELEASE.zip

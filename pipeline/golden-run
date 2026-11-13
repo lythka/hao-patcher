@@ -32,6 +32,14 @@ TOP = Path(__file__).resolve().parent.parent
 GUEST = '/private/var/ssdshare'
 
 
+def opencore_row_of(recipe):
+    """The OpenCore archive row: RELEASE by default (a normal boot shows no OpenCore text; owner 2026-11-13), DEBUG
+    only when the assembly says "opencore": "debug" (diagnosis: early OpenCore lines on screen, full ESP log)."""
+    variant=recipe.get('opencore','release')
+    if variant not in ('release','debug'):
+        raise SystemExit('assembly "opencore" is release or debug, not %r' % variant)
+    return 'opencore_'+variant
+
 def q(value):
     return shlex.quote(str(value))
 
@@ -368,7 +376,8 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
             # Which optional patches (e.g. harvested caches) ran or were skipped, and why.
             state['optional']=json.loads((share/'optional.json').read_text());write(record/'build.json',state)
             shutil.copy2(share/'optional.json',record/'optional.json')
-            used_rows=set(recipe['inputs'].values()) | {'kdk','python_arm64','python_site','fl','opencore_debug'}
+            opencore_row=opencore_row_of(recipe)
+            used_rows=set(recipe['inputs'].values()) | {'kdk','python_arm64','python_site','fl',opencore_row}
             for line in (share/'patches.txt').read_text().splitlines():
                 used_rows.update(line.split()[2:])
             manifest=(share/'MANIFEST.txt').read_text()
@@ -397,7 +406,7 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
             command([share/'py/bin/python3.12','-I',pipeline/'stages/build-efi.py',
                      '--source',share/'oclp','--site',share/'site',
                      '--target',pipeline/'targets'/(recipe['target']+'.json'),
-                     '--revision',recipe['oclp'],'--opencore',lockrows['path'](str(lock_of('opencore_debug')),'opencore_debug'),
+                     '--revision',recipe['oclp'],'--opencore',lockrows['path'](str(lock_of(opencore_row)),opencore_row),
                      '--out',source/'esp','--record',record/'base-efi.json'])
             if overlays:
                 state['overlays']=prepare_overlays(recipe,share,work,record,source,overlays);write(record/'build.json',state)

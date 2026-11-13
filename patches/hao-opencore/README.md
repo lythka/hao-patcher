@@ -178,6 +178,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r49 2026-11-13 A normal boot shows only the Apple logo: `Misc.Debug.AppleDebug` false, and images use the OpenCore 1.0.5 RELEASE archive (row `opencore_release`; golden-run picks it unless the assembly says `"opencore": "debug"`). The DEBUG build printed its early lines and apfs.efi's on screen.
 - r48 2026-11-12 Input rows `kernel_repair_efi`, `kernel_repair_binding` and `intel_commpage_abi` (26B131) now name r42: IntelCommpage reads its collection addresses from `__DATA,__ic_table` at load. kc_bind.py writes this BootKC's table into it in `binder-only` mode instead of refusing a moved layout, and in `binder` mode requires the table to equal the kext's own. config.plist is unchanged. The IntelCommpage binary is new.
 - r47 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runtime-26B131-20261112-0a2c2aad4755). No recipe change.
 - r46 2026-11-12 Dev builds add `hao_diag_time=1` (hao-runtime 0a2c2aa): mach-clock stamps and phase lines on hao's console lines, and PID 1's lines from before the Data volume mounts, so a bench boot shows launchd's own startup on the Gantt's clock.

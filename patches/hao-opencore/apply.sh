@@ -1,6 +1,7 @@
 #!/bin/sh
-# The ESP's OpenCore binaries are already the OpenCore 1.0.5 DEBUG release: pipeline/stages/build-efi.py replaces
-# every *.efi of OCLP's generated EFI from the opencore_debug archive. This recipe adds only the image's kernel
+# The ESP's OpenCore binaries are already the OpenCore 1.0.5 release golden-run chose (RELEASE by default, DEBUG when
+# the assembly says "opencore": "debug"): pipeline/stages/build-efi.py replaces every *.efi of OCLP's generated EFI
+# from that archive. This recipe adds only the image's kernel
 # repairs, kexts and configuration.
 set -eu
 # kmutil embeds its build directory and a fresh enclosing UUID. The recorded repairs bind unchanged
@@ -80,6 +81,8 @@ n['boot-args']=' '.join(args)
 # text (OCLP's base config sets 0x02 with its debug log).
 d['Misc']['Debug']['Target'] = (d['Misc']['Debug']['Target'] | 0x41) & ~0x02
 d['Misc']['Debug']['DisplayLevel'] |= 0x40
+# A normal boot shows nothing but the Apple logo (owner 2026-11-13): no boot.efi/apfs.efi debug lines.
+d['Misc']['Debug']['AppleDebug'] = False
 with open(p,'wb') as f:plistlib.dump(d,f)
 PYCONFIG
 plutil -lint "$ESP/EFI/OC/config.plist"
