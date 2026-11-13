@@ -1,3 +1,4 @@
-# WiFiPeerToPeer compatibility dylib made by patches/golden-gate-userspace/src/wifip2p/make (r66; coverage- and method-checked on 26B131,
-# OCLP class methods checked against oclp-methods.txt): adds AWDLServiceDiscoveryManager add/removeAWDLDiscoveryClient (mDNSResponder) and 10 Wi-Fi Aware/UI agent stand-ins.
-7eaffe614b3b26d6fa447832cd0a7fd6015270f5b65a1e62f8ae1996a20650b1 store/artifacts/wifip2p-compat-26B131-20261113-7eaffe614b3b/wifip2p_compat.dylib
+# WiFiPeerToPeer compatibility dylib made by patches/golden-gate-userspace/src/wifip2p/make (r67; coverage- and method-checked on 26B131,
+# OCLP class methods checked against oclp-methods.txt): AWDLServiceDiscoveryManager add/removeAWDLDiscoveryClient succeed as no-ops
+# (mDNSResponder; Tahoe's makes no such call) and 10 Wi-Fi Aware/UI agent stand-ins.
+20822cf11958a422cc682177bb214410ccd196ad6973a92667d7a04833a7a9e6 store/artifacts/wifip2p-compat-26B131-20261113-20822cf11958/wifip2p_compat.dylib

@@ -122,7 +122,7 @@ class Library(unittest.TestCase):
         self.assertEqual(sh(probe).strip(), '1')
 
     def test_methods_added_to_oclp_classes(self):
-        """kMethods lands on OCLP's own classes at load: mDNSResponder's AWDL registration answers NO + ENOTSUP instead of
+        """kMethods lands on OCLP's own classes at load: mDNSResponder's AWDL registration succeeds as a no-op instead of
         an unrecognized selector (the crash loop of 2026-11-13), and an OCLP method that exists is never replaced. The
         copies get @rpath install names: under DYLD_LIBRARY_PATH the host's own cached WiFiPeerToPeer would win."""
         folder = self.tmp/'oclp-classes'
@@ -158,9 +158,9 @@ class Library(unittest.TestCase):
         sh('xcrun', 'clang', '-arch', 'x86_64', '-fobjc-arc', self.tmp/'mdns.m', folder/'WiFiPeerToPeer',
            '-framework', 'Foundation', f'-Wl,-rpath,{folder}', '-o', probe)
         sh('codesign', '-f', '-s', '-', probe)
-        # add: NO + ENOTSUP (45); remove: OCLP's own method kept (7); added: add + the 2 publisher methods (the other
+        # add: YES, no error (0); remove: OCLP's own method kept (7); added: add + the 2 publisher methods (the other
         # classes are not in this fake OCLP library); pairing: ENOTSUP to its completion block
-        self.assertEqual(sh(probe).split(), ['0', '45', '7', '3', '45'])
+        self.assertEqual(sh(probe).split(), ['1', '0', '7', '3', '45'])
 
     @unittest.skipUnless(shutil.which('ipsw'), 'needs ipsw')
     def test_method_check_reads_the_stand_ins(self):

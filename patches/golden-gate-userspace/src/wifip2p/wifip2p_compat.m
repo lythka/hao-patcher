@@ -24,9 +24,10 @@
 // method lists (read on the laptop at run time; make checks every client-named selector against it and kMethods):
 // - -[AWDLServiceDiscoveryManager addAWDLDiscoveryClient:forService:error:] and remove...: 27.x's mDNSResponder
 //   registers each AWDL Bonjour service (AirDrop's) through them; the unrecognized selector killed mDNSResponder at
-//   every registration (16 crashes in one session, 2026-11-13), taking DNS and Bonjour down with it. They report
-//   ENOTSUP, which mDNSResponder handles: no crash, but no AWDL discovery either (no bridge to OCLP's
-//   startServiceDiscoveryWithConfiguration: yet).
+//   every registration (16 crashes in one session, 2026-11-13), taking DNS and Bonjour down with it. The call is new in
+//   27.x and advisory (it tells wifip2pd a client wants AWDL for a service; Tahoe's mDNSResponder, which OCLP's stack
+//   serves, never makes it, and OCLP's wifip2pd brings AWDL up on its own), so they succeed as no-ops: mDNSResponder
+//   then behaves as Tahoe's does.
 // - Wi-Fi Aware methods newer than 13.7.2 on OCLP's WiFiAwareDataSession, WiFiAwarePublisher and the publish/subscribe
 //   configurations (no Wi-Fi Aware hardware here): getters answer nil/0, setters ignore, the secure-connection
 //   initializer fails (nil), pairing mode reports ENOTSUP to its completion block.
@@ -89,13 +90,16 @@ STAND_IN @interface WiFiP2PKeychainAgent : NSObject @end
 - (void)invalidate {}
 @end
 
-static BOOL AWDLDiscoveryUnsupported(id self, SEL _cmd, id client, id service, NSError **error) {
+static BOOL AWDLDiscoveryClient(id self, SEL _cmd, id client, id service, NSError **error) {
     (void)self; (void)client; (void)service;
-    os_log_error(OS_LOG_DEFAULT, "WiFiPeerToPeer compat: %{public}s unsupported (OCLP's AWDL has no such call)",
-                 sel_getName(_cmd));
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        os_log(OS_LOG_DEFAULT, "WiFiPeerToPeer compat: %{public}s accepted as a no-op (Tahoe's AWDL needs no client list)",
+               sel_getName(_cmd));
+    });
     if (error)
-        *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:ENOTSUP userInfo:nil];
-    return NO;
+        *error = nil;
+    return YES;
 }
 
 static id ReturnNil(id self, SEL _cmd) { (void)self; (void)_cmd; return nil; }
@@ -123,9 +127,9 @@ typedef struct {
 
 static const CompatMethod kMethods[] = {
     {"AWDLServiceDiscoveryManager", "addAWDLDiscoveryClient:forService:error:", "c40@0:8@16@24^@32",
-     (IMP)AWDLDiscoveryUnsupported},
+     (IMP)AWDLDiscoveryClient},
     {"AWDLServiceDiscoveryManager", "removeAWDLDiscoveryClient:forService:error:", "c40@0:8@16@24^@32",
-     (IMP)AWDLDiscoveryUnsupported},
+     (IMP)AWDLDiscoveryClient},
     {"WiFiAwareDataSession", "datapathID", "@16@0:8", (IMP)ReturnNil},
     {"WiFiAwareDataSession", "initSecureConnectionWithPairedDevice:configuration:", "@32@0:8@16@24", (IMP)InitFails},
     {"WiFiAwareDataSession", "initiatorDataAddress", "@16@0:8", (IMP)ReturnNil},
