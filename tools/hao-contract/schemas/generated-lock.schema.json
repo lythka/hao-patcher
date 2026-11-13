@@ -1,0 +1,30 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://github.com/lythka/hao-assets/schemas/generated-lock.schema.json",
+ "title": "generated.lock",
+ "description": "Every generated file a runtime tree holds, as exported to it. input_kind decides which build fields are required and what a header stamp is compared with.",
+ "type": "object",
+ "required": ["lock_version", "files"],
+ "properties": {
+  "lock_version": {"const": 1},
+  "files": {"type": "array", "items": {
+   "type": "object",
+   "required": ["path", "sha256", "export_id", "format", "input_kind"],
+   "properties": {
+    "path": {"type": "string"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "export_id": {"type": ["string", "null"], "description": "opaque id of the export that produced the file"},
+    "format": {"type": ["string", "integer", "null"]},
+    "input_kind": {"enum": ["sdk", "sdk+census", "cache"]},
+    "os_build": {"type": ["string", "null"]},
+    "sdk_build": {"type": ["string", "null"]},
+    "cache_uuid": {"type": ["string", "null"]}
+   },
+   "allOf": [
+    {"if": {"properties": {"input_kind": {"const": "sdk"}}}, "then": {"required": ["sdk_build"]}},
+    {"if": {"properties": {"input_kind": {"const": "sdk+census"}}}, "then": {"required": ["sdk_build", "os_build"]}},
+    {"if": {"properties": {"input_kind": {"const": "cache"}}}, "then": {"required": ["os_build", "cache_uuid"]}}
+   ]
+  }}
+ }
+}

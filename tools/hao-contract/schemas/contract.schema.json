@@ -1,0 +1,136 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://github.com/lythka/hao-assets/schemas/contract.schema.json",
+ "title": "contract.json",
+ "description": "The checks a hao repository keeps, run by hao_contract.py check REPO.",
+ "type": "object",
+ "required": [
+  "contract_version",
+  "role",
+  "checks"
+ ],
+ "properties": {
+  "contract_version": {
+   "const": 1
+  },
+  "role": {
+   "enum": [
+    "research",
+    "runtime",
+    "patcher",
+    "tools",
+    "assets"
+   ]
+  },
+  "checks": {
+   "type": "array",
+   "items": {
+    "oneOf": [
+     {
+      "type": "object",
+      "required": [
+       "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "kind": {
+        "const": "hygiene"
+       },
+       "allow": {
+        "type": "object",
+        "additionalProperties": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "description": "path -> pattern labels allowed in that file"
+       },
+       "commits": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "how many recent commit messages to check"
+       }
+      }
+     },
+     {
+      "type": "object",
+      "required": [
+       "kind",
+       "globs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "kind": {
+        "const": "generated-lock"
+       },
+       "lock": {
+        "type": "string",
+        "default": "generated.lock"
+       },
+       "globs": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "stamp_header": {
+        "type": "string",
+        "description": "header defining HAO_GEN_OS_BUILD and HAO_GEN_FORMAT"
+       }
+      }
+     },
+     {
+      "type": "object",
+      "required": [
+       "kind",
+       "manifest",
+       "os_build",
+       "layout_version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "kind": {
+        "const": "payload"
+       },
+       "manifest": {
+        "type": "string"
+       },
+       "os_build": {
+        "type": "string"
+       },
+       "layout_version": {
+        "type": "integer"
+       }
+      }
+     },
+     {
+      "type": "object",
+      "required": [
+       "kind",
+       "release"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "kind": {
+        "const": "release"
+       },
+       "release": {
+        "type": "string",
+        "description": "path of a release.json (schemas/release.schema.json)"
+       },
+       "dir": {
+        "type": "string",
+        "description": "staging folder: every asset there with its size and sha256, nothing else"
+       },
+       "url_prefix": {
+        "type": "string",
+        "default": "https://github.com/lythka/hao-assets/releases/download"
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+}

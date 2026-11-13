@@ -124,7 +124,7 @@ Each file under `pipeline/inputs/` (`golden/26B131/`, `25G342/`, `common/`, ...)
 input row: optional `#` comment lines, then `SHA256 PATH` (or `- PATH` for a
 directory). A directory row may add `# check: payload os_build=B layout_version=N
 [manifest_sha256=H]`: the folder is then a hao-runtime payload, and every read checks its
-`payload-manifest.json` with the vendored [hao-assets](https://github.com/lythka/hao-assets) checker
+`payload-manifest.json` with the [hao-contract](../tools/hao-contract/README.md) checker
 (clean build, OS build, install-layout version, every file's sha256). A row is looked up first in `pipeline/inputs/golden/<golden_build>/`
 (rows made from that Golden Gate build: its IPSW, kernel, userspace and the fixes
 derived from them), then in the donor build's folder (`25G342`, named by the

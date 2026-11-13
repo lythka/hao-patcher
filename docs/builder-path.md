@@ -40,7 +40,7 @@ as is. Anyone can read what each patch changes and why.
 | Assembler targets | One assembler over a raw image or a whole internal disk, the disk gated by the installer's safety checks | `pipeline/stages/golden-image.py` |
 | Downloads | Pinned, resumable, content-addressed downloads; a host capability matrix | [`tools/acquire`](../tools/acquire/README.md) |
 | Release cut | Classifies every input as downloadable, reproducible, dirty, harvested or unrecorded; writes `release.json` drafts | `pipeline/release-cut` |
-| Contract | Shared checker for the interfaces between the hao repositories, vendored and pinned | [hao-assets](https://github.com/lythka/hao-assets), `tools/hao-contract` |
+| Contract | Shared checker for the interfaces between the hao repositories; other repositories vendor a pinned copy | [`tools/hao-contract`](../tools/hao-contract/README.md) |
 | Metal | Our own legacy-Metal wrapper and MetalOld, generated or extracted and declared | [`tools/metal-wrapper`](../tools/metal-wrapper/README.md), `patches/metal-metalold` |
 
 `validated_revision` and `validated_digest` let a recipe keep a boot test's proof across revisions that only change
