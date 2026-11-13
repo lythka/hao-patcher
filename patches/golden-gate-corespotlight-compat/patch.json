@@ -1,5 +1,5 @@
 {
-  "revision": 5,
+  "revision": 6,
   "stage": "oclp-hook",
   "applies": {
     "models": [
@@ -17,11 +17,14 @@
   "validated_digest": "fb6a8dd0c53b4dcbec458743f3d40840df9867e5186fc2f4a3669897583a68a5",
   "files": [
     {"path": "System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd",
-     "edits": "edits/corespotlightd.json"},
+     "edits": "edits/corespotlightd.json",
+     "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}},
     {"path": "System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/managedcorespotlightd",
-     "edits": "edits/managedcorespotlightd.json"},
+     "edits": "edits/managedcorespotlightd.json",
+     "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}},
     {"path": "usr/lib/corespotlight_compat.dylib",
      "origin": {"kind": "hao", "row": "corespotlight_compat_shim",
-                "note": "new file: adds -[CSSearchQueryContext compiledRankingFactsConfiguration] (src/corespotlight_compat.m, built by make)"}}
+                "note": "new file: adds -[CSSearchQueryContext compiledRankingFactsConfiguration] (src/corespotlight_compat.m, built by make)"},
+     "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}}
   ]
 }

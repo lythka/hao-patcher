@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """edit-engine: apply, check and explain declared file edits (patches/NAME/edits/*.json).
 
-  edit-engine apply SPEC IN OUT [--record FILE] [--sign] [--quiet | --show-edits | --log json]
+  edit-engine apply SPEC IN OUT [--record FILE] [--sign [--entitlements-from FILE]] [--quiet | --show-edits | --log json]
         apply SPEC's edits to IN and write OUT (IN is never changed). Default output: one line per edit;
         --show-edits adds bytes, instructions and reasons; --log json prints one JSON event per line.
-        --sign re-signs OUT ad hoc as the spec says (macOS only). --record writes the full record as JSON.
+        --sign re-signs OUT ad hoc as the spec says (macOS only); a spec whose sign has entitlements_from needs
+        --entitlements-from FILE, the signed file it names. --record writes the full record as JSON.
         --store DIR keeps the original, the result and the record in an artifact store and reuses a stored
         result when the spec, the input and the engine are unchanged and the stored output still hashes right.
   edit-engine inspect STORE PATH    the original and patched files side by side: where they are, their sha256,
@@ -18,13 +19,13 @@ import argparse
 import json
 import os
 from pathlib import Path
-import subprocess
 import sys
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / 'src'))
 import engine   # noqa: E402
 import spec as S   # noqa: E402
+import signing   # noqa: E402
 import store as ST   # noqa: E402
 
 REPO = HERE.parents[1]
@@ -82,24 +83,30 @@ def cmd_apply(a):
     except engine.EditError as x:
         print('edit-engine: refused: %s' % x, file=sys.stderr)
         return 1
+    if a.sign and spec.get('sign'):
+        if sys.platform != 'darwin':
+            print('edit-engine: --sign needs macOS codesign', file=sys.stderr)
+            return 1
+        if spec['sign'].get('entitlements_from') and not a.entitlements_from:
+            print('edit-engine: the spec signs %s: give that file with --entitlements-from FILE'
+                  % S.sign_text(spec['sign']).split(', ', 1)[-1], file=sys.stderr)
+            return 1
+        entitlements = Path(a.entitlements_from).read_bytes() if spec['sign'].get('entitlements_from') else None
+        try:
+            out = signing.sign(out, spec['sign'], data, entitlements, S.codesign_args)
+        except signing.SignatureError as x:
+            print('edit-engine: %s' % x, file=sys.stderr)
+            return 1
+        args = S.codesign_args(spec['sign'], "(the input's)", a.entitlements_from)
+        record['signed'] = args
+        record['signed_sha256'] = engine.sha256(out)
+        if level in ('steps', 'edits'):
+            print('  sign     %s  ok' % ' '.join(args[4:]) if len(args) > 4 else '  sign     ad hoc  ok')
     tmp = a.output + '.edit-engine'
     with open(tmp, 'wb') as f:
         f.write(out)
     os.chmod(tmp, os.stat(a.input).st_mode & 0o7777)
     os.replace(tmp, a.output)
-    if a.sign and spec.get('sign'):
-        if sys.platform != 'darwin':
-            print('edit-engine: --sign needs macOS codesign', file=sys.stderr)
-            return 1
-        existing = None
-        if 'identifier' in spec['sign'].get('preserve', []):
-            shown = subprocess.run(['codesign', '-dv', a.input], capture_output=True, text=True)
-            existing = next((l.split('=', 1)[1] for l in shown.stderr.splitlines() if l.startswith('Identifier=')), None)
-        args = S.codesign_args(spec['sign'], existing)
-        subprocess.run(args + [a.output], check=True, capture_output=True)
-        record['signed'] = args
-        if level in ('steps', 'edits'):
-            print('  sign     %s  ok' % ' '.join(args[4:]) if len(args) > 4 else '  sign     ad hoc  ok')
     if a.record:
         Path(a.record).write_text(json.dumps(record, indent=1) + '\n')
     return 0
@@ -161,6 +168,7 @@ def main():
     q = sub.add_parser('apply')
     q.add_argument('spec'); q.add_argument('input'); q.add_argument('output')
     q.add_argument('--record'); q.add_argument('--sign', action='store_true'); q.add_argument('--store')
+    q.add_argument('--entitlements-from', metavar='FILE')
     g = q.add_mutually_exclusive_group()
     g.add_argument('--quiet', action='store_true'); g.add_argument('--show-edits', action='store_true')
     g.add_argument('--log', choices=['json'])

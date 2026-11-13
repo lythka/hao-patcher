@@ -2,7 +2,7 @@
 """ledger: every file the recipes of a set declare, as one origin + ordered writes, and the chains it refuses.
 
   ledger.py SET TARGET BUILD [--json]          SET = pipeline/sets/SET.txt, TARGET = pipeline/targets/NAME.json
-  ledger.py SET TARGET BUILD --write-expected  record today's chains as pipeline/ledger-expected.json (review it)
+  ledger.py SET TARGET BUILD --write-expected  record this set's chains in pipeline/ledger-expected.json (review it)
 
 Layers, lowest first: Golden Gate's own System ("apple"), the Tahoe donor roots (tools/tahoe-donors/recipes/
 intel-donors.json, "tahoe"), OCLP's hardware overlay for the target (tools/oclp-hardware/profiles/TARGET.json, and
@@ -16,8 +16,14 @@ path is listed with the same writers in pipeline/ledger-expected.json:
   dead-edits   a recipe installs the whole file over another recipe's edits, so those edits are lost
   superseded   a recipe installs the whole file over a file OCLP installs itself (OCLP's write is wasted)
   inside-tree  a recipe writes a file inside a folder another recipe declares whole ("tree": true)
-and always refuses an edit spec whose origin kind is not the kind of the file it edits. An expected entry that no
-longer matches is refused too, so the list only ever shrinks as chains are collapsed.
+and always refuses an edit spec whose origin kind is not the kind of the file it edits. A recipe that edits a file
+inside its own tree edits what that tree installed (no chain). An expected entry that no longer matches is refused
+too, so the list only ever shrinks as chains are collapsed.
+
+pipeline/ledger-expected.json is {"chains": {PATH: {"chain", "writers"}}}, one list for every set: a chain is
+expected by what it is (its path, kind and writers), not by the set it was first seen in, so any set that applies
+the same recipes passes with the same entries. An entry applies to a set when the set applies every recipe it names;
+only then can it be stale.
 """
 import json
 import os
@@ -89,13 +95,17 @@ def build(setfile, target, build_name, root=os.path.join(TOP, 'patches'), layer_
                 e['writers'].append({'recipe': name, 'action': 'edits', 'spec': f['edits'],
                                      'edits': [x['id'] for x in spec['edits']], 'sign': bool(spec.get('sign')),
                                      'origin_kind': spec['origin']['kind'], 'install': f.get('install'), 'source': f.get('source'),
-                                     'input': f.get('input')})
+                                     'input': f.get('input'), 'after': f.get('after')})
             else:
                 e['writers'].append({'recipe': name, 'action': 'origin', 'origin': f['origin'],
-                                     'tree': bool(f.get('tree')), 'install': f.get('install'), 'source': f.get('source')})
-    for e in ledger.values():
-        classify(e, oclp)
-    trees = [(p, w['recipe']) for p, e in ledger.items() for w in e['writers'] if w.get('tree')]
+                                     'tree': bool(f.get('tree')), 'install': f.get('install'), 'source': f.get('source'),
+                                     'after': f.get('after')})
+    tree_writers = [(p, w) for p, e in ledger.items() for w in e['writers'] if w.get('tree')]
+    for path, e in ledger.items():
+        first = e['writers'][0]['recipe']             # a recipe editing a file of its own tree edits the tree's file
+        own = next(((t, w) for t, w in tree_writers if w['recipe'] == first and path != t and under(path, t)), None)
+        classify(e, oclp, own_tree=own)
+    trees = [(p, w['recipe']) for p, w in tree_writers]
     for path, e in ledger.items():                     # another recipe's file inside a recipe's whole tree
         for tree, owner in trees:
             if path != tree and under(path, tree) and any(w['recipe'] != owner for w in e['writers']):
@@ -104,12 +114,18 @@ def build(setfile, target, build_name, root=os.path.join(TOP, 'patches'), layer_
     return ledger
 
 
-def classify(e, oclp):
-    """Set e['chain'] (the kind of multi-writer pattern, or None) and e['problems'] (always refused)."""
+def classify(e, oclp, own_tree=None):
+    """Set e['chain'] (the kind of multi-writer pattern, or None) and e['problems'] (always refused). OWN_TREE
+    (tree path, its writer): the file is inside a tree its first writer installs whole, so that recipe wrote it
+    first (e['own_tree'] says where the materialiser finds those bytes)."""
     writers, base = e['writers'], e['base']
     kinds = []
     current = None                                   # the recipe that last wrote the whole file or edited it
     current_kind = base['kind']                      # what the file is, for an edit spec's origin
+    if own_tree:
+        tree, tw = own_tree
+        e['own_tree'] = {'tree': tree, 'recipe': tw['recipe'], 'row': tw['origin'].get('row'), 'source': tw.get('source')}
+        current, current_kind = tw['recipe'], 'hao'
     edited_by_other = False
     for w in writers:
         if w['action'] == 'edits':
@@ -147,9 +163,21 @@ def writer_names(e):
     return [e['base']['kind']] + tree + [w['recipe'] for w in e['writers']]
 
 
+def named_recipes(writers):
+    """The recipes an expected entry's writer list names (not the base layer; a tree owner by its name)."""
+    return {w.split(' (tree ', 1)[0] for w in writers[1:]}
+
+
+def applies(want, ledger):
+    """Whether the expected entry WANT ({"chain", "writers"}) is about this ledger's set: it applies every recipe
+    the entry names."""
+    applied = {w['recipe'] for e in ledger.values() for w in e['writers']}
+    return named_recipes(want.get('writers', [])) <= applied
+
+
 def lint(ledger, expected):
-    """Problems: refused chains not in EXPECTED ({path: {"chain", "writers"}}), stale expected entries, and every
-    entry's own problems."""
+    """Problems: refused chains not in EXPECTED ({path: {"chain", "writers"}}, shared by every set), stale expected
+    entries (only those whose recipes this set all applies), and every entry's own problems."""
     bad = []
     for path, e in sorted(ledger.items()):
         bad += ['%s: %s' % (path, p) for p in e['problems']]
@@ -161,7 +189,7 @@ def lint(ledger, expected):
                     path, e['chain'], ' -> '.join(got['writers']), ' (expected %s)' % json.dumps(want) if want else ''))
     for path, want in sorted(expected.items()):
         e = ledger.get(path)
-        if not e or not e['chain']:
+        if applies(want, ledger) and (not e or not e['chain']):
             bad.append('%s: listed in ledger-expected.json but no longer a chain: remove it' % path)
     return bad
 
@@ -186,9 +214,30 @@ def render(ledger):
     return '\n'.join(out)
 
 
-def expected_for(setname):
-    data = read_json(EXPECTED) if os.path.isfile(EXPECTED) else {}
-    return data.get(setname, {})
+def expected_chains(path=EXPECTED):
+    """{path: {"chain", "writers"}}: the expected chains, the same for every set."""
+    data = read_json(path) if os.path.isfile(path) else {}
+    return data.get('chains', {})
+
+
+def expected_for(setname=None, path=EXPECTED):
+    """The expected chains SETNAME is checked against: the shared list (SETNAME is kept for callers; the list is
+    keyed by chain, not by set)."""
+    return expected_chains(path)
+
+
+def write_expected(ledger, path=EXPECTED):
+    """Record LEDGER's chains in the shared list: entries about this set (applies()) are replaced by its chains;
+    entries about other sets are kept. Returns the number of chains this set has."""
+    chains = {p: w for p, w in expected_chains(path).items() if not applies(w, ledger)}
+    mine = {p: {'chain': e['chain'], 'writers': writer_names(e)} for p, e in sorted(ledger.items()) if e['chain']}
+    clash = [p for p in mine if p in chains and chains[p] != mine[p]]
+    if clash:
+        raise ValueError('another set expects a different chain for %s' % ', '.join(clash))
+    chains.update(mine)
+    with open(path, 'w') as f:
+        f.write(json.dumps({'chains': chains}, indent=1, sort_keys=True) + '\n')
+    return len(mine)
 
 
 def main(argv):
@@ -202,20 +251,21 @@ def main(argv):
     except (ValueError, OSError, KeyError) as x:
         sys.exit('ledger: %s' % x)
     if '--write-expected' in argv:
-        data = read_json(EXPECTED) if os.path.isfile(EXPECTED) else {}
-        data[setname] = {p: {'chain': e['chain'], 'writers': writer_names(e)} for p, e in sorted(ledger.items())
-                         if e['chain']}
-        with open(EXPECTED, 'w') as f:
-            f.write(json.dumps(data, indent=1, sort_keys=True) + '\n')
-        print('ledger: wrote %d expected chains for %s' % (len(data[setname]), setname))
+        try:
+            n = write_expected(ledger)
+        except ValueError as x:
+            sys.exit('ledger: %s' % x)
+        print('ledger: recorded %d expected chains for %s' % (n, setname))
         return 0
-    problems = lint(ledger, expected_for(setname))
+    expected = expected_for(setname)
+    problems = lint(ledger, expected)
     if '--json' in argv:
         print(json.dumps({'set': setname, 'files': ledger, 'problems': problems}, indent=1))
     else:
         print(render(ledger))
-        print('\nledger: %d declared files, %d chains (%d expected), %d problems' % (
-            len(ledger), sum(1 for e in ledger.values() if e['chain']), len(expected_for(setname)), len(problems)))
+        print('\nledger: %d declared files, %d chains (%d expected for this set), %d problems' % (
+            len(ledger), sum(1 for e in ledger.values() if e['chain']),
+            sum(1 for w in expected.values() if applies(w, ledger)), len(problems)))
         for p in problems:
             print('PROBLEM: %s' % p)
     return 1 if problems else 0

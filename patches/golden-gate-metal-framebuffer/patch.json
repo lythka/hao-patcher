@@ -1,5 +1,5 @@
 {
- "revision": 5,
+ "revision": 6,
  "stage": "oclp-hook",
  "applies": {
   "models": [
@@ -18,7 +18,14 @@
  "files": [
   {
    "path": "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver",
-   "edits": "edits/driver.json"
+   "edits": "edits/driver.json",
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
+   }
   },
   {
    "path": "usr/lib/libmetal-framebuffer.dylib",
@@ -27,7 +34,14 @@
     "row": "metal_framebuffer",
     "note": "new file: framebuffer-read adapter built by build/metal-framebuffer"
    },
-   "source": "libmetal-framebuffer.dylib"
+   "source": "libmetal-framebuffer.dylib",
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
+   }
   }
  ]
 }

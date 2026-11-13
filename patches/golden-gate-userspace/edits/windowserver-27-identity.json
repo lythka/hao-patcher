@@ -26,5 +26,5 @@
    "reason": "WindowServer loads the display-state shim, which supplies the flag byte 27.x's clients need and the x86_64 server omits"
   }
  ],
- "sign": {"mode": "adhoc", "identifier": "com.apple.WindowServer"}
+ "sign": {"mode": "adhoc", "identifier": "com.apple.WindowServer", "entitlements_from": {"kind": "apple", "path": "System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer", "note": "the 27.x WindowServer this Tahoe one serves for: src/install.py resign_with_entitlements signs with its entitlements (codesign -d --entitlements - --xml) and its identifier"}}
 }

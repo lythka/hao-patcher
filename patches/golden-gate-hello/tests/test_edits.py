@@ -37,7 +37,9 @@ class Declaration(unittest.TestCase):
         self.assertEqual(S.validate(SPEC), [])
         self.assertEqual(SPEC['path'], 'System/Library/Frameworks/Metal.framework/Versions/A/Metal')
         files = json.loads((PATCH / 'patch.json').read_text())['files']
-        self.assertIn({'path': SPEC['path'], 'edits': 'edits/metal.json'}, files)
+        entry = next(f for f in files if f['path'] == SPEC['path'])
+        self.assertEqual(entry['edits'], 'edits/metal.json')
+        self.assertEqual(entry['install'], {'mode': '0755', 'owner': 'root:wheel', 'flags': ['restricted']})   # as the hook installs it
 
     def test_same_bytes_as_edit_metal_on_a_synthetic_wrapper(self):
         wrapper = fixture.dylib(

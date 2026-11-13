@@ -119,6 +119,7 @@ checked statically only: no 26B131 image has run it (OPEN). Correct rendering on
 are not yet proven; restart rendering artifacts after a WindowServer crash are outside this patch.
 
 ## Revisions
+- r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libraries), as the hook sets them, so overlays carry them; the hook is unchanged. Keeps r5's validation: what it installs is unchanged (validated_digest).
 - r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json and patch.json files; the hook is unchanged. Keeps r5's validation: what it installs is unchanged (validated_digest).
 - r5 2026-11-11 Per-UUID profiles (`src/profiles.h`) derived by symbol (`src/derive.py`) replace the pinned 26A428
   offsets; adds 26B131. r4 was silently inert there (UUID gate), and its slot 124 and flag byte 0x543 would be wrong:

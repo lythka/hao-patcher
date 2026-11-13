@@ -152,6 +152,110 @@ class Materialize(unittest.TestCase):
         subprocess.run(['codesign', '-f', '-s', '-', '-i', 'Metal', str(ref)], check=True, capture_output=True)
         self.assertEqual((self.d / 'out/base/files' / METAL).read_bytes(), ref.read_bytes())
 
+    def test_tar_members_keep_their_mode_owner_and_folders(self):
+        # as `tar -xp --numeric-owner`: the member's mode and numeric owner, and the tar's folders above it
+        with tarfile.open(self.d / 'rows' / 'caches' / 'setup.tar', 'w') as t:
+            for name, mode, uid in (('private', 0o755, 0), ('private/var/zz', 0o711, 0), ('private/var/zz/C', 0o700, 248)):
+                info = tarfile.TarInfo(name); info.type = tarfile.DIRTYPE; info.mode = mode; info.uid = info.gid = uid
+                t.addfile(info)
+            data = b'index'
+            info = tarfile.TarInfo('private/var/zz/C/store.index'); info.size = len(data)
+            info.mode, info.uid, info.gid = 0o600, 248, 248
+            t.addfile(info, io.BytesIO(data))
+        self.recipe('caches', [
+            {'path': 'private/var/zz/C/store.index', 'origin': {'kind': 'hao', 'row': 'caches'},
+             'source': 'setup.tar!private/var/zz/C/store.index'},
+            {'path': 'private/var/c/store.index', 'origin': {'kind': 'hao', 'row': 'caches'},
+             'source': 'data.tar!private/var/c/store.index', 'install': {'mode': '0640', 'owner': 'root:admin'}}])
+        report, out = self.run_all()
+        m = json.loads((out / 'base/manifest.json').read_text())
+        self.assertEqual({k: m['files']['private/var/zz/C/store.index'][k] for k in ('mode', 'owner', 'flags')},
+                         {'mode': '0600', 'owner': '248:248', 'flags': []})
+        self.assertEqual(m['dirs'], {'private': {'mode': '0755', 'owner': '0:0'},
+                                     'private/var/zz': {'mode': '0711', 'owner': '0:0'},
+                                     'private/var/zz/C': {'mode': '0700', 'owner': '248:248'}})
+        self.assertEqual(m['files']['private/var/c/store.index']['mode'], '0640')       # a declaration wins
+        self.assertEqual(m['files']['private/var/c/store.index']['owner'], 'root:admin')
+        # hao patch puts them in place with those attributes (owners recorded: the test does not run as root)
+        calls = []
+        attrs = livepatch.Attributes(self.d / 'target', privileged=True,
+                                     chown=lambda p, u, g: calls.append((str(p.relative_to(self.d / 'target')), u, g)),
+                                     chflags=lambda p, bits: None)
+        (self.d / 'target').mkdir()
+        livepatch.apply([livepatch.load_overlay(out / 'base')], self.d / 'target', self.d / 'state', attributes=attrs)
+        self.assertIn(('private/var/zz/C/store.index', 248, 248), calls)
+        self.assertIn(('private/var/zz/C', 248, 248), calls)
+        self.assertEqual(oct((self.d / 'target/private/var/zz/C').stat().st_mode & 0o777), '0o700')
+
+    def test_a_stamp_inside_its_own_tree_is_deferred_after_the_kernel_collection(self):
+        kext = self.d / 'rows' / 'payload' / 'HaoExec.kext' / 'Contents'
+        (kext / 'MacOS').mkdir(parents=True)
+        (kext / 'Info.plist').write_bytes(b'plist')
+        (kext / 'MacOS' / 'HaoExec').write_bytes(b'\xcf\xfa\xed\xfe unstamped')
+        self.sources.rows['payload'] = str(self.d / 'rows' / 'payload')
+        kc = 'System/Library/KernelCollections/BootKernelExtensions.kc'
+        exe = 'EFI/OC/Kexts/HaoExec.kext/Contents/MacOS/HaoExec'
+        self.recipe('kernel', [{'path': kc, 'edits': 'edits/k.json'}],
+                    {'k.json': {'format': 1, 'path': kc, 'origin': {'kind': 'hao'},
+                                'edits': [{'id': 'link', 'kind': 'op', 'op': 'kc.link', 'args': {}, 'reason': 'x'}]}})
+        self.recipe('oc', [{'path': 'EFI/OC/Kexts/HaoExec.kext', 'origin': {'kind': 'hao', 'row': 'payload'}, 'tree': True},
+                           {'path': exe, 'edits': 'edits/s.json'}],
+                    {'s.json': {'format': 1, 'path': exe, 'origin': {'kind': 'hao', 'row': 'payload'},
+                                'edits': [{'id': 'stamp', 'kind': 'op', 'op': 'hao.stamp', 'reason': 'x',
+                                           'args': {'kernel_collection': kc}}]}})
+        self.recipe('ids', [{'path': 'usr/lib/hao/native-identities', 'origin': {'kind': 'hao'}, 'after': ['overlays']}])
+        report, out = self.run_all()
+        made = sorted(str(p.relative_to(out / 'base/files')) for p in (out / 'base/files').rglob('*') if p.is_file())
+        self.assertEqual(made, ['EFI/OC/Kexts/HaoExec.kext/Contents/Info.plist'])        # never the unstamped copy
+        self.assertEqual(report['EFI/OC/Kexts/HaoExec.kext']['declared_separately'], [exe])
+        self.assertEqual((report[exe]['outcome'], report[exe]['after']), ('deferred', [kc]))
+        self.assertIn('hao.stamp', report[exe]['reason'])
+        order = [d['path'] for d in json.loads((out / 'deferred.json').read_text())]
+        self.assertLess(order.index(kc), order.index(exe))
+        self.assertEqual(order[-1], 'usr/lib/hao/native-identities')                    # after everything else
+        self.assertEqual(json.loads((out / 'deferred.json').read_text())[order.index('usr/lib/hao/native-identities')]
+                         ['after'], ['overlays'])
+
+    def test_a_signature_takes_another_files_entitlements(self):
+        import plistlib, shutil, subprocess
+        if sys.platform != 'darwin' or not shutil.which('codesign'):
+            self.skipTest('needs macOS codesign')
+        sys.path.insert(0, str(TOP / 'tools/edit-engine/src'))
+        import signing
+        ents = self.d / 'ents.plist'; ents.write_bytes(plistlib.dumps({'com.apple.private.example': True}))
+        path = 'usr/libexec/server'
+        golden = self.d / 'system' / path; golden.parent.mkdir(parents=True)
+        shutil.copyfile('/usr/bin/true', golden)
+        subprocess.run(['codesign', '-f', '-s', '-', '-i', 'com.example.server', '--entitlements', str(ents), str(golden)],
+                       check=True, capture_output=True)
+        tahoe = self.d / 'tahoe'; (tahoe / 'usr/libexec').mkdir(parents=True)
+        shutil.copyfile('/usr/bin/true', tahoe / path)
+        self.sources.tahoe_roots = [str(tahoe)]
+        start = signing.slices((tahoe / path).read_bytes())[0][1]
+        byte = (tahoe / path).read_bytes()[start + 8]
+        spec = {'format': 1, 'path': path, 'origin': {'kind': 'tahoe'},
+                'edits': [{'id': 'x', 'kind': 'literal', 'at': start + 8, 'find': '%02X' % byte,
+                           'replace': '%02X' % byte, 'mask': '00', 'reason': 'x'}],
+                'sign': {'mode': 'adhoc', 'identifier': 'com.example.server',
+                         'entitlements_from': {'kind': 'apple', 'path': path}}}
+        self.recipe('serve', [{'path': path, 'input': {'kind': 'tahoe', 'path': path}, 'edits': 'edits/s.json'}],
+                    {'s.json': spec})
+        report, out = self.run_all()
+        self.assertEqual(report[path]['outcome'], 'made', report[path])
+        made = (out / 'base/files' / path).read_bytes()
+        reference = self.d / 'reference'                # what the hook does: codesign with the golden file's entitlements
+        shutil.copyfile(tahoe / path, reference)
+        xml = self.d / 'golden.plist'
+        xml.write_bytes(subprocess.run(['codesign', '-d', '--entitlements', '-', '--xml', str(golden)],
+                                       check=True, capture_output=True).stdout)
+        subprocess.run(['codesign', '-f', '-s', '-', '-i', 'com.example.server', '--entitlements', str(xml),
+                        str(reference)], check=True, capture_output=True)
+        self.assertEqual(signing.compare(reference.read_bytes(), made)['problems'], [])
+        unsigned = self.d / 'plain'; shutil.copyfile(tahoe / path, unsigned)
+        subprocess.run(['codesign', '-f', '-s', '-', '-i', 'com.example.server', str(unsigned)], check=True,
+                       capture_output=True)
+        self.assertTrue(signing.compare(reference.read_bytes(), unsigned.read_bytes())['problems'])   # the old gap
+
     def test_last_writer_decides_the_pack(self):
         self.recipe('a', [{'path': 'usr/lib/one.dylib', 'origin': {'kind': 'hao', 'row': 'one'}}])
         report, out = self.run_all(packs={'a': 'metal-3802'})

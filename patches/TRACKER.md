@@ -8,27 +8,27 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 
 | Patch | Rev | Stage | Status | Optional | golden-gate-26B131 | golden-gate | recovery | stock | Validation | Newest revision |
 |---|---|---|---|---|---|---|---|---|---|---|
-| darwin27-kernel | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r6 2026-11-12 Declare the kernel, both kernel collections (kc.link) and their Preboot copies in `patch.json` ` |
+| darwin27-kernel | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare the kernel's install mode, 0644 (golden-pristine.sh installs it `-m 644`); the hook is u |
 | darwin27-sandbox-disk-space | r3 | oclp-hook | experiment |  |  | x |  |  | **needs** | r3 2026-11-12 Declare the system.sb rule in `edits/system-sb.json` (edit-engine text.insert, unless already pr |
 | dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
-| golden-gate-corespotlight-compat | r5 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r5 2026-11-12 Declare the daemons' load command and the installed library in edits/*.json and patch.json files |
+| golden-gate-corespotlight-compat | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both daemo |
 | golden-gate-font-registry | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
-| golden-gate-hello | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-12 Declare the Metal wrapper edits in `edits/metal.json` and the three files in `patch.json` `files |
+| golden-gate-hello | r5 | oclp-hook | experiment |  | x | x |  |  | **needs** | r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on Metal, the hell |
 | golden-gate-icon-caches | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
 | golden-gate-live-text-service | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the config edit in edits/config.json; the hook is unchanged. |
-| golden-gate-live-text-shared | r4 | oclp-hook | experiment |  | x |  |  |  | **needs** | r4 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
-| golden-gate-metal-framebuffer | r5 | oclp-hook | experiment |  | x | x |  |  | **needs** | r5 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the  |
+| golden-gate-live-text-shared | r5 | oclp-hook | experiment |  | x |  |  |  | **needs** | r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on libhellobl |
+| golden-gate-metal-framebuffer | r6 | oclp-hook | experiment |  | x | x |  |  | **needs** | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the driver |
 | golden-gate-metal-libraries | r19 | oclp-hook | experiment |  | x | x |  |  | **needs** | r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/t |
-| golden-gate-native-identities | r2 | oclp-hook | experiment |  | x | x |  |  | ok (r1) | r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.jso |
+| golden-gate-native-identities | r3 | oclp-hook | experiment |  | x | x |  |  | ok (r1) | r3 2026-11-12 Declare that its files are made on the target after every overlay file is installed (`"after": [ |
 | golden-gate-shader-caches | r13 | post | experiment | caches | x |  |  |  | **needs** | r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) f |
 | golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
-| golden-gate-userspace | r61 | oclp-hook | experiment |  | x | x |  |  | **needs** | r61 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runt |
-| golden-gate-windowserver-filter | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json a |
-| hao-opencore | r42 | post | experiment |  | x | x |  |  | **needs** | r42 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runt |
-| hao-runtime | r68 | oclp-hook | experiment |  | x | x |  |  | **needs** | r68 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runt |
-| metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
+| golden-gate-userspace | r62 | oclp-hook | experiment |  | x | x |  |  | **needs** | r62 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on the three wrap |
+| golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
+| hao-opencore | r43 | post | experiment |  | x | x |  |  | **needs** | r43 2026-11-12 Declare the HaoExec identity stamp: the executable is its own `files` entry with `edits/haoexec |
+| hao-runtime | r69 | oclp-hook | experiment |  | x | x |  |  | **needs** | r69 2026-11-12 Declare install attributes in patch.json `files` (`restricted` on usr/lib/dyld and usr/libexec/ |
+| metal-compiler-compat | r4 | oclp-hook | experiment |  | x |  |  |  | **needs** | r4 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the servic |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |
-| metalold-selectors | r5 | oclp-hook | product |  | x | x |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the  |
+| metalold-selectors | r6 | oclp-hook | product |  | x | x |  |  | ok (r3) | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the librar |
 | rec-audio | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three kext bundles and the kernel collection link in `patch.json` `files` and `edits |
 | rec-bluetooth-input | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the four kext bundles, btpower, its plist and the kernel collection link in `patch.json` |
 | rec-brightness-keys | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare brightkeys and its plist in `patch.json` `files`; the recipe is unchanged. |

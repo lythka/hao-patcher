@@ -1,0 +1,18 @@
+{
+ "format": 1,
+ "path": "EFI/OC/Kexts/HaoExec.kext/Contents/MacOS/HaoExec",
+ "arch": "x86_64",
+ "origin": {"kind": "hao", "name": "HaoExec.kext's executable", "row": "hao_runtime", "note": "the row's unstamped HaoExec.kext/Contents/MacOS/HaoExec, as the kext folder (declared whole in patch.json) installs it"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "bootkc-identity",
+   "kind": "op",
+   "op": "hao.stamp",
+   "args": {"tool": "stamp_identity.py", "row": "hao_runtime", "kernel_collection": "System/Library/KernelCollections/BootKernelExtensions.kc", "section": "__DATA,__hao_identity"},
+   "reason": "HaoExec binds to the kernel collection this image boots: stamp_identity.py writes that BootKC's kernel identity (UUID, symbol table, activator table, the addresses HaoExec calls) into __DATA,__hao_identity; on any other kernel the kext stays inactive. The BootKC is linked on the target, so the stamp is made there, after it",
+   "evidence": "apply.sh runs the row's stamp_identity.py on the image's BootKernelExtensions.kc after the ditto; tests/test_edits.py (HAO_OPENCORE_HAO_RUNTIME, HAO_OPENCORE_IMAGE_EFI) shows an image's HaoExec differs from the row's only inside __hao_identity"
+  }
+ ],
+ "sign": null
+}

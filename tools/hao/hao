@@ -34,18 +34,25 @@ def printer(level):
         if level == 'quiet' and k not in ('done', 'reverted'):
             return
         if k == 'plan':
-            print('%d to write, %d already current' % (ev['write'], ev['same']))
+            print('%d to write, %d to set attributes on, %d already current' % (ev['write'], ev.get('attrs', 0),
+                                                                                ev['same']))
             if ev['needs_recovery']:
                 print('needs Recovery (installer-only packs, not applied live): %s' % ', '.join(ev['needs_recovery']))
         elif k == 'file.write':
             print('  %-6s %-22s %s' % ('new' if ev['new'] else 'write', ev['pack'], ev['path']))
             if level == 'show':
                 print('         %s -> %s' % ((ev['old_sha256'] or 'none')[:16], ev['sha256'][:16]))
+        elif k == 'file.attrs':
+            print('  %-6s %-22s %s  (%s)' % ('attrs', ev['pack'], ev['path'], ', '.join(ev['keys'])))
         elif k == 'file.revert':
-            print('  %-6s %s' % ('remove' if ev['removed'] else 'restore', ev['path']))
+            print('  %-6s %s' % ('remove' if ev['removed'] else 'attrs' if ev.get('attrs_only') else 'restore',
+                                 ev['path']))
         elif k == 'done':
-            print('applied %s: %d written, %d unchanged%s' % (ev['id'], ev['written'], ev['same'],
-                                                             ', snapshot ' + ev['snapshot'] if ev['snapshot'] else ''))
+            print('applied %s: %d written, %d attributes set, %d unchanged%s' % (
+                ev['id'], ev['written'], ev.get('attrs', 0), ev['same'],
+                ', snapshot ' + ev['snapshot'] if ev['snapshot'] else ''))
+            if ev.get('not_set'):
+                print('not root: owners and system flags of %d files were not set (see the record)' % ev['not_set'])
             print('undo: hao patch --revert --root ROOT --id %s' % ev['id'])
         elif k == 'reverted':
             print('reverted %s: %d files' % (ev['id'], ev['files']))
@@ -70,10 +77,12 @@ def cmd_patch(a):
         overlays = [LP.load_overlay(o) for o in a.overlays]
         if a.dry_run:
             p = LP.plan(overlays, root, 'installer' if a.installer else 'live')
-            printer(level)({'ev': 'plan', 'write': len(p['write']), 'same': len(p['same']),
+            printer(level)({'ev': 'plan', 'write': len(p['write']), 'attrs': len(p['attrs']), 'same': len(p['same']),
                             'needs_recovery': p['needs_recovery']})
             for row in p['write']:
                 print('  %-6s %-22s %s' % ('new' if row['old_sha256'] is None else 'write', row['pack'], row['path']))
+            for row in p['attrs']:
+                print('  %-6s %-22s %s  (%s)' % ('attrs', row['pack'], row['path'], ', '.join(row['attrs'])))
             return 0
         LP.apply(overlays, root, state, mode='installer' if a.installer else 'live', on_event=printer(level))
         return 0

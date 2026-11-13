@@ -65,9 +65,10 @@ initializer, audiomxd, the Swift conformance references and the code identity ca
 re-signing; the two cryptex images are `cryptex.build` specs (`cryptex-os.json`, `cryptex-app.json`) and each of the 26
 stubs is a `hao.embed-stub` spec (`embed-*.json`). `hybridsearchd-job.json` and `launchd-job-cache.json` are
 `plist.set`; the three renamed wrappers (`io80211-oclp.json`, `wifip2p-oclp.json`, `corewifi-tahoe.json`) and
-`windowserver-27-identity.json` are declared with their signing. Not expressible: WindowServer's entitlements come from
-the 27.x program, and the engine applies none of the external ops (cache re-signing, image builds, stub embedding), so
-`tests/test_edits.py` proves those through the recipe's and the payload's own code. The Preboot copies of
+`windowserver-27-identity.json` are declared with their signing; WindowServer's signature takes the 27.x program's
+entitlements (`sign.entitlements_from`, as `resign_with_entitlements` reads them). Files the hook leaves
+`restricted` say so in their `install` flags. The engine applies none of the external ops (cache re-signing, image
+builds, stub embedding), so `tests/test_edits.py` proves those through the recipe's and the payload's own code. The Preboot copies of
 SystemVersion.plist (under the build's group folder) are not declared.
 
 ### Swift conformance type references
@@ -309,6 +310,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r62 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on the three wrappers, their renamed originals, CoreWiFi and the two job plists, as `src/install.py` leaves them) and where WindowServer's entitlements come from (`edits/windowserver-27-identity.json` `sign.entitlements_from`: the 27.x WindowServer, as `resign_with_entitlements` signs it); the hook is unchanged.
 - r61 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runtime-26B131-20261112-273ba980b829). No recipe change.
 - r60 2026-11-12 Declare the original file each renamed wrapper starts from ("input") for pipeline/materialize.py; the hook is unchanged.
 - r59 2026-11-12 Declare the files and edits in patch.json and edits/*.json (cache repairs, renamed wrappers, WindowServer, disabled job, cryptex builds, hao stubs); the hook and what it installs are unchanged.

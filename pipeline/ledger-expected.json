@@ -1,5 +1,5 @@
 {
- "golden-gate-26B131": {
+ "chains": {
   "EFI/OC/config.plist": {
    "chain": "chain",
    "writers": [

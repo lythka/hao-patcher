@@ -41,7 +41,9 @@ class Declaration(unittest.TestCase):
         self.assertEqual(S.validate(SPEC), [])
         self.assertEqual(SPEC['path'], DRIVER)
         files = json.loads((PATCH / 'patch.json').read_text())['files']
-        self.assertIn({'path': DRIVER, 'edits': 'edits/driver.json'}, files)
+        entry = next(f for f in files if f['path'] == DRIVER)
+        self.assertEqual(entry['edits'], 'edits/driver.json')
+        self.assertEqual(entry['install'], {'mode': '0755', 'owner': 'root:wheel', 'flags': ['restricted']})   # as the hook installs it
         op = SPEC['edits'][0]['args']
         self.assertEqual((op['path'], op['weak'], op['timestamp'], op.get('current_version', 0), op.get('compat_version', 0)),
                          (DYLIB, True, 2, 0, 0))

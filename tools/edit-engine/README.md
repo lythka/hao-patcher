@@ -22,6 +22,7 @@ python3.14 -I tools/edit-engine/edit-engine apply --show-edits SPEC IN OUT    # 
 python3.14 -I tools/edit-engine/edit-engine apply --quiet SPEC IN OUT         # failures only
 python3.14 -I tools/edit-engine/edit-engine apply --log json SPEC IN OUT      # one JSON event per line
 python3.14 -I tools/edit-engine/edit-engine apply --sign --record R.json SPEC IN OUT
+python3.14 -I tools/edit-engine/edit-engine apply --sign --entitlements-from FILE SPEC IN OUT   # sign.entitlements_from
 python3.14 -I tools/edit-engine/edit-engine apply --store STORE SPEC IN OUT   # keep, and reuse when hashes match
 python3.14 -I tools/edit-engine/edit-engine inspect STORE PATH                # original and patched side by side
 python3.14 -I tools/edit-engine/edit-engine check SPEC ...
@@ -29,7 +30,8 @@ python3.14 -I tools/edit-engine/edit-engine explain SPEC ...
 ```
 
 `apply` never changes IN. It writes OUT only when every edit applied and every check passed. Otherwise it exits 1
-and the message names the edit. `--sign` re-signs OUT ad hoc as the spec's `sign` says (macOS `codesign`).
+and the message names the edit. `--sign` re-signs OUT ad hoc as the spec's `sign` says (macOS `codesign`); a spec whose `sign` takes another
+file's entitlements needs that file as `--entitlements-from`.
 `--record` writes the input and output SHA-256, each edit's sites (offset, bytes before and after) and whether the
 output matches the spec's recorded one.
 
@@ -78,7 +80,7 @@ JSON log). A damaged object, or a changed spec, input, matcher or engine version
 | `origin` | who made the bytes this spec edits: `kind` `apple` (Golden Gate), `tahoe`, `oclp` or `hao`, with optional `name`, `row` (input row) and `note` |
 | `applied_by` | `installer` (default), `opencore` or `kext:IntelCommpage` |
 | `edits` | applied in order; each sees the result of the ones before |
-| `sign` | `null`, or `{"mode": "adhoc"}` with `"identifier": NAME` or `"preserve": [identifier, entitlements, requirements, flags, runtime]` (keep those from the input file, as `codesign -i <its identifier> --preserve-metadata=…`): signed once, after the last edit |
+| `sign` | `null`, or `{"mode": "adhoc"}` with `"identifier": NAME` or `"preserve": [identifier, entitlements, requirements, flags, runtime]` (keep those from the input file, as `codesign -i <its identifier> --preserve-metadata=…`), and optionally `"entitlements_from"`: the entitlements of another signed file, `{"kind": apple\|tahoe\|oclp\|ventura, "path": P}` (that layer's file at P) or `{"kind": "hao", "row": ROW, "source": P}`, read with `codesign -d --entitlements - --xml` and signed with `--entitlements`, as a hook that gives a program another program's identity does (not with `preserve` entitlements): signed once, after the last edit |
 | `expect` | input SHA-256 → output SHA-256 recorded for that input. A different output is reported, not refused |
 
 Every edit has `id` (lower-case letters, digits, `-`), `kind`, `reason`, and optionally `evidence` and `asm`
@@ -105,16 +107,40 @@ tuples) computes them. Every site's `before` bytes must be there.
 |---|---|
 | `macho.add-dylib` | `path` (absolute), `weak`, `timestamp` (default 2, as ld64 writes), `current_version`, `compat_version`. Uses the zero padding after the load commands and leaves the signature for `sign` |
 | `plist.set` | `key` (list of dictionary keys and array indexes), `value`. Keeps XML or binary format. Not mixed with byte edits in one spec |
-| `metallib.rewrite`, `kc.link`, `cryptex.build`, `hao.embed-stub` | declared for `explain`; applied by their own tools, so `apply` refuses them |
+| `metallib.rewrite`, `kc.link`, `cryptex.build`, `hao.embed-stub`, `hao.stamp` | declared for `explain`; applied by their own tools, so `apply` refuses them. `pipeline/materialize.py` defers a file with one to the target. `hao.stamp` (the hao-runtime row's `stamp_identity.py`, HaoExec's BootKC identity) names the installed file it reads as `kernel_collection`, and the deferred step comes after it |
 
 Checks: every literal and matcher site is checked before it is written. Two edits that touch the same bytes (or
 the same plist key) are refused. After the last edit, every written byte must still be what its edit wrote, and an
 `arch` file must still parse.
 
+## Signatures
+
+`src/signing.py` signs as a spec says (one codesign run, on a temporary copy), reads a signature back (each slice's
+identifier, CodeDirectory flags, special-slot count, CDHash, requirements, entitlements and DER entitlements) and
+`compare()`s two files: the bytes outside the signature (with `LC_CODE_SIGNATURE` and `__LINKEDIT` sizes masked),
+then the identifier, flags, entitlements and requirements. That is what equal means for a signed file:
+
+- **Signature padding is not a difference.** The builder VM's codesign reserves about 18 KB of zeros after the
+  blobs in each slice; the host's reserves none. The CDHash, the file size and the signature's size fields differ,
+  nothing else: `compare()` lists it as a note.
+- **The metadata is.** A file with the right code but a signature without the entitlements its hook gave it (the
+  27.x WindowServer's, for Tahoe's WindowServer) is refused, however equal its code is.
+- **Anything keyed on CDHashes is made from the installed files.** `usr/lib/hao/native-identities`
+  (golden-gate-native-identities) lists the observed CDHash of each re-signed native program; an overlay signed on
+  another machine has other CDHashes, if only from the padding. The recipe declares its files
+  `"after": ["overlays"]`, and `pipeline/materialize.py` defers them and orders them after every overlay file and
+  every other deferred step (`DIR/deferred.json`).
+
+`src/signlint.py` is the static half: a recipe whose hook signs with another file's entitlements
+(`codesign … --entitlements FILE`) or keeps the input's metadata (`--preserve-metadata=…`) needs a signed spec that
+says so (`entitlements_from`, `preserve`). `verify-declaration` runs both: signlint on every changed recipe, and
+`compare()` against `--reference PATH=FILE` files the hooks installed (e.g. read from a built image).
+
 ## Verify
 
 ```sh
 python3.14 -I -B -m unittest discover -s tools/edit-engine/tests
+python3.14 -I tools/edit-engine/src/signlint.py patches/*/
 python3.14 -I -B -m unittest discover -s patches/golden-gate-hello/tests   # HELLO_OCLP_METAL=PATH: OCLP's wrapper too
 ```
 

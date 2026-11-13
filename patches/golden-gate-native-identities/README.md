@@ -43,7 +43,7 @@ to `/` and none is writable by group or others. The carrier gives a listed progr
 original gets; the program itself is the edited one (security trade-off: hao-runtime `docs/security-model.md`,
 "Apple identity for listed programs").
 
-Declared files: `patch.json` `files` lists `usr/lib/hao/native-identities`, the record, and the three originals the README expects (WindowServer from Tahoe, `corespotlightd` and `managedcorespotlightd` from 27.2.1). They are generated or copied whole, so no edit spec is needed; `tests/test_edits.py` checks the paths against the script.
+Declared files: `patch.json` `files` lists `usr/lib/hao/native-identities`, the record, and the three originals the README expects (WindowServer from Tahoe, `corespotlightd` and `managedcorespotlightd` from 27.2.1). They are generated or copied whole, so no edit spec is needed; `tests/test_edits.py` checks the paths against the script. Each says `"after": ["overlays"]`: the list is keyed on the CDHashes of the re-signed programs as installed (an overlay signed on another machine has other CDHashes, if only from signature padding), so it is generated on the target after every overlay file is in place; `pipeline/materialize.py` defers it and lists it last in `deferred.json`.
 
 ## Verify
 
@@ -69,5 +69,6 @@ Earlier: Host tests pass and a host simulation of the 26B131 WindowServer and `c
 their rows. No image has been built with this recipe.
 
 ## Revisions
+- r3 2026-11-12 Declare that its files are made on the target after every overlay file is installed (`"after": ["overlays"]`): the list is keyed on the CDHashes of the files as installed; the hook is unchanged. Keeps r1's validation: what it installs is unchanged (validated_digest).
 - r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.json `files`; the hook is unchanged.
 - r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the native-identities list, replacing golden-gate-code-identity's map and per-daemon interposer.

@@ -90,16 +90,87 @@ class Ledger(unittest.TestCase):
 
     def test_stale_expected_entry_refused(self):
         self.recipe('a', [{'path': 'usr/lib/x', 'origin': {'kind': 'hao'}}])
+        self.recipe('b', [{'path': 'usr/lib/y', 'origin': {'kind': 'hao'}}])
         bad = L['lint'](self.ledger(), {'usr/lib/x': {'chain': 'two-origins', 'writers': ['apple', 'a', 'b']}})
         self.assertIn('no longer a chain: remove it', bad[0])
 
+    def test_expected_chains_are_shared_by_every_set_with_those_recipes(self):
+        # the same chain in two sets passes with one entry; a set without one of its recipes is not held to it
+        self.recipe('a', [{'path': METAL, 'edits': 'edits/m.json'}], {'m.json': self.spec(METAL)})
+        self.recipe('b', [{'path': METAL, 'edits': 'edits/m.json'}], {'m.json': self.spec(METAL)})
+        self.recipe('dev', [{'path': 'usr/lib/dev', 'origin': {'kind': 'hao'}}])
+        expected = {METAL: {'chain': 'chain', 'writers': ['oclp', 'a', 'b']}}
+        self.assertEqual(L['lint'](self.ledger(), expected), [])                    # a, b, dev
+        self.order.remove('dev')
+        self.assertEqual(L['lint'](self.ledger(), expected), [])                    # a, b
+        self.order.remove('b')
+        self.assertEqual(L['lint'](self.ledger(), expected), [])                    # a alone: entry not about it
+
+    def test_write_expected_keeps_other_sets_entries(self):
+        self.recipe('a', [{'path': METAL, 'edits': 'edits/m.json'}], {'m.json': self.spec(METAL)})
+        self.recipe('b', [{'path': METAL, 'edits': 'edits/m.json'}], {'m.json': self.spec(METAL)})
+        out = self.d / 'expected.json'
+        other = {'usr/lib/z': {'chain': 'two-origins', 'writers': ['apple', 'c', 'd']}}
+        out.write_text(json.dumps({'chains': dict(other, **{'usr/lib/gone': {'chain': 'chain',
+                                                                            'writers': ['apple', 'a', 'b']}})}))
+        self.assertEqual(L['write_expected'](self.ledger(), out), 1)
+        self.assertEqual(json.loads(out.read_text())['chains'],
+                         dict(other, **{METAL: {'chain': 'chain', 'writers': ['oclp', 'a', 'b']}}))
+
+    def test_a_recipe_editing_a_file_of_its_own_tree(self):
+        kext = 'EFI/OC/Kexts/HaoExec.kext'
+        self.recipe('oc', [{'path': kext, 'origin': {'kind': 'hao', 'row': 'r'}, 'tree': True},
+                           {'path': kext + '/Contents/MacOS/HaoExec', 'edits': 'edits/s.json'}],
+                    {'s.json': {'format': 1, 'path': kext + '/Contents/MacOS/HaoExec', 'origin': {'kind': 'hao'},
+                                'edits': [{'id': 's', 'kind': 'op', 'op': 'hao.stamp', 'args': {}, 'reason': 'x'}]}})
+        led = self.ledger()
+        e = led[kext + '/Contents/MacOS/HaoExec']
+        self.assertEqual((e['chain'], e['problems'], e['own_tree']['tree']), (None, [], kext))
+
+
+# The files the 26B131 baseline image (dev-bs-test) holds with the `restricted` flag, among the declared ones: each
+# recipe's hook runs `chflags restricted` (or keeps the flag of the file it replaces).
+RESTRICTED = [
+    'System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver',
+    'System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd',
+    'System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/managedcorespotlightd',
+    'System/Library/Frameworks/Metal.framework/Versions/A/Metal',
+    'System/Library/Frameworks/Metal.framework/Versions/A/XPCServices/MTLCompilerService.xpc/Contents/MacOS/MTLCompilerService',
+    'System/Library/LaunchAgents/com.apple.hybridsearchd.plist',
+    'System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFi',
+    'System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFiTahoe.dylib',
+    'System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211',
+    'System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211OCLP.dylib',
+    'System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/3802/Libraries/libhaoMetalCompilerCompat.dylib',
+    'System/Library/PrivateFrameworks/SetupAssistantSupportUI.framework/Versions/A/Resources/default.metallib',
+    'System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/WiFiPeerToPeer',
+    'System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/WiFiPeerToPeerOCLP.dylib',
+    'System/Library/xpc/launchd.plist',
+    'usr/lib/corespotlight_compat.dylib', 'usr/lib/dss_shim.dylib', 'usr/lib/dyld', 'usr/lib/libhelloblur.dylib',
+    'usr/lib/libmetal-framebuffer.dylib', 'usr/lib/libmetalold-selectors.dylib', 'usr/lib/windowserver_filter.dylib',
+    'usr/libexec/hao']
+
 
 class Repository(unittest.TestCase):
-    def test_shipped_set_has_only_expected_chains(self):
-        # a new chain, or a listed one that was collapsed, means: update pipeline/ledger-expected.json on purpose
-        setfile = TOP / 'pipeline/sets/golden-gate-26B131.txt'
-        led = L['build'](setfile, TOP / 'pipeline/targets/mbp92.json', '25G342')
-        self.assertEqual(L['lint'](led, L['expected_for']('golden-gate-26B131')), [])
+    def test_install_attributes_the_baseline_image_has_are_declared(self):
+        led = L['build'](TOP / 'pipeline/sets/golden-gate-26B131.txt', TOP / 'pipeline/targets/mbp92.json', '25G342')
+        install = lambda p: next((w['install'] for w in reversed(led[p]['writers']) if w.get('install')), {})
+        self.assertEqual(len(RESTRICTED), 23)
+        for p in RESTRICTED:
+            self.assertEqual(install(p).get('flags'), ['restricted'], p)
+        self.assertEqual(install('System/Library/Kernels/kernel')['mode'], '0644')     # golden-pristine.sh -m 644
+        exe = led['EFI/OC/Kexts/HaoExec.kext/Contents/MacOS/HaoExec']
+        self.assertEqual((exe['writers'][-1]['spec'], exe['own_tree']['tree'], exe['chain']),
+                         ('edits/haoexec-identity.json', 'EFI/OC/Kexts/HaoExec.kext', None))
+        self.assertEqual(led['usr/lib/hao/native-identities']['writers'][-1]['after'], ['overlays'])
+
+    def test_shipped_sets_have_only_expected_chains(self):
+        # a new chain, or a listed one that was collapsed, means: update pipeline/ledger-expected.json on purpose.
+        # dev-bs-test (golden-gate-26B131 + dev access) has the same chains and passes with the same entries
+        for name in ('golden-gate-26B131', 'dev-bs-test'):
+            setfile = TOP / 'pipeline/sets' / (name + '.txt')
+            led = L['build'](setfile, TOP / 'pipeline/targets/mbp92.json', '25G342')
+            self.assertEqual(L['lint'](led, L['expected_for'](name)), [], name)
 
 
 if __name__ == '__main__':

@@ -10,8 +10,15 @@ a system root:
 
 - writes only files whose full sha256 differs from the overlay's, and checks each before (unchanged since
   planning) and after (the written file has the manifest's sha256)
-- backs up every replaced file and records every new one, so `--revert` restores replaced files and removes
-  files the patch added (a plain backup of existing files misses those)
+- sets each file's mode, owner and flags as the manifest says, also on a file whose content is already right
+  (`attrs`); owners are `user:group` by name (looked up in ROOT's own `private/etc/passwd` and `group`, then
+  this system's) or by number (`248:248`, as `tar --numeric-owner` keeps them); flags are chflags names
+  (`restricted`, `schg`, `uchg`, `sunlnk`, `hidden`, `nodump`). Folders it creates get the manifest's `dirs`
+  mode and owner (a cache folder owned by a system account), else root:wheel 0755
+- owners and system flags need root: without root they are left as they are and the record says which
+  (`not_set`), so a run as a normal user is never a proof of attributes
+- backs up every replaced file and records every new one, so `--revert` restores replaced files and their
+  attributes, and removes files and (empty) folders the patch added (a plain backup of existing files misses those)
 - takes a lock of its own (`STATE/lock`)
 - live, it does not apply `installer`-phase packs (kexts, the cryptex, the EFI partition) and lists them as
   needing Recovery; `--installer` applies them (installer or on-disk Recovery)

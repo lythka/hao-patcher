@@ -1,5 +1,5 @@
 {
- "revision": 61,
+ "revision": 62,
  "stage": "oclp-hook",
  "applies": {
   "models": [
@@ -44,7 +44,10 @@
    },
    "install": {
     "mode": "0755",
-    "owner": "root:wheel"
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
    }
   },
   {
@@ -56,7 +59,10 @@
    },
    "install": {
     "mode": "0755",
-    "owner": "root:wheel"
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
    }
   },
   {
@@ -68,16 +74,33 @@
    },
    "install": {
     "mode": "0755",
-    "owner": "root:wheel"
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
    }
   },
   {
    "path": "System/Library/LaunchAgents/com.apple.hybridsearchd.plist",
-   "edits": "edits/hybridsearchd-job.json"
+   "edits": "edits/hybridsearchd-job.json",
+   "install": {
+    "mode": "0644",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
+   }
   },
   {
    "path": "System/Library/xpc/launchd.plist",
-   "edits": "edits/launchd-job-cache.json"
+   "edits": "edits/launchd-job-cache.json",
+   "install": {
+    "mode": "0644",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
+   }
   },
   {
    "path": "System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211OCLP.dylib",
@@ -85,6 +108,13 @@
    "input": {
     "kind": "oclp",
     "path": "System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
    }
   },
   {
@@ -93,6 +123,13 @@
    "input": {
     "kind": "oclp",
     "path": "System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/WiFiPeerToPeer"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
    }
   },
   {
@@ -101,6 +138,13 @@
    "input": {
     "kind": "tahoe",
     "path": "System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFi"
+   },
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
    }
   },
   {

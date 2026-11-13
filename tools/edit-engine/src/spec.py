@@ -24,7 +24,12 @@ EXTERNAL_OPS = {
     'kc.link': "Tahoe's kmutil",
     'cryptex.build': 'the cryptex builder',
     'hao.embed-stub': 'the hao-runtime installer',
+    'hao.stamp': "the hao-runtime row's stamp_identity.py, against the target's linked BootKC",
 }
+# Installed paths an external op reads on the target, by argument name: the file can only be made after those exist
+# there, so the materialiser lists them as what the deferred step comes after.
+EXTERNAL_INPUTS = {'hao.stamp': ('kernel_collection',)}
+SIGN_KEYS = {'mode', 'identifier', 'preserve', 'entitlements_from'}
 TOP_KEYS = {'format', 'path', 'arch', 'origin', 'applied_by', 'edits', 'sign', 'expect'}
 COMMON_KEYS = {'id', 'kind', 'reason', 'evidence', 'asm'}
 KIND_KEYS = {
@@ -94,13 +99,16 @@ def validate(spec):
         bad.append('applied_by must be one of %s' % ', '.join(APPLIED_BY))
     sign = spec.get('sign')
     if sign is not None and (not isinstance(sign, dict) or sign.get('mode') != 'adhoc'
-                             or set(sign) - {'mode', 'identifier', 'preserve'}
+                             or set(sign) - SIGN_KEYS
                              or not isinstance(sign.get('identifier', ''), str)
                              or not isinstance(sign.get('preserve', []), list)
                              or set(sign.get('preserve', [])) - PRESERVE
                              or ('identifier' in sign and 'identifier' in sign.get('preserve', []))):
-        bad.append('sign must be null or {"mode": "adhoc", "identifier": NAME | "preserve": [%s]} (not both an '
-                   'identifier and preserving it)' % ', '.join(sorted(PRESERVE)))
+        bad.append('sign must be null or {"mode": "adhoc", "identifier": NAME | "preserve": [%s], '
+                   '"entitlements_from": SOURCE} (not both an identifier and preserving it)'
+                   % ', '.join(sorted(PRESERVE)))
+    elif sign is not None and 'entitlements_from' in sign:
+        bad += entitlements_problems(sign)
     expect = spec.get('expect', {})
     if not isinstance(expect, dict) or not all(SHA.match(k) and isinstance(v, str) and SHA.match(v)
                                                for k, v in expect.items()):
@@ -154,6 +162,26 @@ def validate(spec):
     if plist_ops and byte_edits:
         bad.append('plist.set edits cannot be mixed with byte edits in one spec')
     return bad
+
+
+def entitlements_problems(sign):
+    """Problems with SIGN's entitlements_from: {"kind": apple|tahoe|oclp|ventura, "path": RELATIVE} (that layer's
+    file at PATH: the layer as it was before any recipe) or {"kind": "hao", "row": INPUT_ROW, "source": RELATIVE}
+    (a file inside an input row; the row itself when it is a file). Either may carry a "note"."""
+    src = sign['entitlements_from']
+    if 'entitlements' in sign.get('preserve', []):
+        return ["sign: entitlements_from and preserving the input's entitlements exclude each other"]
+    usage = ('sign: entitlements_from is {"kind": %s, "path": RELATIVE} (a layer\'s file) or {"kind": "hao", '
+             '"row": ROW, "source": RELATIVE} (a file in an input row)' % '|'.join(o for o in ORIGINS if o != 'hao'))
+    if not isinstance(src, dict) or src.get('kind') not in ORIGINS or not all(isinstance(v, str) for v in src.values()):
+        return [usage]
+    keys = set(src) - {'note'}
+    if keys == {'kind', 'path'} and src['kind'] != 'hao' and _relative_path(src['path']):
+        return []
+    if src['kind'] == 'hao' and keys in ({'kind', 'row'}, {'kind', 'row', 'source'}) and (
+            'source' not in src or _relative_path(src['source'])):
+        return []
+    return [usage]
 
 
 def _literal_problems(e):
@@ -327,11 +355,20 @@ def sign_text(sign):
         out += ', identifier %s' % sign['identifier']
     if sign.get('preserve'):
         out += ', keeping the file\'s %s' % ', '.join(sign['preserve'])
+    src = sign.get('entitlements_from')
+    if src:
+        out += ', with the entitlements of %s' % (
+            "%s's %s" % (origin_text({'kind': src['kind']}), src['path']) if 'path' in src
+            else 'row %s%s' % (src.get('row'), ' ' + src['source'] if src.get('source') else ''))
     return out
 
 
-def codesign_args(sign, existing_identifier=None):
-    """codesign arguments for SIGN; EXISTING_IDENTIFIER is the input file's, when SIGN preserves it."""
+def codesign_args(sign, existing_identifier=None, entitlements_file=None):
+    """codesign arguments for SIGN; EXISTING_IDENTIFIER is the input file's, when SIGN preserves it;
+    ENTITLEMENTS_FILE holds the entitlements (an XML plist, as `codesign -d --entitlements - --xml` prints them)
+    of the file SIGN's entitlements_from names."""
+    if sign.get('entitlements_from') and not entitlements_file:
+        raise ValueError('sign takes its entitlements from another file (entitlements_from), and none was given')
     args = ['codesign', '-f', '-s', '-']
     preserve = [p for p in sign.get('preserve', []) if p != 'identifier']
     if sign.get('identifier'):
@@ -342,4 +379,6 @@ def codesign_args(sign, existing_identifier=None):
         args += ['-i', existing_identifier]
     if preserve:
         args.append('--preserve-metadata=' + ','.join(preserve))
+    if sign.get('entitlements_from'):
+        args += ['--entitlements', str(entitlements_file)]
     return args

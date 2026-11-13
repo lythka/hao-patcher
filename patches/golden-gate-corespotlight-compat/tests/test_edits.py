@@ -38,14 +38,17 @@ class Declaration(unittest.TestCase):
             spec = load(name)
             self.assertEqual(S.validate(spec), [])
             self.assertEqual(spec['path'], SUPPORT + name)
-            self.assertIn({'path': spec['path'], 'edits': 'edits/%s.json' % name}, files)
+            entry = next(f for f in files if f['path'] == spec['path'])
+            self.assertEqual(entry['edits'], 'edits/%s.json' % name)
+            self.assertEqual(entry['install'], {'mode': '0755', 'owner': 'root:wheel', 'flags': ['restricted']})   # as kc-hook.sh installs it
             edit, = spec['edits']
             self.assertEqual((edit['op'], edit['args']), ('macho.add-dylib', {
                 'path': DYLIB, 'weak': False, 'timestamp': 2, 'current_version': 0x10000, 'compat_version': 0x10000}))
             # as kc-hook.sh: -i <the daemon's own identifier> --preserve-metadata=entitlements,flags,runtime
             self.assertEqual(spec['sign'], {'mode': 'adhoc', 'preserve': ['identifier', 'entitlements', 'flags', 'runtime']})
         self.assertIn({'path': 'usr/lib/corespotlight_compat.dylib', 'origin': {
-            'kind': 'hao', 'row': 'corespotlight_compat_shim', 'note': files[2]['origin']['note']}}, files)
+            'kind': 'hao', 'row': 'corespotlight_compat_shim', 'note': files[2]['origin']['note']},
+            'install': {'mode': '0755', 'owner': 'root:wheel', 'flags': ['restricted']}}, files)
 
     def test_same_bytes_as_add_load_dylib_on_a_synthetic_universal_file(self):
         thin = fixture.dylib(ident=b'/usr/libexec/corespotlightd')

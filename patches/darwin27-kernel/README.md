@@ -47,6 +47,7 @@ Earlier: the collection recipe reproduces BootKC 6494d8e3 (26A428) and c8ae8b05 
 (kernel file no longer copied by the hook) has not been built.
 
 ## Revisions
+- r7 2026-11-12 Declare the kernel's install mode, 0644 (golden-pristine.sh installs it `-m 644`); the hook is unchanged. Keeps r5's validation: what it installs is unchanged (validated_digest).
 - r6 2026-11-12 Declare the kernel, both kernel collections (kc.link) and their Preboot copies in `patch.json` `files` and edits/; the hook is unchanged.
 - r5 2026-11-11 The kernel file is installed once, by the base layer (golden-pristine.sh finalize, before the hardware overlay that reads it); the kc-hook now checks it is `inputs/darwin27_kernel` instead of copying it again, and creates the System and Preboot KernelCollections folders itself. Runs as an ordinary set entry. Collection recipe unchanged. Build and boot validation pending.
 - r4 2026-11-11 Use the measured 26B131 Intel kernel with the 25G342 Tahoe donor kexts. Boot validation pending.

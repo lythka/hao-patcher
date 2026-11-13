@@ -46,7 +46,10 @@ apple|tahoe|oclp|hao, "row": INPUT_ROW, "name": ..., "note": ...}}], optionally 
 for a folder: every file under it), "install": {"mode", "owner", "flags"} and "source" (where the bytes are inside
 the origin row: a relative path, or "ARCHIVE!MEMBER" for a file in a tar; pipeline/materialize.py needs it when the row
 is a folder laid out differently from the install path); an edits entry installed under another name than the file it
-starts from names that file as "input": {"kind", "path"}. An edits file is an edit spec for
+starts from names that file as "input": {"kind", "path"}. "install" "flags" are chflags names (restricted, schg,
+uchg, sunlnk, hidden, nodump): declare what the hook sets, e.g. ["restricted"] where it runs `chflags restricted`.
+A file made on the target (an origin without a row, or an external op) may name what it must come after there:
+"after": [INSTALLED_PATH | "overlays"] ("overlays": every overlay file installed first). An edits file is an edit spec for
 tools/edit-engine (format in its README) and must name the same path; every patches/NAME/edits/*.json must be declared.
 """
 import hashlib, json, os, re, sys
@@ -63,6 +66,8 @@ STAGES = ('oclp-hook', 'post', 'recovery')
 STATUSES = ('product', 'dev', 'diagnostic', 'experiment', 'unfinished', 'deprecated')
 SHIPPING_SETS = ('recovery',)   # sets whose output goes to people: product patches only
 APPLIES = ('models', 'builds')
+# chflags names a declaration's install "flags" may use; tools/hao/src/livepatch.py FLAG_BITS sets each one
+INSTALL_FLAGS = ('restricted', 'schg', 'uchg', 'sunlnk', 'hidden', 'nodump')
 
 
 def names(setfile):
@@ -363,11 +368,18 @@ def file_problems(d, p):
             return ['files must be a non-empty list']
         paths = set()
         for f in files:
-            if not isinstance(f, dict) or set(f) - {'path', 'edits', 'origin', 'tree', 'install', 'source', 'input'} \
+            if not isinstance(f, dict) or set(f) - {'path', 'edits', 'origin', 'tree', 'install', 'source', 'input',
+                                                    'after'} \
                     or ('edits' in f) == ('origin' in f):
                 bad.append('files: each entry is {"path", "edits"} or {"path", "origin"} (+ "tree", "install"): %s'
                            % json.dumps(f))
                 continue
+            after = f.get('after')
+            if after is not None and (not isinstance(after, list) or not after or not all(
+                    isinstance(a, str) and (a == 'overlays' or (a and not a.startswith('/') and '..' not in a.split('/')))
+                    for a in after)):
+                bad.append('files: %s: after is a list of installed paths (relative) or "overlays" (every overlay file '
+                           'installed first), what a file made on the target must come after' % f.get('path'))
             src = f.get('source')
             if src is not None and (not isinstance(src, str) or 'origin' not in f or not f['origin'].get('row')
                                     or src.startswith('/') or '..' in src.replace('!', '/').split('/')):
@@ -387,9 +399,10 @@ def file_problems(d, p):
             if inst is not None and (not isinstance(inst, dict) or set(inst) - {'mode', 'owner', 'flags'}
                                      or ('mode' in inst and not re.fullmatch(r'0[0-7]{3,4}', str(inst['mode'])))
                                      or ('owner' in inst and not re.fullmatch(r'[a-z_0-9]+:[a-z_0-9]+', str(inst['owner'])))
-                                     or not isinstance(inst.get('flags', []), list)):
-                bad.append('files: %s: install is {"mode": "0644", "owner": "root:wheel", "flags": [...]}'
-                           % f.get('path'))
+                                     or not isinstance(inst.get('flags', []), list)
+                                     or set(inst.get('flags', [])) - set(INSTALL_FLAGS)):
+                bad.append('files: %s: install is {"mode": "0644", "owner": "root:wheel", "flags": [%s]}'
+                           % (f.get('path'), ', '.join(INSTALL_FLAGS)))
             path = f.get('path')
             if not (isinstance(path, str) and path and not path.startswith('/') and '..' not in path.split('/')):
                 bad.append('files: path must be relative to the installed system: %r' % (path,))

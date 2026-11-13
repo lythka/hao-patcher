@@ -1,5 +1,5 @@
 {
-  "revision": 42,
+  "revision": 43,
   "stage": "post",
   "applies": {
     "models": [
@@ -39,8 +39,12 @@
         "kind": "hao",
         "row": "hao_runtime",
         "name": "HaoExec.kext",
-        "note": "the row's HaoExec.kext, copied with ditto, then stamp_identity.py (also from the row) writes this image's BootKC identity into the executable's __DATA,__hao_identity section; that stamp is not declared yet"
+        "note": "the row's HaoExec.kext, copied with ditto; its executable is declared on its own below: stamp_identity.py (also from the row) stamps it for this image's BootKC"
       }
+    },
+    {
+      "path": "EFI/OC/Kexts/HaoExec.kext/Contents/MacOS/HaoExec",
+      "edits": "edits/haoexec-identity.json"
     }
   ]
 }

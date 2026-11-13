@@ -16,9 +16,9 @@ With real inputs (environment variable: what it points at):
   USERSPACE_SYSTEM_ROOT      a pristine 26B131 System volume: the two plists (disabled job) and the 27.x WindowServer
   USERSPACE_OCLP_IO80211, USERSPACE_OCLP_WIFIP2P   OCLP 13.7.2-25 wrapper files; USERSPACE_DONOR_COREWIFI: Tahoe's
                              CoreWiFi from the native donors. Spec output (then signed) equals install.py's rename
-  USERSPACE_DONOR_WINDOWSERVER  Tahoe's WindowServer from the native donors: spec output equals
-                             install.resign_with_entitlements (the 27.x entitlements are not in the spec: the test
-                             adds them from the 27.x program, as install.py does)
+  USERSPACE_DONOR_WINDOWSERVER  Tahoe's WindowServer from the native donors: spec output, signed as the spec says
+                             (entitlements_from: the 27.x program's, from USERSPACE_SYSTEM_ROOT), equals
+                             install.resign_with_entitlements byte for byte
   HAO_RUNTIME_PAYLOAD        the row hao_runtime folder: the embed-*.json specs are exactly its cryptex manifest entries
   GOLDEN_OS_CRYPTEX / GOLDEN_APP_CRYPTEX  mounted SystemOS / AppOS images: each spec's source hash is the program's
                              and the payload's hao_fat.combine gives the spec's result hash
@@ -135,14 +135,31 @@ class Declaration(unittest.TestCase):
     def test_windowserver_spec_is_what_resign_with_entitlements_does_to_the_bytes(self):
         """install.resign_with_entitlements: the 27.x Info.plist (matcher), LC_LOAD_DYLIB of the display shim
         (macho.add-dylib: command 0xc, timestamp 2, versions 0x10000), then an ad hoc signature with the 27.x
-        identifier and entitlements (the spec's sign names the identifier; the entitlements come from the 27.x
-        program, which the format cannot name)."""
-        name, spec = BY_PATH[display['DISPLAY_STATE_CLIENTS'][0]]
+        identifier and entitlements: the spec's sign names the identifier and takes the entitlements of the 27.x
+        program at the same path (entitlements_from, kind apple), the file install.py reads them from."""
+        rel = display['DISPLAY_STATE_CLIENTS'][0]
+        name, spec = BY_PATH[rel]
         edits = [e for e in spec['edits'] if e['kind'] == 'op']
         self.assertEqual([e['args']['path'] for e in edits], ['/' + display['DISPLAY_STATE_SHIM']])
         self.assertEqual(edits[0]['args'], {'path': '/usr/lib/dss_shim.dylib', 'weak': False, 'timestamp': 2,
                                             'current_version': 0x10000, 'compat_version': 0x10000})
         self.assertEqual(spec['sign']['identifier'], 'com.apple.WindowServer')
+        self.assertEqual({k: v for k, v in spec['sign']['entitlements_from'].items() if k != 'note'},
+                         {'kind': 'apple', 'path': rel})
+        self.assertEqual(install.RESIGN_WITH_27_ENTITLEMENTS, (rel,))
+        self.assertIn("'--entitlements', entitlements, kept", Path(install.__file__).read_text())
+
+    def test_files_install_py_leaves_restricted_declare_it(self):
+        """disable_jobs runs chflags restricted on the job plist and launchd's cache; install_wrapper_compat gives
+        the compat library and the renamed original the original's flags (restricted, from OCLP or Apple)."""
+        restricted = list(install.DISABLED_JOBS.values()) + [install.LAUNCHD_CACHE]
+        for folder, leaf, suffix in ((install.IO80211, 'IO80211', 'OCLP'), (install.WIFIP2P, 'WiFiPeerToPeer', 'OCLP'),
+                                     (install.COREWIFI, 'CoreWiFi', 'Tahoe')):
+            restricted += [folder + leaf, folder + leaf + suffix + '.dylib']
+        for path in restricted:
+            self.assertEqual(FILES[path].get('install', {}).get('flags'), ['restricted'], path)
+            self.assertEqual(FILES[path]['install']['owner'], 'root:wheel', path)
+        self.assertIn("run('chflags', 'restricted', target)", Path(install.__file__).read_text())
 
     def test_add_dylib_writes_the_same_bytes_as_add_load_dylib(self):
         data = fixture.dylib(size=0x4000, text_at=0x1800, text_size=0x1000, symbols={'_main': 0x1810})
@@ -329,7 +346,7 @@ class RealPlistsAndWindowServer(unittest.TestCase):
             entitlements = tmp/'entitlements.plist'
             entitlements.write_bytes(subprocess.run(['codesign', '-d', '--entitlements', '-', '--xml', str(golden)],
                                                     check=True, capture_output=True).stdout)
-            subprocess.run([*S.codesign_args(spec['sign']), '--entitlements', str(entitlements), str(mine)],
+            subprocess.run([*S.codesign_args(spec['sign'], None, entitlements), str(mine)],   # entitlements_from
                            check=True, capture_output=True)
             self.assertEqual(mine.read_bytes(), kept.read_bytes())
             # the unsigned bytes differ from the reference only in the signature

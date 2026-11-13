@@ -29,6 +29,14 @@ class Declaration(unittest.TestCase):
         self.assertEqual(FILES[o + SUPPORT + 'managedcorespotlightd']['kind'], 'apple')
         self.assertEqual(len(FILES), 5)
 
+    def test_made_after_every_overlay_is_installed(self):
+        """The list is keyed on the CDHashes of the installed programs, so every file is generated on the target
+        after the overlays are in place (no row: the materialiser defers them and orders them last)."""
+        entries = json.loads((PATCH / 'patch.json').read_text())['files']
+        self.assertEqual({tuple(f.get('after', [])) for f in entries}, {('overlays',)})
+        self.assertFalse(any(f['origin'].get('row') for f in entries))
+        self.assertIn('kc-hook.sh', [p.name for p in (PATCH / 'src').iterdir()])
+
 
 if __name__ == '__main__':
     unittest.main()

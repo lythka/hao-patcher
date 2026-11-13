@@ -163,6 +163,27 @@ class Kexts(unittest.TestCase):
         self.assertIn('ditto "$REPAIR_WORK/artifact/EFI/OC/Kexts/IntelCommpage.kext" "$ESP/EFI/OC/Kexts/IntelCommpage.kext"', script)
         self.assertIn('ditto "$P/inputs/hao_runtime/HaoExec.kext" "$ESP/EFI/OC/Kexts/HaoExec.kext"', script)
 
+    def test_haoexec_identity_stamp_is_declared_as_a_target_side_op(self):
+        """apply.sh stamps the executable after the ditto, against this image's BootKC: the executable is its own
+        entry whose spec is the external op hao.stamp, so the materialiser defers it (after the BootKC) and never
+        ships the row's unstamped copy as the final file. The stamp is not re-signed (sign null)."""
+        exe = 'EFI/OC/Kexts/HaoExec.kext/Contents/MacOS/HaoExec'
+        self.assertEqual(FILES[exe], {'path': exe, 'edits': 'edits/haoexec-identity.json'})
+        spec = S.load(PATCH / 'edits/haoexec-identity.json')
+        self.assertEqual(S.validate(spec), [])
+        (edit,) = spec['edits']
+        self.assertEqual(edit['op'], 'hao.stamp')
+        self.assertIn(edit['op'], S.EXTERNAL_OPS)
+        self.assertEqual(edit['args']['kernel_collection'], 'System/Library/KernelCollections/BootKernelExtensions.kc')
+        self.assertIsNone(spec['sign'])
+        script = (PATCH / 'apply.sh').read_text()
+        ditto = script.index('ditto "$P/inputs/hao_runtime/HaoExec.kext"')
+        stamp = script.index('"$P/inputs/hao_runtime/stamp_identity.py" \\\n'
+                             '    "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc" '
+                             '"$ESP/EFI/OC/Kexts/HaoExec.kext"')
+        self.assertLess(ditto, stamp)
+        self.assertNotIn('codesign', script)
+
     @unittest.skipUnless(os.environ.get('HAO_OPENCORE_KERNEL_REPAIR_EFI') and os.environ.get('HAO_OPENCORE_IMAGE_EFI'),
                          'set HAO_OPENCORE_KERNEL_REPAIR_EFI and HAO_OPENCORE_IMAGE_EFI')
     def test_intelcommpage_in_the_image_is_the_rows_folder_byte_for_byte(self):

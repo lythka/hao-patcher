@@ -44,7 +44,9 @@ class Declaration(unittest.TestCase):
     def test_spec_follows_the_format(self):
         self.assertEqual(S.validate(SPEC), [])
         self.assertEqual(SPEC['path'], 'usr/lib/libhelloblur.dylib')
-        self.assertIn({'path': SPEC['path'], 'edits': 'edits/libhelloblur.json'}, FILES)
+        entry = next(f for f in FILES if f['path'] == SPEC['path'])
+        self.assertEqual(entry['edits'], 'edits/libhelloblur.json')
+        self.assertEqual(entry['install'], {'mode': '0755', 'owner': 'root:wheel', 'flags': ['restricted']})   # as the hook installs it
         for f in FILES:
             if 'origin' in f:
                 self.assertEqual(f['origin']['row'], 'live_text_framework')

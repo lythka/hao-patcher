@@ -1,12 +1,12 @@
 {
- "revision": 3,
+ "revision": 4,
  "stage": "oclp-hook",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
  "inputs": ["metal_compiler_compat"],
  "status": "experiment",
  "validated": false,
  "files": [
-  {"path": "System/Library/Frameworks/Metal.framework/Versions/A/XPCServices/MTLCompilerService.xpc/Contents/MacOS/MTLCompilerService", "origin": {"kind": "hao", "row": "metal_compiler_compat", "note": "OCLP's legacy MTLCompilerService with a load command for libhaoMetalCompilerCompat.dylib added and re-signed ad hoc, made by tools/live-text compiler-service; installed whole, and only over the exact service it was made from"}},
-  {"path": "System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/3802/Libraries/libhaoMetalCompilerCompat.dylib", "origin": {"kind": "hao", "row": "metal_compiler_compat", "note": "new file: the shader repair library the service loads at startup"}}
+  {"path": "System/Library/Frameworks/Metal.framework/Versions/A/XPCServices/MTLCompilerService.xpc/Contents/MacOS/MTLCompilerService", "origin": {"kind": "hao", "row": "metal_compiler_compat", "note": "OCLP's legacy MTLCompilerService with a load command for libhaoMetalCompilerCompat.dylib added and re-signed ad hoc, made by tools/live-text compiler-service; installed whole, and only over the exact service it was made from"}, "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}},
+  {"path": "System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/3802/Libraries/libhaoMetalCompilerCompat.dylib", "origin": {"kind": "hao", "row": "metal_compiler_compat", "note": "new file: the shader repair library the service loads at startup"}, "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}}
  ]
 }

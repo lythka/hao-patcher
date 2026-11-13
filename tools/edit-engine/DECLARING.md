@@ -23,6 +23,14 @@ recipe adds or changes on the installed system: the install path, how the hook g
 
 Origins: `apple` = Golden Gate's own file, `tahoe` = a Tahoe donor, `oclp` = OCLP's payload, `hao` = ours.
 
+Install attributes: give every entry the hook's `install`: `{"mode", "owner", "flags"}` exactly as the hook leaves
+the file (`install -o root -g wheel -m 755` → `"mode": "0755", "owner": "root:wheel"`; `chflags restricted`, or a
+copy of the flags of the file it replaces when that file has them → `"flags": ["restricted"]`). Without it the
+materialiser writes root:wheel, 0755 for a Mach-O and 0644 otherwise, no flags. Files from a tar member keep the
+member's mode and numeric owner (as `tar -xp --numeric-owner`), so they need no `install` unless the hook changes
+them. A file made on the target that must wait for others there says so: `"after": [PATH | "overlays"]`
+(`overlays`: after every overlay file and every other target step, e.g. anything keyed on installed CDHashes).
+
 ## 3. Write the spec
 
 Copy the shape of `patches/golden-gate-hello/edits/metal.json`. The format is in this folder's README.
@@ -38,11 +46,18 @@ Copy the shape of `patches/golden-gate-hello/edits/metal.json`. The format is in
 - **Load command added** → `macho.add-dylib`, with exactly the command type (`weak`), `timestamp` and versions the
   existing code writes. Read the `struct.pack` call.
 - **Plist key set** → `plist.set`.
-- **Metallib rewrite, kernel-collection link, cryptex build, hao stub embedding** → the external op
-  (`metallib.rewrite`, `kc.link`, `cryptex.build`, `hao.embed-stub`) with `args` naming its profile or row. That
-  is a declaration only; no byte test is possible for it, so say so in the report.
+- **Metallib rewrite, kernel-collection link, cryptex build, hao stub embedding, HaoExec's identity stamp** → the
+  external op (`metallib.rewrite`, `kc.link`, `cryptex.build`, `hao.embed-stub`, `hao.stamp`) with `args` naming
+  its profile or row (`hao.stamp`: `kernel_collection`, the installed file it reads). That is a declaration only;
+  no byte test is possible for it, so say so in the report. A file inside a tree the same recipe declares whole (a
+  kext folder) can have its own entry like this: the materialiser makes it from that entry, never from the tree.
 - Every edit gets a `reason` in plain words (what the user gets, not how), taken from the recipe's README.
 - `sign`: `{"mode": "adhoc", "identifier": …}` when the hook runs `codesign -f -s -` (copy its `-i`), else `null`.
+  Copy the rest of the call too: `--preserve-metadata=A,B` → `"preserve": [A, B]` (and `identifier` when the hook
+  reads `-i` from the file itself); `--entitlements FILE` where FILE comes from another program
+  (`codesign -d --entitlements - --xml OTHER`) → `"entitlements_from": {"kind", "path"}` naming OTHER. Equal bytes
+  outside the signature are not enough: `src/signlint.py` refuses a hook call no spec accounts for, and
+  `verify-declaration --reference` compares identifier, flags and entitlements with what the hook installed.
 - `expect`: `{real input sha256: output sha256}`, from running the existing code on a copy (step 4).
 
 If a change cannot be expressed with these kinds, **stop for that file**: declare the others, and say in your
@@ -104,10 +119,14 @@ The maintainer runs, on your branch, with each real input you name:
 
 ```sh
 python3.14 -I tools/edit-engine/verify-declaration declare/YOURS --env NAME=PATH ...
+python3.14 -I tools/edit-engine/verify-declaration declare/YOURS --system ROOT --reference PATH=FILE ...
 ```
 
 It refuses changes outside the allowed paths, a revision that does not go up by exactly 1, any other
-`patch.json` change, private paths, and any failing suite; a real-input test without its file is UNVERIFIED.
+`patch.json` change, private paths, a hook signing call no spec accounts for (signlint), and any failing suite; a
+real-input test without its file is UNVERIFIED. With `--reference` (a file the recipe's hook installed, e.g. from a
+built image), the branch's materialiser makes that path and it must have the same code outside the signature and
+the same signing identifier, flags and entitlements; a different CDHash from signature padding is only a note.
 
 ## Report
 

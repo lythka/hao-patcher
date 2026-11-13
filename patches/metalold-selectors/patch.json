@@ -1,5 +1,5 @@
 {
- "revision": 5,
+ "revision": 6,
  "stage": "oclp-hook",
  "applies": {
   "models": [
@@ -20,7 +20,14 @@
  "files": [
   {
    "path": "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver",
-   "edits": "edits/driver.json"
+   "edits": "edits/driver.json",
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
+   }
   },
   {
    "path": "usr/lib/libmetalold-selectors.dylib",
@@ -29,7 +36,14 @@
     "row": "metalold_selectors",
     "note": "new file: Metal selector shim built by build/make, ad hoc signed"
    },
-   "source": "libmetalold-selectors.dylib"
+   "source": "libmetalold-selectors.dylib",
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
+   }
   }
  ]
 }

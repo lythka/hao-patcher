@@ -38,6 +38,7 @@ NEEDS VALIDATION: on a MacBookPro9,2 the Language Chooser played hello and MTLCo
 without a crash; frame rate on the HD 4000 and `textFragment_watchPreview` are untested.
 
 ## Revisions
+- r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on Metal, the hello library (0644) and libhelloblur), as the hook sets them, so overlays carry them; the hook is unchanged.
 - r4 2026-11-12 Declare the Metal wrapper edits in `edits/metal.json` and the three files in `patch.json` `files`; the hook is unchanged.
 - r3 2026-11-11 README and hook comment: runs in set order; golden-gate-userspace no longer replaces System. Recipe unchanged.
 - r2 2026-11-11 The hello library row is a System-rooted folder with `SOURCES`; the hook refuses a System library the rewrite was not made from. 26B131 library (the rewrite touches the same eight functions as 26A428's).

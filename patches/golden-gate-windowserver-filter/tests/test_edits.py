@@ -36,7 +36,9 @@ class Declaration(unittest.TestCase):
         self.assertEqual(S.validate(SPEC), [])
         self.assertEqual(SPEC['path'], 'usr/lib/dss_shim.dylib')
         files = json.loads((PATCH / 'patch.json').read_text())['files']
-        self.assertIn({'path': SPEC['path'], 'edits': 'edits/dss-shim.json'}, files)
+        entry = next(f for f in files if f['path'] == SPEC['path'])
+        self.assertEqual(entry['edits'], 'edits/dss-shim.json')
+        self.assertEqual(entry['install'], {'mode': '0755', 'owner': 'root:wheel', 'flags': ['restricted']})   # as the hook installs it
         edit, = SPEC['edits']
         self.assertEqual(edit['args']['path'].encode(), SCRIPT['DYLIB'])
         self.assertEqual((edit['op'], edit['args']), ('macho.add-dylib', {

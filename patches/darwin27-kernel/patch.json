@@ -1,5 +1,5 @@
 {
-  "revision": 6,
+  "revision": 7,
   "stage": "oclp-hook",
   "applies": {
     "models": [
@@ -25,6 +25,10 @@
         "kind": "apple",
         "row": "darwin27_kernel",
         "note": "Golden Gate's own x86_64 kernel from the IPSW, unchanged; installed once by the base layer (golden-pristine.sh finalize) and only checked by the kc-hook"
+      },
+      "install": {
+        "mode": "0644",
+        "owner": "root:wheel"
       }
     },
     {

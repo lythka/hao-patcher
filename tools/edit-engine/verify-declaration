@@ -2,15 +2,23 @@
 """verify-declaration: accept or refuse a branch that declares recipes' edits (tools/edit-engine/DECLARING.md).
 
   verify-declaration BRANCH [--base REF] [--env NAME=PATH ...]
+                     [--reference PATH=FILE ... --system ROOT [--set NAME] [--target NAME] [--build BUILD]]
 
 Checks, against BASE (default builder/edit-engine), without trusting the branch's own report:
   1. only patches/NAME/{patch.json,README.md,edits/*,tests/*}, patches/TRACKER.md and docs/PATCHES.md changed
   2. each changed recipe: revision + 1, newest README Revisions line names it, files declared, and no other
      patch.json key changed (validated, status, inputs, applies, stage stay as they were)
   3. no private paths in added lines
-  4. in a clean detached checkout of BRANCH: patches.py check, the pipeline, edit-engine and recipe suites, with the
+  4. each changed recipe's signing calls are accounted for by its specs (src/signlint.py): a hook that signs with
+     another file's entitlements needs "entitlements_from", one that keeps the input's metadata needs "preserve"
+  5. in a clean detached checkout of BRANCH: patches.py check, the pipeline, edit-engine and recipe suites, with the
      --env variables and without them; every environment variable a recipe test reads is listed, and one that was
      not given is reported as UNVERIFIED (its real-input test was skipped)
+  6. each --reference PATH=FILE (FILE: what the recipe's own hook installed at PATH, e.g. read from a built image):
+     the branch's materialiser makes PATH (SET on TARGET for BUILD, default golden-gate-26B131 on mbp92 for 25G342,
+     Golden Gate files from --system ROOT) and src/signing.py compare() must find no problem: the same bytes outside
+     the signature, and the same signing identifier, flags, entitlements, DER entitlements and requirements. A
+     different CDHash or signature padding (the builder VM's codesign pads about 18 KB per slice) is a note.
 Exit 0 only when every check passed and no real-input test went unverified (--allow-unverified relaxes the latter).
 """
 import argparse
@@ -18,6 +26,8 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
+import struct
 import subprocess
 import sys
 import tempfile
@@ -42,9 +52,40 @@ def show(ref, path):
 
 
 def private_patterns():
-    import runpy
     test = runpy.run_path(str(REPO / 'pipeline' / 'tests' / 'test_private_references.py'))
     return test['PATTERNS'] + [('scratch folder', TMP)]
+
+
+def reference_problems(made, refs, tree=REPO):
+    """(problems, notes) for REFS ({installed path: reference file}) against the materialiser's output folder MADE
+    (DIR/<pack>/files/<path>, DIR/report.json), compared with TREE's tools/edit-engine/src/signing.py."""
+    signing = runpy.run_path(str(Path(tree) / 'tools/edit-engine/src/signing.py'))
+    report = {}
+    if (Path(made) / 'report.json').is_file():
+        report = {r['path']: r for r in json.loads((Path(made) / 'report.json').read_text())}
+    problems, notes = [], []
+    for path, ref in sorted(refs.items()):
+        r = report.get(path)
+        if r is None or r['outcome'] != 'made':
+            problems.append('%s: not made from the declarations (%s)' % (
+                path, '%s: %s' % (r['outcome'], r['reason']) if r else 'not declared in this set'))
+            continue
+        out = Path(made) / r['pack'] / 'files' / path
+        want, got = Path(ref).read_bytes(), out.read_bytes()
+        if want == got:
+            notes.append('%s: identical to the reference' % path)
+            continue
+        if want[:4] not in (b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe', b'\xca\xfe\xba\xbf'):
+            problems.append('%s: differs from the reference (not a Mach-O, so no signature to set aside)' % path)
+            continue
+        try:
+            result = signing['compare'](want, got)
+        except (ValueError, struct.error) as x:
+            problems.append('%s: cannot compare signatures (%s)' % (path, x))
+            continue
+        problems += ['%s: %s' % (path, x) for x in result['problems']]
+        notes += ['%s: signature only: %s' % (path, x) for x in result['notes']]
+    return problems, notes
 
 
 def main():
@@ -53,7 +94,14 @@ def main():
     p.add_argument('--base', default='builder/edit-engine')
     p.add_argument('--env', action='append', default=[], help='NAME=PATH for a real-input test')
     p.add_argument('--allow-unverified', action='store_true')
+    p.add_argument('--reference', action='append', default=[], metavar='PATH=FILE',
+                   help='the file the hook installed at PATH, compared with what the declarations make')
+    p.add_argument('--system', help='Golden Gate system root for --reference (the materialiser\'s --system)')
+    p.add_argument('--set', default='golden-gate-26B131'); p.add_argument('--target', default='mbp92')
+    p.add_argument('--build', default='25G342')
     a = p.parse_args()
+    if a.reference and not a.system:
+        p.error('--reference needs --system ROOT')
     env_given = dict(e.split('=', 1) for e in a.env)
     problems, notes = [], []
 
@@ -145,6 +193,25 @@ def main():
                     m = re.search(r"skipped '(.*)'", l)
                     if m and any(n in m.group(1) for n in env_names):
                         notes.append('UNVERIFIED: %s' % l.strip())
+        lint = runpy.run_path(str(work / 'tools/edit-engine/src/signlint.py'))
+        for n in sorted(recipes):
+            problems += ['signing: %s' % x for x in lint['problems'](work / 'patches' / n)]
+        if a.reference:
+            refs = dict(r.split('=', 1) for r in a.reference)
+            if (REPO / 'store').exists() and not (work / 'store').exists():
+                (work / 'store').symlink_to((REPO / 'store').resolve())     # the rows' files (git-ignored)
+            made = tmp / 'made'
+            cmd = [PY, '-I', 'pipeline/materialize.py', 'pipeline/sets/%s.txt' % a.set,
+                   'pipeline/targets/%s.json' % a.target, a.build, '--out', str(made), '--system', a.system]
+            for path in refs:
+                cmd += ['--only', path]
+            r = subprocess.run(cmd, cwd=work, capture_output=True, text=True)
+            if r.returncode:
+                problems.append('materialize failed:\n%s' % (r.stdout + r.stderr)[-2000:])
+            else:
+                found, ref_notes = reference_problems(made, refs, work)
+                problems += found
+                notes += ref_notes
     finally:
         git('worktree', 'remove', '--force', str(work))
 

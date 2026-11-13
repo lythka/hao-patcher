@@ -25,10 +25,10 @@ and anyone can read what each patch changes and why.
 | Edit specs and engine | Declared edits (find/replace near a symbol, matcher sites, Mach-O, plist and text operations), checked before and after every write; output signed once | [`tools/edit-engine`](../tools/edit-engine/README.md) |
 | Artifact store | Every apply kept by content, with original and patched files side by side; a build reuses a result when spec, input and engine hash the same | `edit-engine apply --store`, `edit-engine inspect` |
 | Declarations | Every recipe's `patch.json` `files`: origin, edits, source inside its row, install attributes | [`docs/PATCHES.md`](PATCHES.md), `pipeline/patches.py explain` |
-| Acceptance check | Refuses a declaration that changes anything but declarations, or whose specs don't write the same bytes as the recipe's own code on real inputs | `tools/edit-engine/verify-declaration`, [`DECLARING.md`](../tools/edit-engine/DECLARING.md) |
-| Ledger | One origin and ordered writes per declared file; known chains in `pipeline/ledger-expected.json` | `pipeline/ledger.py` |
+| Acceptance check | Refuses a declaration that changes anything but declarations, whose specs don't write the same bytes as the recipe's own code on real inputs, or whose signatures lack what the hook signs with (identifier, entitlements, kept metadata) | `tools/edit-engine/verify-declaration`, [`DECLARING.md`](../tools/edit-engine/DECLARING.md) |
+| Ledger | One origin and ordered writes per declared file; known chains in `pipeline/ledger-expected.json`, one list for every set (a chain is expected by its path and writers) | `pipeline/ledger.py` |
 | Packs | Hardware packs with detection and phase (installer only, or live) | [`packs/`](../packs/README.md), `patches.py packs`, `plan --packs` |
-| Materialiser | Makes each declared file once into pack overlays (files + manifest); what only the target can make is deferred | `pipeline/materialize.py` |
+| Materialiser | Makes each declared file once into pack overlays (files + manifest with mode, owner, flags and folders); what only the target can make is deferred, in dependency order (`deferred.json`) | `pipeline/materialize.py` |
 | Live patch | Applies overlays to a system: only changed files, checked, locked, revertible | [`tools/hao`](../tools/hao/README.md) |
 | Kernel binder | Computes the OpenCore kernel repairs and IntelCommpage table from a recipe and the kernel collection just linked, with no compiler on the target | [`tools/kc-binder`](../tools/kc-binder/README.md) |
 | Assembler targets | One assembler over a raw image or a whole internal disk, the disk gated by the installer's safety checks | `pipeline/stages/golden-image.py` |

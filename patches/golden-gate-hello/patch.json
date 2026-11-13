@@ -1,16 +1,19 @@
 {
- "revision": 4,
+ "revision": 5,
  "stage": "oclp-hook",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
  "inputs": ["hello_metallib_golden_gate", "libhelloblur"],
  "status": "experiment",
  "validated": false,
  "files": [
-  {"path": "System/Library/Frameworks/Metal.framework/Versions/A/Metal", "edits": "edits/metal.json"},
+  {"path": "System/Library/Frameworks/Metal.framework/Versions/A/Metal", "edits": "edits/metal.json",
+   "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}},
   {"path": "System/Library/PrivateFrameworks/SetupAssistantSupportUI.framework/Versions/A/Resources/default.metallib",
    "origin": {"kind": "hao", "row": "hello_metallib_golden_gate",
-              "note": "the build's own library rewritten by cache/metallib (profiles/hello-golden-gate.txt)"}},
+              "note": "the build's own library rewritten by cache/metallib (profiles/hello-golden-gate.txt)"},
+   "install": {"mode": "0644", "owner": "root:wheel", "flags": ["restricted"]}},
   {"path": "usr/lib/libhelloblur.dylib",
-   "origin": {"kind": "hao", "row": "libhelloblur", "note": "new file: blur cache and Continue-button warm-up"}}
+   "origin": {"kind": "hao", "row": "libhelloblur", "note": "new file: blur cache and Continue-button warm-up"},
+   "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}}
  ]
 }

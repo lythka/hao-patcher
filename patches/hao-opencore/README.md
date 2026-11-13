@@ -34,9 +34,12 @@ display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments
   collection's copy while other drivers still call into it.
 - `patch.json` `files` declares the config keys the script in `apply.sh` sets to fixed values (`Misc.Debug.Target`,
   `Misc.Debug.DisplayLevel`, `boot-args`, the Delete list) as `plist.set` edits in [edits/config.json](edits/config.json),
-  and the two kext folders as whole-folder origins. Not declared yet: the four kernel repairs and the two `Kernel.Add`
-  entries (no append or data value in `plist.set`), the HaoExec identity stamp, and early Tahoe kexts (none on any
-  recorded build). The `boot-args` value is the one without the dev-only statistics arguments. `tests/test_edits.py`
+  and the two kext folders as whole-folder origins. HaoExec's executable is declared on its own
+  ([edits/haoexec-identity.json](edits/haoexec-identity.json)): the external op `hao.stamp` (the row's
+  `stamp_identity.py` against the linked BootKC), so the materialiser defers it to the target, after the BootKC; the
+  stamp is not re-signed (OpenCore does not check the kext's signature). Not declared yet: the four kernel repairs and
+  the two `Kernel.Add` entries (no append or data value in `plist.set`), and early Tahoe kexts (none on any recorded
+  build). The `boot-args` value is the one without the dev-only statistics arguments. `tests/test_edits.py`
   proves the values against `apply.sh`.
 - The next OpenCore boot deletes the Apple boot-GUID `bootercfg` and `bootercfg-once` variables (firmware
   logging overrides independent of kernel boot-args); see the
@@ -108,6 +111,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r43 2026-11-12 Declare the HaoExec identity stamp: the executable is its own `files` entry with `edits/haoexec-identity.json` (external op `hao.stamp`, made on the target after the BootKC is linked, not re-signed), so an overlay never ships the unstamped copy; apply.sh is unchanged.
 - r42 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runtime-26B131-20261112-273ba980b829). No recipe change.
 - r41 2026-11-12 Declare the config keys with fixed values (edits/config.json) and the IntelCommpage and HaoExec kext folders in `patch.json` `files`; the recipe is unchanged.
 - r40 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804 + the Swift value walk passes values under 8 bytes, which aborted Weather, StocksWidget, NewsTag and NewsToday2 on 7d0b612). No recipe change.

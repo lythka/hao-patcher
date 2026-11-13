@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -29,8 +30,10 @@ class Base(unittest.TestCase):
         (self.root / 'System/Library/Frameworks/Metal.framework/Versions/A').mkdir(parents=True)
         self.metal = self.root / 'System/Library/Frameworks/Metal.framework/Versions/A/Metal'
         self.metal.write_bytes(b'oclp metal')
+        self.metal.chmod(0o755)
         (self.root / 'usr/lib').mkdir(parents=True)
         (self.root / 'usr/lib/libsame.dylib').write_bytes(b'same')
+        (self.root / 'usr/lib/libsame.dylib').chmod(0o755)          # as the manifest says: nothing to do
 
     def overlay(self, name, phase, files):
         o = self.d / ('overlay-' + name)
@@ -114,6 +117,94 @@ class ApplyRevert(Base):
         with self.assertRaisesRegex(LP.PatchError, 'not proven yet'):
             LP.apply([self.metal_pack()], self.root, self.state, backend=LP.MacOSLiveBackend())
         self.assertEqual(self.metal.read_bytes(), b'oclp metal')
+
+
+class Attributes(Base):
+    """Owner, mode, flags and folders from the manifest. Owners and system flags need root: those tests run with a
+    privileged Attributes whose chown and chflags record the calls (the mode and user flags are set for real)."""
+
+    def manifest_overlay(self, files, dirs=None):
+        o = self.d / 'overlay-attrs'
+        m = {'format': 1, 'pack': 'base', 'phase': 'live-capable', 'files': {}, 'dirs': dirs or {}}
+        for path, (data, meta) in files.items():
+            (o / 'files' / path).parent.mkdir(parents=True, exist_ok=True)
+            (o / 'files' / path).write_bytes(data)
+            m['files'][path] = dict(meta, sha256=sha(data))
+        (o / 'manifest.json').write_text(json.dumps(m))
+        return LP.load_overlay(o)
+
+    def recorder(self):
+        calls = []
+        real = lambda p, bits: os.chflags(p, bits & 0xffff, follow_symlinks=False)   # user flags only, for real
+        attrs = LP.Attributes(self.root, privileged=True, chown=lambda p, u, g: calls.append(('chown', p, u, g)),
+                              chflags=lambda p, bits: (calls.append(('chflags', p, bits)), real(p, bits)))
+        return attrs, calls
+
+    def test_owners_by_name_from_the_root_and_by_number(self):
+        (self.root / 'private/etc').mkdir(parents=True)
+        (self.root / 'private/etc/passwd').write_text('# target\nroot:*:0:0::/var/root:/bin/sh\n'
+                                                      '_iconservices:*:240:240::/var/empty:/usr/bin/false\n')
+        (self.root / 'private/etc/group').write_text('wheel:*:0:root\nadmin:*:80:root\n')
+        a = LP.Attributes(self.root)
+        self.assertEqual(a.ids('_iconservices:admin'), (240, 80))
+        self.assertEqual(a.ids('248:248'), (248, 248))               # tar --numeric-owner, as the manifest keeps it
+        self.assertEqual(a.ids('root:wheel'), (0, 0))
+        with self.assertRaisesRegex(LP.PatchError, 'unknown user'):
+            a.ids('nosuchuser:wheel')
+
+    def test_restricted_owner_mode_and_created_folders(self):
+        attrs, calls = self.recorder()
+        o = self.manifest_overlay(
+            {'usr/lib/dyld': (b'dyld', {'mode': '0755', 'owner': 'root:wheel', 'flags': ['restricted']}),
+             'private/var/folders/zz/x/C/store.index': (b'index', {'mode': '0600', 'owner': '248:248', 'flags': []})},
+            dirs={'private/var/folders/zz/x/C': {'mode': '0700', 'owner': '248:248'}})
+        rec = LP.apply([o], self.root, self.state, now=T0, attributes=attrs)
+        index = self.root / 'private/var/folders/zz/x/C/store.index'
+        self.assertEqual(oct(os.stat(index).st_mode & 0o7777), '0o600')
+        self.assertEqual(oct(os.stat(index.parent).st_mode & 0o7777), '0o700')      # the manifest's folder mode
+        self.assertEqual(oct(os.stat(index.parent.parent).st_mode & 0o7777), '0o755')
+        self.assertIn(('chown', index, 248, 248), calls)
+        self.assertIn(('chown', index.parent, 248, 248), calls)
+        self.assertIn(('chflags', self.root / 'usr/lib/dyld', 0x80000), calls)       # SF_RESTRICTED
+        self.assertEqual(rec['folders'], ['private', 'private/var', 'private/var/folders', 'private/var/folders/zz',
+                                          'private/var/folders/zz/x', 'private/var/folders/zz/x/C'])
+        LP.revert(self.root, self.state, attributes=attrs)
+        self.assertFalse((self.root / 'private').exists())                          # folders it made go too
+
+    def test_attributes_alone_are_set_and_reverted(self):
+        os.chmod(self.metal, 0o644)
+        o = self.manifest_overlay({'System/Library/Frameworks/Metal.framework/Versions/A/Metal':
+                                   (b'oclp metal', {'mode': '0755', 'owner': 'root:wheel', 'flags': ['hidden']})})
+        p = LP.plan([o], self.root)
+        self.assertEqual((len(p['write']), [r['attrs'] for r in p['attrs']]), (0, [['mode', 'flags']]))
+        events = []
+        rec = LP.apply([o], self.root, self.state, on_event=events.append, now=T0)
+        self.assertEqual([e['ev'] for e in events], ['plan', 'file.attrs', 'done'])
+        st = os.stat(self.metal)
+        self.assertEqual((oct(st.st_mode & 0o7777), st.st_flags & 0x8000), ('0o755', 0x8000))
+        self.assertTrue(rec['files'][0]['attrs_only'])
+        self.assertEqual(rec['files'][0]['before']['mode'], '0644')
+        self.assertEqual(LP.plan([o], self.root)['attrs'], [])                     # nothing left to do
+        LP.revert(self.root, self.state)
+        st = os.stat(self.metal)
+        self.assertEqual((oct(st.st_mode & 0o7777), st.st_flags & 0x8000, self.metal.read_bytes()),
+                         ('0o644', 0, b'oclp metal'))
+
+    def test_without_root_owners_and_system_flags_are_recorded_not_set(self):
+        o = self.manifest_overlay({'usr/libexec/hao': (b'hao', {'mode': '0755', 'owner': 'root:wheel',
+                                                                'flags': ['restricted']})})
+        events = []
+        rec = LP.apply([o], self.root, self.state, on_event=events.append, now=T0,
+                       attributes=LP.Attributes(self.root, privileged=False))
+        self.assertEqual(sorted(rec['files'][0]['not_set']), ['flags', 'gid', 'uid'] if os.geteuid() else ['flags'])
+        self.assertEqual(events[-1]['not_set'], 1)
+        self.assertEqual(os.stat(self.root / 'usr/libexec/hao').st_flags & 0x80000, 0)
+
+    def test_unknown_flags_refused_and_names_match_the_declaration_check(self):
+        with self.assertRaisesRegex(LP.PatchError, 'unknown flags'):
+            self.manifest_overlay({'usr/lib/x': (b'x', {'mode': '0644', 'flags': ['sticky']})})
+        patches = runpy.run_path(str(HERE.parents[2] / 'pipeline' / 'patches.py'))
+        self.assertEqual(sorted(patches['INSTALL_FLAGS']), sorted(LP.FLAG_BITS))
 
 
 class CommandLine(Base):

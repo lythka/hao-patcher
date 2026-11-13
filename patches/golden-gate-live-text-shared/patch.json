@@ -1,5 +1,5 @@
 {
- "revision": 4,
+ "revision": 5,
  "stage": "oclp-hook",
  "applies": {
   "models": [
@@ -18,7 +18,14 @@
  "files": [
   {
    "path": "usr/lib/libhelloblur.dylib",
-   "edits": "edits/libhelloblur.json"
+   "edits": "edits/libhelloblur.json",
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
+   }
   },
   {
    "path": "usr/lib/hao-live-text/LiveText.dylib",

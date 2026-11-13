@@ -1,5 +1,5 @@
 {
- "revision": 68,
+ "revision": 69,
  "stage": "oclp-hook",
  "applies": {
   "models": [
@@ -25,7 +25,10 @@
    },
    "install": {
     "mode": "0755",
-    "owner": "root:wheel"
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
    }
   },
   {
@@ -133,7 +136,14 @@
     "row": "hao_runtime",
     "note": "the x86_64 dyld with the libignition boot-spec stage count fixed (payload replace/dyld), written in place only over Apple's file with the manifest's source hash; PID 1 faults after the last stage without it"
    },
-   "source": "replace/dyld"
+   "source": "replace/dyld",
+   "install": {
+    "mode": "0755",
+    "owner": "root:wheel",
+    "flags": [
+     "restricted"
+    ]
+   }
   },
   {
    "path": "usr/lib/hao/install.json",
