@@ -1,6 +1,6 @@
-# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 43af852).
+# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 397b267).
 # Built from a root that includes the App and OS cryptexes (their 26 programs are embedded by golden-gate-userspace).
-# Units u4.1; libhao AF771035; 965 AOT caches. Adds since 0a2c2aa: lazy AOT (caches installed block by block from the
-# mapped file: kernelmanagerd and ~9 others no longer JIT-only) and usage lines after each phase line (hao_diag_time=1).
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=4660678d87f5ec443b274088982ee35301d0f7b72cffc16bae8f9ab397fa57cd
-- store/artifacts/hao-runtime-26B131-20261113-43af85296aa9/payload
+# Units u4.1; libhao 6DC78A24; 965 AOT caches. Adds since 43af852: gssd fix (os_log_set_client_type not applied, 2fad084)
+# and fatal fault reports on their own 256 KB stack (6394002). Since 0a2c2aa also lazy AOT and usage lines.
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=8135b4aa23f9cd4abd8c7e24bed176956eb45bdaa855137ffa2eaa7d16eb7e24
+- store/artifacts/hao-runtime-26B131-20261113-397b2675d037/payload

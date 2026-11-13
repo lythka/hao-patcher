@@ -189,6 +189,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r53 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 397b267 (hao-runtime-26B131-20261113-397b2675d037). No recipe change.
 - r52 2026-11-13 No `ic_csr_internal=1` (removed if present): the image's dyld counts as internal itself (golden-gate-dyld-internal's internalInstall() edit), so only dyld sees an internal install and mobileassetd uses the public asset server; `apply.sh` refuses an image whose dyld lacks the edit.
 - r51 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 43af852 (hao-runtime-26B131-20261113-43af85296aa9). No recipe change.
 - r50 2026-11-13 End-user configuration only: `Misc.Debug.Target` 0 (no OpenCore log, no file writes at boot) and no measurement switches in any build; `IMAGE_DEV_BUILD` is gone. Bench images get `hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1` and the ESP file log from the new `dev-diagnostics` recipe (pack `dev`). Edits `debug-log-to-file` (65) and `debug-log-info-lines` replaced by `no-opencore-log` (0).

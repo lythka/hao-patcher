@@ -29,10 +29,10 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-shader-caches | r13 | post | experiment | caches | x |  |  |  | **needs** | r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) f |
 | golden-gate-user-seed | r8 | post | experiment | caches | x |  |  |  | **needs** | r8 2026-11-13 Tests and README only: the seed chain includes golden-gate-user-template; README names it. seed. |
 | golden-gate-user-template | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-13 26B131 input row user_template_golden_gate (harvest of benchtest's first login on image 3b2291a: |
-| golden-gate-userspace | r67 | oclp-hook | experiment |  | x | x |  |  | **needs** | r67 2026-11-13 wifip2p_compat (20822cf11958): add/removeAWDLDiscoveryClient succeed as no-ops instead of ENOTS |
+| golden-gate-userspace | r68 | oclp-hook | experiment |  | x | x |  |  | **needs** | r68 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 397b267 (hao-runt |
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
-| hao-opencore | r52 | post | experiment |  | x | x |  |  | **needs** | r52 2026-11-13 No `ic_csr_internal=1` (removed if present): the image's dyld counts as internal itself (golden |
-| hao-runtime | r71 | oclp-hook | experiment |  | x | x |  |  | **needs** | r71 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 43af852 (hao-runt |
+| hao-opencore | r53 | post | experiment |  | x | x |  |  | **needs** | r53 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 397b267 (hao-runt |
+| hao-runtime | r72 | oclp-hook | experiment |  | x | x |  |  | **needs** | r72 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 397b267 (hao-runt |
 | metal-compiler-compat | r4 | oclp-hook | experiment |  | x |  |  |  | **needs** | r4 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the servic |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |
 | metalold-selectors | r6 | oclp-hook | product |  | x | x |  |  | ok (r3) | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the librar |
