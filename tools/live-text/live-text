@@ -29,6 +29,7 @@ UNIT = Path(__file__).resolve().parent
 REPO = UNIT.parents[1]
 sys.path.insert(0, str(UNIT/'lib'))
 import compiler_service  # noqa: E402
+from paths import repo_path  # noqa: E402
 import framework  # noqa: E402
 import runtime  # noqa: E402
 
@@ -81,8 +82,8 @@ def stage_inputs(system, hardware, output):
         shutil.copyfile(services[0]/relative, output/'service'/name)
     record = dict(unit='tools/live-text', operation='inputs', system_build=version['ProductBuildVersion'],
                   date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                  sources={'MPSNDArray.metallib': str(system/MPSNDARRAY), 'detector': str(source),
-                           'service': str(services[0])},
+                  sources={'MPSNDArray.metallib': MPSNDARRAY, 'detector': DETECTOR,
+                           'service': repo_path(services[0])},
                   files=tree(output))
     (output/'build.json').write_text(json.dumps(record, indent=2) + '\n')
     return record
@@ -120,8 +121,8 @@ def build(inputs, startup, output, install_root):
                     commit=git('rev-parse', 'HEAD'),
                     dirty=bool(git('status', '--porcelain', '--', str(UNIT), str(REPO/'cache/metallib'))),
                     date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                    inputs={'inputs': str(inputs), 'inputs_build_json': sha(inputs/'build.json'),
-                            'startup_library': str(startup), 'startup_library_sha256': sha(startup)},
+                    inputs={'inputs': repo_path(inputs), 'inputs_build_json': sha(inputs/'build.json'),
+                            'startup_library': repo_path(startup), 'startup_library_sha256': sha(startup)},
                     install_root=install_root,
                     # Installers refuse a System whose MPSNDArray library is not the one repaired here.
                     mpsndarray_source=dict(path=MPSNDARRAY, sha256=sha(inputs/'MPSNDArray.metallib')),

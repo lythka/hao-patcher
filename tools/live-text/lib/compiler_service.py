@@ -27,6 +27,9 @@ UUID = uuid.UUID('3716D20F-B990-3906-B3E5-44E88AE63AF8').bytes
 spec = importlib.util.spec_from_file_location('backend_editor', HERE/'macho_edit.py')
 editor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(editor)
+spec = importlib.util.spec_from_file_location('live_text_paths', HERE/'paths.py')
+paths = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(paths)
 
 
 def sha(path):
@@ -124,7 +127,7 @@ def build(source, compat_artifact, output):
               'commit':run('git','-C',REPO,'rev-parse','HEAD'),
               'dirty':bool(run('git','-C',REPO,'status','--porcelain','--',UNIT,REPO/'cache/metallib/lib/runtime')),
               'date':datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              'inputs':{str(p):sha(p) for p in (source/'MTLCompilerService',source/'Info.plist',source/'CodeResources',compat_artifact/'build.json',compat_artifact/'compat.dylib')},
+              'inputs':{paths.repo_path(p):sha(p) for p in (source/'MTLCompilerService',source/'Info.plist',source/'CodeResources',compat_artifact/'build.json',compat_artifact/'compat.dylib')},
               'source_sha256':{str(p.relative_to(REPO)):sha(p) for p in (HERE/'compiler_service.py',HERE/'macho_edit.py')},
               'compat_commit':compat_record.get('commit'), 'compat_revision':compat_record.get('revision'),
               'service':SERVICE, 'source_service_sha256':sha(source/'MTLCompilerService'),

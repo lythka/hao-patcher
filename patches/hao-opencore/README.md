@@ -189,6 +189,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r58 2026-11-13 Input rows `kernel_repair_efi` and `kernel_repair_binding` (26B131) now name kernel-repairs-26B131-r42-53815151 and kernel-binding-26B131-r42-53815151, rebuilt at 53815151 so build.json names its inputs as `store/...` paths instead of the builder's home folder. `EFI/` (config.plist, IntelCommpage.kext) is byte-identical to r42's; the binding profile differs only in the producer commit and its pin of the new build.json. Installed bytes unchanged: the two recorded 2026-11-13 26B131 images' BootKCs bind to exactly their config.plist (tests/test_kc_bind.py with the new rows).
 - r57 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 1de47eb tree (hao-runtime-26B131-20261113-1de47eb87a7f): the ControlCenter GridSizes and Displayable refusals fixed (2b19233) and the stub skeletons (1de47eb). No recipe change.
 - r56 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 9dce413 tree (hao-runtime-26B131-20261113-9dce4138ddfa): the ControlCenter crash fix and f66403c's float-HFA stack fix. No recipe change.
 - r55 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.

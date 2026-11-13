@@ -27,6 +27,7 @@ UNIT = HERE.parent
 REPO = UNIT.parents[1]
 sys.path.insert(0, str(HERE))
 import detector as detector_tool  # noqa: E402
+from paths import repo_path  # noqa: E402
 
 UMBRELLA = 'LiveText.dylib'
 # The System library the runtime's MPSNDArray.metallib replaces for HD 4000 devices (installers check its hash).
@@ -65,9 +66,9 @@ def build(output, install_root, compat, metallib, detector, source_metallib):
     inputs = {}
     shutil.copy2(compat/'gpu-client.dylib', out/'gpu-client.dylib')
     shutil.copy2(metallib, out/'MPSNDArray.metallib')
-    inputs['gpu-client.dylib'] = dict(path=str(compat/'gpu-client.dylib'), sha256=sha(compat/'gpu-client.dylib'),
+    inputs['gpu-client.dylib'] = dict(path=repo_path(compat/'gpu-client.dylib'), sha256=sha(compat/'gpu-client.dylib'),
                                       cache_metallib_commit=record.get('commit'), revision=record.get('revision'))
-    inputs['MPSNDArray.metallib'] = dict(path=str(metallib), sha256=sha(metallib), source=SOURCE_METALLIB,
+    inputs['MPSNDArray.metallib'] = dict(path=repo_path(metallib), sha256=sha(metallib), source=SOURCE_METALLIB,
                                          source_sha256=sha(source_metallib))
     inputs['detector'] = detector_tool.prepare(detector, out/'detector')
 

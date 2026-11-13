@@ -1,2 +1,3 @@
-# Live Text runtime for /usr/lib/hao-live-text + libhelloblur loading it: framework/ of tools/live-text build (dd1c86b) for 26B131 (MPSNDArray ae6566b2..., libhelloblur d471519b...; build.json names every file's hash).
-7bf6914b8528260e761ed70c566f17693a57e406b6222862cdc892b95509f54d store/artifacts/live-text-26B131-20261111-dd1c86b/framework
+# Live Text runtime for /usr/lib/hao-live-text + libhelloblur loading it: framework/ of tools/live-text build (fa444101) for 26B131 (MPSNDArray ae6566b2..., libhelloblur d471519b...; build.json names every file's hash).
+# Rebuilt at fa444101 so the build.json files name inputs as store/... paths; against dd1c86b only the two build.json files and runtime/gpu-client.dylib (LC_UUID and ad hoc signature; code identical) differ.
+99675b0afae0283d4f0608333b11c970c53ce3264d65a842511c1bbce975f6fb store/artifacts/live-text-26B131-20261113-fa444101/framework

@@ -39,7 +39,7 @@ proves the spec writes the same bytes as `tools/live-text/lib/framework.py`. Own
 ## Input
 
 Row `live_text_framework` is `framework/` of a `tools/live-text build` (26B131:
-`store/artifacts/live-text-26B131-20261111-dd1c86b`); it is built for one System build and one `libhelloblur`.
+`store/artifacts/live-text-26B131-20261113-fa444101`); it is built for one System build and one `libhelloblur`.
 
 ## Verify
 
@@ -75,6 +75,7 @@ Photos' Live Text was never seen working. Not yet built into an image or booted 
 
 ## Revisions
 
+- r7 2026-11-13 Input row `live_text_framework` (26B131) now names framework/ of live-text-26B131-20261113-fa444101, rebuilt from a clean fa444101 so its build.json files name inputs as `store/...` paths instead of the builder's home folder (the row can be published). Installed bytes that change: `/usr/lib/hao-live-text/build.json` (commit, date, input paths, gpu-client.dylib's hash, cache/metallib revision 56) and `/usr/lib/hao-live-text/gpu-client.dylib`: its LC_UUID and ad hoc signature differ, every other byte is identical (ld derived the UUID from the build folder's absolute path, which cache/metallib translation-build used as the install name before tools/live-text sets the final one). libhelloblur, LiveText.dylib, the other helpers, MPSNDArray.metallib and the detector are byte-identical.
 - r6 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on libhelloblur), as the hook sets them, so overlays carry them; the hook is unchanged.
 - r4 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) for pipeline/materialize.py; the hook is unchanged.

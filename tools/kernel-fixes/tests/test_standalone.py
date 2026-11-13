@@ -40,6 +40,15 @@ class Standalone(unittest.TestCase):
             expected, _ = kit.module('original_early_vm', kit.UNIT/'early_vm.py').generate(source, collection)
             actual = plistlib.loads((output/'EFI/OC/config.plist').read_bytes())
             self.assertEqual(expected, actual['Kernel']['Patch'])
+            # the record names inputs as the repository does; ones outside it (this scratch folder) by name only
+            record = json.loads((output/'build.json').read_text())
+            repair = record['inputs']['early_vm_repair']
+            self.assertEqual(('capture.json', 'BootKernelExtensions.kc', 'commpage'),
+                             (repair['capture_path'], repair['collection_path'], record['inputs']['commpage']))
+            self.assertNotIn(str(root.resolve()), (output/'build.json').read_text())
+            inside = kit.module('early_vm_paths', kit.UNIT/'early_vm.py')
+            self.assertEqual('tools/kernel-foundation/early_vm.py', inside.repo_path(kit.UNIT/'early_vm.py'))
+            self.assertEqual('store/artifacts/x', inside.repo_path(kit.REPO/'store/artifacts/x'))
             esp = root/'esp'; (esp/'EFI/OC').mkdir(parents=True)
             original = dict(Kernel=dict(Patch=[dict(Comment='unrelated', Find=b'old')], Add=[]))
             (esp/'EFI/OC/config.plist').write_bytes(plistlib.dumps(original))

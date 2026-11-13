@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Build the builder-VM firmlink tool (row fl) from fl.c and ent.plist into a new folder, with its build record.
+
+  build-fl OUTPUT
+
+OUTPUT/fl: universal (x86_64, arm64), -O2, macOS 27.0 or later, ad hoc signed with ent.plist's entitlement
+(com.apple.private.apfs.set-firmlink). OUTPUT/build.json: the commit and whether the tree was clean, the sources'
+sha256, the toolchain, the commands (repository-relative paths) and the output's sha256. Build from a clean commit;
+the record says if it was not.
+"""
+import datetime
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[2]
+SOURCES = ('fl.c', 'ent.plist')
+MIN_OS = '27.0'
+
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def run(*args, cwd=None):
+    return subprocess.run(list(map(str, args)), check=True, capture_output=True, text=True, cwd=cwd)
+
+
+def build(output):
+    output = Path(output).resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    rel = HERE.relative_to(REPO)
+    compile_ = ['cc', '-O2', '-Wall', '-arch', 'x86_64', '-arch', 'arm64', '-mmacosx-version-min=' + MIN_OS,
+                '-o', 'fl', str(rel/'fl.c')]
+    # the signature identifier is fl-55554944<arm64 UUID>, as the linker named it; codesign lays the two slices out
+    # at 16 KiB
+    sign = ['codesign', '-s', '-', '-f', '--entitlements', str(rel/'ent.plist'), 'fl']
+    # compiled in the repository with a relative source path and output name: no absolute path reaches the binary
+    run(*compile_[:-2], output/'fl', compile_[-1], cwd=REPO)
+    run(*sign[:-1], output/'fl', cwd=REPO)
+    git = lambda *a: run('git', '-C', REPO, *a).stdout.strip()
+    record = dict(unit='pipeline/unpack/pristine-tools', operation='fl', commit=git('rev-parse', 'HEAD'),
+                  dirty=bool(git('status', '--porcelain', '--', str(rel))),
+                  date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                  sources={str(rel/name): sha(HERE/name) for name in SOURCES},
+                  toolchain=dict(cc=run('cc', '--version').stdout.splitlines()[0],
+                                 ld=run('ld', '-v').stderr.splitlines()[0],
+                                 sdk=run('xcrun', '--show-sdk-version').stdout.strip()),
+                  commands=[' '.join(compile_), ' '.join(sign)],
+                  files={'fl': sha(output/'fl')})
+    (output/'build.json').write_text(json.dumps(record, indent=2) + '\n')
+    return record
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2 or sys.argv[1].startswith('-'):
+        sys.exit(__doc__)
+    print(json.dumps(build(sys.argv[1]), indent=2))

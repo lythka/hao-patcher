@@ -1,2 +1,3 @@
-# universal2 site-packages OCLP imports in the builder VM.
-6855f5a194c070e57aa46a8785d4eb2ced396248e0f2418f49476022a4bea6b5 store/python-site
+# universal2 site-packages OCLP imports in the builder VM: the python_site_* wheel rows unpacked by pipeline/python-site
+# make at 85b7269c (build.json beside it). pipeline/python-site check SITE compares a folder with what the rows make.
+caf664fc41345fe3a1a711d01da97bc312a982a1890a313b614692c1059ef81f store/artifacts/python-site-85b7269c/site

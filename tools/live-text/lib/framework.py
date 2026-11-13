@@ -20,6 +20,7 @@ REPO = UNIT.parents[1]
 sys.path.insert(0, str(HERE))
 import macho_edit as editor  # noqa: E402
 import runtime as runtime_tool  # noqa: E402
+from paths import repo_path  # noqa: E402
 
 STARTUP = 'usr/lib/libhelloblur.dylib'
 DYLIB = 6
@@ -69,7 +70,7 @@ def build(library, runtime, output):
     manifest = dict(unit='tools/live-text', operation='framework',
                     commit=git('rev-parse', 'HEAD'), dirty=bool(git('status', '--porcelain', '--', str(UNIT))),
                     date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                    inputs={str(library): sha(library), str(runtime/'build.json'): sha(runtime/'build.json')},
+                    inputs={repo_path(library): sha(library), repo_path(runtime/'build.json'): sha(runtime/'build.json')},
                     source_sha256={str(p.relative_to(REPO)): sha(p) for p in (HERE/'framework.py', HERE/'macho_edit.py')},
                     runtime_root=record['install_root'], umbrella=umbrella,
                     runtime_manifest_sha256=sha(output/'runtime/build.json'),
