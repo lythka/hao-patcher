@@ -35,20 +35,17 @@ Intel Macs are untested. Tested with macOS 27.2.1 (26B131); "next image" means b
 
 | Area | State | Notes |
 |---|---|---|
-| Startup and Setup | Works | Screen on about 45 s after the kernel starts; Setup, account creation and automatic login. First login is slow (next image preloads the account template) |
-| Desktop | Works | Menu bar, Dock, Finder, Liquid Glass, login window, lock screen. The lock screen can lose the wallpaper |
+| Startup and Setup | Works | Screen on about 45 s after the kernel starts; Setup, account creation and automatic login. |
+| Desktop | Works | Menu bar, Dock, Finder, Liquid Glass, login window, lock screen. |
 | Graphics | Works | Accelerated HD 4000 Metal, argument buffers and ASTC textures; hardware video decoding (YouTube 1080p) |
 | Wi-Fi | Works | Joining from Setup or Settings; remembered networks join automatically, also at startup |
 | Audio, input, Bluetooth | Works | Speakers, brightness, keyboard, trackpad, Bluetooth; AirPlay displays are discovered |
-| Control Center and widgets | Broken | Regression in recent hao-runtime builds (worked up to 7415a0b); being fixed |
 | Safari | Works | Browsing, YouTube, WebGPU. WebGL is in progress |
 | Maps | Works | Tiles, search, place cards, location, satellite, 3D globe and buildings |
 | Weather | Works | Including its maps (the next image installs this fix) |
 | Photos | Works | Import, thumbnails, full-size view. Live Text is in progress |
 | SceneKit | Works | 3D scenes with materials, shadows and reflections; Preview opens scenes |
 | Other apps | Works | Calendar, Terminal, System Settings, Preview, App Store, Books, Calculator, Automator, Stocks, News; Home and Freeform open |
-| Spotlight | Partial | Opens and searches; app results rank below web results (the next image lets it download its data) |
-| AirDrop | Partial | The next image stops the mDNSResponder crash; finding nearby devices is not confirmed |
 | ARM-only programs | Works | Run on the Intel CPU through hao-runtime, at about 1/2 to 1/3 of native speed |
 | Sleep and updates | Not tested | |
 

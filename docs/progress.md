@@ -19,8 +19,6 @@ adds the fixes under [What's new](#whats-new).
   Automator.
 - iPad-style apps: Stocks (watchlist, interactive charts, news) and News (Today feed with images); Home opens
   (it needs an iCloud account to go further).
-- Control Center (Wi-Fi, Bluetooth, AirDrop, Now Playing, Display, Sound) and Notification Center widgets,
-  with hao-runtime up to 7415a0b; see Known issues.
 - Maps: tiles, search, place cards, current location, satellite (3D globe and street level) and 3D buildings
   (VectorKit's shader library repaired for the old compiler).
 - Weather: conditions, hourly, air quality, 10-day, and the precipitation, temperature, air-quality and wind
@@ -32,14 +30,6 @@ adds the fixes under [What's new](#whats-new).
 - Spotlight opens and searches.
 - macOS 27's ARM-only programs run on the Intel CPU through hao-runtime, including the
   Geekbench 6 ARM CPU benchmark's workloads.
-
-**Known issues** (2026-11-13)
-- Control Center crashes when opened, and new accounts get no widgets: a regression in hao-runtime after
-  7415a0b (a Swift value passed to SwiftUI in the wrong layout), being bisected.
-- The lock screen can lose the wallpaper: WallpaperAgent crashes under hao-runtime; the next image logs the cause.
-- AirDrop: no longer takes mDNSResponder down in the next image; finding nearby devices is not confirmed.
-- First login is slow (Setup's language-to-region step, account creation); the next image preloads the
-  account template.
 
 **In development**
 - Spotlight: local app results. The next image lets macOS download its search data (only dyld is treated as
@@ -75,7 +65,7 @@ adds the fixes under [What's new](#whats-new).
   the `rapportd` and Control Center crash loops fixed; preloaded shader, icon and font caches; recipes run once in
   set-file order.
 
-In development: Control Center and widgets (regression), Live Text, Spotlight's local results, Maps shadows,
+In development: Control Center and widgets, Live Text, Spotlight's local results, Maps shadows,
 faster translated vector and floating-point code.
 
 ## Fixes
