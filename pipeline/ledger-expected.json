@@ -51,6 +51,14 @@
     "golden-gate-metal-libraries"
    ]
   },
+  "System/Library/xpc/launchd.plist": {
+   "chain": "chain",
+   "writers": [
+    "apple",
+    "golden-gate-userspace",
+    "golden-gate-kernelmanager-helper-warm"
+   ]
+  },
   "usr/lib/dss_shim.dylib": {
    "chain": "chain",
    "writers": [

@@ -1,0 +1,24 @@
+{
+ "format": 1,
+ "path": "System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist",
+ "origin": {"kind": "apple", "name": "Golden Gate System volume"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "helper-run-at-load",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["RunAtLoad"], "value": true},
+   "reason": "kernelmanager_helper starts with launchd, so it has finished its start-up when kernelmanagerd asks it about the kexts OpenCore injects, instead of starting then (10 s under hao) while the kernel's driver requests wait"
+  },
+  {
+   "id": "helper-interactive",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["POSIXSpawnType"], "value": "Interactive"},
+   "reason": "the helper runs at the priority of kernelmanagerd itself, not at background priority, while it serves the boot's kext requests"
+  }
+ ],
+ "sign": null,
+ "expect": {"2de9e53301d286021b6abc810fbdfded628e41eb1d6d01f0492a0270d949fca8": "9c54029c4a06f082881ddef18968f4db1fbd3b9a55ea89a33f9de19a19750fe9"}
+}

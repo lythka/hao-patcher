@@ -1,0 +1,24 @@
+{
+ "format": 1,
+ "path": "System/Library/xpc/launchd.plist",
+ "origin": {"kind": "apple", "name": "Golden Gate System volume, after golden-gate-userspace (hybridsearchd disabled)"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "helper-run-at-load",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["LaunchDaemons", "/System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist", "RunAtLoad"], "value": true},
+   "reason": "kernelmanager_helper starts with launchd, so it has finished its start-up when kernelmanagerd asks it about the kexts OpenCore injects; launchd's job cache carries the same entry as the job plist"
+  },
+  {
+   "id": "helper-interactive",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["LaunchDaemons", "/System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist", "POSIXSpawnType"], "value": "Interactive"},
+   "reason": "the helper runs at the priority of kernelmanagerd itself, not at background priority; launchd's job cache carries the same entry as the job plist"
+  }
+ ],
+ "sign": null,
+ "expect": {"5c0e3b840669b2881a1a204a978e4b6616c64e63e86ed6ae2f7af5e1acf0fd28": "5a45e45b83b1924c86796b80c03aed45be072848730532c5953cdfb8247ad801"}
+}

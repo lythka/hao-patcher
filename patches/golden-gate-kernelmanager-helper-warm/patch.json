@@ -1,0 +1,19 @@
+{
+ "revision": 1,
+ "stage": "oclp-hook",
+ "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
+ "status": "experiment",
+ "validated": false,
+ "files": [
+  {
+   "path": "System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist",
+   "edits": "edits/job.json",
+   "install": {"mode": "0644", "owner": "root:wheel", "flags": ["restricted"]}
+  },
+  {
+   "path": "System/Library/xpc/launchd.plist",
+   "edits": "edits/launchd-job-cache.json",
+   "install": {"mode": "0644", "owner": "root:wheel", "flags": ["restricted"]}
+  }
+ ]
+}
