@@ -9,6 +9,9 @@
   kc-binder compare --boot-kc KC --repair-efi DIR [--binding DIR] [--abi-header FILE] [--recipe RECIPE]
         bind in memory and compare with a recorded repair artifact (kernel_repair_efi), binding profile
         (kernel_repair_binding) and commpage_abi.hpp; one line per field, exit 1 if any differs
+  kc-binder stage DIR
+        copy what bind needs at run time (this script, kcbind.py, compare.py, recipes and their pins,
+        commpage_build.py) into DIR at the same repository-relative paths, with DIR/stage.json: src/stage.py
   kc-binder make-blob ... | make-recipe ...
         release-time producers (need clang, llvm-objdump and the standalone kernel): src/make_recipe.py
 
@@ -92,6 +95,11 @@ def run_compare(args):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ['stage'] and len(argv) == 2:
+        import stage
+        stage.stage(argv[1], REPO)
+        print(argv[1])
+        return 0
     if argv and argv[0] in ('make-blob', 'make-recipe'):
         sys.argv = [str(HERE/'src/make_recipe.py'), argv[0][len('make-'):], *argv[1:]]
         runpy.run_path(str(HERE/'src/make_recipe.py'), run_name='__main__')

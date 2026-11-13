@@ -4,10 +4,25 @@
  "origin": {
   "kind": "oclp",
   "name": "OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it",
-  "note": "in the image's EFI partition, not in the System volume. Not declared here (no edit kind for it yet): the four recorded kernel repairs in Kernel.Patch and the IntelCommpage.kext and HaoExec.kext entries appended to Kernel.Add (plist.set cannot append or carry data bytes), the early Tahoe kext entries (none on any recorded build), and removal of bootercfg and bootercfg-once from NVRAM.Add (OCLP's config has neither). The boot-args value is the one a build without a dev recipe writes: dev builds (IMAGE_DEV_BUILD=1) add hao_nx_stats=1 hao_bridge_stats=1 after hao_crash=1"
+  "note": "in the image's EFI partition, not in the System volume. Not declared here (no edit kind for it yet): the HaoExec.kext entry appended to Kernel.Add (plist.set cannot append), the early Tahoe kext entries (none on any recorded build), and removal of bootercfg and bootercfg-once from NVRAM.Add (OCLP's config has neither). The boot-args value is the one a build without a dev recipe writes: dev builds (IMAGE_DEV_BUILD=1) add hao_nx_stats=1 hao_bridge_stats=1 after hao_crash=1"
  },
  "applied_by": "installer",
  "edits": [
+  {
+   "id": "kernel-repairs",
+   "kind": "op",
+   "op": "kc.bind",
+   "args": {
+    "tool": "tools/kc-binder",
+    "kernel_collection": "System/Library/KernelCollections/BootKernelExtensions.kc",
+    "reference_row": "kernel_repair_efi",
+    "profile_row": "kernel_repair_binding",
+    "abi_row": "intel_commpage_abi",
+    "add": "IntelCommpage.kext"
+   },
+   "reason": "the Darwin 27 kernel starts on Ivy Bridge: the kernel repairs in Kernel.Patch (on 26B131: early VM range initialization, ascending early kernel-map bounds, the bootstrap physical-page alias code and its registration call) and the IntelCommpage.kext Kernel.Add entry, computed by tools/kc-binder from the BootKC this image links",
+   "evidence": "apply.sh runs src/kc_bind.py on the image's BootKernelExtensions.kc, which refuses unless kc-binder's config.plist is byte-identical to the recorded kernel_repair_efi repairs src/repair_binding.py binds to that BootKC (or, when those refuse it, unless IntelCommpage's compiled addresses hold for it); src/repairs.py installs the result. tests/test_kc_bind.py (HAO_OPENCORE_BOOT_KC and the row variables) proves the bytes on the recorded 26B131 collections"
+  },
   {
    "id": "debug-log-to-file",
    "kind": "op",

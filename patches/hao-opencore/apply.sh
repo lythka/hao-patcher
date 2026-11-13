@@ -3,24 +3,40 @@
 # every *.efi of OCLP's generated EFI from the opencore_debug archive. This recipe adds only the image's kernel
 # repairs, kexts and configuration.
 set -eu
-# kmutil embeds its build directory and a fresh enclosing UUID. Bind the unchanged
-# repairs only after verifying the complete referenced kernel/kext segment closure.
+# kmutil embeds its build directory and a fresh enclosing UUID. The recorded repairs bind unchanged
+# only after verifying the complete referenced kernel/kext segment closure (repair_binding.py, the reference).
 REPAIR_WORK=$(mktemp -d /private/var/tmp/kernel-repairs.XXXXXX)
 trap 'rm -rf "$REPAIR_WORK"' EXIT
-/private/var/ssdshare/py/bin/python3.12 -I "$P/src/repair_binding.py" bind \
+ROW_BOUND=
+if /private/var/ssdshare/py/bin/python3.12 -I "$P/src/repair_binding.py" bind \
     --profile "$P/inputs/kernel_repair_binding/profile.json" \
     --artifact "$P/inputs/kernel_repair_efi" \
     --boot-kc "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc" \
-    --output "$REPAIR_WORK/artifact"
-# Preserve the per-image binding record with the build's patch log, before cleanup.
-cp "$REPAIR_WORK/artifact/build.json" "${PATCH_OUTPUT_DIR:-$P}/kernel-repair-binding.json"
-ditto "$REPAIR_WORK/artifact/EFI/OC/Kexts/IntelCommpage.kext" "$ESP/EFI/OC/Kexts/IntelCommpage.kext"
+    --output "$REPAIR_WORK/artifact"; then
+    ROW_BOUND=$REPAIR_WORK/artifact
+    # Preserve the per-image binding record with the build's patch log, before cleanup.
+    cp "$REPAIR_WORK/artifact/build.json" "${PATCH_OUTPUT_DIR:-$P}/kernel-repair-binding.json"
+else
+    echo "hao-opencore: the recorded repairs do not bind to this BootKC; kc-binder binds it on its own"
+fi
+# kc-binder (staged by make.sh) computes the repairs from this BootKC. It refuses unless they equal the recorded
+# repairs bound above, or, when those refused, unless IntelCommpage's compiled addresses hold for this BootKC.
+/private/var/ssdshare/py/bin/python3.12 -I "$P/src/kc_bind.py" \
+    --binder "$P/build" \
+    --boot-kc "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc" \
+    --row "$P/inputs/kernel_repair_efi" \
+    --profile "$P/inputs/kernel_repair_binding/profile.json" \
+    --abi-header "$P/inputs/intel_commpage_abi" \
+    --row-bound "$ROW_BOUND" \
+    --out "$REPAIR_WORK/bound" \
+    --record "${PATCH_OUTPUT_DIR:-$P}/kc-binder.json"
+ditto "$REPAIR_WORK/bound/EFI/OC/Kexts/IntelCommpage.kext" "$ESP/EFI/OC/Kexts/IntelCommpage.kext"
 ditto "$P/inputs/hao_runtime/HaoExec.kext" "$ESP/EFI/OC/Kexts/HaoExec.kext"
 # Bind HaoExec to the kernel collection this image boots (it stays inactive on any other kernel).
 /private/var/ssdshare/py/bin/python3.12 -I "$P/inputs/hao_runtime/stamp_identity.py" \
     "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc" "$ESP/EFI/OC/Kexts/HaoExec.kext"
 /private/var/ssdshare/py/bin/python3.12 -I "$P/src/repairs.py" \
-    "$ESP/EFI/OC/config.plist" "$REPAIR_WORK/artifact" \
+    "$ESP/EFI/OC/config.plist" "$REPAIR_WORK/bound" \
     "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc"
 /private/var/ssdshare/py/bin/python3.12 -I "$P/src/early_kexts.py" \
     "$SYS" "$ESP" "$P/src/early-kexts.txt"

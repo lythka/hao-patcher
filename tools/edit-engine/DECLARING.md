@@ -46,9 +46,10 @@ Copy the shape of `patches/golden-gate-hello/edits/metal.json`. The format is in
 - **Load command added** → `macho.add-dylib`, with exactly the command type (`weak`), `timestamp` and versions the
   existing code writes. Read the `struct.pack` call.
 - **Plist key set** → `plist.set`.
-- **Metallib rewrite, kernel-collection link, cryptex build, hao stub embedding, HaoExec's identity stamp** → the
-  external op (`metallib.rewrite`, `kc.link`, `cryptex.build`, `hao.embed-stub`, `hao.stamp`) with `args` naming
-  its profile or row (`hao.stamp`: `kernel_collection`, the installed file it reads). That is a declaration only;
+- **Metallib rewrite, kernel-collection link, cryptex build, hao stub embedding, HaoExec's identity stamp, kernel
+  repairs bound to the BootKC** → the external op (`metallib.rewrite`, `kc.link`, `cryptex.build`, `hao.embed-stub`,
+  `hao.stamp`, `kc.bind`) with `args` naming its profile or row (`hao.stamp`, `kc.bind`: `kernel_collection`, the
+  installed file it reads). That is a declaration only;
   no byte test is possible for it, so say so in the report. A file inside a tree the same recipe declares whole (a
   kext folder) can have its own entry like this: the materialiser makes it from that entry, never from the tree.
 - Every edit gets a `reason` in plain words (what the user gets, not how), taken from the recipe's README.

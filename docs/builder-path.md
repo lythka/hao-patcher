@@ -30,7 +30,7 @@ and anyone can read what each patch changes and why.
 | Packs | Hardware packs with detection and phase (installer only, or live) | [`packs/`](../packs/README.md), `patches.py packs`, `plan --packs` |
 | Materialiser | Makes each declared file once into pack overlays (files + manifest with mode, owner, flags and folders); what only the target can make is deferred, in dependency order (`deferred.json`) | `pipeline/materialize.py` |
 | Live patch | Applies overlays to a folder or the running Mac (System volume written directly, booted as a new snapshot, reverted to the one booted before): only changed files, checked, locked, rolled back on failure, revertible | [`tools/hao`](../tools/hao/README.md) |
-| Kernel binder | Computes the OpenCore kernel repairs and IntelCommpage table from a recipe and the kernel collection just linked, with no compiler on the target | [`tools/kc-binder`](../tools/kc-binder/README.md) |
+| Kernel binder | Computes the OpenCore kernel repairs and IntelCommpage table from a recipe and the kernel collection just linked, with no compiler on the target. The image build runs it (hao-opencore `kc.bind`) and requires the recorded repairs' bytes where those bind | [`tools/kc-binder`](../tools/kc-binder/README.md) |
 | Assembler targets | One assembler over a raw image or a whole internal disk, the disk gated by the installer's safety checks | `pipeline/stages/golden-image.py` |
 | Downloads | Pinned, resumable, content-addressed downloads; a host capability matrix | [`tools/acquire`](../tools/acquire/README.md) |
 | Release cut | Classifies every input as downloadable, reproducible, dirty, harvested or unrecorded; writes `release.json` drafts | `pipeline/release-cut` |
@@ -43,7 +43,8 @@ its declarations. Moving an input row clears that proof.
 ## Not done yet
 
 - **Installing from these pieces.** Images are still built by the recipes' own hooks. The pieces above are proven
-  equal to them on real inputs, not yet used in their place.
+  equal to them on real inputs, not yet used in their place, except the kernel binder: hao-opencore installs its
+  repairs (equal to the recorded ones on every recorded 26B131 collection; not yet through a VM build or a boot).
 - **The USB installer:** the Recovery-on-a-stick launcher, disk layout on the target, and kernel collections linked
   and bound there.
 - **A first release.** Inputs built from uncommitted trees or harvested from a running laptop block a cut until

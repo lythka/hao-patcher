@@ -272,6 +272,32 @@ class Format(unittest.TestCase):
         self.assertIn('badtree: files: a: "tree": true goes with an origin', got)
         self.assertIn('badinst: files: a: install is', got)
         self.assertIn('every file under it from hao', patches.explain('t', root=self.d / 'patches'))
+        self.assertIn('install  mode 0755, owner root:wheel, flags restricted', patches.explain('t', root=self.d / 'patches'))
+        self.assertIn('Installed mode 0755, owner root:wheel, flags restricted.', patches.catalog(root=self.d / 'patches'))
+
+    def test_explain_and_catalog_show_install_and_after(self):
+        stamp = {'format': 1, 'path': 'EFI/x', 'origin': {'kind': 'hao', 'row': 'row_a'},
+                 'edits': [{'id': 's', 'kind': 'op', 'op': 'hao.stamp', 'reason': 'why',
+                            'args': {'kernel_collection': 'System/Library/KernelCollections/BootKernelExtensions.kc'}}]}
+        self.patch('late', inputs=['row_a'], files=[
+            {'path': 'usr/lib/list', 'origin': {'kind': 'hao'}, 'after': ['overlays', 'usr/lib/other'],
+             'install': {'mode': '0644', 'owner': 'root:wheel'}},
+            {'path': 'EFI/x', 'edits': 'edits/x.json', 'after': ['usr/lib/list']},
+            {'path': 'usr/lib/plain', 'origin': {'kind': 'hao', 'row': 'row_a'}}])
+        self.edits('late', 'x.json', stamp)
+        self.assertEqual(self.check(), [])
+        text = patches.explain('late', root=self.d / 'patches')
+        self.assertIn('install  mode 0644, owner root:wheel\n  after    every overlay file installed first; usr/lib/other',
+                      text)
+        self.assertIn('after    System/Library/KernelCollections/BootKernelExtensions.kc (hao.stamp reads it); '
+                      'usr/lib/list', text)
+        self.assertIn('usr/lib/plain\n  origin   hao (row row_a)\n  install  default: root:wheel', text)
+        md = patches.catalog(root=self.d / 'patches')
+        self.assertIn('Installed mode 0644, owner root:wheel. Made after every overlay file installed first, '
+                      '`usr/lib/other`.', md)
+        self.assertIn('Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (hao.stamp reads it), '
+                      '`usr/lib/list`.', md)
+        self.assertIn('- `usr/lib/plain`: whole file from hao (row row_a).\n', md)
 
     def test_declared_file_rules(self):
         self.patch('both', files=[{'path': 'a', 'edits': 'edits/a.json', 'origin': {'kind': 'hao'}}])

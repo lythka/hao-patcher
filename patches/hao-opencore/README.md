@@ -13,14 +13,24 @@ display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments
   generated EFI from the `opencore_debug` archive. The DEBUG build makes the ESP log record each kernel patch result.
   `Misc.Debug.Target` keeps logging (0x01) and the file log (0x40) and clears on-screen output (0x02), which OCLP's
   base config enables.
-- `src/repair_binding.py` binds the recorded kernel repairs (early VM range initialization, ascending early
-  kernel-map bounds, bootstrap physical-page aliases) to this image's BootKC. The repairs are RIP-relative code
-  tied to one collection layout, and kmutil gives every build a new enclosing UUID and build paths. The binder
-  therefore verifies every fileset member's UUID, load commands, segment map and segment hashes against the
-  reference profile, checks every recorded Find pattern and its context, and writes a per-image artifact whose
-  `build.json` is kept with the build log as `kernel-repair-binding.json`.
-- `src/repairs.py` installs exactly those repairs and the `IntelCommpage.kext` Kernel.Add entry, and refuses any
-  BootKC whose full SHA-256 differs from the bound artifact. Startup-trace patches are dropped (VM only).
+- The kernel repairs (early VM range initialization, ascending early kernel-map bounds, bootstrap physical-page
+  aliases) are RIP-relative code tied to one collection layout, and kmutil gives every build a new enclosing UUID
+  and build paths. Two binders run on this image's BootKC:
+  - `src/repair_binding.py` (the reference) binds the recorded repairs (`kernel_repair_efi`) unchanged: it verifies
+    every fileset member's UUID, load commands, segment map and segment hashes against the reference profile, checks
+    every recorded Find pattern and its context, and writes a per-image artifact whose `build.json` is kept with the
+    build log as `kernel-repair-binding.json`. On a collection it was not recorded for it refuses, and the build goes on.
+  - `src/kc_bind.py` runs [tools/kc-binder](../../tools/kc-binder/README.md) (staged into `build/` by `make.sh`),
+    which computes the repairs from the BootKC itself. It refuses unless its `config.plist` is byte-identical to the
+    recorded repairs bound above, every patch field and the capture match, and the profile's patch sites and
+    IntelCommpage bindings hold (mode `binder`, every image today). When `repair_binding.py` refused, it uses its own
+    repairs only if every collection-dependent line of the `commpage_abi.hpp` IntelCommpage.kext was compiled with
+    (`intel_commpage_abi`) still holds for this BootKC (mode `binder-only`); otherwise it says which lines need a
+    rebuilt IntelCommpage. A kernel no binder recipe covers (26A428) keeps the recorded repairs (mode `row`). Its
+    record is kept as `kc-binder.json`.
+- `src/repairs.py` installs exactly the repairs of `kc_bind.py`'s artifact and the `IntelCommpage.kext` Kernel.Add
+  entry, and refuses any BootKC whose full SHA-256 differs from the bound artifact. Startup-trace patches are dropped
+  (VM only).
 - `HaoExec.kext` comes from the `hao_runtime` payload and is stamped by the payload's `stamp_identity.py` with this
   image's BootKC identity. It is a KEC (`com.apple.kec.HaoExec`), starts before PID 1 and stays inactive on any
   other kernel. Executables with an arm64 slice and no x86_64 slice are sent to XNU's `#!` activator with
@@ -34,12 +44,12 @@ display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments
   collection's copy while other drivers still call into it.
 - `patch.json` `files` declares the config keys the script in `apply.sh` sets to fixed values (`Misc.Debug.Target`,
   `Misc.Debug.DisplayLevel`, `boot-args`, the Delete list) as `plist.set` edits in [edits/config.json](edits/config.json),
-  and the two kext folders as whole-folder origins. HaoExec's executable is declared on its own
+  after the kernel repairs and the IntelCommpage Kernel.Add entry as the external op `kc.bind` (made on the target,
+  after the BootKC; `tests/test_kc_bind.py` proves the bytes), and the two kext folders as whole-folder origins. HaoExec's executable is declared on its own
   ([edits/haoexec-identity.json](edits/haoexec-identity.json)): the external op `hao.stamp` (the row's
   `stamp_identity.py` against the linked BootKC), so the materialiser defers it to the target, after the BootKC; the
-  stamp is not re-signed (OpenCore does not check the kext's signature). Not declared yet: the four kernel repairs and
-  the two `Kernel.Add` entries (no append or data value in `plist.set`), and early Tahoe kexts (none on any recorded
-  build). The `boot-args` value is the one without the dev-only statistics arguments. `tests/test_edits.py`
+  stamp is not re-signed (OpenCore does not check the kext's signature). Not declared yet: the HaoExec `Kernel.Add` entry (no append
+  in `plist.set`), and early Tahoe kexts (none on any recorded build). The `boot-args` value is the one without the dev-only statistics arguments. `tests/test_edits.py`
   proves the values against `apply.sh`.
 - The next OpenCore boot deletes the Apple boot-GUID `bootercfg` and `bootercfg-once` variables (firmware
   logging overrides independent of kernel boot-args); see the
@@ -90,13 +100,25 @@ the candidates, so the helper start and collection loads would likely remain, an
   records the hao-runtime commit).
 - `kernel_repair_binding`: the reference profile made by `kernel-fixes repair-binding profile`
   ([tools/kernel-fixes](../../tools/kernel-fixes/README.md)).
-- `kernel_repair_efi`: the three repairs and IntelCommpage, from `tools/kernel-foundation` `make vm-esp`
-  ([tools/kernel-foundation](../../tools/kernel-foundation/README.md)).
+- `kernel_repair_efi`: the repairs (three on 26A428, four on 26B131) and IntelCommpage, from `tools/kernel-foundation`
+  `make vm-esp` ([tools/kernel-foundation](../../tools/kernel-foundation/README.md)): the reference kc-binder must
+  equal, and the IntelCommpage.kext installed.
+- `intel_commpage_abi`: the `commpage_abi.hpp` that IntelCommpage.kext was compiled with (the binding profile pins its
+  SHA-256), from the same `tools/kernel-foundation` build.
+
+`make.sh` (on the host, when the build stages this patch) copies tools/kc-binder's run-time files, its recipes and
+their pins, and `tools/kernel-foundation/commpage_build.py` into `build/`, with `build/stage.json`, which `kc_bind.py`
+checks before it runs them.
 
 ## Verify
 
-Host tests: `python3.14 -I -m unittest discover -s patches/hao-opencore/tests`. The `HAO_OPENCORE_*` variables named in
-`tests/test_edits.py` add the real-input checks.
+Host tests: `python3.14 -I -B -m unittest discover -s patches/hao-opencore/tests`. The `HAO_OPENCORE_*` variables named
+in `tests/test_edits.py` and `tests/test_kc_bind.py` add the real-input checks. `test_kc_bind.py` with
+`HAO_OPENCORE_BOOT_KC` (Boot KCs) or `HAO_OPENCORE_RUNS` (recorded golden-run folders), and the
+`kernel_repair_efi`, `kernel_repair_binding` and `intel_commpage_abi` rows, runs both binders as apply.sh does and
+requires the same config.plist bytes; `HAO_OPENCORE_GUEST_PYTHON` runs them with the builder VM's Python.
+
+In the build log, `kc-binder.json` (next to `kernel-repair-binding.json`) has `"mode": "binder"`.
 
 On the built ESP, `plutil -lint` passes and Kernel.Add has `IntelCommpage.kext` and `HaoExec.kext`. After a boot,
 the ESP's OpenCore log shows each repair and both kexts applied once. On the running system:
@@ -129,7 +151,8 @@ must still die with VM guard flavor 13 (status 137), which shows the fix leaves 
 has a 15-second alarm. Finally load a website in Safari and scroll, navigate and reload.
 
 ## Validation
-NEEDS VALIDATION: r44 adds `auxKCAtBoot=false` (not booted yet; see Verify). the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r40 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
+NEEDS VALIDATION: r45 binds the repairs with tools/kc-binder (host tests: byte-identical config.plist on the 26B131
+bootstrap KC and nine recorded image KCs; no VM build yet). r44 adds `auxKCAtBoot=false` (not booted yet; see Verify). the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r40 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
 
 Laptop 2026-11-12, image d131d5b (26B131, dev build): boots with r40 (hao d9ea9bd's HaoExec and stamp_identity.py); image 7d0b612 booted with r39 on 2026-11-11.
 Laptop 2026-11-11, image 4d1c48c (26B131, dev build): boots with r33; r34's HaoExec.kext and stamp_identity.py are byte-identical to r33's.
@@ -141,6 +164,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r45 2026-11-12 Bind the kernel repairs to the freshly linked BootKC with tools/kc-binder (src/kc_bind.py, staged by make.sh): refuses unless they equal the recorded repairs repair_binding.py binds, and binds a collection those refuse when IntelCommpage's compiled addresses still hold for it. New input row `intel_commpage_abi`; the repairs are declared as `kc.bind` in edits/config.json. Same config.plist bytes on every recorded 26B131 KC.
 - r44 2026-11-12 Boot-arg `auxKCAtBoot=false`: kernelmanagerd no longer tries (and fails) to build an Aux KC from the codeless AppleMobileDevice kext before loading the System KC, which cost 18.5 s per boot (23 s first boot).
 - r43 2026-11-12 Declare the HaoExec identity stamp: the executable is its own `files` entry with `edits/haoexec-identity.json` (external op `hao.stamp`, made on the target after the BootKC is linked, not re-signed), so an overlay never ships the unstamped copy; apply.sh is unchanged.
 - r42 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runtime-26B131-20261112-273ba980b829). No recipe change.

@@ -1,11 +1,11 @@
 """The declaration of hao-opencore: edits/config.json and the two kexts it copies into the EFI partition.
 python3.14 -I -B -m unittest discover -s patches/hao-opencore/tests
 
-edits/config.json declares the keys apply.sh's embedded script (the heredoc named PYCONFIG) sets to fixed values. It
-does not declare the rest of what the recipe changes in the config (see the spec's origin note and the README): the
-four kernel repairs in Kernel.Patch and the IntelCommpage and HaoExec entries of Kernel.Add. So the tests prove, not
-byte equality of the whole file, but: every declared key holds the value the script writes, and the script's other
-changes to the config are exactly Kernel.Add.
+edits/config.json declares the kernel repairs and the IntelCommpage Kernel.Add entry as the external op kc.bind
+(src/kc_bind.py with tools/kc-binder, on the target; tests/test_kc_bind.py proves its bytes) and the keys apply.sh's
+embedded script (the heredoc named PYCONFIG) sets to fixed values. It does not declare the HaoExec entry of Kernel.Add
+(see the spec's origin note and the README). So the tests prove, not byte equality of the whole file, but: every
+declared key holds the value the script writes, and the script's other changes to the config are exactly Kernel.Add.
 
 Always run, on a synthetic OCLP-shaped config. Real inputs, one variable each, skipped when unset:
   HAO_OPENCORE_INPUT=PATH               OCLP's base config.plist for the image (sha256 4be999f8..., made on the host
@@ -33,6 +33,8 @@ import engine   # noqa: E402
 import spec as S   # noqa: E402
 
 SPEC = S.load(PATCH / 'edits/config.json')
+# The edits the engine applies: kc.bind is carried out by src/kc_bind.py on the target, before the script's keys.
+PLIST = dict(SPEC, edits=[e for e in SPEC['edits'] if e['op'] == 'plist.set'])
 FILES = {f['path']: f for f in json.loads((PATCH / 'patch.json').read_text())['files']}
 SCRIPT = (PATCH / 'apply.sh').read_text().split("<<'PYCONFIG'\n", 1)[1].split('\nPYCONFIG', 1)[0]
 APPLE = '7C436110-AB2A-4BBB-A880-FE41995C9F82'
@@ -72,14 +74,26 @@ class Config(unittest.TestCase):
         self.assertEqual(S.validate(SPEC), [])
         self.assertEqual(SPEC['path'], 'EFI/OC/config.plist')
         self.assertEqual(FILES['EFI/OC/config.plist'], {'path': SPEC['path'], 'edits': 'edits/config.json'})
-        self.assertEqual({e['op'] for e in SPEC['edits']}, {'plist.set'})
+        self.assertEqual([e['op'] for e in SPEC['edits']][:2], ['kc.bind', 'plist.set'])
+        self.assertEqual({e['op'] for e in SPEC['edits'][1:]}, {'plist.set'})
+        self.assertIn('kc.bind', S.EXTERNAL_OPS)
+        args = SPEC['edits'][0]['args']
+        self.assertEqual(args['kernel_collection'], 'System/Library/KernelCollections/BootKernelExtensions.kc')
+        inputs = json.loads((PATCH / 'patch.json').read_text())['inputs']
+        for key in ('reference_row', 'profile_row', 'abi_row'):
+            self.assertIn(args[key], inputs)
+        script = (PATCH / 'apply.sh').read_text()
+        # kc_bind.py writes the artifact repairs.py installs, before the script sets its keys.
+        self.assertLess(script.index('"$P/src/kc_bind.py"'), script.index('"$P/src/repairs.py"'))
+        self.assertLess(script.index('"$P/src/repairs.py"'), script.index("<<'PYCONFIG'"))
+        self.assertIn('"$ESP/EFI/OC/config.plist" "$REPAIR_WORK/bound"', script)
 
     def check(self, data):
-        out, record = engine.apply(SPEC, data, repo=str(TOP))
+        out, record = engine.apply(PLIST, data, repo=str(TOP))
         code = script_output(data)
         engine_config, code_config = plistlib.loads(out), plistlib.loads(code)
         # Every declared key holds the value the script writes.
-        for e in SPEC['edits']:
+        for e in PLIST['edits']:
             for config in (engine_config, code_config):
                 node = config
                 for key in e['args']['key']:
@@ -101,7 +115,7 @@ class Config(unittest.TestCase):
         data = oclp_config()
         release = plistlib.loads(script_output(data))['NVRAM']['Add'][APPLE]['boot-args']
         dev = plistlib.loads(script_output(data, '1'))['NVRAM']['Add'][APPLE]['boot-args']
-        self.assertEqual(release, SPEC['edits'][2]['args']['value'])
+        self.assertEqual(release, PLIST['edits'][2]['args']['value'])
         self.assertEqual(dev, release.replace('hao_crash=1 ', 'hao_crash=1 %s ' % DEV_ARGS))
 
     @unittest.skipUnless(os.environ.get('HAO_OPENCORE_INPUT'), 'set HAO_OPENCORE_INPUT to the base config.plist')
@@ -114,12 +128,12 @@ class Config(unittest.TestCase):
     def test_the_config_of_an_image_built_with_the_recipe_has_every_declared_value(self):
         base = plistlib.loads(Path(os.environ['HAO_OPENCORE_INPUT']).read_bytes())
         image = plistlib.loads(Path(os.environ['HAO_OPENCORE_IMAGE_CONFIG']).read_bytes())
-        out, _ = engine.apply(SPEC, Path(os.environ['HAO_OPENCORE_INPUT']).read_bytes(), repo=str(TOP))
+        out, _ = engine.apply(PLIST, Path(os.environ['HAO_OPENCORE_INPUT']).read_bytes(), repo=str(TOP))
         declared = plistlib.loads(out)
         # The image is a dev build: its boot-args carry the two statistics arguments, nothing else differs.
         args = declared['NVRAM']['Add'][APPLE]['boot-args']
         declared['NVRAM']['Add'][APPLE]['boot-args'] = args.replace('hao_crash=1 ', 'hao_crash=1 %s ' % DEV_ARGS)
-        # Not declared: the four kernel repairs and the two Kernel.Add entries.
+        # Declared by kc.bind (tests/test_kc_bind.py): the four kernel repairs and IntelCommpage; not declared: HaoExec.
         patches = image['Kernel']['Patch']
         self.assertEqual(patches[:len(base['Kernel']['Patch'])], base['Kernel']['Patch'])
         self.assertEqual(len(patches) - len(base['Kernel']['Patch']), 4)
@@ -160,7 +174,7 @@ class Kexts(unittest.TestCase):
             self.assertEqual(entry['origin']['row'], row)
             self.assertIn(row, inputs)
         script = (PATCH / 'apply.sh').read_text()
-        self.assertIn('ditto "$REPAIR_WORK/artifact/EFI/OC/Kexts/IntelCommpage.kext" "$ESP/EFI/OC/Kexts/IntelCommpage.kext"', script)
+        self.assertIn('ditto "$REPAIR_WORK/bound/EFI/OC/Kexts/IntelCommpage.kext" "$ESP/EFI/OC/Kexts/IntelCommpage.kext"', script)
         self.assertIn('ditto "$P/inputs/hao_runtime/HaoExec.kext" "$ESP/EFI/OC/Kexts/HaoExec.kext"', script)
 
     def test_haoexec_identity_stamp_is_declared_as_a_target_side_op(self):

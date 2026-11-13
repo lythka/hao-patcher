@@ -3,9 +3,11 @@
 Computes the Darwin 27 early-VM kernel repairs (OpenCore `Kernel.Patch` entries) and IntelCommpage's collection
 address table for a given Boot kernel collection. It needs only Python's standard library: no compiler,
 disassembler or Apple tool. That way an installer can bind against the collection it has just linked instead of
-copying repairs captured from a bootstrap image (workflow plan step 10). This is the host version. Nothing in the
-image build calls it yet; `patches/hao-opencore` still installs the recorded `kernel_repair_efi` through
-`src/repair_binding.py`.
+copying repairs captured from a bootstrap image (workflow plan step 10). The image build binds with it:
+`patches/hao-opencore` stages it (`make.sh`, `kc-binder stage`) and its `src/kc_bind.py` runs it in the builder VM on
+the BootKC the build just linked. There it must equal the recorded `kernel_repair_efi` that `src/repair_binding.py`
+binds to the same collection; on a collection those refuse, it binds alone when IntelCommpage's compiled addresses
+still hold (see [hao-opencore](../../patches/hao-opencore/README.md)).
 
 ## What it computes, and from what
 
@@ -47,6 +49,15 @@ python3.14 -I tools/kc-binder/kc-binder compare --boot-kc KC --repair-efi EFI_AR
   [--binding BINDING_ARTIFACT] [--abi-header commpage_abi.hpp]
 ```
 
+```sh
+python3.14 -I tools/kc-binder/kc-binder stage NEW_DIR
+```
+
+`stage` copies what `bind` reads at run time (`kc-binder`, `src/kcbind.py`, `src/compare.py`, every recipe and the
+files it pins, `tools/kernel-foundation/commpage_build.py`) into NEW_DIR at the same repository-relative paths, with
+`stage.json` (each file's SHA-256; `src/stage.py` `verify` checks it). `src/stage.py` runs on Python 3.9, so the
+host's `/usr/bin/python3` can stage; the binder itself runs on the builder VM's Python 3.12.
+
 `bind` writes `EFI/OC/config.plist` (the same layout `kernel-fixes build-repairs` writes: the four patches and
 the IntelCommpage `Kernel.Add` entry), `capture.json` (the early-VM capture, as `port_profile.finish_early_vm`
 writes it), `commpage-table.json` and `bind.json` (inputs, resolved points, output hashes). Any failed check
@@ -69,8 +80,8 @@ python3.14 -I tools/kc-binder/kc-binder make-recipe --kc-recipe tools/kernel-fix
 
 ## Not done yet
 
-- The image build does not call the binder. `repair_binding.py` and the recorded `kernel_repair_efi` remain the
-  installed path. Its pinned SHA256 and `tools/kernel-fixes` are unchanged.
+- `repair_binding.py` and the recorded `kernel_repair_efi` stay the reference the image build checks the binder
+  against. Its pinned SHA256 and `tools/kernel-fixes` are unchanged.
 - IntelCommpage still compiles the addresses into the kext (`commpage_abi.hpp`). The table computed here is what
   a load-time version would read. The kext change (read (member, segment, offset) at load and add the member's
   segment base) and the way the table reaches it (for example an OpenCore-injected property) are open, and need

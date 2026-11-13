@@ -107,7 +107,7 @@ tuples) computes them. Every site's `before` bytes must be there.
 |---|---|
 | `macho.add-dylib` | `path` (absolute), `weak`, `timestamp` (default 2, as ld64 writes), `current_version`, `compat_version`. Uses the zero padding after the load commands and leaves the signature for `sign` |
 | `plist.set` | `key` (list of dictionary keys and array indexes), `value`. Keeps XML or binary format. Not mixed with byte edits in one spec |
-| `metallib.rewrite`, `kc.link`, `cryptex.build`, `hao.embed-stub`, `hao.stamp` | declared for `explain`; applied by their own tools, so `apply` refuses them. `pipeline/materialize.py` defers a file with one to the target. `hao.stamp` (the hao-runtime row's `stamp_identity.py`, HaoExec's BootKC identity) names the installed file it reads as `kernel_collection`, and the deferred step comes after it |
+| `metallib.rewrite`, `kc.link`, `cryptex.build`, `hao.embed-stub`, `hao.stamp`, `kc.bind` | declared for `explain`; applied by their own tools, so `apply` refuses them (a spec may still list one next to `plist.set` edits). `pipeline/materialize.py` defers a file with one to the target. `hao.stamp` (the hao-runtime row's `stamp_identity.py`, HaoExec's BootKC identity) and `kc.bind` (`tools/kc-binder`: OpenCore's kernel repairs computed from the BootKC) name the installed file they read as `kernel_collection`, and the deferred step comes after it |
 
 Checks: every literal and matcher site is checked before it is written. Two edits that touch the same bytes (or
 the same plist key) are refused. After the last edit, every written byte must still be what its edit wrote, and an

@@ -25,10 +25,11 @@ EXTERNAL_OPS = {
     'cryptex.build': 'the cryptex builder',
     'hao.embed-stub': 'the hao-runtime installer',
     'hao.stamp': "the hao-runtime row's stamp_identity.py, against the target's linked BootKC",
+    'kc.bind': "tools/kc-binder, against the target's linked BootKC",
 }
 # Installed paths an external op reads on the target, by argument name: the file can only be made after those exist
 # there, so the materialiser lists them as what the deferred step comes after.
-EXTERNAL_INPUTS = {'hao.stamp': ('kernel_collection',)}
+EXTERNAL_INPUTS = {'hao.stamp': ('kernel_collection',), 'kc.bind': ('kernel_collection',)}
 SIGN_KEYS = {'mode', 'identifier', 'preserve', 'entitlements_from'}
 TOP_KEYS = {'format', 'path', 'arch', 'origin', 'applied_by', 'edits', 'sign', 'expect'}
 COMMON_KEYS = {'id', 'kind', 'reason', 'evidence', 'asm'}
@@ -156,7 +157,7 @@ def validate(spec):
             op = e.get('op')
             if op == 'plist.set':
                 plist_ops += 1
-            else:
+            elif op not in EXTERNAL_OPS:     # an external op is carried out by its own tool, never by the engine
                 byte_edits += 1
             bad += ['%s: %s' % (where, p) for p in _op_problems(e)]
     if plist_ops and byte_edits:

@@ -15,6 +15,7 @@ import unittest
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / 'src'))
+import engine   # noqa: E402
 import signing   # noqa: E402
 import signlint   # noqa: E402
 import spec as S   # noqa: E402
@@ -55,6 +56,20 @@ class Format(unittest.TestCase):
         self.assertEqual(S.validate(s), [])
         self.assertIn('hao.stamp', S.EXTERNAL_OPS)
         self.assertEqual(S.EXTERNAL_INPUTS['hao.stamp'], ('kernel_collection',))
+
+    def test_kc_bind_is_external_names_its_input_and_sits_with_plist_set(self):
+        """hao-opencore's config.plist: kc.bind (tools/kc-binder writes the kernel repairs) and plist.set keys in
+        one spec. An external op is no byte edit of the engine's, so the mix is allowed; apply refuses the op."""
+        s = spec(None)
+        s['path'] = 'EFI/OC/config.plist'
+        s['edits'] = [{'id': 'bind', 'kind': 'op', 'op': 'kc.bind', 'reason': 'x',
+                       'args': {'kernel_collection': 'System/Library/KernelCollections/BootKernelExtensions.kc'}},
+                      {'id': 'key', 'kind': 'op', 'op': 'plist.set', 'args': {'key': ['a'], 'value': 1}, 'reason': 'x'}]
+        self.assertEqual(S.validate(s), [])
+        self.assertEqual(S.EXTERNAL_INPUTS['kc.bind'], ('kernel_collection',))
+        self.assertIn('kc.bind (applied by tools/kc-binder', S.edit_summary(s['edits'][0]))
+        with self.assertRaisesRegex(engine.EditError, 'applied by tools/kc-binder'):
+            engine.apply(s, b'<?xml version="1.0"?><plist version="1.0"><dict/></plist>')
 
 
 @unittest.skipUnless(CODESIGN, 'needs macOS codesign and /usr/bin/true')

@@ -263,6 +263,31 @@ class Compare(Case):
         self.assertIn('site: bytes', result.stderr)
 
 
+class Stage(Case):
+    """`kc-binder stage`: the run-time closure at repository-relative paths, checked by stage.json."""
+
+    def test_staged_binder_binds_as_the_checkout_does(self):
+        import stage
+        out = self.temp/'stage'
+        result = subprocess.run([sys.executable, '-I', str(CLI), 'stage', str(out)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        record = stage.verify(out)
+        self.assertEqual(list(record['files']), sorted(stage.closure()))
+        self.assertIn('tools/kernel-fixes/profiles/26B131/kc-recipe.json', record['files'])
+        for path in sorted((out/'tools/kc-binder/recipes').glob('*.json')):
+            kcbind.Recipe(path, out)   # every pin resolves inside the stage
+        kc, recipe = fixture.Fixture().write(self.temp/'fix')
+        for name, cli in (('checkout', CLI), ('staged', out/'tools/kc-binder/kc-binder')):
+            result = subprocess.run([sys.executable, '-I', str(cli), 'bind', '--boot-kc', str(kc), '--recipe',
+                                     str(recipe), '--out', str(self.temp/name)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.temp/'checkout/EFI/OC/config.plist').read_bytes(),
+                         (self.temp/'staged/EFI/OC/config.plist').read_bytes())
+        (out/'tools/kc-binder/src/compare.py').write_text('# changed\n')
+        with self.assertRaisesRegex(ValueError, 'compare.py differs from stage.json'):
+            stage.verify(out)
+
+
 class CheckedIn(unittest.TestCase):
     """recipes/ and blobs/: pins hold, no Apple bytes, and the blob is today's assembly."""
 

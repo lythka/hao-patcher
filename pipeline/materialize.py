@@ -17,10 +17,10 @@ tar member (source "ARCHIVE!MEMBER") otherwise keeps the member's mode and numer
 --numeric-owner` does, and the manifest's "dirs" carries the tar's own folders above it (mode and owner) for the
 folders hao has to create; anything else is root:wheel, 0755 for a Mach-O and 0644 otherwise, with no flags.
 
-A path is "deferred" when it can only be made on the target (kc.link, cryptex.build, hao.embed-stub, hao.stamp,
-files the hook generates) and "unresolved" when its source isn't found; both are reported with the reason, never
+A path is "deferred" when it can only be made on the target (kc.link, kc.bind, cryptex.build, hao.embed-stub,
+hao.stamp, files the hook generates) and "unresolved" when its source isn't found; both are reported with the reason, never
 guessed. A deferred path also lists what it comes after on the target: the installed files its external op reads
-(hao.stamp: the linked BootKC) and the declaration's "after" ("overlays": every overlay file installed first, e.g.
+(hao.stamp, kc.bind: the linked BootKC) and the declaration's "after" ("overlays": every overlay file installed first, e.g.
 usr/lib/hao/native-identities, which is keyed on the CDHashes of the files as installed). DIR/report.json lists every
 path's outcome; DIR/deferred.json lists the deferred paths in an order that satisfies those dependencies.
 
