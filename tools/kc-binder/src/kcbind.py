@@ -440,3 +440,45 @@ def table_addresses(table, kc):
                        if base <= member.address < base+size)
         result[member.address] = dict(member=name, segment=segment, offset=member.fileoff(member.address))
     return result
+
+
+# IntelCommpage's load-time table -------------------------------------------------------------------------------
+
+# abi_lines entries that are not table entries: code facts of this kernel and its IOSurface member, compiled into
+# IntelCommpage (its trampolines and checks). A collection the binder binds must still give these lines exactly.
+CODE_LINES = ('iosurface_uuid', 'iosurface_prefix', 'user_trap_prefix_length', 'user_trap_prefix',
+              'pe_state_bootargs_offset', 'boot_args_csr_offset', 'target_uuid')
+
+
+def table_layout(recipe, foundation):
+    """The IntelCommpage table layout this recipe fills (commpage_build.py table_layout)."""
+    spec = recipe.binder['commpage']
+    return foundation['table_layout'](spec['required'], spec['alias_slots'], spec['map_slots'],
+                                      [h['name'] for h in spec['hooks']])
+
+
+def table_values(table):
+    """The values commpage_build.py table_bytes packs, from commpage_table's result."""
+    a = lambda point: int(point['address'], 0)  # noqa: E731
+    return dict(kernel_uuid=bytes.fromhex(table['kernel']['uuid']), kernel_header=int(table['kernel']['header'], 0),
+                iosurface_header=int(table['iosurface']['header'], 0),
+                iosurface_set_value=a(table['iosurface']['entry']),
+                symbols={n: a(table['symbols'][n]) for n in table['required']},
+                alias_slots=[a(p) for p in table['alias_slots']], map_slots=[a(p) for p in table['map_slots']],
+                hook_sites=[a(h) for h in table['hooks']],
+                hook_original=[bytes.fromhex(h['original']) for h in table['hooks']])
+
+
+def table_bytes(recipe, table, foundation):
+    """The __DATA,__ic_table contents IntelCommpage reads for this collection."""
+    return foundation['table_bytes'](table_layout(recipe, foundation), table_values(table))
+
+
+def stamp(recipe, table, foundation, binary):
+    """(IntelCommpage binary with its table written for this collection, the table). Refuses a kext without the
+    table, or whose table is another version or layout, or was compiled for another kernel."""
+    data = table_bytes(recipe, table, foundation)
+    try:
+        return foundation['stamp_table'](binary, table_layout(recipe, foundation), data), data
+    except ValueError as error:
+        raise BindError(str(error)) from None

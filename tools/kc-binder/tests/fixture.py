@@ -65,6 +65,21 @@ def header(commands):
     return struct.pack('<IIIIIIII', 0xfeedfacf, 0x1000007, 3, 12, len(commands), len(blob), 0, 0)+blob
 
 
+def kext_binary(table=None, code=b'\x55\x48\x89\xe5\xc3'):
+    """A thin x86_64 kext-shaped Mach-O: __TEXT (CODE) and __DATA, with __DATA,__ic_table holding TABLE (an
+    IntelCommpage with the load-time table) or without that section (an IntelCommpage from before it)."""
+    sections = []
+    data = (table or b'').ljust(0x100, b'\0')
+    if table is not None:
+        sections.append(b'__ic_table'.ljust(16, b'\0')+b'__DATA'.ljust(16, b'\0')
+                        + struct.pack('<QQIIIIIIII', 0x2000, len(table), 0x2000, 3, 0, 0, 0, 0, 0, 0))
+    seg = lambda name, vm, off, body, n: command(0x19, name.ljust(16, b'\0')+struct.pack(  # noqa: E731
+        '<QQQQiiII', vm, 0x1000, off, len(body), 7, 3, n, 0)+b''.join(sections if n else []))
+    commands = [seg(b'__TEXT', 0x1000, 0x1000, code, 0), seg(b'__DATA', 0x2000, 0x2000, data, len(sections))]
+    head = header(commands)
+    return head.ljust(0x1000, b'\0')+code.ljust(0x1000, b'\0')+data
+
+
 class Fixture:
     def __init__(self, moves=None, kernel_uuid=KERNEL_UUID, version='27.2.0', reversed_bounds=True):
         """moves: {segment: added vm offset}, as a different kmutil link would place it."""

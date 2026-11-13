@@ -6,8 +6,8 @@ disassembler or Apple tool. That way an installer can bind against the collectio
 copying repairs captured from a bootstrap image (workflow plan step 10). The image build binds with it:
 `patches/hao-opencore` stages it (`make.sh`, `kc-binder stage`) and its `src/kc_bind.py` runs it in the builder VM on
 the BootKC the build just linked. There it must equal the recorded `kernel_repair_efi` that `src/repair_binding.py`
-binds to the same collection; on a collection those refuse, it binds alone when IntelCommpage's compiled addresses
-still hold (see [hao-opencore](../../patches/hao-opencore/README.md)).
+binds to the same collection. On a collection those refuse, it binds alone and writes that collection's table
+into IntelCommpage (see [hao-opencore](../../patches/hao-opencore/README.md)).
 
 ## What it computes, and from what
 
@@ -36,7 +36,13 @@ For a collection, `src/kcbind.py`:
 6. builds the IntelCommpage table: the 28 kernel symbols, alias and map slots, the eight hook sites with their
    first 14 bytes (masked check as in step 3), the IOSurface header, entry and UUID, the kernel header and UUID,
    and the `user_trap` and `csr_get_active_config` reads that `commpage_build.py` turns into the trampoline prefix
-   and boot-args offsets.
+   and boot-args offsets;
+7. packs the table entries as IntelCommpage reads them at load (`__DATA,__ic_table`, layout in
+   `tools/kernel-foundation/commpage_build.py` `table_bytes`, see its
+   [README](../kernel-foundation/README.md#intelcommpages-address-table)). `stamp` writes the result into a kext.
+   It refuses a kext without the section, a kext whose table has another version, size, slot counts or layout,
+   and a kext compiled for another kernel UUID. Lines the table does not carry (`kcbind.CODE_LINES`: prologues,
+   boot-args offsets, UUIDs) must still match the header IntelCommpage was compiled with.
 
 `kc-binder compare` prints these results next to a recorded `kernel_repair_efi` artifact, the
 `kernel_repair_binding` profile and the `commpage_abi.hpp` IntelCommpage was compiled with, one row per field.
@@ -51,6 +57,7 @@ python3.14 -I tools/kc-binder/kc-binder compare --boot-kc KC --repair-efi EFI_AR
 
 ```sh
 python3.14 -I tools/kc-binder/kc-binder stage NEW_DIR
+python3.14 -I tools/kc-binder/kc-binder stamp --boot-kc KC --kext IntelCommpage.kext   # in place
 ```
 
 `stage` copies what `bind` reads at run time (`kc-binder`, `src/kcbind.py`, `src/compare.py`, every recipe and the
@@ -60,7 +67,9 @@ host's `/usr/bin/python3` can stage; the binder itself runs on the builder VM's 
 
 `bind` writes `EFI/OC/config.plist` (the same layout `kernel-fixes build-repairs` writes: the four patches and
 the IntelCommpage `Kernel.Add` entry), `capture.json` (the early-VM capture, as `port_profile.finish_early_vm`
-writes it), `commpage-table.json` and `bind.json` (inputs, resolved points, output hashes). Any failed check
+writes it), `commpage-table.json`, `commpage-table.bin` (the table as IntelCommpage reads it) and `bind.json`
+(inputs, resolved points, output hashes). Writing a different table changes bytes covered by the kext's ad-hoc
+signature. HaoExec's identity stamp does the same, and OpenCore injects the kext either way. Any failed check
 stops with exit status 1 and a message that names the point. Nothing is written in that case.
 
 Release-time producers (they need clang, llvm-objdump through `tools/kernel-fixes/port_profile.py`, and the
@@ -82,10 +91,9 @@ python3.14 -I tools/kc-binder/kc-binder make-recipe --kc-recipe tools/kernel-fix
 
 - `repair_binding.py` and the recorded `kernel_repair_efi` stay the reference the image build checks the binder
   against. Its pinned SHA256 and `tools/kernel-fixes` are unchanged.
-- IntelCommpage still compiles the addresses into the kext (`commpage_abi.hpp`). The table computed here is what
-  a load-time version would read. The kext change (read (member, segment, offset) at load and add the member's
-  segment base) and the way the table reaches it (for example an OpenCore-injected property) are open, and need
-  a boot test.
+- IntelCommpage r42 reads the table at load. No build has produced a restamped kext yet: every recorded 26B131
+  collection gives the reference table. The first image that restamps it needs a QEMU and a laptop boot. A kext
+  from before r42 (no table) still needs every collection-dependent line to match.
 - HaoExec identity stamping is separate (`hao_runtime`'s `stamp_identity.py`).
 - Only 26B131 has a binder recipe. A new kernel needs `kernel-fixes port-profile` / `complete-profile`
   first, then `make-recipe`.
@@ -99,7 +107,8 @@ python3.14 -I -B -m unittest discover -s tools/kc-binder/tests
 Synthetic tests always run. They build Boot KCs with movable segments and the code shapes the binder reads, bind
 them with one recipe after kmutil-like moves, check every refusal (changed byte, misdirected field, non-zero
 padding, duplicate Find, already-ascending bounds, other kernel or version, changed hook, broken pin), check the
-IntelCommpage table and header lines, and run the command line. With `xcrun clang` they also compare all four
+IntelCommpage table and header lines. They also check the table bytes, a stamp into a synthetic kext after every
+segment moved, and each stamp refusal (no section, version, layout, kernel UUID), and run the command line. With `xcrun clang` they also compare all four
 patches with today's producers (`early_vm.py` + `pv_bootstrap.py`) on the synthetic collections and reassemble the
 PV blob. The checked-in recipe and blob are checked against their pins.
 
@@ -112,6 +121,7 @@ The recorded 26B131 artifacts run when these are set (the folders are the `kerne
 | `KC_BINDER_REPAIR_EFI` | the `kernel_repair_efi` folder: `config.plist` byte-identical, every patch field, the capture |
 | `KC_BINDER_REPAIR_BINDING` | the `kernel_repair_binding` folder: patch sites and all `abi_bindings` |
 | `KC_BINDER_COMMPAGE_ABI` | `build/commpage_abi.hpp` of the commpage artifact the binding profile pins |
+| `KC_BINDER_COMMPAGE_KEXT` | that artifact's `IntelCommpage.kext`. With the header, the table for each KC is byte-identical to the kext's, and its entries read back as the header's (r41 compiled) lines |
 | `KC_BINDER_KERNEL`, `KC_BINDER_IOSURFACE_LAYOUT` | `darwin27_kernel` and the reference KC's `iosurface-layout.json`: `make-recipe` reproduces `recipes/26B131.json` (needs llvm-objdump) |
 
 Host tests prove the computation only. A boot of the bound collection (QEMU, then the MacBookPro9,2) is a

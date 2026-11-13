@@ -46,6 +46,7 @@ repairs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(repairs)
 FOUNDATION = runpy.run_path(str(TOP/'tools/kernel-foundation/commpage_build.py'))
 KEXT = 'EFI/OC/Kexts/IntelCommpage.kext'
+BINARY = KEXT+'/Contents/MacOS/IntelCommpage'
 PYTHON = os.environ.get('HAO_OPENCORE_GUEST_PYTHON') or sys.executable
 
 
@@ -101,8 +102,10 @@ class Synthetic(Case):
         (stage/'stage.json').write_text(json.dumps(record))
         return stage
 
-    def recorded(self, fix, name):
-        """A kernel_repair_efi-shaped row, its binding profile and the commpage_abi.hpp, all for FIX's layout."""
+    def recorded(self, fix, name, table_kext=True, edit=None, kernel_uuid=None):
+        """A kernel_repair_efi-shaped row, its binding profile and the commpage_abi.hpp, all for FIX's layout.
+        The row's IntelCommpage has the load-time table (for KERNEL_UUID if given), or with table_kext=False, the
+        collection addresses compiled in (no table). EDIT changes the header text."""
         kc, recipe_path = fix.write(self.temp/('fix-'+name))
         recipe, collection = kcbind.Recipe(recipe_path, TOP), kcbind.Collection(bytes(fix.data))
         patches, capture, _ = kcbind.bind_repairs(recipe, collection)
@@ -110,13 +113,16 @@ class Synthetic(Case):
         row = self.temp/('row-'+name)
         (row/KEXT/'Contents/MacOS').mkdir(parents=True)
         (row/KEXT/'Contents/Info.plist').write_bytes(b'<plist/>')
-        (row/KEXT/'Contents/MacOS/IntelCommpage').write_bytes(b'kext-'+name.encode())
+        data = kcbind.table_bytes(recipe, table, FOUNDATION)
+        if kernel_uuid:
+            data = data[:32]+kernel_uuid+data[48:]
+        (row/BINARY).write_bytes(fixture.kext_binary(data if table_kext else None, code=name.encode()))
         (row/'EFI/OC/config.plist').write_bytes(kcbind.config_plist(patches))
         replacements = [dict(comment=p['Comment'], find=p['Find'].hex(), replace=p['Replace'].hex()) for p in patches]
         (row/'build.json').write_text(json.dumps(dict(inputs=dict(early_vm_repair=dict(capture=capture,
                                                                                        replacements=replacements)))))
         header = self.temp/('commpage_abi-'+name+'.hpp')
-        header.write_text('\n'.join(kcbind.abi_lines(table, FOUNDATION).values())+'\n')
+        header.write_text((edit or (lambda t: t))('\n'.join(kcbind.abi_lines(table, FOUNDATION).values())+'\n'))
         profile = dict(abi_header_sha256=sha(header.read_bytes()), reference_collection_sha256=collection.sha256,
                        payload_files={str(p.relative_to(row)): sha(p.read_bytes())
                                       for p in sorted(row.rglob('*')) if p.is_file()},
@@ -203,7 +209,10 @@ class Synthetic(Case):
         kc.write_bytes(bytes(moved.data))
         result, out, record = self.run_kc_bind(self.staged, kc, self.row, self.profile, self.header, None)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(record.read_text())['mode'], 'binder-only')
+        record = json.loads(record.read_text())
+        self.assertEqual(record['mode'], 'binder-only')
+        self.assertEqual(record['commpage_table']['restamped'], False)
+        self.assertEqual((out/BINARY).read_bytes(), (self.row/BINARY).read_bytes())
         recipe = kcbind.Recipe(self.staged/'tools/kc-binder/recipes/fixture.json', TOP)
         patches, _, _ = kcbind.bind_repairs(recipe, kcbind.Collection(bytes(moved.data)))
         self.assertEqual((out/'EFI/OC/config.plist').read_bytes(), kcbind.config_plist(patches))
@@ -212,14 +221,69 @@ class Synthetic(Case):
         self.assertEqual(config['Kernel']['Patch'][1:], patches)
         self.assertEqual(config['Kernel']['Add'][-1]['BundlePath'], 'IntelCommpage.kext')
 
-    def test_binder_only_refuses_when_intelcommpage_was_compiled_for_another_layout(self):
-        moved = fixture.Fixture(moves=Synthetic_MOVES)
+    def moved(self):
         kc = self.temp/'moved.kc'
-        kc.write_bytes(bytes(moved.data))
-        result, out, _ = self.run_kc_bind(self.staged, kc, self.row, self.profile, self.header, None)
+        kc.write_bytes(bytes(fixture.Fixture(moves=Synthetic_MOVES).data))
+        return kc
+
+    def test_binder_only_writes_the_table_for_a_moved_layout(self):
+        """Every segment moved: IntelCommpage gets the moved collection's table in its binary, nothing else
+        changes, and the installed repairs are the moved collection's."""
+        kc = self.moved()
+        result, out, record = self.run_kc_bind(self.staged, kc, self.row, self.profile, self.header, None)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        record = json.loads(record.read_text())
+        self.assertEqual(record['mode'], 'binder-only')
+        self.assertTrue(record['commpage_table']['load_time'])
+        self.assertTrue(record['commpage_table']['restamped'])
+        recipe = kcbind.Recipe(self.staged/'tools/kc-binder/recipes/fixture.json', TOP)
+        collection = kcbind.Collection(kc.read_bytes())
+        table = kcbind.table_bytes(recipe, kcbind.commpage_table(recipe, collection), FOUNDATION)
+        row, installed_binary = (self.row/BINARY).read_bytes(), (out/BINARY).read_bytes()
+        offset, size = FOUNDATION['find_table'](row)
+        self.assertEqual(installed_binary[offset:offset+size], table)
+        self.assertNotEqual(row[offset:offset+size], table)
+        self.assertEqual(installed_binary[:offset]+installed_binary[offset+size:], row[:offset]+row[offset+size:])
+        self.assertEqual(record['commpage_table']['sha256'], sha(table))
+        self.assertEqual((out/KEXT/'Contents/Info.plist').read_bytes(), (self.row/KEXT/'Contents/Info.plist').read_bytes())
+        patches, _, _ = kcbind.bind_repairs(recipe, collection)
+        self.assertEqual(plistlib.loads(installed(out, kc))['Kernel']['Patch'][1:], patches)
+
+    def test_binder_only_refuses_a_kext_without_the_table_compiled_for_another_layout(self):
+        kc, _, row, profile, header = self.recorded(fixture.Fixture(), 'legacy', table_kext=False)
+        result, out, _ = self.run_kc_bind(self.staged, self.moved(), row, profile, header, None)
         self.assertEqual(result.returncode, 1)
         self.assertIn('IntelCommpage.kext was compiled for another collection layout', result.stderr)
         self.assertIn('addr_printf', result.stderr)
+        self.assertFalse(out.exists())
+
+    def test_binder_only_refuses_other_kernel_code_or_a_table_for_another_kernel(self):
+        prefix = lambda t: t.replace('iosurface_prefix[] = {85,', 'iosurface_prefix[] = {86,')  # noqa: E731
+        _, _, row, profile, header = self.recorded(fixture.Fixture(), 'code', edit=prefix)
+        result, out, _ = self.run_kc_bind(self.staged, self.moved(), row, profile, header, None)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('compiled for another collection kernel code', result.stderr)
+        self.assertIn('iosurface_prefix', result.stderr)
+        self.assertNotIn('addr_printf', result.stderr)
+        _, _, row, profile, header = self.recorded(fixture.Fixture(), 'uuid', kernel_uuid=bytes(range(0x30, 0x40)))
+        result, out, _ = self.run_kc_bind(self.staged, self.moved(), row, profile, header, None, 'o2')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('IntelCommpage.kext table: IntelCommpage was compiled for kernel 303132', result.stderr)
+        self.assertFalse(out.exists())
+
+    def test_binder_refuses_a_kext_whose_table_is_not_this_collections(self):
+        """The recorded repairs bound, yet the kext's own table differs from the one kc-binder computes."""
+        recipe = kcbind.Recipe(self.staged/'tools/kc-binder/recipes/fixture.json', TOP)
+        other = kcbind.Collection(self.moved().read_bytes())
+        (self.row/BINARY).write_bytes(fixture.kext_binary(
+            kcbind.table_bytes(recipe, kcbind.commpage_table(recipe, other), FOUNDATION), code=b'a'))
+        profile = json.loads(self.profile.read_text())
+        profile['payload_files'][BINARY] = sha((self.row/BINARY).read_bytes())
+        self.profile.write_text(json.dumps(profile))
+        result, out, _ = self.run_kc_bind(self.staged, self.kc, self.row, self.profile, self.header,
+                                          self.row_bound(self.row, self.kc))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('this BootKC gives another table than the kext holds', result.stderr)
         self.assertFalse(out.exists())
 
     def test_row_mode_when_no_binder_recipe_names_the_kernel(self):
@@ -313,8 +377,12 @@ class Recorded(Case):
         # Had repair_binding.py refused this KC, kc-binder alone binds it to the same bytes (IntelCommpage holds).
         result, alone, record = self.run_kc_bind(self.staged, kc, self.row, self.profile, self.header, None, name+'-alone')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(record.read_text())['mode'], 'binder-only')
+        record = json.loads(record.read_text())
+        self.assertEqual(record['mode'], 'binder-only')
         self.assertEqual(installed(alone, kc), installed(bound, kc), kc)
+        # A load-time IntelCommpage: the table kc-binder writes for this KC is the one the row's kext holds.
+        self.assertFalse(record['commpage_table']['restamped'], kc)
+        self.assertEqual((alone/BINARY).read_bytes(), (self.row/BINARY).read_bytes(), kc)
         return out
 
     def test_every_boot_kc_binds_byte_identical_to_the_row(self):
@@ -347,6 +415,10 @@ class Recorded(Case):
             self.assertEqual([e for e in built['Kernel']['Add'] if e['BundlePath'] == 'IntelCommpage.kext'],
                              mine['Kernel']['Add'], run)
             image_kext = guest/'boot-efi/payload'/KEXT
+            if FOUNDATION['find_table']((image_kext/'Contents/MacOS/IntelCommpage').read_bytes()) is None:
+                # Built before the load-time table (r41, addresses compiled in): tools/kc-binder's Recorded
+                # test_table_equals_the_compiled_values checks this KC's table against those compiled lines.
+                continue
             for p in sorted((out/KEXT).rglob('*')):
                 if p.is_file():
                     self.assertEqual((image_kext/p.relative_to(out/KEXT)).read_bytes(), p.read_bytes(), p)

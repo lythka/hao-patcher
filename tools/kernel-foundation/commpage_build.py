@@ -123,6 +123,134 @@ def csr_layout(code, address, pe_state):
     return bootargs, csr
 
 
+# IntelCommpage's collection address table: __DATA,__ic_table in the kext (src/commpage_table.h is the C side).
+# Every address that moves when kmutil lays out another collection sits here, not in the code: the kext reads it at
+# load, after checking magic, version, size, slot counts, slot names (layout) and the kernel UUID. The build stamps
+# the reference collection's values; tools/kc-binder restamps it for the collection an image boots.
+TABLE_SECTION = (b'__DATA', b'__ic_table')
+TABLE_MAGIC, TABLE_VERSION = 0x42544349, 1          # 'ICTB'
+TABLE_HEADER = '<III4s16s16sQQQ'                     # magic, version, size, counts, layout, kernel UUID, 3 addresses
+HOOK_BYTES = 14
+# commpage_abi.hpp definitions that are table entries (they move with the collection layout). The other
+# collection-derived lines (prefixes, UUIDs, boot-args offsets) are code facts of the kernel and its members.
+TABLE_DEFINITIONS = ('addr_kernel_header', 'addr_iosurface_header', 'addr_iosurface_set_value',
+                     'alias_slots', 'map_slots', 'hook_sites', 'hook_original')
+
+
+def table_layout(symbols, alias_slots, map_slots, hooks):
+    """Which address sits in which slot: the names, in table order."""
+    return dict(version=TABLE_VERSION, symbols=list(symbols), alias_slots=list(alias_slots),
+                map_slots=list(map_slots), hooks=list(hooks))
+
+
+def layout_id(layout):
+    return hashlib.sha256(json.dumps(layout, sort_keys=True, separators=(',', ':')).encode()).digest()[:16]
+
+
+def table_counts(layout):
+    counts = [len(layout[k]) for k in ('symbols', 'alias_slots', 'map_slots', 'hooks')]
+    if any(not 0 < n < 256 for n in counts):
+        raise ValueError('IntelCommpage table slot counts out of range')
+    return bytes(counts)
+
+
+def table_size(layout):
+    n = sum(table_counts(layout)[:4])
+    size = struct.calcsize(TABLE_HEADER)+8*n+HOOK_BYTES*len(layout['hooks'])
+    return (size+7)//8*8
+
+
+def table_bytes(layout, values):
+    """The table for VALUES: kernel_uuid (16 bytes), kernel_header, iosurface_header, iosurface_set_value, symbols
+    {name: address}, alias_slots, map_slots, hook_sites (addresses, table order), hook_original (14 bytes each)."""
+    if (len(values['alias_slots']), len(values['map_slots']), len(values['hook_sites']), len(values['hook_original'])) != (
+            len(layout['alias_slots']), len(layout['map_slots']), len(layout['hooks']), len(layout['hooks'])):
+        raise ValueError('IntelCommpage table values do not fill its layout')
+    if len(values['kernel_uuid']) != 16 or any(len(h) != HOOK_BYTES for h in values['hook_original']):
+        raise ValueError('IntelCommpage table UUID or hook bytes have the wrong length')
+    data = struct.pack(TABLE_HEADER, TABLE_MAGIC, TABLE_VERSION, table_size(layout), table_counts(layout),
+                       layout_id(layout), bytes(values['kernel_uuid']), values['kernel_header'],
+                       values['iosurface_header'], values['iosurface_set_value'])
+    words = [values['symbols'][n] for n in layout['symbols']]+list(values['alias_slots'])+list(values['map_slots'])
+    words += list(values['hook_sites'])
+    data += struct.pack('<%dQ' % len(words), *words)+b''.join(bytes(h) for h in values['hook_original'])
+    return data+bytes(table_size(layout)-len(data))
+
+
+def read_table(data, layout):
+    """VALUES (as table_bytes takes them) from table bytes, after checking the header against LAYOUT."""
+    magic, version, size, counts, ident, uuid, kernel_header, io_header, io_entry = struct.unpack_from(TABLE_HEADER, data)
+    if (magic, version) != (TABLE_MAGIC, TABLE_VERSION):
+        raise ValueError('IntelCommpage table: magic/version %#x/%d, expected %#x/%d'
+                         % (magic, version, TABLE_MAGIC, TABLE_VERSION))
+    if size != table_size(layout) or len(data) != size or counts != table_counts(layout) or ident != layout_id(layout):
+        raise ValueError('IntelCommpage table: size, slot counts or layout differ from this binder recipe')
+    n = [len(layout[k]) for k in ('symbols', 'alias_slots', 'map_slots', 'hooks')]
+    at = struct.calcsize(TABLE_HEADER)
+    words = struct.unpack_from('<%dQ' % sum(n), data, at)
+    hooks = at+8*sum(n)
+    return dict(kernel_uuid=uuid, kernel_header=kernel_header, iosurface_header=io_header,
+                iosurface_set_value=io_entry, symbols=dict(zip(layout['symbols'], words[:n[0]])),
+                alias_slots=list(words[n[0]:n[0]+n[1]]), map_slots=list(words[n[0]+n[1]:n[0]+n[1]+n[2]]),
+                hook_sites=list(words[n[0]+n[1]+n[2]:]),
+                hook_original=[data[hooks+HOOK_BYTES*i:hooks+HOOK_BYTES*(i+1)] for i in range(n[3])])
+
+
+def find_table(binary):
+    """(file offset, size) of __DATA,__ic_table in a thin x86_64 kext binary, or None (a kext from before the table)."""
+    found = []
+    for cmd, p in commands(binary):
+        if cmd != 0x19:
+            continue
+        for i in range(struct.unpack_from('<I', binary, p+64)[0]):
+            s = p+72+80*i
+            if (binary[s+16:s+32].split(b'\0')[0], binary[s:s+16].split(b'\0')[0]) == TABLE_SECTION:
+                size, offset = struct.unpack_from('<Q', binary, s+40)[0], struct.unpack_from('<I', binary, s+48)[0]
+                found.append((offset, size))
+    if len(found) > 1:
+        raise ValueError('kext has more than one IntelCommpage table')
+    return found[0] if found else None
+
+
+def stamp_table(binary, layout, table):
+    """BINARY with its IntelCommpage table replaced by TABLE. The kext's own table must already be this layout and
+    version, for the same kernel UUID; otherwise this refuses."""
+    where = find_table(binary)
+    if where is None:
+        raise ValueError('kext has no IntelCommpage table (__DATA,__ic_table)')
+    offset, size = where
+    current = read_table(binary[offset:offset+size], layout)
+    new = read_table(table, layout)
+    if current['kernel_uuid'] != new['kernel_uuid']:
+        raise ValueError('IntelCommpage was compiled for kernel %s, the table is for %s'
+                         % (current['kernel_uuid'].hex(), new['kernel_uuid'].hex()))
+    return binary[:offset]+table+binary[offset+size:]
+
+
+def table_header_lines(layout, values):
+    """The commpage_abi.hpp lines that size the table and give its reference contents (IC_TABLE_REFERENCE)."""
+    ints = lambda seq: ','.join(str(v) for v in seq)  # noqa: E731
+    words = lambda seq: ','.join(f'{v:#x}ULL' for v in seq)  # noqa: E731
+    counts = table_counts(layout)
+    initializer = ('{%#xU,%dU,%dU,{%s},{%s},{%s},%#xULL,%#xULL,%#xULL,{%s},{%s},{%s},{%s},{%s}}' % (
+        TABLE_MAGIC, TABLE_VERSION, table_size(layout), ints(counts), ints(layout_id(layout)),
+        ints(values['kernel_uuid']), values['kernel_header'], values['iosurface_header'],
+        values['iosurface_set_value'], words(values['symbols'][n] for n in layout['symbols']),
+        words(values['alias_slots']), words(values['map_slots']), words(values['hook_sites']),
+        ','.join('{'+ints(h)+'}' for h in values['hook_original'])))
+    return ([f'static constexpr unsigned ic_table_magic = {TABLE_MAGIC:#x};',
+             f'static constexpr unsigned ic_table_version = {TABLE_VERSION};',
+             f'static constexpr unsigned ic_table_size = {table_size(layout)};',
+             f'static constexpr unsigned ic_symbol_count = {counts[0]};',
+             f'static constexpr unsigned ic_alias_count = {counts[1]};',
+             f'static constexpr unsigned ic_map_count = {counts[2]};',
+             f'static constexpr unsigned ic_hook_count = {counts[3]};',
+             'static const unsigned char ic_table_counts[] = {'+ints(counts)+'};',
+             'static const unsigned char ic_table_layout[] = {'+ints(layout_id(layout))+'};',
+             '#define IC_SYMBOLS(X) '+' '.join(f'X({n})' for n in layout['symbols']),
+             '#define IC_TABLE_REFERENCE '+initializer])
+
+
 def dyld_cache_uuid(path):
     with open(path, 'rb') as f:
         header = f.read(0x68)
@@ -238,7 +366,8 @@ def main():
                     f'static constexpr uintptr_t sandbox_anchor_delta = {sandbox_anchor};',
                     f'static constexpr unsigned policy_ops_offset = {rename_layout["ops_offset"]};',
                     f'static constexpr unsigned policy_completion_offset = {rename_layout["completion_offset"]};',
-                    f'static constexpr unsigned register_prefix_length = {len(register_prefix)};']
+                    f'static constexpr unsigned register_prefix_length = {len(register_prefix)};',
+                    f'static constexpr unsigned return_prefix_length = {len(return_prefix)};']
     policy_syscall_delta, syscall_slot, policy_syscall_prefix = policy_syscall_binding(
         sandbox, rename_layout['ops_offset'], rename_layout['completion_offset'], rename_layout['callback_symbol'])
     definitions += [f'static constexpr uintptr_t sandbox_policy_syscall_delta = {policy_syscall_delta:#x};',
@@ -295,7 +424,26 @@ def main():
                     'static const uintptr_t map_slots[] = {'+','.join(f'{mapped(names[n]):#x}ULL' for n in maps)+'};',
                     'static const uintptr_t hook_sites[] = {'+','.join(f'{a:#x}ULL' for a in hook_addresses)+'};',
                     'static const unsigned char hook_original[][14] = {'+','.join('{'+','.join(str(v) for v in read(a,14))+'}' for a in hook_addresses)+'};']
-    (build/'commpage_abi.hpp').write_text('\n'.join(definitions)+'\n')
+    hook_names = hooks+['fixed_locator', '_mac_policy_register', 'vn_rename_return']
+    layout = table_layout(required, aliases, maps, hook_names)
+    table_values = dict(kernel_uuid=uuid, kernel_header=header_address,
+                        iosurface_header=int(iosurface_layout['header_address'], 0),
+                        iosurface_set_value=int(iosurface_layout['entry_address'], 0),
+                        symbols={n: mapped(names[n]) for n in required},
+                        alias_slots=[mapped(names[n]) for n in aliases], map_slots=[mapped(names[n]) for n in maps],
+                        hook_sites=hook_addresses, hook_original=[read(a, HOOK_BYTES) for a in hook_addresses])
+    (build/'commpage-table.bin').write_bytes(table_bytes(layout, table_values))
+    (build/'commpage-table-layout.json').write_text(json.dumps(layout, indent=1)+'\n')
+    # The table entries' reference values stay in the header, worded as before, in namespace ic_reference: the
+    # kext reads them only from IntelCommpage_table (IC_TABLE_REFERENCE is its initial contents).
+    in_table = {f'addr{n}' for n in required} | set(TABLE_DEFINITIONS)
+    name = lambda line: re.match(r'static (?:constexpr |const )\S+ (?:\S+ )?([A-Za-z_][A-Za-z0-9_]*)', line).group(1)  # noqa: E731
+    reference = [d for d in definitions if name(d) in in_table]
+    if {name(d) for d in reference} != in_table:
+        raise ValueError('IntelCommpage table definitions missing from the header')
+    header = [d for d in definitions if name(d) not in in_table]
+    header += ['namespace ic_reference {', *reference, '}', *table_header_lines(layout, table_values)]
+    (build/'commpage_abi.hpp').write_text('\n'.join(header)+'\n')
     here = Path(__file__).resolve().parent
     def run(*a): subprocess.run([str(v) for v in a], check=True)
     run('xcrun','clang++','-target','x86_64-apple-macos10.13','-std=c++17','-O2',
@@ -324,6 +472,8 @@ _IntelCommpage_map_exec:
     popq %rdx
     popq %rsi
     popq %rdi
+.globl _IntelCommpage_exec_prefix
+_IntelCommpage_exec_prefix:
     .byte '''+','.join(hex(v) for v in exec_prefix)+'''
     jmpq *_IntelCommpage_exec_resume(%rip)
 '''
@@ -332,6 +482,8 @@ _IntelCommpage_map_exec:
     assembly += '''
 .globl _IntelCommpage_fixed_locator
 _IntelCommpage_fixed_locator:
+.globl _IntelCommpage_fixed_prefix
+_IntelCommpage_fixed_prefix:
     .byte '''+','.join(hex(v) for v in fixed_prefix)+'''
     movabsq $'''+hex(args.fixed_beyond_max & ~1)+''', %rax
     testq %rax, %r8
@@ -376,11 +528,15 @@ _IntelCommpage_policy_register:
     popq %rdx
     popq %rsi
     popq %rdi
+.globl _IntelCommpage_register_prefix
+_IntelCommpage_register_prefix:
     .byte '''+','.join(hex(v) for v in register_prefix)+'''
     jmpq *_IntelCommpage_policy_resume(%rip)
 .globl _IntelCommpage_rename_return
 _IntelCommpage_rename_return:
     callq _IntelCommpage_rename_complete
+.globl _IntelCommpage_return_prefix
+_IntelCommpage_return_prefix:
     .byte '''+','.join(hex(v) for v in return_prefix)+'''
 '''
     # Donor profile_init's frame-setup prologue (no PC-relative operand), then

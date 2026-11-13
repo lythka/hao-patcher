@@ -13,14 +13,18 @@ EFI/OC/Kexts/IntelCommpage.kext), plus capture.json and commpage-table.json. Whi
 
 - binder: kc-binder computed them from KC, and they equal the row's bound artifact byte for byte (config.plist, every
   patch field and the capture) and the profile's patch sites and IntelCommpage bindings. Any difference refuses.
-  This is every image built today.
+  IntelCommpage's address table, written for KC, must equal the one the kext already holds. This is every image
+  built today: the installed files are the row's.
 - binder-only: repair_binding.py refused KC (a collection the row was not recorded for), and kc-binder bound it.
-  IntelCommpage.kext still has the collection addresses compiled in, so every collection-dependent line of HEADER
-  must equal what kc-binder computes for KC; otherwise this refuses and says which lines need a new IntelCommpage.
+  An IntelCommpage.kext with the load-time table (__DATA,__ic_table) gets KC's table written into its binary; the
+  lines of HEADER that are code facts rather than table entries (kcbind.CODE_LINES) must still equal what kc-binder
+  computes for KC. A kext from before the table has the collection addresses compiled in, so every
+  collection-dependent line of HEADER must equal KC's. Otherwise this refuses and names the lines.
 - row: no kc-binder recipe names KC's kernel (e.g. 26A428); the row's bound artifact is used as before.
 
-In every mode IntelCommpage.kext's files must be the row's, as the profile lists them. Exit status 1 with a message
-naming the check on any refusal; OUT is written only when every check passes.
+In every mode the row's IntelCommpage.kext files must be the ones the profile lists; only binder-only can change the
+installed binary, and only inside its table (the record's commpage_table says whether it did). Exit status 1 with a
+message naming the check on any refusal; OUT is written only when every check passes.
 """
 import argparse
 from datetime import datetime, timezone
@@ -33,6 +37,7 @@ import shutil
 import sys
 
 KEXT = 'EFI/OC/Kexts/IntelCommpage.kext'
+BINARY = 'Contents/MacOS/IntelCommpage'
 
 
 def sha(data):
@@ -108,7 +113,19 @@ def bind(stage, collection, row, profile_path, header_path, row_bound, out):
         raise Refused('kc-binder computed other repairs than the row holds')
     if plistlib.loads(config)['Kernel']['Add'] != reference['Kernel']['Add']:
         raise Refused('kc-binder writes another IntelCommpage Kernel.Add entry than the row')
-    header_bad = bad_rows(compare.abi_header(table, header.decode(), foundation))
+    header_rows = compare.abi_header(table, header.decode(), foundation)
+    header_bad = bad_rows(header_rows)
+    binary = (row/KEXT/BINARY).read_bytes()
+    load_time = foundation['find_table'](binary) is not None
+    if load_time:
+        # IntelCommpage reads its collection addresses from __DATA,__ic_table: write this BootKC's.
+        try:
+            stamped, table_data = kcbind.stamp(recipe, table, foundation, binary)
+        except kcbind.BindError as error:
+            raise Refused('IntelCommpage.kext table: %s' % error)
+        code_bad = bad_rows(row for row in header_rows if row[0].split()[-1] in kcbind.CODE_LINES)
+    else:
+        stamped, table_data, code_bad = binary, None, header_bad
     if row_bound:
         bound = Path(row_bound)
         if config != (bound/'EFI/OC/config.plist').read_bytes():
@@ -116,20 +133,28 @@ def bind(stage, collection, row, profile_path, header_path, row_bound, out):
         differ = bad_rows(compare.repairs(patches, capture, kc, bound))
         differ += bad_rows(compare.binding(patches, table, kc, profile))
         differ += header_bad
+        if stamped != binary:
+            differ.append('IntelCommpage table: this BootKC gives another table than the kext holds')
         if differ:
             raise Refused('kc-binder and the recorded repairs differ for this BootKC: ' + '; '.join(differ))
         if kext_files(bound) != kext_files(row):
             raise Refused('the bound IntelCommpage.kext differs from the row')
         mode = 'binder'
     else:
-        if header_bad:
-            raise Refused('IntelCommpage.kext was compiled for another collection layout; rebuild it for this '
-                          'BootKC (tools/kernel-foundation): ' + '; '.join(header_bad))
+        if code_bad:
+            raise Refused('IntelCommpage.kext was compiled for another collection %s; rebuild it for this '
+                          'BootKC (tools/kernel-foundation): %s' % ('kernel code' if load_time else 'layout',
+                                                                     '; '.join(code_bad)))
         mode = 'binder-only'
     out.mkdir(parents=True, exist_ok=False)
     (out/'EFI/OC').mkdir(parents=True)
     (out/'EFI/OC/config.plist').write_bytes(config)
     shutil.copytree(row/KEXT, out/KEXT, copy_function=shutil.copy2)
+    if stamped != binary:
+        (out/KEXT/BINARY).write_bytes(stamped)
+    record['commpage_table'] = dict(load_time=load_time, restamped=stamped != binary,
+                                    sha256=sha(table_data) if table_data else None,
+                                    kext_binary_sha256=dict(row=sha(binary), installed=sha(stamped)))
     capture_bytes = (json.dumps(capture, indent=2)+'\n').encode()
     (out/'capture.json').write_bytes(capture_bytes)
     (out/'commpage-table.json').write_text(json.dumps(table, indent=1)+'\n')
