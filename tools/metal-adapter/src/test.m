@@ -1,5 +1,6 @@
-// metal-adapter-test (x86_64): one compute kernel on the GPU, checked against a CPU reference.
+// metal-adapter-test (x86_64): one compute kernel on the GPU checked against a CPU reference, or one draw read back.
 //   metal-adapter-test KERNEL METALLIB      KERNEL = add1 | saxpy_long_name | source (MSL compiled at run time)
+//                                                  | render-color | render-texture | render-source (see run_render)
 // Whatever Metal the process links (/System/.../Metal) is used: OCLP's wrapper + MetalOld normally, the bundle's
 // Metal27 when DYLD_FRAMEWORK_PATH points at the bundle's fw/. Prints the Metal images loaded, the device, the
 // pipeline (threadExecutionWidth, maxTotalThreadsPerThreadgroup) and one line
@@ -136,7 +137,7 @@ static NSString *const kSource =
 static int run(char **argv);
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IOLBF, 0);
-  if (argc < 3) { fprintf(stderr, "usage: metal-adapter-test add1|saxpy_long_name|source METALLIB\n"); return 2; }
+  if (argc < 3) { fprintf(stderr, "usage: metal-adapter-test add1|saxpy_long_name|source|render-color|render-texture|render-source METALLIB\n"); return 2; }
   gKernel = argv[1];
   static char altstack[1 << 16]; stack_t ss = {.ss_sp = altstack, .ss_size = sizeof altstack};
   sigaltstack(&ss, NULL);
@@ -161,6 +162,117 @@ static int image_loaded(const char *needle) {
   for (uint32_t i = 0; i < _dyld_image_count(); i++) { const char *n = _dyld_get_image_name(i); if (n && strstr(n, needle)) return 1; }
   return 0;
 }
+static int compile_only(void) { const char *c = getenv("HAO_COMPILE_ONLY"); return c && *c; }
+
+// MTLStorageModeManaged and synchronizeResource: are deprecated in the macOS 27 SDK (no effect on Apple silicon); on
+// the Intel GPU they are the way to read a texture back.
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+// ---- render: one draw into a 64x64 RGBA8 texture, read back and checked pixel by pixel
+//   render-color    lib's tri_vertex + solid_fragment: the lower-left half triangle (px < py) in the constant colour
+//                   (setFragmentBytes), the rest the clear colour; the diagonal px == py is not checked
+//   render-texture  tri_vertex + tex_fragment: a triangle covering the target samples a 4x4 texture (nearest,
+//                   setFragmentTexture + setFragmentSamplerState): pixel (x, y) = texel (x / 16, y / 16)
+//   render-source   as render-color, with the shaders compiled from MSL at run time
+static NSString *const kRenderSource =
+  @"#include <metal_stdlib>\nusing namespace metal;\nstruct VOut { float4 pos [[position]]; };\n"
+   "vertex VOut src_vertex(device const float2 *pos [[buffer(0)]], uint vid [[vertex_id]]) {\n"
+   "  VOut o; o.pos = float4(pos[vid], 0.0f, 1.0f); return o; }\n"
+   "fragment float4 src_fragment(VOut in [[stage_in]], constant float4 &color [[buffer(0)]]) { return color; }\n";
+enum { RW = 64, RH = 64, TW = 4 };
+static void texel(unsigned x, unsigned y, uint8_t out[4]) {
+  out[0] = (uint8_t)(20 + 60 * x); out[1] = (uint8_t)(20 + 60 * y); out[2] = (uint8_t)(200 - 25 * (x + y)); out[3] = 255;
+}
+
+static int run_render(id<MTLDevice> dev, NSString *how, char **argv) {
+  const char *k = argv[1];
+  int tex = !strcmp(k, "render-texture"), src = !strcmp(k, "render-source");
+  if (!tex && !src && strcmp(k, "render-color")) return result("SETUP-ERROR", @"unknown render case");
+  NSError *e = nil;
+  id<MTLLibrary> lib = src ? [dev newLibraryWithSource:kRenderSource options:nil error:&e]
+                           : [dev newLibraryWithURL:[NSURL fileURLWithPath:@(argv[2])] error:&e];
+  fprintf(stderr, "[test] library %s error=%s\n", lib ? "OK" : "FAIL", e ? e.localizedDescription.UTF8String : "-");
+  if (!lib) return result("NO-LIBRARY", e.localizedDescription);
+  NSString *vn = src ? @"src_vertex" : @"tri_vertex", *fn = src ? @"src_fragment" : tex ? @"tex_fragment" : @"solid_fragment";
+  id<MTLFunction> vf = [lib newFunctionWithName:vn], ff = [lib newFunctionWithName:fn];
+  if (!vf || !ff) return result("NO-LIBRARY", [NSString stringWithFormat:@"no function %@", vf ? fn : vn]);
+  MTLRenderPipelineDescriptor *pd = [MTLRenderPipelineDescriptor new];
+  pd.vertexFunction = vf; pd.fragmentFunction = ff;
+  pd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA8Unorm;
+  e = nil;
+  id<MTLRenderPipelineState> pso = [dev newRenderPipelineStateWithDescriptor:pd error:&e];
+  print_images("pipeline");
+  if (!pso) return result("NO-PIPELINE", e.localizedDescription);
+  fprintf(stderr, "[test] pipeline OK class=%s\n", class_getName([(id)pso class]));
+  NSString *props = [NSString stringWithFormat:@"device=\"%@\" via=%@ pipeline=%s", dev.name, how, class_getName([(id)pso class])];
+  if (compile_only()) return result("COMPILE-OK", props);
+
+  MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:RW height:RH mipmapped:NO];
+  td.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead; td.storageMode = MTLStorageModeManaged;
+  id<MTLTexture> target = [dev newTextureWithDescriptor:td];
+  if (!target) return result("GPU-ERROR", [props stringByAppendingString:@" no render target"]);
+  id<MTLTexture> st = nil; id<MTLSamplerState> ss = nil;
+  if (tex) {
+    MTLTextureDescriptor *sd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:TW height:TW mipmapped:NO];
+    sd.usage = MTLTextureUsageShaderRead; sd.storageMode = MTLStorageModeManaged;
+    st = [dev newTextureWithDescriptor:sd];
+    uint8_t px[TW * TW * 4];
+    for (unsigned y = 0; y < TW; y++) for (unsigned x = 0; x < TW; x++) texel(x, y, px + (y * TW + x) * 4);
+    [st replaceRegion:MTLRegionMake2D(0, 0, TW, TW) mipmapLevel:0 withBytes:px bytesPerRow:TW * 4];
+    MTLSamplerDescriptor *smp = [MTLSamplerDescriptor new];
+    smp.minFilter = smp.magFilter = MTLSamplerMinMagFilterNearest;
+    smp.sAddressMode = smp.tAddressMode = MTLSamplerAddressModeClampToEdge;
+    ss = [dev newSamplerStateWithDescriptor:smp];
+    if (!st || !ss) return result("GPU-ERROR", [props stringByAppendingString:@" no texture or sampler"]);
+  }
+  id<MTLCommandQueue> q = [dev newCommandQueue];
+  if (!q) return result("GPU-ERROR", [props stringByAppendingString:@" no command queue"]);
+  MTLRenderPassDescriptor *rp = [MTLRenderPassDescriptor renderPassDescriptor];
+  rp.colorAttachments[0].texture = target;
+  rp.colorAttachments[0].loadAction = MTLLoadActionClear;
+  rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+  rp.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 1.0, 1.0);  // (0, 0, 255, 255)
+  id<MTLCommandBuffer> cb = [q commandBuffer];
+  id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:rp];
+  [enc setRenderPipelineState:pso];
+  static const float half[6] = {-1, -1, 1, -1, -1, 1}, full[6] = {-1, -1, 3, -1, -1, 3};
+  [enc setVertexBytes:tex ? full : half length:sizeof half atIndex:0];
+  const float color[4] = {1.0f, 0.2f, 0.6f, 1.0f};                           // (255, 51, 153, 255)
+  if (tex) { [enc setFragmentTexture:st atIndex:0]; [enc setFragmentSamplerState:ss atIndex:0]; }
+  else [enc setFragmentBytes:color length:sizeof color atIndex:0];
+  [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+  [enc endEncoding];
+  id<MTLBlitCommandEncoder> bl = [cb blitCommandEncoder];
+  [bl synchronizeResource:target];
+  [bl endEncoding];
+  [cb commit];
+  [cb waitUntilCompleted];
+  fprintf(stderr, "[test] command buffer status=%ld error=%s\n", (long)cb.status, cb.error ? cb.error.description.UTF8String : "-");
+  if (cb.status != MTLCommandBufferStatusCompleted || cb.error)
+    return result("GPU-ERROR", [NSString stringWithFormat:@"%@ cbstatus=%ld error=\"%@\"", props, (long)cb.status, cb.error.localizedDescription]);
+
+  static uint8_t out[RW * RH * 4];
+  [target getBytes:out bytesPerRow:RW * 4 fromRegion:MTLRegionMake2D(0, 0, RW, RH) mipmapLevel:0];
+  NSUInteger bad = 0, checked = 0, fx = 0, fy = 0, inside = 0; int maxd = 0; uint8_t got[4] = {0}, want0[4] = {0};
+  for (unsigned y = 0; y < RH; y++) for (unsigned x = 0; x < RW; x++) {
+    uint8_t want[4];
+    if (tex) texel(x / (RW / TW), y / (RH / TW), want);
+    else if (x == y) continue;  // on the triangle's edge: either colour is right
+    else if (x < y) { want[0] = 255; want[1] = 51; want[2] = 153; want[3] = 255; inside++; }
+    else { want[0] = 0; want[1] = 0; want[2] = 255; want[3] = 255; }
+    const uint8_t *p = out + (y * RW + x) * 4; int d = 0;
+    for (int c = 0; c < 4; c++) { int dc = abs((int)p[c] - (int)want[c]); if (dc > d) d = dc; }
+    checked++;
+    if (d > maxd) maxd = d;
+    if (d > 1) { if (!bad) { fx = x; fy = y; memcpy(got, p, 4); memcpy(want0, want, 4); } bad++; }
+  }
+  fprintf(stderr, "[test] pixel(0,63)=%u,%u,%u,%u pixel(63,0)=%u,%u,%u,%u\n", out[(63 * RW) * 4], out[(63 * RW) * 4 + 1],
+          out[(63 * RW) * 4 + 2], out[(63 * RW) * 4 + 3], out[63 * 4], out[63 * 4 + 1], out[63 * 4 + 2], out[63 * 4 + 3]);
+  NSString *check = [NSString stringWithFormat:@"%@ checked=%lu bad=%lu maxdiff=%d%@", props, (unsigned long)checked,
+                     (unsigned long)bad, maxd, tex ? @"" : [NSString stringWithFormat:@" inside=%lu", (unsigned long)inside]];
+  if (bad) return result("FAIL", [check stringByAppendingFormat:@" first_bad=%lu,%lu got=%u,%u,%u,%u want=%u,%u,%u,%u",
+                                  (unsigned long)fx, (unsigned long)fy, got[0], got[1], got[2], got[3], want0[0], want0[1], want0[2], want0[3]]);
+  return result("PASS", check);
+}
 
 static int run(char **argv) {
   // HAO_EXPECT=adapter|control: refuse to report a result from the wrong Metal (e.g. DYLD_* stripped on the way)
@@ -181,6 +293,7 @@ static int run(char **argv) {
           (unsigned long)dev.maxThreadsPerThreadgroup.height, (unsigned long)dev.maxThreadsPerThreadgroup.depth);
   if ([(id)dev respondsToSelector:sel_registerName("llvmVersion")])
     fprintf(stderr, "[test] device llvmVersion %ld\n", (long)((NSInteger (*)(id, SEL))objc_msgSend)((id)dev, sel_registerName("llvmVersion")));
+  if (!strncmp(argv[1], "render-", 7)) return run_render(dev, how, argv);
 
   NSError *e = nil;
   id<MTLLibrary> lib = nil; NSString *fname = @(argv[1]);
@@ -202,7 +315,7 @@ static int run(char **argv) {
           class_getName([(id)pso class]), (unsigned long)tew, (unsigned long)maxT);
   NSString *props = [NSString stringWithFormat:@"device=\"%@\" via=%@ threadExecutionWidth=%lu maxTotalThreadsPerThreadgroup=%lu",
                      dev.name, how, (unsigned long)tew, (unsigned long)maxT];
-  if (getenv("HAO_COMPILE_ONLY")) return result("COMPILE-OK", props);
+  if (compile_only()) return result("COMPILE-OK", props);
 
   NSUInteger tg = 64; while (tg > 1 && tg > maxT) tg >>= 1;
   id<MTLCommandQueue> q = [dev newCommandQueue];

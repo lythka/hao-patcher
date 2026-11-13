@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """make.py: build the Metal27 adapter's laptop test bundle, and the host replay runtime it is tested against.
 
-  make.py bundle OUT --cache DIR [--template FILE] [--tar]
+  make.py bundle OUT --cache DIR --metalold FILE [--template FILE] [--tar]
       OUT/metal27-adapter-test/   the bundle (copy it to the laptop as the tarball, never with scp -r)
       OUT/metal27-adapter-test.tgz (+ .sha256) with --tar
       OUT/work/                   intermediates (the unsigned Metal cut, cache-dylib's report and check, AIR)
   make.py host-runtime OUT --from RT [--laptop-paths]
       a host replay runtime for the adapter, derived from a cache/shaders replay runtime RT (see README)
-  make.py inputs --cache DIR [--template FILE]
+  make.py inputs --cache DIR [--metalold FILE] [--template FILE]
       only check the inputs against inputs.json
 
 Inputs (all read-only, each checked against inputs.json before use; nothing Apple's is in this repository):
   --cache DIR       the 26B131 x86_64 dyld cache folder (the Rosetta cryptex of the 26B131 IPSW, mounted)
+  --metalold FILE   OCLP's MetalOld.dylib (13.2.1-25): abi.py reads its descriptor struct encodings and 27's from
+                    the Metal cut and writes OUT/work/layouts.inc, the shim's translation table (generated here,
+                    never committed: it carries Apple's private type encodings)
   CACHE_DYLIB       hao-tools' tools/cache-dylib (a hao-tools checkout next to this repository unless set)
   --template FILE   optional: the captured MetalOld type-7 request r2 shipped; without it the bundle gets the
                     template built from the framing in inputs.json (same requests on the wire, see README)
@@ -42,7 +45,8 @@ SIGNED = ['bin/metal-adapter-test', 'bin/q2log.dylib', 'fw/Metal.framework/Versi
 MANIFEST = ['bin/metal-adapter-test', 'bin/q2log.dylib', 'fw/Metal.framework/Versions/A/libHaoMetalShim.dylib',
             'fw/Metal.framework/Versions/A/Metal', 'fw/MTLCompiler.framework/Versions/32023/MTLCompiler',
             'fw/MTLCompiler.framework/Versions/32024/MTLCompiler', 'lib/downgrade-template.req7',
-            'lib/kernels-11.metallib', 'lib/kernels-27.metallib', 'run.sh']
+            'lib/kernels-11.metallib', 'lib/kernels-27.metallib', 'lib/render-11.metallib', 'lib/render-27.metallib',
+            'run.sh']
 
 
 def sha(path):
@@ -58,7 +62,7 @@ def run(*cmd, **kw):
     return subprocess.run([str(c) for c in cmd], check=True, **kw)
 
 
-def check_inputs(cache, template=None):
+def check_inputs(cache, template=None, metalold=None):
     """Refuse unless every input is the file inputs.json names. Returns the cache-dylib directory."""
     want = INPUTS['x86_64_cache']
     for name, digest in want['files'].items():
@@ -76,6 +80,10 @@ def check_inputs(cache, template=None):
                              'or set CACHE_DYLIB')
         if sha(p) != digest:
             raise SystemExit(f'{p}: not hao-tools {cd["commit"]} ({cd["revision"]}); sha256 {sha(p)}, expected {digest}')
+    if metalold:
+        got = sha(metalold)
+        if got != INPUTS['metalold']['sha256']:
+            raise SystemExit(f'MetalOld {metalold}: sha256 {got}, expected {INPUTS["metalold"]["sha256"]}')
     if template:
         got = sha(template)
         if got != INPUTS['downgrade_template']['captured_sha256']:
@@ -91,11 +99,11 @@ def template_bytes():
     return bytes.fromhex(t['framing_hex']) + bytes(t['placeholder_module_size'])
 
 
-def build_bundle(out, cache, template=None, tar=False):
+def build_bundle(out, cache, metalold, template=None, tar=False):
     out = Path(out).resolve()
     if out.exists():
         raise SystemExit(f'{out} exists; give a new folder')
-    cd = check_inputs(cache, template)
+    cd = check_inputs(cache, template, metalold)
     b, w = out / BUNDLE, out / 'work'
     md = b / 'fw/Metal.framework/Versions/A'
     for d in (w, b / 'bin', b / 'lib', b / 'src', md, *(b / f'fw/MTLCompiler.framework/Versions/{v}' for v in (32023, 32024))):
@@ -116,10 +124,12 @@ def build_bundle(out, cache, template=None, tar=False):
     if errors:
         raise SystemExit(f'check.py: {len(errors)} errors in the Metal cut')
 
-    # 2. shim (re-exported by Metal27; does not link Metal)
+    # 2. shim (re-exported by Metal27; does not link Metal), with the descriptor layout table generated from
+    #    MetalOld and the Metal cut (abi.py)
+    run(sys.executable, '-I', HERE / 'abi.py', 'layouts', metalold, w / 'Metal27.cut', '--out', w / 'layouts.inc')
     run(*CC, '-dynamiclib', '-install_name', '@loader_path/libHaoMetalShim.dylib', '-compatibility_version', '1.0',
-        '-current_version', '1.0', f'-DMETAL27_UUID="{uuid}"', f'-I{SRC}', SRC / 'shim.c', '-o',
-        md / 'libHaoMetalShim.dylib', '-lobjc')
+        '-current_version', '1.0', f'-DMETAL27_UUID="{uuid}"', f'-I{w}', f'-I{SRC}', SRC / 'shim.c', '-o',
+        md / 'libHaoMetalShim.dylib', '-lobjc', '-framework', 'CoreFoundation')
     # 3. MTLCompiler stand-in, at the two paths 27's Metal dlopens
     for v in (32023, 32024):
         run(*CC, '-dynamiclib', '-install_name', f'{MTLCOMPILER}/{v}/MTLCompiler', SRC / 'standin.c', '-o',
@@ -128,11 +138,17 @@ def build_bundle(out, cache, template=None, tar=False):
     run(*CC, '-fobjc-arc', '-framework', 'Foundation', '-framework', 'Metal', '-framework', 'IOKit', SRC / 'test.m',
         '-o', b / 'bin/metal-adapter-test')
     run(*CC, '-dynamiclib', '-install_name', '@loader_path/q2log.dylib', SRC / 'q2log.c', '-o', b / 'bin/q2log.dylib')
-    # 5. kernels: 27.2 default target (what 27's own metallibs look like) and macOS 11 target (older AIR)
-    run('xcrun', 'metal', '-c', SRC / 'kernels.metal', '-o', w / 'kernels-27.air')
-    run('xcrun', 'metallib', w / 'kernels-27.air', '-o', b / 'lib/kernels-27.metallib')
-    run('xcrun', 'metal', '-mmacos-version-min=11.0', '-c', SRC / 'kernels.metal', '-o', w / 'kernels-11.air')
-    run('xcrun', 'metallib', w / 'kernels-11.air', '-o', b / 'lib/kernels-11.metallib')
+    #    host only, never in the bundle: the same program for the r38 replay runtime's MetalOld (host-control.sh)
+    (w / 'host').mkdir()
+    run(*CC, '-fobjc-arc', '-DHOST_R38_EXPORTS', '-framework', 'Foundation', '-framework', 'Metal', '-framework', 'IOKit',
+        SRC / 'test.m', '-o', w / 'host/metal-adapter-test-r38')
+    run('codesign', '-f', '-s', '-', w / 'host/metal-adapter-test-r38')
+    # 5. kernels and render shaders: 27.2 default target (what 27's own metallibs look like) and macOS 11 target
+    for src in ('kernels', 'render'):
+        run('xcrun', 'metal', '-c', SRC / f'{src}.metal', '-o', w / f'{src}-27.air')
+        run('xcrun', 'metallib', w / f'{src}-27.air', '-o', b / f'lib/{src}-27.metallib')
+        run('xcrun', 'metal', '-mmacos-version-min=11.0', '-c', SRC / f'{src}.metal', '-o', w / f'{src}-11.air')
+        run('xcrun', 'metallib', w / f'{src}-11.air', '-o', b / f'lib/{src}-11.metallib')
     if template:
         shutil.copyfile(template, b / 'lib/downgrade-template.req7')
     else:
@@ -153,9 +169,10 @@ def build_bundle(out, cache, template=None, tar=False):
     os.chmod(b / 'run.sh', 0o755)
     shutil.copyfile(HERE / 'README.md', b / 'README.md')
     for p in sorted(SRC.iterdir()):
-        if p.is_file():
+        if p.is_file() and p.name != 'layouts.inc':
             shutil.copyfile(p, b / 'src' / p.name)
-    for p in ('make.py', 'inputs.json'):
+    shutil.copyfile(w / 'layouts.inc', b / 'src' / 'layouts.inc')   # the bundle never leaves this machine and the laptop
+    for p in ('make.py', 'inputs.json', 'abi.py'):
         shutil.copyfile(HERE / p, b / 'src' / p)
     (b / 'MANIFEST.sha256').write_text(''.join(f'{sha(b / f)}  {f}\n' for f in MANIFEST))
     print('built', b, file=sys.stderr)
@@ -215,6 +232,7 @@ def main(argv=None):
     b = sub.add_parser('bundle')
     b.add_argument('out')
     b.add_argument('--cache', required=True)
+    b.add_argument('--metalold', required=True)
     b.add_argument('--template')
     b.add_argument('--tar', action='store_true')
     h = sub.add_parser('host-runtime')
@@ -223,14 +241,15 @@ def main(argv=None):
     h.add_argument('--laptop-paths', action='store_true')
     i = sub.add_parser('inputs')
     i.add_argument('--cache', required=True)
+    i.add_argument('--metalold')
     i.add_argument('--template')
     a = ap.parse_args(argv)
     if a.cmd == 'bundle':
-        build_bundle(a.out, a.cache, a.template, a.tar)
+        build_bundle(a.out, a.cache, a.metalold, a.template, a.tar)
     elif a.cmd == 'host-runtime':
         host_runtime(a.out, a.rt, a.laptop_paths)
     else:
-        print('inputs OK; cache-dylib', check_inputs(a.cache, a.template))
+        print('inputs OK; cache-dylib', check_inputs(a.cache, a.template, a.metalold))
 
 
 if __name__ == '__main__':

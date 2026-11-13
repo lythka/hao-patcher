@@ -1,5 +1,7 @@
 #!/bin/zsh
 # Laptop run of the Metal27 adapter test (MacBookPro9,2, Golden Gate 26B131 image). As the logged-in user, no root.
+# r3: compute (as r2) plus offscreen render: a constant-colour triangle, a textured triangle and a source-compiled
+# triangle, drawn into a 64x64 texture and read back pixel by pixel (src/test.m, run_render).
 # Changes nothing on the system: every test process runs under sandbox-exec with all file writes denied except into
 # this run's results folder; nothing is copied, swapped or installed; the OCLP files are only read.
 # Usage: ./run.sh            -> results/<timestamp>/ (summary.txt first)
@@ -87,6 +89,9 @@ run_case control-saxpy           saxpy_long_name kernels-27.metallib HAO_EXPECT=
 run_case control-source          source          kernels-27.metallib HAO_EXPECT=control
 run_case control-11-add1         add1            kernels-11.metallib HAO_EXPECT=control
 run_case control-11-saxpy        saxpy_long_name kernels-11.metallib HAO_EXPECT=control
+run_case control-render-color    render-color    render-27.metallib  HAO_EXPECT=control
+run_case control-render-texture  render-texture  render-27.metallib  HAO_EXPECT=control
+run_case control-render-source   render-source   render-27.metallib  HAO_EXPECT=control
 if (( missing )) && [[ -z ${HAO_RUN_ALL:-} ]]; then  # HAO_RUN_ALL=1: host plumbing test only
   say "adapter runs SKIPPED: an OCLP file they use is missing (see above)"
 else
@@ -96,6 +101,14 @@ else
   run_case adapter-source        source          kernels-27.metallib $ADAPTER $FLIP
   run_case adapter-11-add1       add1            kernels-11.metallib $ADAPTER $FLIP
   run_case adapter-11-saxpy      saxpy_long_name kernels-11.metallib $ADAPTER $FLIP
+  say "---- adapter, render: offscreen draws read back (the shim hands the driver MetalOld-layout descriptor structs)"
+  run_case adapter-render-color      render-color   render-27.metallib $ADAPTER $FLIP
+  run_case adapter-render-texture    render-texture render-27.metallib $ADAPTER $FLIP
+  run_case adapter-render-source     render-source  render-27.metallib $ADAPTER $FLIP
+  run_case adapter-11-render-color   render-color   render-11.metallib $ADAPTER $FLIP
+  run_case adapter-11-render-texture render-texture render-11.metallib $ADAPTER $FLIP
+  say "---- A/B: render without the descriptor translation (expected: the driver misreads 27's structs, CRASH)"
+  run_case adapter-nolayouts-render-color render-color render-27.metallib $ADAPTER $FLIP HAO_METAL27_LAYOUTS=0
   say "---- adapter, device created by hand (driver bundle + -initWithAcceleratorPort:)"
   run_case adapter-manual-add1   add1            kernels-27.metallib $ADAPTER $FLIP HAO_DEVICE=manual
   run_case adapter-manual-saxpy  saxpy_long_name kernels-27.metallib $ADAPTER $FLIP HAO_DEVICE=manual
@@ -129,14 +142,23 @@ for f in $(find $HOME/Library/Logs/DiagnosticReports -newer $R/.start -type f 2>
   if pass adapter-add1 && pass adapter-saxpy; then ad=PASS
   elif pass adapter-manual-add1 && pass adapter-manual-saxpy; then ad=PASS-MANUAL; else ad=FAIL; fi
   if pass xpc-add1 && pass xpc-saxpy; then xpc=PASS; else xpc=FAIL; fi
+  if pass control-render-color && pass control-render-texture; then rctl=PASS; else rctl=FAIL; fi
+  if pass adapter-render-color && pass adapter-render-texture; then rad=PASS; else rad=FAIL; fi
   print "control (system Metal = OCLP wrapper + MetalOld): $ctl"
   print "adapter (27.2.1 Metal, in-process OCLP 31001 + 3802): $ad"
   print "xpc variant (27.2.1 Metal, system MTLCompilerService, no flip): $xpc"
+  print "render control (system Metal): $rctl"
+  print "render adapter (27.2.1 Metal): $rad"
   case "$ctl/$ad" in
     PASS/PASS) print "=> YES: macOS 27's own Metal ran both kernels on the HD 4000 with correct results (compute).";;
     PASS/PASS-MANUAL) print "=> YES with a hand-made device: compile and execution work; MTLCreateSystemDefaultDevice did not give the device (see adapter-add1).";;
     PASS/FAIL) print "=> NOT YET: the system's own path works here, the adapter does not; read adapter-*/log.txt.";;
     *) print "=> INCONCLUSIVE: the control failed, so this image's Metal does not run these kernels either.";;
+  esac
+  case "$rctl/$rad" in
+    PASS/PASS) print "=> RENDER YES: macOS 27's own Metal drew a solid and a textured triangle on the HD 4000; every pixel read back matched.";;
+    PASS/FAIL) print "=> RENDER NOT YET: the system's own path draws here, the adapter does not; read adapter-render-*/log.txt.";;
+    *) print "=> RENDER INCONCLUSIVE: the control failed, so this image's Metal does not draw these either.";;
   esac
   print "\nnothing-written check: $R/writes-check.txt"
 } > $R/summary.txt

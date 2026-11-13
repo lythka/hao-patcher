@@ -30,6 +30,10 @@
       "dsc.py": "724e63e109ab6aa1f3d4ad47f010c5795540ca27b49806e88ae63e7fa0e3ad77"
     }
   },
+  "metalold": {
+    "what": "OCLP's MetalOld.dylib, payload 13.2.1-25 of the OCLP hardware artifact (System/Library/Frameworks/Metal.framework/Versions/A/MetalOld.dylib); abi.py reads its descriptor struct encodings",
+    "sha256": "90a1ff7a995b3ece3e7f0779676d3382a0614cc5c2652692250556d292f6e201"
+  },
   "downgrade_template": {
     "what": "MetalOld's type-7 (AIR downgrade) request for OCLP's 31001 MTLCompiler, 13.2.1 framing: header and name 'add1', then an 8-byte placeholder module (the stand-in replaces name and module)",
     "captured_sha256": "ce4640d4e1f3fba469a91c290a08ee06f5d48d2b886524c1e1d6676a422cd5aa",
