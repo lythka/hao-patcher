@@ -10,17 +10,34 @@ Gate's ARM-only programs on the Intel CPU.
 
 ![macOS 27 desktop and Control Center on an Intel Mac](docs/images/desktop-intel.jpg)
 
-[Gallery](docs/gallery.md) · [Status](docs/progress.md) · [Building](docs/building.md) ·
+[Gallery](docs/gallery.md) · [Progress](docs/progress.md) · [Building](docs/building.md) ·
 [Buy me a coffee](https://buymeacoffee.com/lythka)
 
 ## Status
 
 Experimental. Developed and tested on a 2012 13-inch MacBook Pro (MacBookPro9,2: Ivy Bridge, Intel HD 4000); other
-Intel Macs are untested.
+Intel Macs are untested. Tested with macOS 27.2.1 (26B131); "next image" means built, not yet tested on hardware.
 
-The desktop, accelerated graphics, Wi-Fi, audio, Bluetooth and most built-in apps work, including Safari, Maps,
-Weather, Photos and Stocks. Known issues include a Control Center crash, slow first login and the lock-screen
-wallpaper. [Status](docs/progress.md) has the full list, what's new and every fix.
+| Area | State | Notes |
+|---|---|---|
+| Startup and Setup | Works | Screen on about 45 s after the kernel starts; Setup, account creation and automatic login. First login is slow (next image preloads the account template) |
+| Desktop | Works | Menu bar, Dock, Finder, Liquid Glass, login window, lock screen. The lock screen can lose the wallpaper |
+| Graphics | Works | Accelerated HD 4000 Metal, argument buffers and ASTC textures; hardware video decoding (YouTube 1080p) |
+| Wi-Fi | Works | Joining from Setup or Settings; remembered networks join automatically, also at startup |
+| Audio, input, Bluetooth | Works | Speakers, brightness, keyboard, trackpad, Bluetooth; AirPlay displays are discovered |
+| Control Center and widgets | Broken | Regression in recent hao-runtime builds (worked up to 7415a0b); being fixed |
+| Safari | Works | Browsing, YouTube, WebGPU. WebGL is in progress |
+| Maps | Works | Tiles, search, place cards, location, satellite, 3D globe and buildings |
+| Weather | Works | Including its maps (the next image installs this fix) |
+| Photos | Works | Import, thumbnails, full-size view. Live Text is in progress |
+| SceneKit | Works | 3D scenes with materials, shadows and reflections; Preview opens scenes |
+| Other apps | Works | Calendar, Terminal, System Settings, Preview, App Store, Books, Calculator, Automator, Stocks, News; Home and Freeform open |
+| Spotlight | Partial | Opens and searches; app results rank below web results (the next image lets it download its data) |
+| AirDrop | Partial | The next image stops the mDNSResponder crash; finding nearby devices is not confirmed |
+| ARM-only programs | Works | Run on the Intel CPU through hao-runtime, at about 1/2 to 1/3 of native speed |
+| Sleep and updates | Not tested | |
+
+[Progress](docs/progress.md) has the detailed lists, what's new and every fix.
 
 ## Risks
 
