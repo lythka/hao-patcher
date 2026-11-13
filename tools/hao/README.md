@@ -13,7 +13,7 @@ happened, why it matters, what was left untouched and what to do next (exit 1).
 
 ```sh
 hao detect [--out mac.json]                     # on the target: model, board id, GPU/Wi-Fi/audio, patch sets, packs
-hao fetch RELEASE.json [--cache DIR] [--verify] [--host-check]
+hao fetch RELEASE.json [--cache DIR] [--verify] [--host-check] [--assets-from DIR|URL]
 hao verify [ROOT] [--manifests OVERLAY_DIR|MANIFEST]...
 hao build-image REPO --model MacBookPro9,2 [--overlay-system ROOT] [--dry-run]
 sudo hao build-disk /dev/diskN --model MacBookPro9,2 [--dry-run]     # output (b): an external SSD
@@ -26,7 +26,9 @@ hao install /dev/diskN [--dry-run]              # on the target, from the stick'
   proven laptop's devices only; an unknown GPU, Wi-Fi or audio device is named in a note). Packs follow from
   `packs/*.json` (`pipeline/patches.py select_packs`); `any_intel` packs only on an Intel Mac. The profile file is what
   `--profile` takes; `--model` builds the same profile from the recorded one without the Mac.
-- **fetch** runs `tools/acquire` (content-addressed cache, default `~/Library/Caches/hao`); `--verify` checks only,
+- **fetch** runs `tools/acquire` on a release.json: its downloads (Apple's and third-party files) and its assets (our
+  own files and archives) go into the content-addressed cache (default `~/Library/Caches/hao`), each checked by size
+  and sha256. `--verify` checks only, `--assets-from DIR|URL` takes the assets from a staged folder or mirror first,
   `--host-check` runs `tools/acquire/host-check` first.
 - **verify** (`src/verify.py`, read-only) checks every file of the pack manifests (sha256, mode, owner, flags) under
   ROOT (default `/`); manifests come from overlay folders or `ROOT/private/var/db/hao/manifests`.

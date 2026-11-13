@@ -75,7 +75,7 @@ and reused between builds, keyed on their inputs and on the builder's tools.
 | Command | What it does | State |
 |---|---|---|
 | `hao detect` | the Mac, its devices and packs | works |
-| `hao fetch` / `hao verify` | pinned downloads; checks an installed system against its manifests | works |
+| `hao fetch` / `hao verify` | a release's pinned downloads and assets; checks an installed system against its manifests | works |
 | `hao create-installer` | on any Mac: download, unpack, prepare packs, write the USB stick | checks and plan only; writing the stick is not built |
 | `hao install` | on the target, from the stick: lay out the disk, copy macOS, add Intel support, apply packs, link the kernel, seal, make it bootable | builds from the stick's kit in a Recovery that relaxes SIP and AMFI; host tests only, not yet run onto a real disk |
 | `hao build-disk` | the same assembly onto an external SSD | stages the kit and builds onto the SSD, under the same conditions as `install`; host tests only |

@@ -6,6 +6,7 @@ own servers on the user's Mac.
 
 ```sh
 python3.14 -I tools/acquire/acquire fetch release.json --cache CACHE      # download what is missing
+python3.14 -I tools/acquire/acquire fetch release.json --cache CACHE --assets-from STAGED_DIR   # assets from a folder
 python3.14 -I tools/acquire/acquire verify release.json --cache CACHE     # all present and intact?
 python3.14 -I tools/acquire/acquire path release.json NAME --cache CACHE  # where a file is
 ```
@@ -19,7 +20,10 @@ python3.14 -I tools/acquire/acquire path release.json NAME --cache CACHE  # wher
 - **Output:** `--quiet`, the default (one line per file plus progress), or `--log json`.
 - **Dependencies:** the standard library only.
 
-Manifest (the `downloads` part of a `release.json`):
+Manifest: a `release.json` (`pipeline/release-cut --write`), or just its `downloads`. Its `downloads` are Apple's and
+third-party files, its `assets` our own (each named by its `file`); both are fetched and checked the same way. An entry
+without a URL is refused. `--assets-from DIR|URL` fetches the assets from that folder or URL prefix first (a staged
+release before upload, a mirror) and from their own URLs only when it lacks them.
 
 ```json
 {"downloads": [{"name": "macos-27.2.1-26B131-installer", "url": "https://…", "size": 14812043264,
@@ -30,7 +34,6 @@ Not done yet:
 
 - **Decoding and unpacking:** the pinned `ipsw` binary for AEA decoding and the prebuilt unpack tools.
 - **The host matrix:** which steps work on macOS 12, 13 and 14 and later, on Intel and Apple silicon.
-- **Real URLs and hashes:** `release cut` writes them (step 13).
 
 ## Host matrix
 
@@ -58,4 +61,5 @@ python3.14 -I -B -m unittest discover -s tools/acquire/tests      # includes hos
 
 The tests serve files from a local HTTP server and never touch the network. They cover a fetch, then reuse
 without a request; resuming from a partial file; a server that ignores ranges; a wrong file refused and a mirror
-used; a missing URL; a duplicate manifest entry; and the command line.
+used; a missing URL; a duplicate manifest entry; a release's downloads and assets; assets from a staged folder
+(file:// URLs), a changed staged asset refused, an entry without a URL; and the command line.
