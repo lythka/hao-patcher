@@ -1,7 +1,7 @@
-# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 9dce413).
-# Built from a clean 9dce413 tree, from a root that includes the App and OS cryptexes (their 26 programs are embedded by
-# golden-gate-userspace). Units u4.1; libhao B7F314C6; 963 embedded (0 DIFF), 965 of 969 AOT caches, dyld fixed.
-# Adds since 397b267: f66403c float-HFA stack fix; 9dce413 ControlCenter crash fix (an Optional over a guest spare-bit
-# multi-payload enum no longer drops the whole value's conversion).
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=2e3172bae541c9c350ca133dd42f60f0c5383b40aa207086b748304c55982ded
-fddb787fae48b5d1c505f41c2f81166985f41adbb86f67c7a9e1973449b037d7 store/artifacts/hao-runtime-26B131-20261113-9dce4138ddfa/payload
+# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 1de47eb).
+# Built from a clean 1de47eb tree, from a root that includes the App and OS cryptexes (their 26 programs are embedded by
+# golden-gate-userspace). Units u4.1; libhao 01FBCC1B; 963 embedded (0 DIFF), 965 of 969 AOT caches, dyld fixed.
+# Adds since 397b267: f66403c float-HFA stack fix; 9dce413 ControlCenter crash fix; 2b19233 ControlCenter GridSizes and
+# Displayable refusals; 1de47eb stub skeletons (embed/skeletons: stubs filled with no linker on the user's Mac).
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=9a2398ef4d644d4b250ee7af9b5c1610c2e3542395548e6c8d52654b5238b9da
+22aaf175d66f2354d35331fd4a672fbc7d066e45749a6acc090735e77c9781d1 store/artifacts/hao-runtime-26B131-20261113-1de47eb87a7f/payload

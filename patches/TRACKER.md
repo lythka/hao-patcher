@@ -29,10 +29,10 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-shader-caches | r14 | post | experiment | caches | x |  |  |  | **needs** | r14 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artif |
 | golden-gate-user-seed | r8 | post | experiment | caches | x |  |  |  | **needs** | r8 2026-11-13 Tests and README only: the seed chain includes golden-gate-user-template; README names it. seed. |
 | golden-gate-user-template | r4 | post | experiment |  | x |  |  |  | **needs** | r4 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
-| golden-gate-userspace | r70 | oclp-hook | experiment |  | x | x |  |  | **needs** | r70 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 9dce413 t |
+| golden-gate-userspace | r71 | oclp-hook | experiment |  | x | x |  |  | **needs** | r71 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 1de47eb t |
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
-| hao-opencore | r56 | post | experiment |  | x | x |  |  | **needs** | r56 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 9dce413 t |
-| hao-runtime | r74 | oclp-hook | experiment |  | x | x |  |  | **needs** | r74 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 9dce413 t |
+| hao-opencore | r57 | post | experiment |  | x | x |  |  | **needs** | r57 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 1de47eb t |
+| hao-runtime | r75 | oclp-hook | experiment |  | x | x |  |  | **needs** | r75 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 1de47eb t |
 | metal-compiler-compat | r5 | oclp-hook | experiment |  | x |  |  |  | **needs** | r5 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |
 | metalold-selectors | r7 | oclp-hook | product |  | x | x |  |  | ok (r3) | r7 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
