@@ -64,6 +64,22 @@ class Latest(unittest.TestCase):
                       'hao-runtime bbbbbbb', readme)
         self.assertNotIn('r5', open(os.path.join(self.top, 'patches', 'other', 'README.md')).read())
 
+    def test_validated_users_need_validation_again(self):
+        p = os.path.join(self.top, 'patches', 'user-a', 'patch.json')
+        json.dump({'revision': 4, 'inputs': ['hao_runtime'], 'validated': True, 'validated_revision': 3,
+                   'validated_digest': 'ab' * 32}, open(p, 'w'), indent=1)
+        self.art('hao-runtime-26B131-20261111-bbbbbbbbbbbb', 'bbbbbbb')
+        rc, _ = self.run_latest('hao_runtime', '26B131')
+        self.assertEqual(rc, 0)
+        pj = json.load(open(p))
+        self.assertEqual((pj['revision'], pj['validated']), (5, False))
+        self.assertNotIn('validated_revision', pj)
+        self.assertNotIn('validated_digest', pj)
+        readme = open(os.path.join(self.top, 'patches', 'user-a', 'README.md')).read()
+        self.assertIn('## Validation\nNEEDS VALIDATION: r5 moved an input row', readme)
+        self.assertIn('earlier evidence:\n\ny\n', readme)
+        self.assertNotIn('NEEDS VALIDATION', open(os.path.join(self.top, 'patches', 'user-b', 'README.md')).read())
+
     def test_up_to_date_changes_nothing(self):
         self.art('hao-runtime-26B131-20261110-aaaaaaaaaaaa', 'aaaaaaa')
         rc, out = self.run_latest('hao_runtime', '26B131')

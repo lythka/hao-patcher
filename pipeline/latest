@@ -9,7 +9,8 @@ Families (ROW: where its artifacts are, what counts as finished):
 
 The row file is found in pipeline/inputs/golden/BUILD, then pipeline/inputs/BUILD. When it already names the newest
 artifact nothing changes (exit 0). Otherwise: the row's path line is replaced and the commit and libhao tokens in its
-comment are refreshed; every patch whose patch.json inputs name the row gets revision + 1 and a "## Revisions" line;
+comment are refreshed; every patch whose patch.json inputs name the row gets revision + 1 and a "## Revisions" line
+(a validated patch becomes validated false with NEEDS VALIDATION, since what it installs changed);
 patches/TRACKER.md is regenerated. Nothing is committed: review, run `patches.py check` and the tests, then commit
 (CLAUDE.md). --dry-run prints the choice and the planned edits without writing.
 """
@@ -68,7 +69,18 @@ def bump(top, name, line, today):
     text = open(rd).read()
     if text.count('## Revisions\n') != 1:
         sys.exit('latest: %s README has no single "## Revisions" heading' % name)
-    open(rd, 'w').write(text.replace('## Revisions\n', '## Revisions\n- r%d %s %s\n' % (n, today, line), 1))
+    text = text.replace('## Revisions\n', '## Revisions\n- r%d %s %s\n' % (n, today, line), 1)
+    # a moved row changes what the patch installs: a boot test's proof of an earlier revision no longer covers it
+    pjtext = open(pj).read()
+    if re.search(r'"validated":\s*true', pjtext):
+        pjtext = re.sub(r'"validated":\s*true', '"validated": false', pjtext, count=1)
+        pjtext = re.sub(r',\s*"validated_(revision|digest)":\s*("[0-9a-f]*"|\d+)', '', pjtext)
+        open(pj, 'w').write(pjtext)
+        if '\n## Validation\n' in text:
+            head, rest = text.split('\n## Validation\n', 1)
+            text = head + '\n## Validation\nNEEDS VALIDATION: r%d moved an input row (%s); earlier evidence:\n\n' % (
+                n, line) + rest.lstrip('\n')
+    open(rd, 'w').write(text)
     return n
 
 
