@@ -1,0 +1,2 @@
+# root's LaunchServices store and auth.db of one 26B131 image, as its own lsd and authd wrote them in a builder boot (tools/first-boot-seeds/rootls collect). Not made yet: this path does not exist, so golden-gate-root-launchservices (optional, group boot-seeds) is skipped. Point it at the rootls folder made from the same image the posts run on.
+- store/artifacts/root-launchservices-26B131-not-made-yet

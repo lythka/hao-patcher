@@ -1,0 +1,270 @@
+#!/usr/bin/env python3
+"""rootls: root's LaunchServices store and authd's auth.db from a builder-run first boot of an image, as an artifact.
+
+    rootls collect DATA_ROOT --build BUILD --schema N [--source TEXT] [--out DIR]
+    rootls check ARTIFACT --build BUILD [--schema N] [--deny TEXT]... [--dump]
+
+collect reads a mounted, read-only Data volume of an image that has booted once (a builder boot: QEMU through
+tools/qemu-vm, stopped once lsd logged "set seeding complete", before any account exists) and copies exactly two
+things: root's store folder
+
+    private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/0/com.apple.LaunchServices.dv/*.csstore   -> ls/
+
+(uid 0's DARWIN_USER_DIR: the same path on every Mac) and private/var/db/auth.db (-> auth.db, any -wal folded in
+with sqlite3). Nothing else of that boot is read: its system keychain, Local KDC realm, logs, network and hardware
+state belong to that boot only and must never ship. It writes DIR/root-launchservices-BUILD-DATE-HASH12/ with
+build.json and SHA256SUMS (HASH12 = the first 12 hex of SHA256SUMS' SHA-256), refuses an existing folder, runs
+check on the result and prints the directory input row.
+
+check refuses an artifact that is not one store for this build: every .csstore must start with lsd's magic "bdsl" and
+carry schema N in its name (com.apple.LaunchServices-N-v2.csstore and optionally its SystemDataOnly- twin; N is what
+the image's own lsd logs as "lsd starting with schema version N", see bootcost), auth.db must pass integrity_check
+with config version 2 and rules, and no string in any file may name an account home (/Users/ other than /Users/Shared
+and State:/Users/ConsoleUser), a mount outside /System/Volumes (/Volumes/...: the builder's or the VM's), a test
+harness (local.testbench, local.testssh), or a --deny string. --dump also has this Mac's lsregister dump the store and
+requires the dump's "Seeded System Version" to name BUILD: lsregister silently dumps the running system's own
+database when it cannot read a store's schema, so any other header means this host cannot check the file (nothing of
+the dump is printed or kept).
+"""
+import argparse
+import datetime
+import hashlib
+import json
+import re
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+UNIT, REVISION = 'tools/first-boot-seeds/rootls', 1
+ROOT_LS = 'private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/0/com.apple.LaunchServices.dv'
+AUTH_DB = 'private/var/db/auth.db'
+STORE_RX = re.compile(r'^(SystemDataOnly-)?com\.apple\.LaunchServices-(\d+)-v2\.csstore$')
+MAGIC = b'bdsl'
+LSREGISTER = ('/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/'
+              'Versions/A/Support/lsregister')
+# A string that names something no shipped store may hold. Allowed look-alikes are matched first and removed.
+ALLOWED = [re.compile(rb'/Users/Shared\b'), re.compile(rb'State:/Users/ConsoleUser'), re.compile(rb'/System/Volumes/')]
+# A path names a folder starting with a letter or number: Apple's sandbox rules in the store ("^/Volumes/"
+# (uuid-regex-string) ...) and its path pool's bare "/Volumes/" are not paths.
+DENIED = [(re.compile(rb'(?<!\^)/Users/[A-Za-z0-9_][\w.-]*'), 'account home'),
+          (re.compile(rb'(?<!\^)/Volumes/[A-Za-z0-9][\w .+-]*'), 'mount outside /System/Volumes'),
+          (re.compile(rb'local\.test(bench|ssh)'), 'test harness')]
+STRING = re.compile(rb'[\x20-\x7e]{6,}')
+
+
+class Refused(Exception):
+    pass
+
+
+def sha_file(p):
+    h = hashlib.sha256()
+    with open(p, 'rb') as f:
+        for b in iter(lambda: f.read(1 << 20), b''):
+            h.update(b)
+    return h.hexdigest()
+
+
+def commit():
+    try:
+        here = Path(__file__).resolve().parent
+        rev = subprocess.run(['git', '-C', str(here), 'rev-parse', '--short', 'HEAD'], capture_output=True,
+                             text=True, check=True).stdout.strip()
+        dirty = subprocess.run(['git', '-C', str(here), 'status', '--porcelain', '--', '.'], capture_output=True,
+                               text=True, check=True).stdout.strip()
+        return rev, not dirty
+    except (OSError, subprocess.CalledProcessError):
+        return None, False
+
+
+def scan(data, extra=()):
+    """Denied strings in data: [(reason, string)], each distinct string once."""
+    hits, seen = [], set()
+    for m in STRING.finditer(data):
+        s = m.group(0)
+        for a in ALLOWED:
+            s = a.sub(b'', s)
+        for rx, why in DENIED + [(re.compile(re.escape(d.encode())), '--deny') for d in extra]:
+            for h in rx.finditer(s):
+                k = (why, h.group(0))
+                if k not in seen:
+                    seen.add(k)
+                    hits.append((why, h.group(0).decode('ascii', 'replace')))
+    return hits
+
+
+def fold_sqlite(src, dest):
+    """auth.db with its -wal (if any) folded in, as one file at dest, without writing next to src."""
+    with tempfile.TemporaryDirectory() as t:
+        t = Path(t)
+        for suffix in ('', '-wal', '-shm'):
+            p = Path(str(src) + suffix)
+            if p.exists():
+                shutil.copyfile(p, t / ('auth.db' + suffix))
+        con = sqlite3.connect(str(t / 'auth.db'))
+        try:
+            out = sqlite3.connect(str(dest))
+            con.backup(out)
+            out.close()
+        finally:
+            con.close()
+
+
+def check_auth(path):
+    con = sqlite3.connect('file:%s?immutable=1' % path, uri=True)
+    try:
+        ok = con.execute('PRAGMA integrity_check').fetchone()[0]
+        version = dict(con.execute('SELECT key, value FROM config').fetchall()).get('version')
+        rules = con.execute('SELECT count(*) FROM rules').fetchone()[0]
+    except sqlite3.DatabaseError as e:
+        raise Refused('auth.db: %s' % e)
+    finally:
+        con.close()
+    if ok != 'ok':
+        raise Refused('auth.db: integrity_check says %s' % ok)
+    if str(version) != '2':
+        raise Refused('auth.db: config version %r, authd 27 writes 2' % version)
+    if not rules:
+        raise Refused('auth.db: no rules')
+    return {'rules': rules, 'version': int(version)}
+
+
+def dump_header(store, build, lsregister=LSREGISTER):
+    """Have lsregister dump a copy of store; return the bundle count. Refuses when the dump is not of this store."""
+    with tempfile.TemporaryDirectory() as t:
+        copy = Path(t) / store.name
+        shutil.copyfile(store, copy)
+        p = subprocess.run([lsregister, '-dump', str(copy)], capture_output=True, text=True, timeout=600)
+        seeded, bundles = None, 0
+        for line in p.stdout.splitlines():
+            if seeded is None and line.startswith('Seeded System Version:'):
+                seeded = line.split(':', 1)[1].strip()
+            elif line.startswith('bundle id:'):
+                bundles += 1
+    if seeded is None or '(%s)' % build not in seeded:
+        raise Refused('%s: lsregister did not dump this store (its header names %r, not build %s): this host '
+                      'cannot read its schema' % (store.name, seeded, build))
+    return bundles
+
+
+def check(artifact, build, schema=None, deny=(), dump=False, lsregister=LSREGISTER):
+    """Refuse (Refused) or return the counts of an artifact folder (ls/ and auth.db)."""
+    artifact = Path(artifact)
+    ls = artifact / 'ls'
+    stores = sorted(p for p in ls.iterdir() if p.is_file()) if ls.is_dir() else []
+    if not stores:
+        raise Refused('%s: no ls/ store files' % artifact)
+    schemas, out = set(), {'stores': {}}
+    for p in stores:
+        m = STORE_RX.match(p.name)
+        if not m:
+            raise Refused('%s: not a LaunchServices store name' % p.name)
+        schemas.add(int(m.group(2)))
+        data = p.read_bytes()
+        if data[:4] != MAGIC:
+            raise Refused('%s: does not start with %r' % (p.name, MAGIC))
+        hits = scan(data, deny)
+        if hits:
+            raise Refused('%s: names %s' % (p.name, '; '.join('%s %r' % h for h in hits[:8])))
+        out['stores'][p.name] = {'size': len(data)}
+    if len(schemas) != 1:
+        raise Refused('stores of several schemas: %s' % sorted(schemas))
+    (found,) = schemas
+    if schema is not None and found != int(schema):
+        raise Refused('store schema %d, the image\'s lsd writes %s' % (found, schema))
+    if not any(STORE_RX.match(p.name).group(1) is None for p in stores):
+        raise Refused('no main store (com.apple.LaunchServices-%d-v2.csstore)' % found)
+    out['schema'] = found
+    auth = artifact / 'auth.db'
+    if not auth.is_file():
+        raise Refused('no auth.db')
+    hits = scan(auth.read_bytes(), deny)
+    if hits:
+        raise Refused('auth.db: names %s' % '; '.join('%s %r' % h for h in hits[:8]))
+    out['auth'] = check_auth(auth)
+    if dump:
+        main = next(p for p in stores if STORE_RX.match(p.name).group(1) is None)
+        out['dump_bundles'] = dump_header(main, build, lsregister)
+    meta = artifact / 'build.json'
+    if meta.is_file():
+        b = json.loads(meta.read_text()).get('build')
+        if b != build:
+            raise Refused('build.json is for %s, not %s' % (b, build))
+    return out
+
+
+def collect(data_root, build, schema, out_dir, source=None, today=None):
+    """Copy root's store and auth.db from data_root into a new artifact folder in out_dir; return its path."""
+    data_root, out_dir = Path(data_root), Path(out_dir)
+    src = data_root / ROOT_LS
+    files = sorted(p for p in src.iterdir() if p.is_file() and p.name.endswith('.csstore')) if src.is_dir() else []
+    if not files:
+        raise Refused('%s: no .csstore under %s (has that image booted until lsd finished seeding?)' % (data_root, ROOT_LS))
+    if not (data_root / AUTH_DB).is_file():
+        raise Refused('%s: no %s' % (data_root, AUTH_DB))
+    users = data_root / 'Users'
+    accounts = sorted(p.name for p in users.iterdir() if p.is_dir() and p.name not in ('Shared', 'Guest')
+                      and not p.name.startswith('.')) if users.is_dir() else []
+    if accounts:
+        raise Refused('%s has accounts (%s): collect before Setup makes one' % (data_root, ', '.join(accounts)))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix='.rootls-', dir=out_dir))
+    try:
+        (work / 'ls').mkdir()
+        skipped = sorted(p.name for p in src.iterdir() if p.name not in {f.name for f in files})
+        for p in files:
+            shutil.copyfile(p, work / 'ls' / p.name)
+        fold_sqlite(data_root / AUTH_DB, work / 'auth.db')
+        counts = check(work, build, schema)
+        rev, clean = commit()
+        date = (today or datetime.date.today()).isoformat()
+        record = {'unit': UNIT, 'revision': REVISION, 'commit': rev, 'clean': clean, 'date': date, 'build': build,
+                  'schema': counts['schema'], 'source': source, 'auth_rules': counts['auth']['rules'],
+                  'stores': counts['stores'], 'not_copied': skipped,
+                  'origin': 'generated: the image\'s own lsd and authd in a builder boot, no account, no harvest'}
+        (work / 'build.json').write_text(json.dumps(record, indent=1, sort_keys=True) + '\n')
+        rows = ''.join('%s  %s\n' % (sha_file(p), p.relative_to(work).as_posix())
+                       for p in sorted(work.rglob('*')) if p.is_file())
+        (work / 'SHA256SUMS').write_text(rows)
+        name = 'root-launchservices-%s-%s-%s' % (build, date.replace('-', ''), hashlib.sha256(rows.encode()).hexdigest()[:12])
+        final = out_dir / name
+        if final.exists():
+            raise Refused('%s exists' % final)
+        work.rename(final)
+        return final
+    finally:
+        if work.exists():
+            shutil.rmtree(work)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    sub = ap.add_subparsers(dest='cmd', required=True)
+    c = sub.add_parser('collect')
+    c.add_argument('data_root')
+    c.add_argument('--build', required=True)
+    c.add_argument('--schema', required=True, type=int)
+    c.add_argument('--source', help='what booted (run folder, image identity), recorded in build.json')
+    c.add_argument('--out', default='.')
+    k = sub.add_parser('check')
+    k.add_argument('artifact')
+    k.add_argument('--build', required=True)
+    k.add_argument('--schema', type=int)
+    k.add_argument('--deny', action='append', default=[])
+    k.add_argument('--dump', action='store_true')
+    a = ap.parse_args(argv)
+    try:
+        if a.cmd == 'collect':
+            final = collect(a.data_root, a.build, a.schema, a.out, a.source)
+            print('rootls: %s' % final)
+            print('row: - %s' % final)
+        else:
+            print(json.dumps(check(a.artifact, a.build, a.schema, a.deny, a.dump), indent=1))
+    except Refused as e:
+        sys.exit('rootls: %s' % e)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""bootcost: the first-boot-only work of each boot in a unified log, as times after the boot's mach time zero.
+
+    bootcost LOG [--json OUT]
+
+LOG is a .logarchive (read with /usr/bin/log show --style ndjson --info --debug) or such an ndjson export. Every boot
+in it is reported: the milestones below, the spans between them, and counts. A boot that built root's
+LaunchServices store (lsd found no store) is a first boot; the others show what the same image does without that
+work, so two boots of one image side by side are the closed-loop measure of a seed or warm-up.
+
+Times are seconds after the boot's mach time zero (wall time minus machTimestamp, the median over the boot's
+events; Intel mach units are nanoseconds), which is about 2-3 s before the kernel's first log line that the bench's
+seconds_after_kernel uses. Reading a log changes nothing.
+"""
+import argparse
+import collections
+import datetime
+import json
+import re
+import statistics
+import subprocess
+import sys
+from pathlib import Path
+
+LOG = '/usr/bin/log'
+
+# (key, process, uid or None, pattern, which): 'first'/'last' record a time, 'count' counts lines.
+EVENTS = [
+    ('lsd_start', 'lsd', 0, r'lsd starting with schema version (\d+)', 'first'),
+    ('lsd_no_store', 'lsd', 0, r'_CSStoreCreateWithURL failed .*(no such file|Code=260)', 'first'),
+    ('lsd_seed_start', 'lsd', 0, r'Seeding database with UID: 0\b', 'first'),
+    ('lsd_plugins_done', 'lsd', 0, r'system plugin scan regist', 'first'),
+    ('lsd_system_saved', 'lsd', 0, r'Saved system content database', 'first'),
+    ('lsd_seed_complete', 'lsd', 0, r'set seeding complete', 'first'),
+    ('lsd_plugins', 'lsd', 0, r'LSDatabaseBuilder registered plugin', 'count'),
+    ('lsd_bundles', 'lsd', 0, r'LSDatabaseBuilder registered (?!plugin|library)', 'count'),
+    ('lsd_ext_point_scans', 'lsd', 0, r'not in the binding map, scanning all extension points', 'count'),
+    ('loginwindow_ls_unblocked', 'loginwindow', None, r'Database was seeding; client will retry and block', 'first'),
+    ('ls_block_end', None, None, r'Database was seeding; client will retry and block', 'last'),
+    ('ls_blocked_lines', None, None, r'Database was seeding; client will retry and block', 'count'),
+    ('ls_wait_start', None, None, r'Waiting for Launch Services seeding', 'first'),
+    ('ls_wait_end', None, None, r'Launch Services seeding complete after', 'last'),
+    ('fskitd_ls_wait_start', 'fskitd', None, r'Waiting for Launch Services seeding', 'first'),
+    ('fskitd_ls_wait_end', 'fskitd', None, r'Launch Services seeding complete after', 'first'),
+    ('authd_no_db', 'authd', None, r'authdb: open .*unable to open', 'first'),
+    ('authd_import_last', 'authd', None, r'authdb: importing', 'last'),
+    ('authd_imports', 'authd', None, r'authdb: importing', 'count'),
+    ('authd_check_ok', 'authd', None, r'Database check OK', 'first'),
+    ('ust_first_run', 'UpdateSettingsTool', None, r'Last run version', 'first'),
+    ('ust_skipped', 'UpdateSettingsTool', None, r'Skipping this time', 'first'),
+    ('preboot_update_start', 'storagekitd', None, r'updatePrebootForVolume:\S*\]: \S+, keepSessionAlive=1', 'first'),
+    ('preboot_mount_timeout', 'storagekitd', None, r'mount failed: err=-69842', 'first'),
+    ('preboot_update_done', 'storagekitd', None, r'Update preboot of .* is complete, keepSessionAlive=1', 'first'),
+    ('system_keychain_made', 'systemkeychain', None, r'commited /Library/Keychains/System\.keychain', 'first'),
+    ('lkdc_spawned', 'launchd', None, r'^Successfully spawned configureLocalKDC', 'first'),
+    ('loginwindow_start', 'loginwindow', None, r'Login Window Application Started', 'first'),
+    ('springboard_start', 'SetupAssistantSpringboard', None, r'Starting SetupAssistantSpringboard', 'first'),
+    ('setup_ramdisk_start', 'mbsystemadministration', None, r'DiskImageParamsRAM', 'first'),
+    ('setup_ramdisk_attached', 'mbsystemadministration', None, r'Disk image attached', 'first'),
+    ('setup_record_changed', 'loginwindow', None, r'ODTrigger received: .*_mbsetupuser', 'first'),
+    ('setup_login', 'loginwindow', None, r'attempting login for user: _mbsetupuser', 'first'),
+    ('language_chooser', 'Language Chooser', None, r'', 'first'),
+    ('setup_assistant', 'Setup Assistant', None, r'', 'first'),
+    ('widget_kills', 'chronod', None, r'Extension process termination requested', 'count'),
+]
+
+# (name, start key, end key): reported when both ends are in the boot.
+SPANS = [
+    ('lsd root store build', 'lsd_start', 'lsd_seed_complete'),
+    ('  before the plugin scan (CoreTypes, extension points, required bundles)', 'lsd_start', 'lsd_seed_start'),
+    ('  system plugin scan', 'lsd_seed_start', 'lsd_plugins_done'),
+    ('  app registration after the system database is saved', 'lsd_system_saved', 'lsd_seed_complete'),
+    ('loginwindow blocked on LaunchServices (lsd start -> its "Database was seeding")', 'lsd_start',
+     'loginwindow_ls_unblocked'),
+    ('any client blocked on LaunchServices (lsd start -> last "Database was seeding")', 'lsd_start', 'ls_block_end'),
+    ('fskitd waits for LaunchServices seeding', 'fskitd_ls_wait_start', 'fskitd_ls_wait_end'),
+    ('authd builds auth.db', 'authd_no_db', 'authd_import_last'),
+    ('Preboot update kept alive (writeconfig for UpdateSettingsTool)', 'preboot_update_start', 'preboot_update_done'),
+    ('Setup RAM disk attach (mbsystemadministration)', 'setup_ramdisk_start', 'setup_ramdisk_attached'),
+    ('Springboard -> Setup account login', 'springboard_start', 'setup_login'),
+]
+
+SCREENS = ('language_chooser', 'setup_assistant')
+
+
+def events_of(path):
+    """Yield the log's events as dicts (ndjson lines); a .logarchive is read with log show."""
+    path = Path(path)
+    if path.suffix == '.logarchive' or path.is_dir():
+        p = subprocess.Popen([LOG, 'show', '--archive', str(path), '--style', 'ndjson', '--info', '--debug'],
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        lines = p.stdout
+    else:
+        p, lines = None, path.open()
+    try:
+        for line in lines:
+            line = line.strip()
+            if not line.startswith('{'):
+                continue
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if 'timestamp' in e and e.get('bootUUID'):
+                yield e
+    finally:
+        lines.close()
+        if p:
+            p.wait()
+
+
+def wall(ts):
+    """Seconds since the epoch of a log timestamp ('2026-11-12 17:34:21.000000-0800')."""
+    return datetime.datetime.strptime(ts[:26] + ts[26:].replace(':', ''), '%Y-%m-%d %H:%M:%S.%f%z').timestamp()
+
+
+COMPILED = [(k, proc, uid, re.compile(pat), which) for k, proc, uid, pat, which in EVENTS]
+
+
+class Boot:
+    def __init__(self, uuid):
+        self.uuid, self.offsets, self.first_wall = uuid, [], None
+        self.hits = {}            # key -> wall time
+        self.counts = collections.Counter()
+        self.schema = None
+        self.fontworker = collections.defaultdict(lambda: [None, None, 0])   # uid -> first, last, bookmarks
+        self.blocked = collections.Counter()
+        self.killed = set()
+
+    def add(self, e):
+        w = wall(e['timestamp'])
+        if self.first_wall is None or w < self.first_wall:
+            self.first_wall = w
+        m = e.get('machTimestamp') or 0
+        if m > 0 and len(self.offsets) < 200000:
+            self.offsets.append(w - m / 1e9)
+        proc = (e.get('processImagePath') or '').rsplit('/', 1)[-1]
+        uid, msg = e.get('userID'), e.get('eventMessage') or ''
+        for key, p, u, rx, which in COMPILED:
+            if p is not None and proc != p or u is not None and uid != u:
+                continue
+            hit = rx.search(msg)
+            if not hit:
+                continue
+            if which == 'count':
+                self.counts[key] += 1
+            elif which == 'first':
+                if key not in self.hits or w < self.hits[key]:
+                    self.hits[key] = w
+            elif key not in self.hits or w > self.hits[key]:
+                self.hits[key] = w
+            if key == 'lsd_start' and self.schema is None:
+                self.schema = int(hit.group(1))
+            if key == 'ls_blocked_lines':
+                self.blocked[proc] += 1
+            if key == 'widget_kills':
+                k = re.match(r'\[([^\]]+)\]', msg)
+                self.killed.add(k.group(1) if k else msg)
+        if proc == 'fontworker' and 'CFURLCreateBookmarkData' in msg:
+            f = self.fontworker[uid]
+            f[0] = w if f[0] is None else min(f[0], w)
+            f[1] = w if f[1] is None else max(f[1], w)
+            f[2] += 1
+
+    def zero(self):
+        return statistics.median(self.offsets) if self.offsets else self.first_wall
+
+    def report(self):
+        z = self.zero()
+        at = {k: round(v - z, 2) for k, v in self.hits.items()}
+        spans = []
+        for name, a, b in SPANS:
+            if a in at and b in at:
+                spans.append({'name': name, 'start': at[a], 'end': at[b], 'seconds': round(at[b] - at[a], 2)})
+        screens = [at[k] for k in SCREENS if k in at]
+        return {
+            'boot': self.uuid,
+            'mach_zero': datetime.datetime.fromtimestamp(z).isoformat(timespec='milliseconds'),
+            'first_boot': 'lsd_no_store' in at,
+            'launchservices_schema': self.schema,
+            'first_screen': min(screens) if screens else None,
+            'milestones': dict(sorted(at.items(), key=lambda kv: kv[1])),
+            'spans': spans,
+            'counts': dict(self.counts),
+            'ls_blocked_processes': dict(self.blocked),
+            'widgets_killed': len(self.killed),
+            'fontworker_bookmarks': {str(u): {'first': round(f[0] - z, 2), 'last': round(f[1] - z, 2), 'count': f[2]}
+                                     for u, f in sorted(self.fontworker.items(), key=lambda kv: str(kv[0]))},
+        }
+
+
+def analyse(path):
+    boots = collections.OrderedDict()
+    for e in events_of(path):
+        b = boots.get(e['bootUUID'])
+        if b is None:
+            b = boots[e['bootUUID']] = Boot(e['bootUUID'])
+        b.add(e)
+    reports = [b.report() for b in boots.values()]
+    reports.sort(key=lambda r: r['mach_zero'])
+    return reports
+
+
+def table(reports):
+    out = []
+    head = 'boot ' + '  '.join('%-10s' % r['boot'][:8] for r in reports)
+    out.append('%-74s %s' % ('', head))
+    out.append('%-74s %s' % ('first boot (lsd had no store)', '  '.join('%-10s' % r['first_boot'] for r in reports)))
+    out.append('%-74s %s' % ('LaunchServices schema', '  '.join('%-10s' % r['launchservices_schema'] for r in reports)))
+    out.append('%-74s %s' % ('first screen (Language Chooser or Setup Assistant)',
+                             '  '.join('%-10s' % r['first_screen'] for r in reports)))
+    names = [s[0] for s in SPANS]
+    for n in names:
+        cells = []
+        for r in reports:
+            s = next((s for s in r['spans'] if s['name'] == n), None)
+            cells.append('%-10s' % ('%.1f s' % s['seconds'] if s else '-'))
+        out.append('%-74s %s' % (n[:74], '  '.join(cells)))
+    keys = sorted({k for r in reports for k in r['milestones']}, key=lambda k: min(r['milestones'].get(k, 1e9) for r in reports))
+    out.append('')
+    out.append('milestones (s after mach zero)')
+    for k in keys:
+        out.append('  %-72s %s' % (k, '  '.join('%-10s' % r['milestones'].get(k, '-') for r in reports)))
+    out.append('')
+    out.append('counts')
+    for k in sorted({k for r in reports for k in r['counts']}):
+        out.append('  %-72s %s' % (k, '  '.join('%-10s' % r['counts'].get(k, 0) for r in reports)))
+    for r in reports:
+        for uid, f in r['fontworker_bookmarks'].items():
+            out.append('  fontworker bookmarks uid %-4s boot %s: %d (%.1f-%.1f)' % (uid, r['boot'][:8], f['count'],
+                                                                                    f['first'], f['last']))
+    return '\n'.join(out)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    ap.add_argument('log', help='.logarchive or ndjson export')
+    ap.add_argument('--json', help='also write the reports here')
+    a = ap.parse_args(argv)
+    reports = analyse(a.log)
+    if not reports:
+        sys.exit('bootcost: no events in %s' % a.log)
+    print(table(reports))
+    if a.json:
+        Path(a.json).write_text(json.dumps(reports, indent=1) + '\n')
+
+
+if __name__ == '__main__':
+    main()
