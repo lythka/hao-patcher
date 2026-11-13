@@ -162,6 +162,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 | Apple code identity of hao and re-signed programs | `golden-gate-userspace` (carrier in Security), `golden-gate-native-identities` | [patches/golden-gate-userspace/src/codeid](patches/golden-gate-userspace/src/codeid), hao-runtime `libhao_codeid` |
 | Live Text (Vision text recognition) | `metal-compiler-compat`, `golden-gate-live-text-shared`, `golden-gate-live-text-service` | [tools/live-text](tools/live-text), [cache/metallib](cache/metallib) |
 | Metal argument buffers and ASTC textures (HD 4000) | recipe in progress | [tools/metal-argbuf](tools/metal-argbuf) |
+| macOS 27's own Metal on the HD 4000 (adapter in place of MetalOld) | laptop test only | [tools/metal-adapter](tools/metal-adapter) |
 
 [patches/README.md](patches/README.md) describes the recipe format, and
 [patches/TRACKER.md](patches/TRACKER.md) lists every recipe with its stage and

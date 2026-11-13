@@ -1,0 +1,39 @@
+{
+  "x86_64_cache": {
+    "what": "macOS 27.2.1 (26B131) x86_64 dyld cache: System/Library/dyld of the Rosetta cryptex in the 26B131 UniversalMac IPSW (input row ipsw_27_0), mounted read-only",
+    "uuid": "262fa161f25b34f2b18bc7ed4369d620",
+    "files": {
+      "dyld_shared_cache_x86_64": "1ea9e2cfcec5b03603415d4f5e0f8f59884f7786a3f3a027e783847f3ef25057",
+      "dyld_shared_cache_x86_64.01": "2992c56ec67804a411c973c715dd86984bde657f52e5aa07dfefec69fa5bd9d5",
+      "dyld_shared_cache_x86_64.02": "01b2e156f12e4d0e8a0a59c4c9a40e94e359a2058e6daaaf0c2384604b701524",
+      "dyld_shared_cache_x86_64.03": "632488d4a2c36e459c6da077ea0d2c412dc46da1b545fd32f9863d42e3e379c6",
+      "dyld_shared_cache_x86_64.04": "97749bf6a11619be23782e6e6f4c495d8079dbb5b52a6ae8a5632d9ddfb19f4b",
+      "dyld_shared_cache_x86_64.05": "146bd2888639e86ebb5d2d11dc409ab9d4f0333b714ff56a6f44c4bf76bf5d58",
+      "dyld_shared_cache_x86_64.06": "fcb3ac956b68df8107dc8adea2e3357c1477c6f2fa3c5d3c48abb23b54a758b7",
+      "dyld_shared_cache_x86_64.map": "888888eadb0c2e7adbaa8403ae20dd6c3202b8d6114036c01739a17807a412bb"
+    }
+  },
+  "metal27": {
+    "image": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+    "version": "383.1",
+    "lc_uuid": "48F171CD-FACE-36BC-B493-35D09729952E",
+    "cut_sha256": "dbb5e8e89d66ea1d12bdaf11297ca2c20ab13a495468a2ec6b3ae09405c30d2c",
+    "is_internal_build_offset": "0x1a72d8"
+  },
+  "cache_dylib": {
+    "what": "hao-tools tools/cache-dylib (MIT, same owner), used from its own checkout",
+    "revision": "r6",
+    "commit": "7e5dd2a609980b2922cf45398b793b86454b0bc4",
+    "files": {
+      "cache_dylib.py": "fa7592755be5dff3cd334a47c006a7126d6f5e3908cc1ad47ac5806e8aba038f",
+      "check.py": "84811f68a9e9229b3502b9a5332078d58c81cd83793104b25d4096663aab35d5",
+      "dsc.py": "724e63e109ab6aa1f3d4ad47f010c5795540ca27b49806e88ae63e7fa0e3ad77"
+    }
+  },
+  "downgrade_template": {
+    "what": "MetalOld's type-7 (AIR downgrade) request for OCLP's 31001 MTLCompiler, 13.2.1 framing: header and name 'add1', then an 8-byte placeholder module (the stand-in replaces name and module)",
+    "captured_sha256": "ce4640d4e1f3fba469a91c290a08ee06f5d48d2b886524c1e1d6676a422cd5aa",
+    "framing_hex": "0000000604085000d80000000c000000e400000000000000e8000000000000000000000000000000200000007c00000002000000000000000000000000000000000000000000000000000000000000000000000000000000e800000005000000f000000008000000f80000000000000000000000f8000000000000000000000000000000f800000000000000000000000000000000000000000000000000000000000000f8000000000000000000000000000000000000000700000001000000da0e0000000000000000000001000000f80000000000000000000200da0e000000000000000000006164643100000000",
+    "placeholder_module_size": 8
+  }
+}
