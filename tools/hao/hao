@@ -20,7 +20,9 @@
 
   hao detect [--out FILE]                                     this Mac's hardware, OCLP patch sets and packs, as a
         profile file for --profile (run it on the target: its Recovery or an installed macOS; read-only)
-  hao fetch RELEASE.json [--cache DIR] [--verify] [--host-check]  download (or check) every file the release pins
+  hao fetch RELEASE.json [--cache DIR] [--verify] [--host-check] [--assets-from DIR|URL]
+        download (or with --verify only check) every file the release pins: its downloads (Apple's and third-party
+        files) and its assets (ours), each by size and sha256, into the content-addressed cache
   hao verify [ROOT] [--manifests DIR|FILE]...                 every installed pack file against its manifest
   hao build-image REPO (--model M | --profile F) [--assembly NAME] [--overlay-system ROOT] [--dry-run]
         assemble an image in the builder VM (pipeline/golden-run), committed to the image repository REPO
@@ -268,15 +270,18 @@ def cmd_fetch(a, c):
         if r.returncode:
             return r.returncode
     try:
-        rows = acquire['load'](a.release)
+        rows = acquire['load'](a.release, a.assets_from)
     except acquire['AcquireError'] as x:
-        raise CON.Stopped(str(x))
-    c.banner('hao fetch  %d files pinned by %s' % (len(rows), a.release), release=a.release, cache=str(a.cache))
+        raise CON.Stopped(str(x), why='every file a release names must be pinned by URL, size and sha256')
+    kinds = [r['kind'] for r in rows]
+    c.banner('hao fetch  %d files pinned by %s (%d downloads, %d assets)' % (
+        len(rows), a.release, kinds.count('download'), kinds.count('asset')), release=a.release, cache=str(a.cache))
     if a.verify:
         bad = [r['name'] for r in rows if not acquire['intact'](a.cache, r)]
         for r in rows:
-            c.item('%-44s %s' % (r['name'], 'missing or damaged' if r['name'] in bad else 'sha256'),
-                   ok=r['name'] not in bad, ev='file.verify', name=r['name'], intact=r['name'] not in bad)
+            c.item('%-8s %-44s %s' % (r['kind'], r['name'], 'missing or damaged' if r['name'] in bad else 'sha256'),
+                   ok=r['name'] not in bad, ev='file.verify', name=r['name'], kind=r['kind'],
+                   intact=r['name'] not in bad)
         if bad:
             raise CON.Stopped('%d of %d files are missing or damaged' % (len(bad), len(rows)),
                               options=['hao fetch %s' % a.release])
@@ -386,6 +391,7 @@ def main():
     q.set_defaults(fn=guarded(cmd_detect))
     q = sub.add_parser('fetch'); q.add_argument('release'); q.add_argument('--cache', type=Path, default=CACHE)
     q.add_argument('--verify', action='store_true'); q.add_argument('--host-check', action='store_true')
+    q.add_argument('--assets-from', help='fetch the release assets from this folder or URL prefix first')
     CON.add_level_flags(q); q.set_defaults(fn=guarded(cmd_fetch))
     q = sub.add_parser('verify'); q.add_argument('root', nargs='?', default='/')
     q.add_argument('--manifests', action='append', default=[]); CON.add_level_flags(q)

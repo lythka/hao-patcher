@@ -477,6 +477,35 @@ class CommandLineTest(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn('reused', r.stdout)
 
+    def test_fetch_release_assets_from_a_staged_folder(self):
+        with tempfile.TemporaryDirectory() as d:
+            stage, cache = Path(d) / 'stage', d + '/cache'
+            stage.mkdir()
+            apple, ours = b'apple file', b'our archive'
+            (Path(d) / 'apple.bin').write_bytes(apple)
+            (stage / 'shim.tar').write_bytes(ours)
+            rel = stage / 'release.json'
+            rel.write_text(json.dumps({
+                'downloads': [{'row': 'ipsw', 'name': 'apple.bin', 'url': (Path(d) / 'apple.bin').as_uri(),
+                               'size': len(apple), 'sha256': hashlib.sha256(apple).hexdigest()}],
+                'assets': [{'row': 'shim', 'file': 'shim.tar', 'size': len(ours), 'format': 'tar', 'commit': 'c',
+                            'url': 'http://127.0.0.1:9/27.2.1-26B131.0/shim.tar',
+                            'sha256': hashlib.sha256(ours).hexdigest()}]}))
+            r = self.hao('fetch', str(rel), '--cache', cache, '--verify')
+            self.assertEqual(r.returncode, 1)
+            r = self.hao('fetch', str(rel), '--cache', cache, '--assets-from', str(stage), '--log', 'json')
+            self.assertEqual(r.returncode, 0, r.stderr)
+            evs = [json.loads(line) for line in r.stdout.splitlines()]
+            self.assertEqual(sorted(e['name'] for e in evs if e['ev'] == 'fetch.ok'), ['apple.bin', 'shim.tar'])
+            self.assertEqual((Path(cache) / 'sha256' / hashlib.sha256(ours).hexdigest()).read_bytes(), ours)
+            r = self.hao('fetch', str(rel), '--cache', cache, '--verify')
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('1 downloads, 1 assets', r.stdout)
+            (Path(cache) / 'sha256' / hashlib.sha256(ours).hexdigest()).write_bytes(b'changed')
+            r = self.hao('fetch', str(rel), '--cache', cache, '--verify')
+            self.assertEqual(r.returncode, 1)
+            self.assertIn('missing or damaged', r.stdout + r.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

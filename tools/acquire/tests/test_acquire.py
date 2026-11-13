@@ -112,6 +112,73 @@ class Acquire(unittest.TestCase):
         with self.assertRaisesRegex(A['AcquireError'], 'listed twice'):
             A['load'](m)
 
+    def release(self, folder, **asset_over):
+        """A release.json in FOLDER: one download from the server, one asset (an archive staged in FOLDER)."""
+        tar = b'ours' * 1000
+        (folder / 'shim.tar').write_bytes(tar)
+        asset = {'row': 'shim', 'file': 'shim.tar', 'url': 'http://127.0.0.1:9/releases/shim.tar', 'size': len(tar),
+                 'sha256': hashlib.sha256(tar).hexdigest(), 'commit': '0' * 40, 'format': 'tar'}
+        asset.update(asset_over)
+        m = folder / 'release.json'
+        m.write_text(json.dumps({'downloads': [dict(self.row(), row='installer')], 'assets': [asset],
+                                 'made_on_mac': [{'row': 'kernel', 'producer': 'x', 'inputs': ['installer']}]}))
+        return m, asset
+
+    def test_release_downloads_and_assets(self):
+        stage = Path(tempfile.mkdtemp())
+        m, asset = self.release(stage, url=self.base + '/shim.tar')
+        (self.www / 'shim.tar').write_bytes((stage / 'shim.tar').read_bytes())
+        rows = A['load'](m)
+        self.assertEqual([(r['kind'], r['name']) for r in rows], [('download', 'installer'), ('asset', 'shim.tar')])
+        got = A['fetch'](rows, self.cache)
+        self.assertEqual(Path(got['shim.tar']).read_bytes(), (stage / 'shim.tar').read_bytes())
+        self.assertTrue(all(A['intact'](self.cache, r) for r in rows))
+        self.assertEqual(sorted(Handler.hits), ['/installer.bin', '/shim.tar'])
+
+    def test_assets_from_a_staged_folder(self):
+        stage = Path(tempfile.mkdtemp())
+        m, asset = self.release(stage)
+        rows = A['load'](m, assets_from=stage)
+        shim = rows[1]
+        self.assertTrue(shim['url'].startswith('file://') and shim['url'].endswith('/shim.tar'))
+        self.assertEqual(shim['mirrors'], [asset['url']])           # its own URL only when the folder lacks it
+        events = []
+        A['fetch'](rows, self.cache, on_event=events.append)
+        self.assertNotIn('mirror-failed', [e['ev'] for e in events])
+        self.assertEqual(A['final_path'](self.cache, shim).read_bytes(), (stage / 'shim.tar').read_bytes())
+        self.assertEqual(Handler.hits, ['/installer.bin'])           # the asset never left the folder
+
+    def test_a_staged_asset_that_differs_is_refused(self):
+        stage = Path(tempfile.mkdtemp())
+        m, _ = self.release(stage)
+        (stage / 'shim.tar').write_bytes(b'tampered')
+        rows = A['load'](m, assets_from=stage)
+        with self.assertRaisesRegex(A['AcquireError'], 'shim.tar: no source gave the pinned file'):
+            A['fetch'](rows[1:], self.cache)
+        self.assertFalse(A['intact'](self.cache, rows[1]))
+
+    def test_an_entry_without_url_is_refused(self):
+        stage = Path(tempfile.mkdtemp())
+        m, _ = self.release(stage, url=None)
+        with self.assertRaisesRegex(A['AcquireError'], "asset 'shim.tar' needs url"):
+            A['load'](m)
+        m.write_text(json.dumps({'downloads': [dict(self.row(), url=None)]}))
+        with self.assertRaisesRegex(A['AcquireError'], "download 'installer' needs url"):
+            A['load'](m)
+        m.write_text(json.dumps({'downloads': [], 'assets': []}))
+        with self.assertRaisesRegex(A['AcquireError'], 'no downloads or assets'):
+            A['load'](m)
+
+    def test_command_line_assets_from(self):
+        stage = Path(tempfile.mkdtemp())
+        m, _ = self.release(stage)
+        run = lambda *a: subprocess.run([sys.executable, '-I', str(TOOL), *map(str, a)], capture_output=True, text=True)
+        r = run('fetch', m, '--cache', self.cache, '--assets-from', stage)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(run('verify', m, '--cache', self.cache).returncode, 0)
+        self.assertTrue(run('path', m, 'shim.tar', '--cache', self.cache).stdout.strip().endswith(
+            hashlib.sha256((stage / 'shim.tar').read_bytes()).hexdigest()))
+
     def test_command_line(self):
         m = self.cache / 'release.json'
         m.write_text(json.dumps({'downloads': [self.row()]}))

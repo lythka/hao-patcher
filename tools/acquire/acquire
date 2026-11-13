@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """acquire: download every file a release pins, by URL, size and sha256 (workflow plan step 12).
 
-  acquire fetch MANIFEST --cache DIR [--only NAME ...] [--quiet | --log json]
+  acquire fetch MANIFEST --cache DIR [--only NAME ...] [--assets-from DIR|URL] [--quiet | --log json]
   acquire verify MANIFEST --cache DIR          every pinned file present and intact, nothing fetched
   acquire path MANIFEST NAME --cache DIR       where NAME is (after fetch)
 
 MANIFEST is JSON: {"downloads": [{"name": NAME, "url": URL, "size": BYTES, "sha256": HEX, "mirrors": [URL, ...]}]}
-(the "downloads" part of a release.json). Files are kept content-addressed in DIR/sha256/<hex>. A file already
+(the "downloads" part of a release.json), and a release.json's "assets" too ({"row", "file", "url", "size",
+"sha256"}; NAME is the file). --assets-from fetches the assets from that folder or URL prefix first (DIR/FILE), and
+from their own URLs only when it lacks them. Files are kept content-addressed in DIR/sha256/<hex>. A file already
 there with the right hash is never fetched again. A partial download (DIR/partial/<hex>) resumes with an HTTP Range
-request. A file whose size or sha256 differs is refused and never moved into place; the next mirror is tried.
-Standard library only.
+request. A file whose size or sha256 differs is refused and never moved into place; the next mirror is tried. An
+entry without a URL is refused. Standard library only.
 """
 import argparse
 import hashlib
@@ -19,6 +21,7 @@ from pathlib import Path
 import shutil
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 CHUNK = 1 << 20
@@ -28,17 +31,32 @@ class AcquireError(RuntimeError):
     pass
 
 
-def load(manifest):
+def asset_source(where):
+    """The URL prefix --assets-from names: a folder (as a file:// URL) or a URL."""
+    if '://' in str(where):
+        return str(where).rstrip('/') + '/'
+    return Path(where).resolve().as_uri().rstrip('/') + '/'
+
+
+def load(manifest, assets_from=None):
+    """The entries MANIFEST pins: its downloads, then its assets (named by their file), each with its "kind"."""
     with open(manifest) as f:
         m = json.load(f)
-    rows = m.get('downloads')
-    if not isinstance(rows, list) or not rows:
-        raise AcquireError('%s has no downloads' % manifest)
+    rows = [dict(r, kind='download') for r in m.get('downloads') or []]
+    for a in m.get('assets') or []:
+        row = {'name': a.get('file'), 'url': a.get('url'), 'size': a.get('size'), 'sha256': a.get('sha256'),
+               'mirrors': list(a.get('mirrors', [])), 'kind': 'asset', 'row': a.get('row')}
+        if assets_from and isinstance(row['name'], str):
+            row['mirrors'] = ([row['url']] if row['url'] else []) + row['mirrors']
+            row['url'] = asset_source(assets_from) + urllib.parse.quote(row['name'])
+        rows.append(row)
+    if not rows:
+        raise AcquireError('%s has no downloads or assets' % manifest)
     names = set()
     for r in rows:
         for k, t in (('name', str), ('url', str), ('size', int), ('sha256', str)):
-            if not isinstance(r.get(k), t):
-                raise AcquireError('%s: download %r needs %s' % (manifest, r.get('name'), k))
+            if not isinstance(r.get(k), t) or isinstance(r.get(k), bool):
+                raise AcquireError('%s: %s %r needs %s' % (manifest, r['kind'], r.get('name') or r.get('row'), k))
         if r['name'] in names:
             raise AcquireError('%s: %s listed twice' % (manifest, r['name']))
         if len(r['sha256']) != 64 or r['size'] < 0:
@@ -160,11 +178,12 @@ def main():
         q.add_argument('--cache', required=True)
         if name == 'fetch':
             q.add_argument('--only', nargs='+')
+            q.add_argument('--assets-from', help='fetch the assets from this folder or URL prefix first')
             g = q.add_mutually_exclusive_group()
             g.add_argument('--quiet', action='store_true'); g.add_argument('--log', choices=['json'])
     a = p.parse_args()
     try:
-        rows = load(a.manifest)
+        rows = load(a.manifest, getattr(a, 'assets_from', None))
         if a.action == 'fetch':
             level = 'json' if a.log == 'json' else 'quiet' if a.quiet else 'steps'
             fetch(rows, a.cache, only=set(a.only or []), on_event=printer(level))
