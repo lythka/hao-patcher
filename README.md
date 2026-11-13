@@ -8,10 +8,25 @@ kernel extensions, drivers and boot files macOS 26 (Tahoe) still ships, legacy h
 Patcher, a set of compatibility fixes, and [hao-runtime](https://github.com/lythka/hao-runtime), which runs Golden
 Gate's ARM-only programs on the Intel CPU.
 
-![macOS 27 desktop and Control Center on an Intel Mac](docs/images/desktop-intel.jpg)
+![macOS 27.2.1 on a 2012 MacBook Pro: About This Mac, Control Center and widgets](docs/images/desktop-intel.jpg)
 
 [Gallery](docs/gallery.md) · [Progress](docs/progress.md) · [Building](docs/building.md) ·
 [Buy me a coffee](https://buymeacoffee.com/lythka)
+
+### Metal argument buffers on the Intel HD 4000
+
+The HD 4000's legacy Metal stack has no argument buffers or ASTC textures, which Weather's maps, Safari's WebGPU,
+SceneKit and Apple's effects engine need. hao-patcher adds both to the shader compiler and the driver
+([tools/metal-argbuf](tools/metal-argbuf)):
+
+<p>
+<img src="docs/images/gallery/weather-wind-map.jpg" alt="Weather wind map on the HD 4000" width="49%">
+<img src="docs/images/gallery/weather-temperature-map.jpg" alt="Weather temperature map on the HD 4000" width="49%">
+</p>
+
+<img src="docs/images/argbuf-webgpu.jpg" alt="Safari WebGPU compute and render check passing on the HD 4000" width="98%">
+
+More in the [gallery](docs/gallery.md): the air-quality map, Maps in 3D and SceneKit.
 
 ## Status
 

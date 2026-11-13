@@ -1,6 +1,6 @@
 # Gallery
 
-macOS 27.2.1 (26B131) on the development platform, a 2012 MacBook Pro (Intel HD 4000), 2026-11-12. Weather and
+macOS 27.2.1 (26B131) on the development platform, a 2012 MacBook Pro (Intel HD 4000), 2026-11-12 (app windows shown). Weather and
 WebGPU need Metal argument buffers and ASTC textures, which the HD 4000's legacy Metal stack does not provide;
 [tools/metal-argbuf](../tools/metal-argbuf) implements them in the shader compiler and the driver. Maps and SceneKit
 need their shader libraries repaired for the old compiler ([cache/metallib](../cache/metallib)).
