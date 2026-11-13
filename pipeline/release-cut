@@ -1,27 +1,39 @@
 #!/usr/bin/python3 -I
-"""release-cut: what a release of an assembly would ship, and whether each input could be made again.
+"""release-cut: what a release of an assembly ships, and whether each input could be made again.
 
   release-cut --dry-run ASSEMBLY [--json]                   (ASSEMBLY = pipeline/assemblies/NAME.json)
-  release-cut --write OUT.json ASSEMBLY [--overlays DIR] [--draft]
-        the release.json a cut publishes: downloads (row, size, sha256; URL filled by the cut), our assets with
-        their producers, recipe revisions, packs, and each overlay file's expected sha256 (from materialize's
-        DIR). Refused while any row is not download/reproducible, unless --draft.
+  release-cut --write OUT.json ASSEMBLY --release NAME [--stage DIR] [--allow-pending] [--final]
+        the release.json of release NAME (MACOS-BUILD.N, e.g. 27.2.1-26B131.0; the hao-assets contract's release
+        schema): downloads (url, size, sha256), our assets (file, url, size, sha256, producing commit, format),
+        the rows made on the user's Mac (producer, Apple input rows), harvested rows, plus pending rows, recipe
+        revisions and packs. With --stage, every asset file is written into DIR (new or empty) and checked against
+        release.json after. Refused while the release is incomplete (a pending row, an ours row without a clean
+        producer, a row with no content class), unless --allow-pending, which writes it with "state": "incomplete".
+        A release is a prerelease unless --final.
 
-Every input row the assembly's set and donors use is resolved (pipeline/inputs/golden/BUILD, then the donor build,
-then common) and classified, without changing anything:
-  download      Apple or third-party bytes the user's builder fetches itself (installers, KDK, OCLP); must be
-                pinned by URL, size and sha256 in release.json (tools/acquire)
+Rows: every input the assembly's set and donors use, the rows golden-run reads besides them (KDK, CPythons, site
+packages, the firmlink tool, OpenCore, PatcherSupportPkg) and the Apple inputs of the rows made on the Mac, resolved
+in pipeline/inputs/golden/BUILD, then the donor build, then common.
+
+Each row has two classes. By content (pipeline/release-classes.json, with a reason per row):
+  ours          our own bytes: published as a release asset, a file row as the file, a folder row as one
+                deterministic tar (sorted, mtime 0, owner 0, modes 0755/0644, no compression) of the listed files
+  made-on-mac   made from Apple's files on the user's Mac (producer, input rows); never published
+  download      Apple or third-party bytes the user's Mac fetches by url, size and sha256 (tools/acquire)
+  harvested     made on a running laptop (caches, seeds): never shipped; the target makes its own at first boot
+  in-checkout   a tracked file of hao-patcher, delivered with the source at the release commit
+  pending       held out of this release for the reason given
+No asset may hold a private reference (the contract's patterns: home folders, private repositories).
+By build record (whether the bytes can be made again):
+  download      under a download root of the store
   reproducible  an artifact whose build.json names a clean commit of a producer found here (hao-patcher, hao-runtime,
                 hao-tools, or the repository the store belongs to), or a tracked, committed source file
+  reproducible-except  rebuilt from a clean commit, identical except a documented stamp (pipeline/reproductions.json)
   dirty         built from a tree with uncommitted changes
-  harvested     made from a running laptop (caches, seeds): never shipped; left out of a release with a note (the
-                target makes its own caches at first boot)
-  reproducible-except  rebuilt from a clean commit, identical except a documented stamp (pipeline/reproductions.json);
-                a cut accepts it and lists the difference as a note
+  harvested     a harvest record
   unrecorded    no build.json, or no producer commit in it
   missing       the row's file is not in the store
-The cut itself (exporting rows and build records into release.json, refusing dirty or unrecorded producers)
-follows once every row is downloadable or reproducible (workflow plan step 13). Exit 1 when a row is not.
+--dry-run exits 1 when a row has no content class or an ours row is not reproducible.
 """
 import json
 import os
@@ -133,8 +145,196 @@ def classify_record(row, hit):
     return 'reproducible', '%s: %s@%s' % (parts[2], repo, str(commit)[:10])
 
 
-def release_json(assembly, results, overlays=None):
-    """The release manifest a cut would publish (state "draft" while any row is not download/reproducible)."""
+def classes():
+    """pipeline/release-classes.json: what each row is by content (ours, made-on-mac, download, harvested,
+    in-checkout, pending), with its reason."""
+    return json.loads((TOP / 'pipeline' / 'release-classes.json').read_text())['rows']
+
+
+def release_rows(assembly):
+    """[(row, hit)] for everything a release of ASSEMBLY involves: the rows release-cut always classified (the set
+    and the donors), the rows golden-run reads besides the set (tools/hao/src/assets.py: KDK, both CPythons, site
+    packages, the firmlink tool, OpenCore, PatcherSupportPkg), and the Apple inputs the made-on-mac rows are made
+    from (release-classes.json), first lock folder wins."""
+    assets = runpy.run_path(str(TOP / 'tools' / 'hao' / 'src' / 'assets.py'))
+    lock = runpy.run_path(str(TOP / 'pipeline' / 'lock.py'))
+    a = json.loads(Path(assembly).read_text())
+    folders = [TOP / 'pipeline/inputs/golden' / a['golden_build'], TOP / 'pipeline/inputs' / a['donor_build'],
+               TOP / 'pipeline/inputs/common']
+    tables = [(f, lock['rows'](str(f))) for f in folders if f.is_dir()]
+    out = list(rows_for(assembly))
+    names = list(assets['FIXED']) + ['opencore_' + a.get('opencore', 'release')]
+    if (TOP / 'store' / 'oclp').exists():
+        names.append('psp_' + assets['oclp_psp'](TOP / 'store', a['oclp']))
+    data = classes()
+    seen = {r for r, _ in out}
+    while names:
+        name = names.pop(0)
+        if name in seen:
+            continue
+        seen.add(name)
+        out.append((name, next(((f, t[name]) for f, t in tables if name in t), None)))
+    for row, _ in list(out):                       # the Apple inputs of every made-on-mac row, transitively
+        stack = list(data.get(row, {}).get('inputs', []))
+        while stack:
+            name = stack.pop(0)
+            if name in seen:
+                continue
+            seen.add(name)
+            out.append((name, next(((f, t[name]) for f, t in tables if name in t), None)))
+            stack += data.get(name, {}).get('inputs', [])
+    return out
+
+
+def sha256_file(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for block in iter(lambda: f.read(1 << 20), b''):
+            h.update(block)
+    return h.hexdigest()
+
+
+def producer_of(row, hit):
+    """(repository, full commit) of the clean build that made ROW's artifact: its pipeline/reproductions.json
+    entry (a clean rebuild) when there is one, else its build.json."""
+    rel = os.path.relpath(hit[1][1], TOP)
+    parts = rel.split('/')
+    if parts[:2] != ['store', 'artifacts'] or len(parts) < 3:
+        return 'hao-patcher', None
+    entry = reproduction(row, parts[2])
+    if entry:
+        commit = entry['commit']
+    else:
+        art = TOP / 'store' / 'artifacts' / parts[2]
+        build = next((b for b in (art / 'build.json', art / 'payload' / 'build.json') if b.is_file()), None)
+        meta = json.loads(build.read_text()) if build else {}
+        producer = meta.get('producer') if isinstance(meta.get('producer'), dict) else {}
+        commit = meta.get('commit') or meta.get('hao_commit') or producer.get('commit')
+    if not commit:
+        return None, None
+    repo = commit_known(str(commit))
+    if repo is None:
+        return None, str(commit)
+    store_repo = (TOP / 'store').resolve().parent
+    where = TOP if repo == 'hao-patcher' else store_repo if repo == store_repo.name else Path.home() / repo
+    full = subprocess.run(['git', '-C', str(where), 'rev-parse', str(commit) + '^{commit}'], capture_output=True,
+                          text=True)
+    return repo, full.stdout.strip() if full.returncode == 0 else str(commit)
+
+
+def private_refs(data):
+    """Private references in DATA (bytes), by the contract's patterns (home folders, private repositories)."""
+    contract = runpy.run_path(str(TOP / 'tools' / 'hao-contract' / 'hao_contract.py'))
+    text = data.decode('latin-1')
+    return sorted({label for label, pattern in contract['PRIVATE'] if pattern.search(text)})
+
+
+def archive_members(folder, include=None):
+    """The sorted [(relative path, Path)] a folder row's archive holds: every file, folder and link below FOLDER,
+    or only INCLUDE (relative paths; a folder takes everything below it) and the folders above them."""
+    folder = Path(folder)
+    every = sorted(p for p in folder.rglob('*'))
+    picked = []
+    for p in every:
+        rel = p.relative_to(folder).as_posix()
+        if include is None or any(rel == i or rel.startswith(i.rstrip('/') + '/') for i in include):
+            picked.append(rel)
+    if include is not None:
+        missing = [i for i in include if not (folder / i).exists() and not (folder / i).is_symlink()]
+        if missing:
+            raise ValueError('%s: lacks %s' % (folder, ', '.join(missing)))
+        parents = {Path(r).parent.as_posix() for r in picked}
+        closure = set()
+        for d in parents:
+            while d not in ('', '.'):
+                closure.add(d)
+                d = Path(d).parent.as_posix()
+        picked = sorted(set(picked) | closure)
+    return [(rel, folder / rel) for rel in sorted(picked)]
+
+
+def write_archive(out, folder, include=None):
+    """A deterministic tar of FOLDER (see release-classes.json "archive") written to the binary file OUT."""
+    import tarfile
+    with tarfile.open(fileobj=out, mode='w', format=tarfile.PAX_FORMAT) as tar:
+        for rel, p in archive_members(folder, include):
+            info = tarfile.TarInfo(rel)
+            info.mtime, info.uid, info.gid, info.uname, info.gname = 0, 0, 0, '', ''
+            if p.is_symlink():
+                info.type, info.linkname, info.mode = tarfile.SYMTYPE, os.readlink(p), 0o755
+                tar.addfile(info)
+            elif p.is_dir():
+                info.type, info.mode = tarfile.DIRTYPE, 0o755
+                tar.addfile(info)
+            else:
+                info.size = p.stat().st_size
+                info.mode = 0o755 if p.stat().st_mode & 0o111 else 0o644
+                with open(p, 'rb') as f:
+                    tar.addfile(info, f)
+
+
+class _Sink:
+    """A write-only file that keeps only the sha256 and size of what was written."""
+    def __init__(self):
+        import hashlib
+        self.h, self.size = hashlib.sha256(), 0
+
+    def write(self, b):
+        self.h.update(b)
+        self.size += len(b)
+        return len(b)
+
+    def tell(self):
+        return self.size
+
+
+def make_asset(row, hit, entry, stage=None):
+    """(file name, size, sha256, problems) of ROW's release asset; written into STAGE when given."""
+    sha, path = hit[1]
+    path = Path(path)
+    problems = []
+    if entry['publish'] == 'file':
+        name = path.name
+        data = path.read_bytes()
+        digest = __import__('hashlib').sha256(data).hexdigest()
+        if sha != '-' and digest != sha:
+            problems.append('%s: %s is not the row\'s pinned file' % (row, path.name))
+        refs = private_refs(data)
+        if refs:
+            problems.append('%s: %s holds a %s' % (row, path.name, ', '.join(refs)))
+        if stage is not None and not problems:
+            (Path(stage) / name).write_bytes(data)
+        return name, len(data), digest, problems
+    name = row + '.tar'
+    for rel, p in archive_members(path, entry.get('include')):
+        if p.is_file() and not p.is_symlink():
+            refs = private_refs(p.read_bytes())
+            if refs:
+                problems.append('%s: %s holds a %s' % (row, rel, ', '.join(refs)))
+    if problems:
+        return name, None, None, problems
+    if stage is None:
+        sink = _Sink()
+        write_archive(sink, path, entry.get('include'))
+        return name, sink.size, sink.h.hexdigest(), problems
+    with open(Path(stage) / name, 'wb') as f:
+        write_archive(f, path, entry.get('include'))
+    return name, (Path(stage) / name).stat().st_size, sha256_file(Path(stage) / name), problems
+
+
+ASSET_URL = 'https://github.com/lythka/hao-assets/releases/download/%s/%s'
+RELEASE_NAME = __import__('re').compile(r'^\d+(\.\d+){1,2}-\d{2}[A-Z]\d{2,4}[a-z]?\.\d+$')
+
+
+def build_release(assembly, name, stage=None, prerelease=True):
+    """(release.json as a dict, problems). Every row of release_rows is placed by its content class
+    (release-classes.json): ours rows become assets (made, hashed and, with STAGE, written there), downloads carry
+    their URL, made-on-mac rows their producer and Apple inputs. A problem is anything that keeps the release from
+    being complete: a row with no class, a pending row, an ours row without a clean producer, a download without
+    its file here."""
+    if not RELEASE_NAME.match(name):
+        raise ValueError('release %r is not MACOS-BUILD.N (e.g. 27.2.1-26B131.0)' % name)
     patches = runpy.run_path(str(TOP / 'pipeline' / 'patches.py'))
     a = json.loads(Path(assembly).read_text())
     import contextlib, io
@@ -142,84 +342,156 @@ def release_json(assembly, results, overlays=None):
         plan = patches['plan'](TOP / 'pipeline/sets' / (a['patch_set'] + '.txt'),
                                TOP / 'pipeline/targets' / (a['target'] + '.json'), a['donor_build'], locks=None)
     packs = patches['load_packs']()
-    # harvested rows (caches made on a running laptop) never ship: their recipes are dev-only in a release, and the
-    # target makes its own caches at first boot (workflow plan decision, 2026-11-12)
-    left_out = ['%s: %s' % (row, d) for row, c, d, _ in results if c == 'harvested']
-    refusals = ['%s: %s (%s)' % (row, c, d) for row, c, d, _ in results
-                if c not in ('download', 'reproducible', 'reproducible-except', 'harvested')]
-    notes = ['%s: %s' % (row, d) for row, c, d, _ in results if c == 'reproducible-except']
-    downloads, assets = [], []
-    for row, c, detail, hit in results:
-        if c == 'harvested':
+    data = classes()
+    problems, notes = [], []
+    downloads, assets, made, harvested, in_checkout, pending = [], [], [], [], [], []
+    runtime_commit = None
+    for row, hit in release_rows(assembly):
+        entry = data.get(row)
+        if entry is None:
+            problems.append('%s: not in pipeline/release-classes.json' % row)
             continue
-        sha, path = hit[1] if hit else ('-', None)
-        size = os.path.getsize(path) if path and os.path.isfile(path) else None
-        item = {'row': row, 'sha256': sha, 'size': size}
-        if c == 'download':
-            downloads.append(dict(item, name=row, url=None))      # the URL is filled in by the cut, never guessed
+        kind = entry['class']
+        if row == 'hao_runtime' and hit and os.path.isdir(hit[1][1]):
+            m = Path(hit[1][1]) / 'payload-manifest.json'
+            runtime_commit = json.loads(m.read_text()).get('commit') if m.is_file() else None
+        if kind == 'harvested':
+            harvested.append(row)
+        elif kind == 'in-checkout':
+            in_checkout.append({'row': row, 'path': os.path.relpath(hit[1][1], TOP) if hit else None,
+                                'reason': entry['reason']})
+        elif kind == 'made-on-mac':
+            made.append({'row': row, 'producer': entry['producer'], 'inputs': entry.get('inputs', []),
+                         'reason': entry['reason']})
+        elif kind == 'pending':
+            pending.append({'row': row, 'content': entry.get('content'), 'reason': entry['reason']})
+            problems.append('%s: pending (%s)' % (row, entry['reason']))
+        elif kind == 'download':
+            path = hit[1][1] if hit else None
+            if not path or not os.path.isfile(path):
+                problems.append('%s: the download is not here to size (%s)' % (row, path))
+                continue
+            downloads.append({'row': row, 'name': entry['name'], 'url': entry['url'], 'size': os.path.getsize(path),
+                              'sha256': hit[1][0], 'reason': entry['reason']})
+        elif kind == 'ours':
+            record, detail = classify(row, hit)
+            if record not in ('reproducible', 'reproducible-except'):
+                problems.append('%s: ours, but %s (%s)' % (row, record, detail))
+                continue
+            if record == 'reproducible-except':
+                notes.append('%s: %s' % (row, detail))
+            repo, commit = producer_of(row, hit)
+            file, size, digest, bad = make_asset(row, hit, entry, stage)
+            if bad:
+                problems += bad
+                continue
+            item = {'row': row, 'file': file, 'url': ASSET_URL % (name, file), 'size': size, 'sha256': digest,
+                    'commit': commit, 'repo': repo, 'format': entry['publish'], 'reason': entry['reason']}
+            if entry.get('include'):
+                item['includes'] = entry['include']
+            if entry.get('made_on_mac_files'):
+                item['completed_on_mac'] = entry['made_on_mac_files']
+            assets.append(item)
         else:
-            assets.append(dict(item, class_=c, producer=detail))
-    out = {'release_format': 1, 'state': 'draft' if refusals else 'cut', 'assembly': Path(assembly).stem,
-           'golden_build': a['golden_build'], 'donor_build': a['donor_build'], 'target': a['target'],
-           'patch_set': a['patch_set'],
-           'proven_on': sorted({m for p in packs.values() for m in p.get('proven_on', [])}),
-           'recipes': {name: patches['revision'](name) for _, name, _ in plan},
+            problems.append('%s: unknown class %r' % (row, kind))
+    files = [x['file'] for x in assets]
+    problems += ['asset file %s is made by two rows' % f for f in sorted({f for f in files if files.count(f) > 1})]
+    head = subprocess.run(['git', '-C', str(TOP), 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+    dirty = bool(subprocess.run(['git', '-C', str(TOP), 'status', '--porcelain', '--untracked-files=no'],
+                                capture_output=True, text=True).stdout.strip())
+    if dirty:
+        problems.append('hao-patcher: the checkout has uncommitted changes')
+    rel = {'contract_version': 1, 'release': name, 'prerelease': prerelease,
+           'proven_models': sorted({m for p in packs.values() for m in p.get('proven_on', [])}),
+           'assembly': Path(assembly).stem, 'golden_build': a['golden_build'], 'donor_build': a['donor_build'],
+           'oclp': a['oclp'], 'hao_patcher': head, 'hao_runtime': runtime_commit or '',
+           'downloads': downloads, 'assets': assets, 'made_on_mac': made, 'harvested': sorted(harvested),
+           'expected': {},
+           'state': 'complete' if not problems else 'incomplete',
+           'unproven': True,
+           'target': a['target'], 'patch_set': a['patch_set'],
+           'recipes': {n: patches['revision'](n) for _, n, _ in plan},
+           'dev_only_recipes': sorted(n for _, n, inputs in plan if set(harvested) & set(inputs)),
            'packs': {n: {'phase': p['phase'], 'recipes': p.get('recipes', [])} for n, p in sorted(packs.items())},
-           'downloads': downloads, 'assets': [{k.rstrip('_'): v for k, v in x.items()} for x in assets],
-           'refusals': refusals, 'notes': notes, 'left_out': left_out}
-    harvested_rows = {row for row, c, _, _ in results if c == 'harvested'}
-    dev_only = sorted(name for _, name, inputs in plan if harvested_rows & set(inputs))
-    out['dev_only_recipes'] = dev_only
-    if overlays:
-        ledger_mod = runpy.run_path(str(TOP / 'pipeline' / 'ledger.py'))
-        led = ledger_mod['build'](TOP / 'pipeline/sets' / (a['patch_set'] + '.txt'),
-                                  TOP / 'pipeline/targets' / (a['target'] + '.json'), a['donor_build'])
-        skip = [p for p, e in led.items() if e['writers'][-1]['recipe'] in dev_only]
-        expected = {}
-        for m in sorted(Path(overlays).glob('*/manifest.json')):
-            man = json.loads(m.read_text())
-            expected[man['pack']] = {p: f['sha256'] for p, f in sorted(man['files'].items())
-                                     if not any(p == s or p.startswith(s.rstrip('/') + '/') for s in skip)}
-        out['expected_outputs'] = expected    # compared after a build, not fatal: a difference is a note
-    return out
+           'in_checkout': in_checkout, 'pending': pending, 'notes': notes,
+           'archive_format': json.loads((TOP / 'pipeline' / 'release-classes.json').read_text())['archive']}
+    return rel, problems
+
+
+def check_stage(rel, stage):
+    """Problems: every asset staged with its size and sha256, nothing else staged but release.json and dotfiles."""
+    stage = Path(stage)
+    bad = []
+    names = {x['file'] for x in rel['assets']}
+    for x in rel['assets']:
+        f = stage / x['file']
+        if not f.is_file():
+            bad.append('%s is not staged' % x['file'])
+        elif f.stat().st_size != x['size'] or sha256_file(f) != x['sha256']:
+            bad.append('staged %s is not the file release.json pins' % x['file'])
+    bad += ['%s is staged but not an asset' % p.name for p in sorted(stage.iterdir())
+            if p.name not in names and p.name != 'release.json' and not p.name.startswith('.')]
+    return bad
 
 
 def main(argv):
     if '--write' in argv:
         i = argv.index('--write')
-        out_path = argv[i + 1]
+        out_path = Path(argv[i + 1])
         argv = argv[:i] + argv[i + 2:]
-        overlays = None
-        if '--overlays' in argv:
-            j = argv.index('--overlays'); overlays = argv[j + 1]; argv = argv[:j] + argv[j + 2:]
+        opts = {}
+        for flag in ('--release', '--stage'):
+            if flag in argv:
+                j = argv.index(flag)
+                opts[flag] = argv[j + 1]
+                argv = argv[:j] + argv[j + 2:]
+        if '--release' not in opts:
+            sys.exit(__doc__)
         assembly = next(a for a in argv if not a.startswith('--'))
-        pairs = rows_for(assembly)
-        results = [(row,) + classify(row, hit) + (hit,) for row, hit in pairs]
-        rel = release_json(assembly, results, overlays)
-        if rel['state'] != 'cut' and '--draft' not in argv:
-            print('release-cut: refused, %d rows are not reproducible or downloadable (use --draft to write a draft):'
-                  % len(rel['refusals']), file=sys.stderr)
-            for r in rel['refusals']:
-                print('  ' + r, file=sys.stderr)
+        stage = Path(opts['--stage']) if '--stage' in opts else None
+        if stage is not None:
+            if stage.exists() and any(p for p in stage.iterdir() if not p.name.startswith('.')):
+                print('release-cut: %s is not empty' % stage, file=sys.stderr)
+                return 1
+            stage.mkdir(parents=True, exist_ok=True)
+        rel, problems = build_release(assembly, opts['--release'], stage, prerelease='--final' not in argv)
+        if problems and '--allow-pending' not in argv:
+            print('release-cut: refused, the release is incomplete (--allow-pending writes it, marked incomplete):',
+                  file=sys.stderr)
+            for p in problems:
+                print('  ' + p, file=sys.stderr)
+            if stage is not None:
+                for x in rel['assets']:
+                    (stage / x['file']).unlink(missing_ok=True)
             return 1
-        Path(out_path).write_text(json.dumps(rel, indent=1) + '\n')
-        print('release-cut: wrote %s (%s; %d downloads, %d assets, %d refusals)' % (
-            out_path, rel['state'], len(rel['downloads']), len(rel['assets']), len(rel['refusals'])))
-        return 0
+        out_path.write_text(json.dumps(rel, indent=1) + '\n')
+        bad = check_stage(rel, stage) if stage is not None else []
+        for b in bad:
+            print('release-cut: ' + b, file=sys.stderr)
+        print('release-cut: wrote %s (%s; %d downloads, %d assets, %d made on the Mac, %d harvested, %d pending)' % (
+            out_path, rel['state'], len(rel['downloads']), len(rel['assets']), len(rel['made_on_mac']),
+            len(rel['harvested']), len(rel['pending'])))
+        for p in problems:
+            print('  ' + p)
+        return 1 if bad else 0
     if '--dry-run' not in argv or len([a for a in argv if not a.startswith('--')]) != 1:
         sys.exit(__doc__)
     assembly = next(a for a in argv if not a.startswith('--'))
-    results = [(row,) + classify(row, hit) for row, hit in rows_for(assembly)]
+    data = classes()
+    results = [(row,) + classify(row, hit) + (data.get(row, {}).get('class', 'unclassified'),)
+               for row, hit in release_rows(assembly)]
     if '--json' in argv:
-        print(json.dumps([{'row': r, 'class': c, 'detail': d} for r, c, d in results], indent=1))
+        print(json.dumps([{'row': r, 'class': c, 'detail': d, 'content': k} for r, c, d, k in results], indent=1))
     else:
-        for row, c, detail in sorted(results, key=lambda x: (x[1], x[0])):
-            print('%-14s %-34s %s' % (c, row, detail))
+        for row, c, detail, k in sorted(results, key=lambda x: (x[3], x[1], x[0])):
+            print('%-12s %-19s %-34s %s' % (k, c, row, detail))
         counts = {}
-        for _, c, _ in results:
-            counts[c] = counts.get(c, 0) + 1
+        for _, _, _, k in results:
+            counts[k] = counts.get(k, 0) + 1
         print('\nrelease-cut: %d rows: %s' % (len(results), ', '.join('%d %s' % (n, c) for c, n in sorted(counts.items()))))
-    return 0 if all(c in ('download', 'reproducible', 'reproducible-except', 'harvested') for _, c, _ in results) else 1
+    ok = all(k != 'unclassified' and (k != 'ours' or c in ('reproducible', 'reproducible-except'))
+             for _, c, _, k in results)
+    return 0 if ok else 1
 
 
 if __name__ == '__main__':

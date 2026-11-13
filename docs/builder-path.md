@@ -39,7 +39,7 @@ as is. Anyone can read what each patch changes and why.
 | Kernel binder | Computes the OpenCore kernel repairs and IntelCommpage table from a recipe and the kernel collection just linked, with no compiler on the target. The image build runs it (hao-opencore `kc.bind`) and requires the recorded repairs' bytes where those bind. Elsewhere it writes the table into IntelCommpage, which reads it at load (kernel-foundation r42), so a moved layout needs no rebuilt kext | [`tools/kc-binder`](../tools/kc-binder/README.md) |
 | Assembler targets | One assembler over a raw image or a whole internal disk, the disk gated by the installer's safety checks | `pipeline/stages/golden-image.py` |
 | Downloads | Pinned, resumable, content-addressed downloads; a host capability matrix | [`tools/acquire`](../tools/acquire/README.md) |
-| Release cut | Classifies every input as downloadable, reproducible, dirty, harvested or unrecorded; writes `release.json` drafts | `pipeline/release-cut` |
+| Release cut | Classifies every input by content (ours, made on the Mac, download, harvested; `pipeline/release-classes.json`, a reason per row) and by build record; writes `release.json` (the hao-assets release schema) and stages our assets: files as they are, folders as one deterministic tar each | `pipeline/release-cut` |
 | Contract | Shared checker for the interfaces between the hao repositories, vendored and pinned | [hao-assets](https://github.com/lythka/hao-assets), `tools/hao-contract` |
 | Metal | Our own legacy-Metal wrapper and MetalOld, generated or extracted and declared | [`tools/metal-wrapper`](../tools/metal-wrapper/README.md), `patches/metal-metalold` |
 
@@ -102,9 +102,7 @@ why it matters, what was left untouched and what to do next.
 - **The USB installer:** the Recovery-on-a-stick launcher in Golden Gate's Recovery. Its riskiest unknowns (bundled
   Python, kmutil and the binder, cryptex sealing, volume groups and firmlinks) pass in the laptop's Tahoe Recovery
   ([`tools/recovery-spikes`](../tools/recovery-spikes/README.md)); they run again in Golden Gate's.
-- **A first release.** `pipeline/release-cut --dry-run` lists every input a cut would refuse: today one built from
-  a checkout with uncommitted changes and one without a build record. Caches harvested from a running laptop never
-  ship; a release warms them up on the first boot instead (not built yet).
+- **A first release.** `pipeline/release-cut --write` stages a prerelease (`--allow-pending`): our compiled shims and recipe data as assets, Apple's and third-party files as pinned downloads, the rest made on the Mac. Held: hao-runtime's payload (its split of our files from those generated from Apple binaries), three rows whose build records hold home-folder paths (kernel repairs, Live Text, the Metal compiler service), the firmlink tool (no build record) and OCLP's Python packages (no single URL). Caches harvested from a running laptop never ship; a release warms them up on the first boot instead (not built yet).
 - **On the laptop:** the live patch's snapshot and revert (`tools/hao/laptop/run-9a.sh`), and the replacement Metal
   stack.
 
