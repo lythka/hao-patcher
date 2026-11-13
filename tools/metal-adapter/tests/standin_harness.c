@@ -4,6 +4,7 @@
 //   standin_harness req13 REQ13 OUT              the type-13 request after option translation and module-cache move
 //                                                (HAO_FE_MODULE_CACHE from the environment)
 //   standin_harness reply27 REPLY OUT            a 3802 type-1 reply with its reflection in 27's layout (reflection27)
+//   standin_harness template X OUT               the built-in template (installed build, HAO_TEMPLATE_INC), else exit 3
 // Exit 0 and OUT written, or exit 3 when the stand-in would not rewrite (layout refused / no change).
 #include "../src/standin.c"
 
@@ -27,6 +28,10 @@ int main(int argc, char **argv) {
     o = reflection27(0, a, n1, &on);
   } else if (!strcmp(argv[1], "req13") && argc == 4) {
     int mv; o = translate13(0, a, n1, &on, &mv); (void)mv;
+  } else if (!strcmp(argv[1], "template") && argc == 4) {
+#ifdef HAO_TEMPLATE_INC
+    o = (uint8_t *)kTemplate; on = sizeof kTemplate;
+#endif
   } else return 2;
   if (!o) return 3;
   return put(argv[argc - 1], o, on);

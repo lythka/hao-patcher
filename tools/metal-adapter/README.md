@@ -4,11 +4,13 @@ Lets macOS 27.2.1's own x86_64 `Metal.framework` (383.1) drive the Intel HD 4000
 legacy compilers and driver, instead of OCLP's `MetalOld` + our [metal-wrapper](../metal-wrapper/README.md). The
 fallback, and what every image ships today, is still the wrapper.
 
-**Status: laptop test only.** No recipe installs any of it. 27's Metal is loaded with `DYLD_FRAMEWORK_PATH` inside a
-sandboxed test process; nothing on the system is changed. Compute is proven on the laptop (r2). Render aborted on the
-laptop in r3 (27's reflection reader, reached through the image's `libmetal-framebuffer` hook); r4 fixes that and is
-proven on the host replay as far as the host goes (pipeline state created, reflection identical to MetalOld's), and
-waits for its laptop run.
+**Status: laptop test, and a dev-only installed trial.** The test bundle loads 27's Metal with `DYLD_FRAMEWORK_PATH`
+inside a sandboxed test process; nothing on the system is changed. Compute is proven on the laptop (r2); render
+aborted on the laptop in r3 (27's reflection reader, reached through the image's `libmetal-framebuffer` hook); r4
+fixes that, and compute, render and reflection pass on the laptop with it. `make.py installed` builds the same pieces
+for the whole system (every process, WindowServer included); the dev-only recipe
+[golden-gate-metal27](../../patches/golden-gate-metal27/README.md) (pack `metal27-trial`, in no default set)
+installs them. Not booted yet.
 
 | Piece | Source | What |
 |---|---|---|
@@ -20,6 +22,7 @@ waits for its laptop run.
 | runner | [run.sh](run.sh) | the laptop run: manifest check, one sandboxed process per case, summary |
 | builder | [make.py](make.py), [inputs.json](inputs.json), [abi.py](abi.py) | the bundle; the host replay runtime; the descriptor layout table |
 | host replay | [host-replay.sh](host-replay.sh), [host-control.sh](host-control.sh) | the bundle against the fake HD 4000; the same under MetalOld, with its requests captured |
+| installed trial | `make.py installed` | Metal27 (the bundle's file), and the installed builds of the shim and the stand-in, as System files |
 
 ## How it works
 
@@ -202,6 +205,42 @@ Log prefixes in `<run>/log.txt`: `[shim]` (Metal image and UUID, ivar offsets, t
 `[standin]` (every request and reply; raw dumps in `<run>/dump/`), `[q2log]`, `[test]` (for render also two
 pixels: `pixel(0,63)`, `pixel(63,0)`).
 
+## The installed trial (`make.py installed`)
+
+```sh
+CACHE_DYLIB=PATH/hao-tools/tools/cache-dylib \
+python3.14 -I tools/metal-adapter/make.py installed OUT --cache ROSETTA_CRYPTEX/System/Library/dyld --metalold OCLP_METALOLD
+# OUT/root/System/...: the four files below; OUT/build.json: inputs, toolchain, commit, sha256 of each, Metal27's UUID
+```
+
+| System file | What |
+|---|---|
+| `Frameworks/Metal.framework/Versions/A/Metal` | Metal27: the bundle's file byte for byte (`e0d38ca0…`, the one r2–r4 ran), over OCLP's wrapper |
+| `Frameworks/Metal.framework/Versions/A/libHaoMetalShim.dylib` | the shim, installed build (`-DHAO_METAL27_INSTALLED`) |
+| `PrivateFrameworks/MTLCompiler.framework/Versions/{32023,32024}/MTLCompiler` | the stand-in, installed build (`-DHAO_STANDIN_INSTALLED`) |
+
+Metal and both MTLCompiler paths are images of the x86_64 dyld cache. On the image dyld loads the file at such a
+path instead of the cache's copy (an on-disk root) because `ic_csr_internal=1` makes the kernel report
+`CSR_ALLOW_APPLE_INTERNAL` ([hao-opencore](../../patches/hao-opencore/README.md)); that is how OCLP's wrapper replaces
+27's Metal today. No cache image links MTLCompiler 32023 or 32024 (`ipsw dyld imports`); 27's Metal `dlopen`s them.
+
+What the installed builds change (the routing, the flip, the layouts and the reflection cut are the same code):
+
+- **Shim:** the in-process compiler is on unless `HAO_METAL27_INTERNAL=0` (the image's `MTLCompilerService` is OCLP's
+  13.2.1 build, which cannot serve 27's Metal: `xpc-*` in laptop run 2). Nothing on stderr unless `HAO_SHIM_LOG=1`.
+  A refusal (another Metal, MetalOld loaded, the flip's pattern or offset not found) never ends the process: it goes
+  to the unified log (`log show --predicate 'subsystem == "org.hao.metal27"'`) and the shim does nothing more there.
+- **Stand-in:** carries the type-7 template (generated from `inputs.json` at build); `HAO_DOWNGRADE_TEMPLATE` still
+  overrides it. Nothing on stderr unless `HAO_STANDIN_LOG=1`; a compiler that cannot be loaded is a fault in the
+  unified log, then `abort` as before. Both builds now map any `-std=metalM.N` above 3.0 to `-std=metal3.0` (was:
+  only 4.1), since apps choose their language version.
+
+Host replay with the installed shim and stand-ins in the r4 bundle (`HAO_REFLECTION=1`, `HAO_DOWNGRADE_TEMPLATE`
+empty, so the built-in template): `add1`, `saxpy_long_name`, `source`, `render-color`, `render-texture`,
+`render-source` give their pipeline as r4 did; no `[shim]` or `[standin]` line in any log; every type-1, type-7,
+spliced and 31001 reply dump byte-identical to r4's (type 13 differs only in the run's folder paths); reflection
+lines identical.
+
 ## Host replay
 
 The host (Apple silicon, x86_64 under Rosetta) has no HD 4000. cache/shaders' replay interposer (`ip.dylib`) fakes
@@ -282,7 +321,7 @@ python3.14 -I -B -m unittest discover -s tools/metal-adapter/tests
 METAL_ADAPTER_METALOLD=OCLP_METALOLD METAL_ADAPTER_METAL27=OUT/work/Metal27.cut \
 METAL_ADAPTER_BUNDLE=OUT/metal27-adapter-test \
 METAL_ADAPTER_R2_RESULTS=LAPTOP_RESULTS/20261112-164152 METAL_ADAPTER_TEMPLATE=R2_TEMPLATE \
-METAL_ADAPTER_R3_RESULTS=LAPTOP_RESULTS/20261112-175530 \
+METAL_ADAPTER_R3_RESULTS=LAPTOP_RESULTS/20261112-175530 METAL_ADAPTER_INSTALLED=INSTALLED_OUT \
     python3.14 -I -B -m unittest discover -s tools/metal-adapter/tests
 ```
 
@@ -297,6 +336,12 @@ the test.
 With the variables: `METAL_ADAPTER_METALOLD` and `METAL_ADAPTER_METAL27` (checked against `inputs.json`) generate
 `layouts.inc` in a temporary folder, recompute it from its own encodings, and check its bit positions against what
 both binaries' getters read and the driver's read offsets landing on the right fields.
+`tests/test_installed.py`: the installed stand-in built natively (silent, its template equal to `make.py`'s); the
+installed shim, built with an empty layout table, loaded under Rosetta into a process whose Metal is the host's own:
+quiet refusal, the process goes on (the test build still exits 70). `METAL_ADAPTER_INSTALLED=OUT` (a `make.py
+installed` result) checks `build.json` against the files, and a Rosetta probe on OUT's Metal27: the in-process
+switch set with nothing on stderr, off with `HAO_METAL27_INTERNAL=0`, the shim's log with `HAO_SHIM_LOG=1`; with
+`METAL_ADAPTER_BUNDLE` too, OUT's Metal is the bundle's.
 `METAL_ADAPTER_BUNDLE` runs a Rosetta probe that makes texture, render pipeline and colour
 attachment descriptors through 27's public API and reads their private structs through the shim, from a dylib in a
 folder named like a driver bundle, checking every value at MetalOld's offset (and that ordinary callers still get
