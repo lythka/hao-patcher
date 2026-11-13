@@ -229,6 +229,9 @@ class GoldenRun(unittest.TestCase):
         for name in ('post','hooks','site','py/bin'):(share/name).mkdir(parents=True)
         python=share/'py/bin/python3.12';python.write_text('#!/bin/sh\nexec '+sys.executable+' "$@"\n');python.chmod(0o755)
         shutil.copy2(TOP/'pipeline/stages/copy-hooks.py',source/'copy-hooks.py')
+        shutil.copy2(TOP/'pipeline/stages/golden-assemble.sh',source/'golden-assemble.sh')
+        shutil.copy2(TOP/'pipeline/kit.py',source/'kit.py')
+        if not (share/'py-x86_64').exists():(share/'py-x86_64').symlink_to('py')
         script='''import json,pathlib,sys
 c=json.load(open(sys.argv[1]));w=pathlib.Path(c['work']);w.mkdir()
 (w/'command-000.log').write_text('retained command evidence')
@@ -239,7 +242,8 @@ raise SystemExit(c['rc'])
 '''
         (source/'golden-image.py').write_text(script)
         local=root/'guest-local'
-        (share/'guest-config.json').write_text(json.dumps(dict(work=str(local/'work'),image=str(local/'target.img'),rc=rc)))
+        (share/'kit.json').write_text(json.dumps(RUN['KIT']['template'](dict(work=str(local/'work'),rc=rc),'fixture',
+                                                                        str(share),str(local))))
         text=RUN['job_script'](str(local),str(share),'%d:%d'%(os.getuid(),os.getgid()),workspace=workspace)
         environment=dict(os.environ);environment.pop('SSDVM_AGENT_ID',None)
         result=subprocess.run(['/bin/sh'],input=text,text=True,capture_output=True,env=environment)

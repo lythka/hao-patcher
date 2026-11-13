@@ -42,6 +42,7 @@ MIRRORS = {
     'darwin27_kernel': ('pipeline/inputs/golden/26B131', 'darwin27_kernel'),
     'fl': ('pipeline/inputs/common', 'fl'),
     'fl_noent': ('pipeline/inputs/common', 'fl-noent'),
+    'python_x86_64': ('pipeline/inputs/common', 'python_x86_64'),
 }
 
 # Repository paths every Python spike gets in code.tar (plus kc-binder's own stage at kcstage/).

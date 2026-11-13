@@ -43,7 +43,7 @@ Revision r4, status dev. [Recipe](../patches/dev-access/README.md)
 
 ## dev-diagnostics
 
-Revision r2, status dev. [Recipe](../patches/dev-diagnostics/README.md)
+Revision r3, status dev. [Recipe](../patches/dev-diagnostics/README.md)
 
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, after hao-opencore (and golden-gate-live-text-service); 3 edits, applied by the installer.
   1. `diagnostic-boot-args`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 auxKCAtBoot=false".
@@ -128,7 +128,7 @@ Revision r2, status experiment. [Recipe](../patches/golden-gate-launchd-warm/REA
 
 ## golden-gate-live-text-service
 
-Revision r3, status experiment. [Recipe](../patches/golden-gate-live-text-service/README.md)
+Revision r4, status experiment. [Recipe](../patches/golden-gate-live-text-service/README.md)
 
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, after hao-opencore; 1 edit, applied by the installer.
   1. `revblock-without-media`: plist.set NVRAM:Add:4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102:revblock = "none".
@@ -384,7 +384,7 @@ Revision r7, status experiment. [Recipe](../patches/golden-gate-windowserver-fil
 
 ## hao-opencore
 
-Revision r53, status experiment. [Recipe](../patches/hao-opencore/README.md)
+Revision r54, status experiment. [Recipe](../patches/hao-opencore/README.md)
 
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it; 5 edits, applied by the installer. Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (kc.bind reads it).
   1. `kernel-repairs`: kc.bind (applied by tools/kc-binder, against the target's linked BootKC).

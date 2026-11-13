@@ -4,7 +4,7 @@
 #   SHARE/pristine      payload.yaa, links.txt, firmlinks_payload (unpack), sys/data lists, firmlinks + root_uuid metadata, tools
 #   SHARE/oclp    OCLP source at commit OCLP (git archive of $OCLP_REPO) + the Universal-Binaries.dmg it expects
 #   SHARE/kdk     the build's KDK, expanded (System/Library/Extensions + SystemVersion.plist), cached in $CACHE
-#   SHARE/py SHARE/site   arm64 CPython + the site-packages OCLP imports
+#   SHARE/py SHARE/py-x86_64 SHARE/site   arm64 and x86_64 CPython + the site-packages OCLP imports (universal)
 #   SHARE/patches.txt   the set's image patches that apply to this target and build (pipeline/patches.py plan)
 #   SHARE/optional.json the set's optional patches that ran or were skipped, with the reason
 #   SHARE/hooks/NN-<name>  the set's oclp-hook patches (patches/<name>/src, OCLP runs its hook.sh SYS DATA) and
@@ -49,9 +49,13 @@ if [[ ! -f $K/System/Library/CoreServices/SystemVersion.plist ]]; then
 fi
 ditto $K $SHARE/kdk/$KDK
 
-PY=$CACHE/python/arm64
-[[ -x $PY/python/bin/python3.12 ]] || { rm -rf $PY; mkdir -p $PY; tar -xzf $(common python_arm64) -C $PY; }
-ditto $PY/python $SHARE/py; ditto $(common python_site) $SHARE/site
+# Both CPythons: SHARE/py (arm64) and SHARE/py-x86_64; the assembly copies the one for the Mac it runs on to its py/.
+for arch dir in arm64 py x86_64 py-x86_64; do
+    PY=$CACHE/python/$arch
+    [[ -x $PY/python/bin/python3.12 ]] || { rm -rf $PY; mkdir -p $PY; tar -xzf $(common python_$arch) -C $PY; }
+    ditto $PY/python $SHARE/$dir
+done
+ditto $(common python_site) $SHARE/site
 
 # A patch input: the Golden Gate build's row (GOLDEN_LOCK, golden-first only), else the donor build's, else common's.
 # Optional patches whose rows are not there, or whose group is in SKIP_OPTIONAL (space-separated), are left out of the
