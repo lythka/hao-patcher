@@ -14,7 +14,8 @@ comment are refreshed; every patch whose patch.json inputs name the row gets rev
 patches/TRACKER.md is regenerated. Nothing is committed: review, run `patches.py check` and the tests, then commit
 (CLAUDE.md). --dry-run prints the choice and the planned edits without writing.
 """
-import datetime, glob, json, os, re, subprocess, sys
+import datetime
+import hashlib, glob, json, os, re, subprocess, sys
 
 TOP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -105,6 +106,11 @@ def main(argv, top=TOP, today=None):
     commit, uuid8 = meta['hao_commit'], libhao_uuid8(os.path.join(art, 'payload'))
     lines = [l for l in text.splitlines() if l.startswith('#')]
     lines = [re.sub(r'names its commit: [0-9a-f]+', 'names its commit: %s' % commit, l) for l in lines]
+    manifest = os.path.join(art, 'payload', 'payload-manifest.json')
+    if os.path.isfile(manifest):   # the row's payload check names the manifest of the payload it points to
+        with open(manifest, 'rb') as f:
+            digest = hashlib.sha256(f.read()).hexdigest()
+        lines = [re.sub(r'manifest_sha256=[0-9a-f]{64}', 'manifest_sha256=' + digest, l) for l in lines]
     if uuid8:   # the token may wrap onto the next comment line ("bound to libhao\n# 239ea10b")
         lines = re.sub(r'(bound to libhao(?:\n#)?\s+)[0-9a-f]{8}', r'\g<1>' + uuid8, '\n'.join(lines)).split('\n')
     new = '\n'.join(lines + ['- ' + rel]) + '\n'

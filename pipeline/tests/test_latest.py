@@ -64,6 +64,17 @@ class Latest(unittest.TestCase):
                       'hao-runtime bbbbbbb', readme)
         self.assertNotIn('r5', open(os.path.join(self.top, 'patches', 'other', 'README.md')).read())
 
+    def test_payload_check_follows_the_new_manifest(self):
+        import hashlib
+        open(self.row, 'w').write(ROW.replace('- store', '# check: payload os_build=26B131 layout_version=1 '
+                                                         'manifest_sha256=' + 'a' * 64 + '\n- store'))
+        a = self.art('hao-runtime-26B131-20261111-bbbbbbbbbbbb', 'bbbbbbb')
+        manifest = os.path.join(a, 'payload', 'payload-manifest.json')
+        open(manifest, 'w').write('{"os_build": "26B131"}')
+        self.run_latest('hao_runtime', '26B131')
+        want = hashlib.sha256(open(manifest, 'rb').read()).hexdigest()
+        self.assertIn('manifest_sha256=%s\n' % want, open(self.row).read())
+
     def test_validated_users_need_validation_again(self):
         p = os.path.join(self.top, 'patches', 'user-a', 'patch.json')
         json.dump({'revision': 4, 'inputs': ['hao_runtime'], 'validated': True, 'validated_revision': 3,

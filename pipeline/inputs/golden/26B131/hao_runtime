@@ -1,7 +1,6 @@
-# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 0a2c2aa).
+# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 43af852).
 # Built from a root that includes the App and OS cryptexes (their 26 programs are embedded by golden-gate-userspace).
-# Units u4.1; libhao AB009826; 965 AOT caches regenerated for it. Adds since 273ba98: JIT tail rounds (inline FP16
-# FMLA), payload-manifest.json (the runtime -> patcher contract), boot timing (hao_diag_time=1: mach-clock stamps,
-# phase lines, PID 1's lines from before the Data volume mounts) and the Books fix 0900b12.
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=b713cb5fa7927622d551689c8dc57b63024645d9c1cf680c47d0f4794480a5f7
-- store/artifacts/hao-runtime-26B131-20261112-0a2c2aad4755/payload
+# Units u4.1; libhao AF771035; 965 AOT caches. Adds since 0a2c2aa: lazy AOT (caches installed block by block from the
+# mapped file: kernelmanagerd and ~9 others no longer JIT-only) and usage lines after each phase line (hao_diag_time=1).
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=4660678d87f5ec443b274088982ee35301d0f7b72cffc16bae8f9ab397fa57cd
+- store/artifacts/hao-runtime-26B131-20261113-43af85296aa9/payload
