@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from macho import add_load_dylib, section_ranges, set_install_name
@@ -230,9 +231,11 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
     if reused:
         counts, app = reused
     else:
+        started = time.monotonic()
         counts = build_os_image(os_work, golden_os, rosetta, workspace, driverkit_artifact, donor_tool,
                                 codeid_carrier, hao)
         app = build_app_image(payload, app_work, workspace, hao)
+        print(f'cryptex images built in {time.monotonic() - started:.1f} s', flush=True)
         if cache:
             cache.store(os_work, app_work, counts, app)
     print('Combined cryptex:', json.dumps(counts), flush=True)

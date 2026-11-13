@@ -34,6 +34,7 @@ import stat
 import struct
 import subprocess
 import sys
+import time
 
 CPU_X86_64 = 0x01000007
 LIST = 'usr/lib/hao/native-identities'
@@ -44,6 +45,8 @@ HASHES = {1: hashlib.sha1, 2: hashlib.sha256, 3: hashlib.sha256, 4: hashlib.sha3
 RANK = {1: 1, 3: 2, 2: 3, 4: 4}                       # the kernel's preference among CodeDirectories
 CS_ADHOC = 0x2
 PIECE = 64
+# what the last candidates() walk did, for the log (main): entries listed, executables whose headers were read, seconds
+WALK = dict(entries=0, executables=0, seconds=0.0)
 
 
 def slices(data):
@@ -210,9 +213,12 @@ def candidates(system):
     MH_EXECUTE; slice is x86_64_signature's result (slice_bytes reads the bytes when they are needed)."""
     system = Path(system)
     skip = {system/ORIGINALS}
+    started = time.monotonic()
+    WALK.update(entries=0, executables=0, seconds=0.0)
     for folder, dirs, names in os.walk(system):
         here = Path(folder)
         dirs[:] = sorted(d for d in dirs if here/d not in skip and not (here/d).is_symlink())
+        WALK['entries'] += len(dirs) + len(names)
         for name in sorted(names):
             path = here/name
             try:
@@ -222,10 +228,14 @@ def candidates(system):
             # a regular file by lstat: is_file() and not is_symlink(), without two more stat calls
             if not (info.st_mode & 0o111) or not stat.S_ISREG(info.st_mode) or info.st_size < 4096:
                 continue
+            WALK['executables'] += 1
             found = x86_64_signature(path)
             sig = found and found[0]
             if sig and sig['filetype'] == 2 and sig['adhoc']:
+                WALK['seconds'] += time.monotonic() - started
                 yield path.relative_to(system).as_posix(), sig, found
+                started = time.monotonic()
+    WALK['seconds'] += time.monotonic() - started
 
 
 def scan(system, sources):
@@ -323,7 +333,10 @@ def main():
         rows, skipped = scan(args.system, args.source)
         print(json.dumps(dict(rows=rows, skipped=skipped), indent=2))
         return
+    started = time.monotonic()
     record = install(args.system, args.source)
+    print(f'native-identities: walk {WALK["seconds"]:.1f} s ({WALK["entries"]} entries, {WALK["executables"]} '
+          f'executables\' headers read), install {time.monotonic() - started:.1f} s in all', flush=True)
     path = args.record or args.system/RECORD
     path.write_text(json.dumps(record, indent=2) + '\n')
     os.chmod(path, 0o644)

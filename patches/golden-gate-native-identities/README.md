@@ -78,13 +78,16 @@ mounted read-only and its record's two sources), on a real System:
 NEEDS VALIDATION: r4 reads headers and signatures instead of whole files. On the exported 26B131 image (System
 read-only, the record's two sources) its scan equals r3's byte for byte (rows and skips), the list it gives equals the
 image's `/usr/lib/hao/native-identities`, and all 11,517 Mach-O files of that System and the pristine 27.2.1 System
-give the same signature and slice bytes; the hook is otherwise unchanged. A VM build with it is the open check.
+give the same signature and slice bytes; the hook is otherwise unchanged. VM build 2026-11-13 (dev-26B131): same 3
+rows and 936 skips; the step took 220 s (232 s before), so in the builder reading the files was not the main cost
+(the walk of the System's ~340k entries is the likely one). The hook's log now gives the walk's seconds, entries and
+executables read, to confirm that on the next build.
 r1: laptop 2026-11-11, image 4d1c48c (26B131): Setup's automatic login after account creation is authorized in 16 s (system.login.console with the auto-login mechanism).
 Earlier: Host tests pass and a host simulation of the 26B131 WindowServer and `corespotlightd` edits gives
 their rows. No image has been built with this recipe.
 
 ## Revisions
-- r4 2026-11-13 `native_identities.py` reads each executable's headers and code signature only, and a slice's bytes only for the 90% comparison (172 MB instead of 7.4 GB on 26B131); same rows, skips and list.
+- r4 2026-11-13 `native_identities.py` reads each executable's headers and code signature only, and a slice's bytes only for the 90% comparison (172 MB instead of 7.4 GB on 26B131); same rows, skips and list. Logs the walk's time and counts.
 - r3 2026-11-12 Declare that its files are made on the target after every overlay file is installed (`"after": ["overlays"]`): the list is keyed on the CDHashes of the files as installed; the hook is unchanged. Keeps r1's validation: what it installs is unchanged (validated_digest).
 - r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.json `files`; the hook is unchanged.
 - r1 2026-11-11 Initial: Apple originals of re-signed native programs under /usr/lib/hao/originals and the native-identities list, replacing golden-gate-code-identity's map and per-daemon interposer.
