@@ -1,6 +1,7 @@
-# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 397b267).
-# Built from a root that includes the App and OS cryptexes (their 26 programs are embedded by golden-gate-userspace).
-# Units u4.1; libhao 6DC78A24; 965 AOT caches. Adds since 43af852: gssd fix (os_log_set_client_type not applied, 2fad084)
-# and fatal fault reports on their own 256 KB stack (6394002). Since 0a2c2aa also lazy AOT and usage lines.
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=8135b4aa23f9cd4abd8c7e24bed176956eb45bdaa855137ffa2eaa7d16eb7e24
-cb906b4b4aa1a59f36f76f6e127d639631a15f97228626caba19811fe6b43a9b store/artifacts/hao-runtime-26B131-20261113-397b2675d037/payload
+# hao runtime payload for 26B131 from https://github.com/lythka/hao-runtime (build.json names its commit: 9dce413).
+# Built from a clean 9dce413 tree, from a root that includes the App and OS cryptexes (their 26 programs are embedded by
+# golden-gate-userspace). Units u4.1; libhao B7F314C6; 963 embedded (0 DIFF), 965 of 969 AOT caches, dyld fixed.
+# Adds since 397b267: f66403c float-HFA stack fix; 9dce413 ControlCenter crash fix (an Optional over a guest spare-bit
+# multi-payload enum no longer drops the whole value's conversion).
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=2e3172bae541c9c350ca133dd42f60f0c5383b40aa207086b748304c55982ded
+fddb787fae48b5d1c505f41c2f81166985f41adbb86f67c7a9e1973449b037d7 store/artifacts/hao-runtime-26B131-20261113-9dce4138ddfa/payload

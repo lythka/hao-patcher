@@ -342,6 +342,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r70 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 9dce413 tree (hao-runtime-26B131-20261113-9dce4138ddfa): the ControlCenter crash fix and f66403c's float-HFA stack fix. No recipe change.
 - r69 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r68 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 397b267 (hao-runtime-26B131-20261113-397b2675d037). No recipe change.
 - r67 2026-11-13 wifip2p_compat (20822cf11958): add/removeAWDLDiscoveryClient succeed as no-ops instead of ENOTSUP. The call is new in 27.x and advisory; Tahoe's mDNSResponder never makes it and OCLP's wifip2pd brings AWDL up on its own, so mDNSResponder now behaves as Tahoe's does for AirDrop.
