@@ -1,5 +1,6 @@
 # Local inputs, images and build records (see docs/inputs.md).
 store/
+store
 
 # Build outputs. A patch's build/ folder is source; its own build/ output is not.
 build/

@@ -1,0 +1,66 @@
+{
+ "format": 1,
+ "note": "Rows rebuilt on the host from a clean commit and compared with the stored file (2026-11-12). release-cut accepts an entry whose artifact the row still names. 'identical': byte-identical; 'except': only the named stamp differs.",
+ "rows": {
+  "io80211_compat": {
+   "artifact": "io80211-compat-26B131-20261111-c0558983229b",
+   "repo": "hao-patcher",
+   "commit": "e20a3c31",
+   "result": "identical"
+  },
+  "corespotlight_compat_shim": {
+   "artifact": "corespotlight-compat-26A428-20261106-7f7f5fcc7a73",
+   "repo": "hao-patcher",
+   "commit": "177dc8a1",
+   "result": "identical"
+  },
+  "metal_quad_runtime_golden_gate": {
+   "artifact": "metal-ballot-runtime-26A428-20261106-e22a06e77430",
+   "repo": "hao-patcher",
+   "commit": "177dc8a1",
+   "result": "identical"
+  },
+  "tahoe_extensions_donors": {
+   "artifact": "minimal-extensions-25G342-26B131",
+   "repo": "hao-patcher",
+   "commit": "b417500",
+   "result": "identical"
+  },
+  "tahoe_driverkit_donors": {
+   "artifact": "minimal-driverkit-25G342-26B131",
+   "repo": "hao-patcher",
+   "commit": "b417500",
+   "result": "identical"
+  },
+  "tahoe_recovery_donors": {
+   "artifact": "minimal-recovery-25G342-26B131",
+   "repo": "hao-patcher",
+   "commit": "b417500",
+   "result": "identical"
+  },
+  "tahoe_boot_donors": {
+   "artifact": "minimal-boot-25G342-26B131",
+   "repo": "hao-patcher",
+   "commit": "b417500",
+   "result": "except",
+   "except": "manifest.json records the mtime_ns of two BuildManifest.plists the make writes; the payload is identical"
+  },
+  "codeid_carrier": {
+   "artifact": "codeid-carrier-20261111-002baf5f2e03",
+   "repo": "hao-patcher",
+   "commit": "0ff4a9ae",
+   "also": {
+    "hao-runtime": "33a0a040"
+   },
+   "result": "identical"
+  },
+  "libhelloblur": {
+   "artifact": "libhelloblur-d471519b",
+   "repo": "hao-patcher",
+   "commit": "133a9b8b",
+   "result": "except",
+   "except": "the linker version (ld 27037.1 then, 27106.1 now) and the UUID and ad hoc signature that follow from it; every section identical",
+   "open": "133a9b8b is only on the local branch consolidate/fold-packages-20261110, not on origin"
+  }
+ }
+}

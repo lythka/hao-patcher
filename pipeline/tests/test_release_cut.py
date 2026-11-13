@@ -27,8 +27,22 @@ class ReleaseCut(unittest.TestCase):
         r = subprocess.run([sys.executable, '-I', str(TOP / 'pipeline/release-cut'), '--dry-run',
                             str(TOP / 'pipeline/assemblies/mbp92-26B131.json'), '--json'], capture_output=True, text=True)
         classes = {x['class'] for x in json.loads(r.stdout)}
-        self.assertLessEqual(classes, {'download', 'reproducible', 'dirty', 'harvested', 'unrecorded', 'missing'})
-        self.assertEqual(r.returncode, 0 if classes <= {'download', 'reproducible'} else 1)
+        self.assertLessEqual(classes, {'download', 'reproducible', 'reproducible-except', 'dirty', 'harvested',
+                                       'unrecorded', 'missing'})
+        self.assertEqual(r.returncode, 0 if classes <= {'download', 'reproducible', 'reproducible-except'} else 1)
+
+
+class Reproductions(unittest.TestCase):
+    def test_entries_name_their_artifact_and_a_known_commit(self):
+        data = json.loads((TOP / 'pipeline/reproductions.json').read_text())
+        for row, e in data['rows'].items():
+            self.assertIn(e['result'], ('identical', 'except'), row)
+            self.assertTrue(e['result'] != 'except' or e.get('except'), row)
+            self.assertTrue(R['commit_known'](e['commit']), '%s: commit %s not found' % (row, e['commit']))
+
+    def test_a_record_for_another_artifact_is_ignored(self):
+        self.assertIsNone(R['reproduction']('io80211_compat', 'io80211-compat-some-other-build'))
+        self.assertIsNotNone(R['reproduction']('io80211_compat', 'io80211-compat-26B131-20261111-c0558983229b'))
 
 
 class Write(unittest.TestCase):
