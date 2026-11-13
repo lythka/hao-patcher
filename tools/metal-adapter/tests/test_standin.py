@@ -152,6 +152,100 @@ class Standin(Harness):
         self.assertIn(b'/x/com.apple.metalfe', s)
 
 
+def section(kind, data):
+    return struct.pack('<QQ', kind, len(data)) + data + bytes(-len(data) % 8)
+
+
+def reply(*sections):
+    return struct.pack('<Q', len(sections)) + b''.join(sections)
+
+
+def stage_blob(table_entries=1, version=0x10001, data=b''):
+    """A synthetic input-stage reflection blob in 3802's layout: header, attribute bitset, an argument list (opaque
+    bytes here, with unaligned strings as in a real one), u32, END1, the stage-input attributes, then at END1 the second
+    table (END2, count, 36-byte entries), then u32, length, data. Returns (blob, END1, END2)."""
+    head = b'MTLPSBIN' + struct.pack('<II', version, 0)
+    args = struct.pack('<II', 1, 0x54) + b'pos\0' + bytes(range(1, 30))
+    attrs = b'air.vertex_id\0' + struct.pack('<III', 0x21, 0, 0) + b'.uv\0'
+    end1 = len(head) + len(args) + 12 + len(attrs)
+    table = struct.pack('<II', end1 + 8 + 36 * table_entries, table_entries) + bytes(range(36)) * table_entries
+    end2 = end1 + len(table)
+    blob = (head + args + struct.pack('<III', 0x1e, end1, 1) + attrs + table +
+            struct.pack('<II', 0xffffffff, len(data)) + data)
+    return blob, end1, end2
+
+
+@unittest.skipUnless(have_clang(), 'needs Xcode')
+class Reflection(Harness):
+    """3802's input-stage reflection, cut to the layout 27's reader takes (standin.c, reflection27)."""
+    def test_vertex_table_cut(self):
+        blob, end1, end2 = stage_blob(1)
+        binary = b'GC' + bytes(range(256)) * 3
+        r = self.put('v.reply', reply(section(2, blob), section(5, b''), section(0, binary)))
+        rc, out, err = self.run_h('reply27', r)
+        self.assertEqual(rc, 0, err)
+        cut = blob[:end1] + blob[end2:]
+        self.assertEqual(out, reply(section(2, cut), section(5, b''), section(0, binary)))
+        self.assertIn('input-stage table', err)
+
+    def test_compute_empty_table_cut(self):
+        blob, end1, end2 = stage_blob(0, data=b'\x04')
+        self.assertEqual(end2 - end1, 8)
+        r = self.put('c.reply', reply(section(2, blob), section(5, b''), section(0, b'CTNI' * 9)))
+        rc, out, err = self.run_h('reply27', r)
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out, reply(section(2, blob[:end1] + blob[end2:]), section(5, b''), section(0, b'CTNI' * 9)))
+
+    def test_left_alone(self):
+        blob, end1, _ = stage_blob(1)
+        frag = b'MTLPSBIN' + struct.pack('<II', 0x10001, 1) + b'color\0' + bytes(20) + struct.pack('<III', 0, 0xffffffff, 0)
+        bad_count = bytearray(blob)
+        struct.pack_into('<I', bad_count, end1 + 4, 2)              # END2 no longer matches the entry count
+        cases = {
+            'fragment': reply(section(2, frag), section(1, b'\x01\x02\0\0'), section(5, b''), section(0, b'GC')),
+            'newer version': reply(section(2, stage_blob(1, version=0x20000)[0]), section(0, b'GC')),
+            'count mismatch': reply(section(2, bytes(bad_count)), section(0, b'GC')),
+            'not a section list': reply(section(2, blob), section(0, b'GC')) + bytes(16),
+            'no reflection': reply(section(5, b''), section(0, b'GC' * 40)),
+        }
+        for name, data in cases.items():
+            with self.subTest(name):
+                rc, out, err = self.run_h('reply27', self.put('x.reply', data))
+                self.assertEqual(rc, 3, err)
+                self.assertIsNone(out)
+
+
+@unittest.skipUnless(have_clang() and os.environ.get('METAL_ADAPTER_R3_RESULTS'), 'set METAL_ADAPTER_R3_RESULTS')
+class LaptopReplies(Harness):
+    """The laptop's own 3802 replies (r3 run, 2026-11-12 17:55, every one 27's reader aborted on when asked for
+    reflection): each vertex reply loses exactly its input-stage table, each fragment reply is left alone."""
+    def test_laptop_replies(self):
+        res = Path(os.environ['METAL_ADAPTER_R3_RESULTS'])
+        seen = {'cut': 0, 'kept': 0}
+        for rp in sorted(res.glob('adapter-*render*/dump/*.reply')):
+            req = rp.with_suffix('.req1')
+            if not req.exists():
+                continue
+            q = req.read_bytes()
+            no, nl = words(q, 24)[22:24]
+            name = q[no:no + nl].split(b'\0')[0]
+            with self.subTest(run=rp.parent.parent.name, reply=rp.name, function=name):
+                rc, out, err = self.run_h('reply27', rp)
+                if name.endswith(b'_vertex'):
+                    self.assertEqual(rc, 0, err)
+                    orig = rp.read_bytes()
+                    n0, n1 = struct.unpack_from('<Q', orig, 16)[0], struct.unpack_from('<Q', out, 16)[0]
+                    self.assertTrue(0 < n0 - n1 <= 8 + 36 * 16)
+                    self.assertEqual(out[24:24 + 12], orig[24:24 + 12])
+                    self.assertEqual(orig[-1000:], out[-1000:])
+                    seen['cut'] += 1
+                else:
+                    self.assertEqual(rc, 3, err)
+                    seen['kept'] += 1
+        self.assertGreater(seen['cut'], 0)
+        self.assertGreater(seen['kept'], 0)
+
+
 @unittest.skipUnless(have_clang() and os.environ.get('METAL_ADAPTER_R2_RESULTS'), 'set METAL_ADAPTER_R2_RESULTS')
 class LaptopDumps(Harness):
     """The laptop's own requests (r2 run, 2026-11-12 16:42): the repo's stand-in rebuilds them byte for byte."""

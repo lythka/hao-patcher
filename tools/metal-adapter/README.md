@@ -5,8 +5,10 @@ legacy compilers and driver, instead of OCLP's `MetalOld` + our [metal-wrapper](
 fallback, and what every image ships today, is still the wrapper.
 
 **Status: laptop test only.** No recipe installs any of it. 27's Metal is loaded with `DYLD_FRAMEWORK_PATH` inside a
-sandboxed test process; nothing on the system is changed. Compute is proven on the laptop (r2); render (r3) is proven
-on the host replay as far as the host goes (pipeline state created) and waits for its laptop run.
+sandboxed test process; nothing on the system is changed. Compute is proven on the laptop (r2). Render aborted on the
+laptop in r3 (27's reflection reader, reached through the image's `libmetal-framebuffer` hook); r4 fixes that and is
+proven on the host replay as far as the host goes (pipeline state created, reflection identical to MetalOld's), and
+waits for its laptop run.
 
 | Piece | Source | What |
 |---|---|---|
@@ -34,6 +36,16 @@ on the host replay as far as the host goes (pipeline state created) and waits fo
      a template with 27's function name and module spliced in) → 27's own request with the downgraded module →
      OCLP 3802 + the Intel plugin. 3802 accepts 27's type-1 header as it is. A render pipeline is two such
      requests, fragment then vertex; nothing else differs from compute.
+   - 3802's reply, in 27's reflection layout. The reply is a list of sections (u64 count; per section u64 type, u64
+     size, data, padding to 8); type 2 is the stage's reflection (`MTLPSBIN`, version 0x10001), which 27's Metal
+     parses only when the pipeline asks for reflection (`MTLPipelineOptionArgumentInfo`). For a vertex or compute
+     function (Metal's input-stage reader) 3802 writes, after the arguments and the stage-input attributes, a second
+     table (u32 end, u32 count, 36 bytes per entry) that MetalOld 306 reads or skips by its end offset. 27's reader
+     (383) has no such table: it reads the next u32 and the trailing data where the table starts, then aborts because
+     it did not end at the blob's end. The stand-in cuts that table out (and shrinks the section) when the blob's
+     whole tail checks: an end offset pointing at the table, the table's end = its start + 8 + 36 × count, and the
+     trailing length ending the blob exactly. Fragment blobs are the same for both readers and are left alone.
+     `HAO_STANDIN_REFLECTION=0` turns it off (A/B).
    - plugin-less requests (13 frontend, 15 specialization, …) → OCLP 31001 as they are. Type 13 gets three 27
      options rewritten (`-fmetal-math-mode=fast`, `-fmetal-math-fp32-functions=fast`, `-std=metal4.1`) and, with
      `HAO_FE_MODULE_CACHE`, its module cache moved (the sandbox denies the user cache dir).
@@ -136,7 +148,15 @@ then runs each case as its own process under `sandbox-exec`, with every file wri
 `results/<timestamp>/`, and a 120 s watchdog; after two timeouts it skips the rest. `DYLD_*` go through
 `/usr/bin/env`'s argv (SIP-protected binaries drop them from their own environment). Afterwards
 `rm -rf ~/metal27-adapter-test*` removes everything; nothing outside the results folder is written, which
-`writes-check.txt` shows for Metal's user cache dir. No root. 23 processes, about 2–4 minutes.
+`writes-check.txt` shows for Metal's user cache dir. No root. 28 processes, about 2–4 minutes.
+
+On the image, OCLP's HD 4000 driver carries two weak dylibs (`/usr/lib/libmetal-framebuffer.dylib` from
+[golden-gate-metal-framebuffer](../../patches/golden-gate-metal-framebuffer/README.md), `libmetalold-selectors.dylib`
+from [metalold-selectors](../../patches/metalold-selectors/README.md)); they load into the adapter's process with the
+driver. The framebuffer dylib hooks the device's render pipeline factories and asks every render pipeline for
+argument reflection, so on the laptop every render case goes through 27's reflection reader, with or without
+`HAO_REFLECTION`. `system.txt` records both dylibs and whether the driver names them (by `grep`: `otool`
+would ask to install the developer tools on the laptop).
 
 | run | Metal in the process | compile path | device |
 |---|---|---|---|
@@ -144,7 +164,12 @@ then runs each case as its own process under `sandbox-exec`, with every file wri
 | `adapter-*` | bundle Metal27 + shim | in process: stand-in → 31001 downgrade → 3802 + Intel plugin | default, then by hand if nil |
 | `adapter-manual-*` | same | same | by hand: driver bundle + `-initWithAcceleratorPort:` |
 | `adapter-nolayouts-render-color` | same, `HAO_METAL27_LAYOUTS=0` | same | default |
+| `adapter-noreflection-render-color` | same | same, `HAO_STANDIN_REFLECTION=0` (3802's reflection unchanged) | default |
+| `control-reflect-*`, `adapter-reflect-*` | as `control-*`, `adapter-*`, with `HAO_REFLECTION=1` | as `control-*`, `adapter-*` | as `control-*`, `adapter-*` |
 | `xpc-*` | bundle Metal27 + shim, no flip | the system's x86_64 `MTLCompilerService` | as `adapter` |
+
+`HAO_REFLECTION=1` makes the test program create its pipeline with `MTLPipelineOptionArgumentInfo` and print every
+argument of the reflection (`[test] reflection STAGE name=… type=… index=…`, buffer and texture details).
 
 Cases (`KERNEL` argument of the test program):
 
@@ -160,8 +185,8 @@ Render read-back: a blit `synchronizeResource:` of the managed target, then `get
 (M4 Max), through the system Metal and through Metal27 + shim (27's XPC compiler), all three render cases PASS with
 maxdiff 0, so the expected values are right.
 
-`summary.txt` has one line per run, `RESULT kernel=K status=S …` then `TEARDOWN …`, and two verdicts (compute,
-render).
+`summary.txt` has one line per run, `RESULT kernel=K status=S …` then `TEARDOWN …`, two verdicts (compute,
+render) and a reflection line (`adapter-reflect-*` PASS with the same argument reflection as `control-reflect-*`).
 
 | status | meaning |
 |---|---|
@@ -234,6 +259,22 @@ differ only in the same few bytes that also differ between two MetalOld runs (a 
 two 5-byte values near the end, process-specific). Without the descriptor translation (`HAO_METAL27_LAYOUTS=0`)
 the first pipeline aborts in the driver's vertex function key. The compute cases still give 6/6 COMPILE-OK.
 
+**Laptop run 3 (r3, 2026-11-12 17:55): compute PASS again, render aborted.** Control render 3/3 PASS (maxdiff 0).
+Every adapter render case (27.2 and 11.0 targets, and `nolayouts`) compiled both stages through 31001 and 3802,
+then aborted (signal 6) inside 27's Metal, called from `libmetal-framebuffer.dylib`'s pipeline hook. The hook is
+not the cause: it asks for `MTLPipelineOptionArgumentInfo` reflection, and 27's input-stage reflection reader
+aborts on 3802's vertex reflection (the second table, see How it works). The host replay reproduces it with the
+image's two driver dylibs added to its driver (the abort, the same stack), and without them with `HAO_REFLECTION=1`
+alone, for compute too: every adapter pipeline that asks for reflection aborted, render or compute.
+
+**Host replay, reflection (r4, 2026-11-12).** With the stand-in's cut: all ten cases (`add1`, `saxpy_long_name`,
+`source`, `render-color`, `render-texture`, `render-source`; 27.2 and 11.0 targets) give their pipeline with
+`HAO_REFLECTION=1`, and every argument's reflection (name, type, index, active, access, buffer alignment, size and
+data type, texture type and data type, array length) is identical to MetalOld's for the same case
+(`host-control.sh`). With the image's framebuffer and selector dylibs on the replay driver, all render and compute
+cases give their pipeline; `HAO_STANDIN_REFLECTION=0` aborts as on the laptop. Fragment replies are not changed;
+vertex replies lose 44 bytes (one table entry), compute replies 8 (an empty table).
+
 ## Verify
 
 ```sh
@@ -241,12 +282,15 @@ python3.14 -I -B -m unittest discover -s tools/metal-adapter/tests
 METAL_ADAPTER_METALOLD=OCLP_METALOLD METAL_ADAPTER_METAL27=OUT/work/Metal27.cut \
 METAL_ADAPTER_BUNDLE=OUT/metal27-adapter-test \
 METAL_ADAPTER_R2_RESULTS=LAPTOP_RESULTS/20261112-164152 METAL_ADAPTER_TEMPLATE=R2_TEMPLATE \
+METAL_ADAPTER_R3_RESULTS=LAPTOP_RESULTS/20261112-175530 \
     python3.14 -I -B -m unittest discover -s tools/metal-adapter/tests
 ```
 
 Without Apple binaries (Xcode needed for the compiled parts): inputs and their refusal; the template's framing;
 `add_reexport` on a dylib built here; `run.sh`'s syntax; the stand-in's type-7 build, module splice, refusal of an
-unknown layout and type-13 rewriting, on synthetic requests, built natively from `src/standin.c`; `abi.py`'s
+unknown layout and type-13 rewriting, on synthetic requests, built natively from `src/standin.c`; its reflection cut
+on synthetic replies (vertex and compute cut; fragment, newer versions, a wrong table count and a reply that is not
+a section list left alone); `abi.py`'s
 parser, layout (unions, objects, 32-bit bitfield units), field mapping and table output on encodings written in
 the test.
 
@@ -258,4 +302,11 @@ attachment descriptors through 27's public API and reads their private structs t
 folder named like a driver bundle, checking every value at MetalOld's offset (and that ordinary callers still get
 27's struct). `METAL_ADAPTER_R2_RESULTS` makes the stand-in rebuild laptop run 2's own type-7 and spliced type-1
 requests from its type-1 requests and 31001 replies, byte for byte, with the built template (and the captured one,
-with `METAL_ADAPTER_TEMPLATE`).
+with `METAL_ADAPTER_TEMPLATE`). `METAL_ADAPTER_R3_RESULTS` runs the reflection cut on laptop run 3's own 3802
+render replies: each vertex reply loses only its table, each fragment reply is left alone.
+
+Host replay of the reflection matrix: each case with `HAO_REFLECTION=1` through `host-control.sh` and
+`host-replay.sh`, then the `[test] reflection` lines of the two logs compared. To reproduce the image's driver, add
+the two weak dylibs to a copy of the host runtime's driver with
+`patches/golden-gate-metal-framebuffer/src/add_weak_dylib.py` (the `metalold_selectors` and `metal_framebuffer`
+input rows' dylibs, by their absolute path) and sign it ad hoc.

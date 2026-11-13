@@ -16,6 +16,7 @@
 //   HAO_STANDIN_DUMP        optional directory: every request/reply is written there
 //   HAO_FE_MODULE_CACHE     optional (test harness): directory for the 31001 frontend's module cache (see modcache)
 //   HAO_STANDIN_ROUTE=3802  capture only (see passthrough)
+//   HAO_STANDIN_REFLECTION=0  A/B: 3802's reflection to 27 unchanged (see reflection27)
 // Render: 27 sends each stage of a render pipeline (vertex, fragment) as its own plugin-bound type-1 request, the
 // same framing as compute, so the same downgrade + splice serves them (host replay, r3).
 #include <dlfcn.h>
@@ -216,6 +217,63 @@ static uint8_t *translate13(int i, const void *d, size_t sz, size_t *osz, int *m
   *osz = sz; return copy;
 }
 
+// 3802's reflection, in 27's layout. A plugin-bound (type 1) reply is a list of sections: u64 count, then per
+// section u64 type, u64 size, the data, padding to 8. Type 2 is the stage's reflection, "MTLPSBIN" + u32 version,
+// which 27's Metal parses only when the pipeline asks for reflection (MTLPipelineOptionArgumentInfo; the image's
+// libmetal-framebuffer hook does on every render pipeline). 3802 writes version 0x10001. For a vertex or compute
+// function (Metal's input-stage reader) that is: ... arguments, u32, u32 END1, u32 count, stage-input attributes,
+// then at END1 a second table: u32 END2, u32 count, count * 36 bytes; then at END2 u32, u32 length, that many bytes,
+// and the end. MetalOld 306 reads the second table (when the reader's flag bit 20 is set) or skips it by END2. 27's
+// reader (Metal 383) has no second table: after END1 it reads the u32 and the length, and aborts unless that ends the
+// blob (laptop r3: every adapter render case aborted there, through the framebuffer hook; compute aborts the same way
+// when it asks). The fragment reader is the same in both for version 0x10001. So the second table is cut out of an
+// input-stage blob. The blob is recognized by its tail, from the end, and only when the whole structure checks: a
+// u32 END1 (> its own position) whose target holds END2 = END1 + 8 + 36 * count, END2 + 8 + length = the blob size,
+// and nothing else in the reply changes. Returns NULL when there is nothing to change.
+static uint32_t rd32(const uint8_t *p) { uint32_t v; memcpy(&v, p, 4); return v; }
+static uint64_t rd64(const uint8_t *p) { uint64_t v; memcpy(&v, p, 8); return v; }
+// Input-stage blob B (n bytes): the offset END1 of its second table, its end END2 (*e2), or 0.
+static size_t stage_table(const uint8_t *b, size_t n, size_t *e2) {
+  if (n < 32 || memcmp(b, "MTLPSBIN", 8) || rd32(b + 8) != 0x10001) return 0;
+  size_t found = 0, hits = 0;
+  for (size_t q = 16; q + 8 <= n; q++) {
+    uint64_t end2 = rd32(b + q), cnt = rd32(b + q + 4);
+    if (end2 != q + 8 + 36 * cnt || end2 + 8 > n || end2 + 8 + rd32(b + end2 + 4) != n) continue;
+    int pointed = 0;  // END1 itself, stored before the table (u32 END1, u32 count, attributes...)
+    for (size_t p = 12; p + 4 <= q && !pointed; p++) pointed = rd32(b + p) == q;
+    if (pointed) { found = q; *e2 = end2; hits++; }
+  }
+  return hits == 1 ? found : 0;
+}
+static uint8_t *reflection27(int i, const uint8_t *r, size_t rs, size_t *os) {
+  if (rs < 8) return NULL;
+  uint64_t count = rd64(r); size_t off = 8, cut_at = 0, cut = 0, sec = 0, e2 = 0;
+  if (count == 0 || count > 64) return NULL;
+  for (uint64_t k = 0; k < count; k++) {
+    if (off + 16 > rs) return NULL;
+    uint64_t type = rd64(r + off), size = rd64(r + off + 8);
+    if (size > rs - off - 16) return NULL;
+    size_t q;
+    if (type == 2 && !cut && (q = stage_table(r + off + 16, size, &e2))) { sec = off; cut_at = off + 16 + q; cut = e2 - q; }
+    off = (off + 16 + size + 7) & ~(size_t)7;
+  }
+  if (off != ((rs + 7) & ~(size_t)7)) return NULL;  // not this layout: the sections fill the reply
+  if (!cut) return NULL;
+  uint64_t size = rd64(r + sec + 8), nsize = size - cut;
+  size_t old_end = (sec + 16 + size + 7) & ~(size_t)7, new_end = (sec + 16 + nsize + 7) & ~(size_t)7;
+  if (old_end > rs) return NULL;
+  *os = rs - (old_end - new_end);
+  uint8_t *o = calloc(1, *os);
+  memcpy(o, r, cut_at);
+  memcpy(o + cut_at, r + cut_at + cut, sec + 16 + size - cut_at - cut);
+  memcpy(o + sec + 8, &nsize, 8);
+  memcpy(o + new_end, r + old_end, rs - old_end);
+  fprintf(stderr, "[standin] #%d reflection: input-stage table at %zu (%zu B) cut for 27's reader, reply %zu -> %zu B\n",
+          i, cut_at - sec - 16, cut, rs, *os);
+  return o;
+}
+static int reflection_fix(void) { const char *v = getenv("HAO_STANDIN_REFLECTION"); return !v || strcmp(v, "0"); }
+
 // One request at a time: 27's Metal compiles from several threads (pipeline creation, async completion handlers), and
 // OCLP's 3802 and 31001 services were written for MTLCompilerService, which serializes. Recursive, in case a reply
 // handler starts another compile on the same thread.
@@ -264,6 +322,11 @@ static void build(void *s, unsigned plugin, unsigned type, const void *d, size_t
   ((build_t)S3802("MTLCodeGenServiceBuildRequest"))(s, plugin, type, d, sz,
     ^(unsigned st, const void *r, size_t rs, const char *err) {
       fprintf(stderr, "[standin] #%d 3802 reply status=%u size=%zu err=%s\n", i, st, rs, err ? err : "-");
-      dump("reply", i, r, rs); cb(st, r, rs, err); });
+      dump("reply", i, r, rs);
+      size_t ns; uint8_t *fixed = st == 0 && type == 1 && reflection_fix() ? reflection27(i, r, rs, &ns) : NULL;
+      if (!fixed) { cb(st, r, rs, err); return; }
+      dump("reply27", i, fixed, ns);
+      cb(st, fixed, ns, err);
+      free(fixed); });  // like 3802's own buffer, valid only during the reply: 27 copies what it keeps
   fprintf(stderr, "[standin] #%d BuildRequest returned\n", i);
 }

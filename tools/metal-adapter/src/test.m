@@ -167,6 +167,22 @@ static int compile_only(void) { const char *c = getenv("HAO_COMPILE_ONLY"); retu
 // MTLStorageModeManaged and synchronizeResource: are deprecated in the macOS 27 SDK (no effect on Apple silicon); on
 // the Intel GPU they are the way to read a texture back.
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+// HAO_REFLECTION=1: create pipelines with MTLPipelineOptionArgumentInfo and print the argument reflection, one line
+// per argument (the image's libmetal-framebuffer hook asks for it on every render pipeline, as many apps do). 27's
+// Metal parses the reflection 3802 returns only when it is asked for.
+static int want_reflection(void) { const char *r = getenv("HAO_REFLECTION"); return r && *r && strcmp(r, "0"); }
+static void reflect(const char *stage, NSArray<MTLArgument *> *args) {
+  fprintf(stderr, "[test] reflection %s %s%lu arguments\n", stage, args ? "" : "(nil) ", (unsigned long)args.count);
+  for (MTLArgument *a in args)
+    fprintf(stderr, "[test] reflection %s name=%s type=%ld index=%lu active=%d access=%ld bufferAlignment=%lu "
+            "bufferDataSize=%lu bufferDataType=%ld textureType=%ld textureDataType=%ld arrayLength=%lu\n", stage,
+            a.name.UTF8String, (long)a.type, (unsigned long)a.index, a.isActive, (long)a.access,
+            a.type == MTLArgumentTypeBuffer ? (unsigned long)a.bufferAlignment : 0,
+            a.type == MTLArgumentTypeBuffer ? (unsigned long)a.bufferDataSize : 0,
+            a.type == MTLArgumentTypeBuffer ? (long)a.bufferDataType : 0,
+            a.type == MTLArgumentTypeTexture ? (long)a.textureType : 0,
+            a.type == MTLArgumentTypeTexture ? (long)a.textureDataType : 0, (unsigned long)a.arrayLength);
+}
 // ---- render: one draw into a 64x64 RGBA8 texture, read back and checked pixel by pixel
 //   render-color    lib's tri_vertex + solid_fragment: the lower-left half triangle (px < py) in the constant colour
 //                   (setFragmentBytes), the rest the clear colour; the diagonal px == py is not checked
@@ -199,7 +215,11 @@ static int run_render(id<MTLDevice> dev, NSString *how, char **argv) {
   pd.vertexFunction = vf; pd.fragmentFunction = ff;
   pd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA8Unorm;
   e = nil;
-  id<MTLRenderPipelineState> pso = [dev newRenderPipelineStateWithDescriptor:pd error:&e];
+  MTLRenderPipelineReflection *rr = nil;
+  id<MTLRenderPipelineState> pso = want_reflection()
+    ? [dev newRenderPipelineStateWithDescriptor:pd options:MTLPipelineOptionArgumentInfo reflection:&rr error:&e]
+    : [dev newRenderPipelineStateWithDescriptor:pd error:&e];
+  if (want_reflection()) { reflect("vertex", rr.vertexArguments); reflect("fragment", rr.fragmentArguments); }
   print_images("pipeline");
   if (!pso) return result("NO-PIPELINE", e.localizedDescription);
   fprintf(stderr, "[test] pipeline OK class=%s\n", class_getName([(id)pso class]));
@@ -307,7 +327,11 @@ static int run(char **argv) {
   id<MTLFunction> fn = [lib newFunctionWithName:fname];
   if (!fn) return result("NO-LIBRARY", [@"no function " stringByAppendingString:fname]);
   e = nil;
-  id<MTLComputePipelineState> pso = [dev newComputePipelineStateWithFunction:fn error:&e];
+  MTLComputePipelineReflection *cr = nil;
+  id<MTLComputePipelineState> pso = want_reflection()
+    ? [dev newComputePipelineStateWithFunction:fn options:MTLPipelineOptionArgumentInfo reflection:&cr error:&e]
+    : [dev newComputePipelineStateWithFunction:fn error:&e];
+  if (want_reflection()) reflect("compute", cr.arguments);
   print_images("pipeline");
   if (!pso) return result("NO-PIPELINE", e.localizedDescription);
   NSUInteger tew = pso.threadExecutionWidth, maxT = pso.maxTotalThreadsPerThreadgroup;

@@ -2,6 +2,10 @@
 # Laptop run of the Metal27 adapter test (MacBookPro9,2, Golden Gate 26B131 image). As the logged-in user, no root.
 # r3: compute (as r2) plus offscreen render: a constant-colour triangle, a textured triangle and a source-compiled
 # triangle, drawn into a 64x64 texture and read back pixel by pixel (src/test.m, run_render).
+# r4: 3802's reflection in 27's layout (the stand-in cuts the input-stage table 27's reader no longer has). r3's render
+# runs all aborted there: the image's libmetal-framebuffer.dylib, loaded by the HD 4000 driver, asks every render
+# pipeline for reflection. New: reflection cases (HAO_REFLECTION=1, argument reflection printed and compared with the
+# control's) and an A/B without the cut.
 # Changes nothing on the system: every test process runs under sandbox-exec with all file writes denied except into
 # this run's results folder; nothing is copied, swapped or installed; the OCLP files are only read.
 # Usage: ./run.sh            -> results/<timestamp>/ (summary.txt first)
@@ -34,6 +38,8 @@ OCLP=(
   $SL/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver
   $SL/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/libMTLIntelCompilerPlugin.dylib
   $SL/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/libigdmd.dylib
+  /usr/lib/libmetal-framebuffer.dylib
+  /usr/lib/libmetalold-selectors.dylib
 )
 {
   print "== $(date)"; sw_vers; uname -a; sysctl -n hw.model machdep.cpu.brand_string; id -un
@@ -46,6 +52,11 @@ OCLP=(
   /usr/bin/plutil -p $SL/Frameworks/Metal.framework/Versions/A/XPCServices/MTLCompilerService.xpc/Contents/version.plist 2>&1
   print "\n== bundle symlinks resolve to"
   ls -la $B/fw/Metal.framework/Versions/A/ $B/fw/Metal.framework/Versions/A/XPCServices/ 2>&1
+  # the image's weak dylibs, loaded with the driver (no otool: without the developer tools it opens an install dialog)
+  print "\n== dylib paths the HD 4000 driver names"
+  for l in /usr/lib/libmetal-framebuffer.dylib /usr/lib/libmetalold-selectors.dylib; do
+    print "$l: $(/usr/bin/grep -c -a -F $l $SL/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver 2>&1)"
+  done
   print "\n== IOAccelerator Metal plugin"
   /usr/sbin/ioreg -r -c IOAccelerator -d 1 -l 2>/dev/null | grep -E '"(MetalPluginName|MetalPluginClassName|IOClass|model)"'
 } > $R/system.txt 2>&1
@@ -92,6 +103,8 @@ run_case control-11-saxpy        saxpy_long_name kernels-11.metallib HAO_EXPECT=
 run_case control-render-color    render-color    render-27.metallib  HAO_EXPECT=control
 run_case control-render-texture  render-texture  render-27.metallib  HAO_EXPECT=control
 run_case control-render-source   render-source   render-27.metallib  HAO_EXPECT=control
+run_case control-reflect-add1    add1            kernels-27.metallib HAO_EXPECT=control HAO_REFLECTION=1
+run_case control-reflect-render-texture render-texture render-27.metallib HAO_EXPECT=control HAO_REFLECTION=1
 if (( missing )) && [[ -z ${HAO_RUN_ALL:-} ]]; then  # HAO_RUN_ALL=1: host plumbing test only
   say "adapter runs SKIPPED: an OCLP file they use is missing (see above)"
 else
@@ -107,8 +120,13 @@ else
   run_case adapter-render-source     render-source  render-27.metallib $ADAPTER $FLIP
   run_case adapter-11-render-color   render-color   render-11.metallib $ADAPTER $FLIP
   run_case adapter-11-render-texture render-texture render-11.metallib $ADAPTER $FLIP
+  say "---- adapter, reflection asked for (MTLPipelineOptionArgumentInfo): compared with control-reflect-*"
+  run_case adapter-reflect-add1           add1           kernels-27.metallib $ADAPTER $FLIP HAO_REFLECTION=1
+  run_case adapter-reflect-render-texture render-texture render-27.metallib  $ADAPTER $FLIP HAO_REFLECTION=1
   say "---- A/B: render without the descriptor translation (expected: the driver misreads 27's structs, CRASH)"
   run_case adapter-nolayouts-render-color render-color render-27.metallib $ADAPTER $FLIP HAO_METAL27_LAYOUTS=0
+  say "---- A/B: 3802's reflection unchanged (expected: CRASH in 27's reflection reader, as every r3 render run)"
+  run_case adapter-noreflection-render-color render-color render-27.metallib $ADAPTER $FLIP HAO_STANDIN_REFLECTION=0
   say "---- adapter, device created by hand (driver bundle + -initWithAcceleratorPort:)"
   run_case adapter-manual-add1   add1            kernels-27.metallib $ADAPTER $FLIP HAO_DEVICE=manual
   run_case adapter-manual-saxpy  saxpy_long_name kernels-27.metallib $ADAPTER $FLIP HAO_DEVICE=manual
@@ -144,11 +162,16 @@ for f in $(find $HOME/Library/Logs/DiagnosticReports -newer $R/.start -type f 2>
   if pass xpc-add1 && pass xpc-saxpy; then xpc=PASS; else xpc=FAIL; fi
   if pass control-render-color && pass control-render-texture; then rctl=PASS; else rctl=FAIL; fi
   if pass adapter-render-color && pass adapter-render-texture; then rad=PASS; else rad=FAIL; fi
+  refl() { grep '^\[test\] reflection' $R/$1/log.txt 2>/dev/null; }
+  same_refl() { pass control-reflect-$1 && pass adapter-reflect-$1 && [[ -n "$(refl control-reflect-$1)" ]] &&
+                [[ "$(refl control-reflect-$1)" == "$(refl adapter-reflect-$1)" ]]; }
+  if same_refl add1 && same_refl render-texture; then rfl=PASS; else rfl=FAIL; fi
   print "control (system Metal = OCLP wrapper + MetalOld): $ctl"
   print "adapter (27.2.1 Metal, in-process OCLP 31001 + 3802): $ad"
   print "xpc variant (27.2.1 Metal, system MTLCompilerService, no flip): $xpc"
   print "render control (system Metal): $rctl"
   print "render adapter (27.2.1 Metal): $rad"
+  print "reflection (adapter PASS, argument reflection identical to the control's): $rfl"
   case "$ctl/$ad" in
     PASS/PASS) print "=> YES: macOS 27's own Metal ran both kernels on the HD 4000 with correct results (compute).";;
     PASS/PASS-MANUAL) print "=> YES with a hand-made device: compile and execution work; MTLCreateSystemDefaultDevice did not give the device (see adapter-add1).";;
