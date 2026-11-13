@@ -1,0 +1,20 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://github.com/lythka/hao-assets/schemas/payload-manifest.schema.json",
+ "title": "payload-manifest.json",
+ "description": "A hao-runtime payload as handed to the patcher. File paths are relative to the manifest's folder.",
+ "type": "object",
+ "required": ["version", "commit", "clean", "os_build", "cache_uuid", "units_version", "units_sha256",
+              "layout_version", "files"],
+ "properties": {
+  "version": {"type": "string"},
+  "commit": {"type": "string"},
+  "clean": {"const": true},
+  "os_build": {"type": "string"},
+  "cache_uuid": {"type": "string"},
+  "units_version": {"type": "string"},
+  "units_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+  "layout_version": {"type": "integer"},
+  "files": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+ }
+}

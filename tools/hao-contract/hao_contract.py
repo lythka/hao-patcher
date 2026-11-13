@@ -1,20 +1,24 @@
-# Vendored from hao-assets (hao_contract.py at commit df3658e); update by copying the file from a newer hao-assets
-# commit and changing the pin in tools/hao-contract/PIN. Do not edit here.
 #!/usr/bin/env python3
-"""hao-contract: the interfaces between the research, runtime and patcher repositories, checked (workflow plan step 3).
+"""hao-contract: the interfaces between the hao repositories, checked. Its home is hao-patcher
+(tools/hao-contract); other repositories vendor a pinned copy.
 
   hao_contract.py check REPO            run the checks REPO/contract.json names; one line per problem, exit 1
+  hao_contract.py message FILE          the hygiene check on one commit message (a commit-msg hook); exit 1
   hao_contract.py lock REPO GLOB... --os-build B [--input-kind K] [--sdk-build S] [--cache-uuid U] [--format F]
                                         print a generated.lock for the files GLOB matches (review, then commit)
   hao_contract.py stamps REPO GLOB...   the OS build stamped in each generated file's header
+  hao_contract.py --version             the checker's version
 
 REPO/contract.json: {"contract_version": 1, "role": "research" | "runtime" | "patcher", "checks": [...]}, where a
 check is one of
   {"kind": "hygiene", "allow": {PATH: [PATTERN LABELS]}, "commits": N}
-        no tracked file (and none of the last N commit messages) names a private location
+        no tracked file (and none of the last N commit messages) names a home folder or a private name. Private
+        names are not kept in this file: they are read from $HAO_CONTRACT_PRIVATE or
+        ~/.config/hao-contract/private-names, one "LABEL: TEXT" per line (# starts a comment). Without that
+        file only home folders are checked
   {"kind": "generated-lock", "lock": "generated.lock", "globs": ["src/*_gen.inc"], "stamp_header": PATH}
         every file the globs match is listed with its sha256, export id, format and input_kind; every listed file
-        matches; a cache-kind file must be stamped with its os_build (the 26B131-rows-under-a-26A428-stamp case);
+        matches; a cache-kind file must be stamped with its os_build;
         an sdk+census file stamped for another build is a coverage note; an sdk-kind file needs only sdk_build;
         with stamp_header, every cache table's os_build equals its HAO_GEN_OS_BUILD and every format its
         HAO_GEN_FORMAT (the runtime's one startup stamp)
@@ -32,14 +36,25 @@ import re
 import subprocess
 import sys
 
+__version__ = '0.1.0'
 CONTRACT_VERSION = 1
-# Built from parts so this file does not match itself.
-PRIVATE = [
-    ('private research repository', re.compile(re.escape('hao-' 'research'))),
-    ('private evidence folder', re.compile(re.escape('store/' 'evidence'))),
-    ('archived private tooling', re.compile(re.escape('ssd-tools-' 'archive'))),
-    ('home folder', re.compile('/' r'Users/(?!Shared\b)[A-Za-z]')),
-]
+HOME = ('home folder', re.compile('/' r'Users/(?!Shared\b)[A-Za-z]'))   # built from parts: no self-match
+
+
+def private_names(path=None):
+    """[(label, pattern)]: home folders, plus the local private-names file's entries."""
+    path = Path(path or os.environ.get('HAO_CONTRACT_PRIVATE') or
+                Path.home() / '.config' / 'hao-contract' / 'private-names')
+    names = [HOME]
+    if path.is_file():
+        for line in path.read_text().splitlines():
+            line = line.split('#', 1)[0].strip()
+            label, sep, text = line.partition(':')
+            if sep and text.strip():
+                names.append((label.strip(), re.compile(re.escape(text.strip()))))
+    return names
+
+
 STAMP = re.compile(r'\b(\d{2}[A-Z]\d{2,4}[a-z]?)\)')
 LOCK_FIELDS = ('path', 'sha256', 'export_id', 'format', 'input_kind')
 # What each input kind must name, and what a header stamp is compared with:
@@ -78,6 +93,7 @@ def stamp_of(path):
 def check_hygiene(repo, c):
     bad = []
     allow = c.get('allow', {})
+    names = private_names()
     for name in tracked(repo):
         path = Path(repo) / name
         if path.is_symlink() or not path.is_file():
@@ -86,7 +102,7 @@ def check_hygiene(repo, c):
         if b'\0' in data[:8192]:
             continue
         text = data.decode('utf8', 'replace')
-        for label, pattern in PRIVATE:
+        for label, pattern in names:
             if label in allow.get(name, []):
                 continue
             for n, line in enumerate(text.splitlines(), 1):
@@ -99,10 +115,17 @@ def check_hygiene(repo, c):
                              capture_output=True, text=True, check=True).stdout
         for entry in filter(str.strip, log.split('\x1e')):
             h, _, body = entry.strip().partition('\0')
-            for label, pattern in PRIVATE:
+            for label, pattern in names:
                 if pattern.search(body):
                     bad.append('hygiene: commit %s message names a %s' % (h, label))
     return bad
+
+
+def check_message(text):
+    """Hygiene on one commit message; comment lines (git's template) are ignored."""
+    body = '\n'.join(l for l in text.splitlines() if not l.startswith('#'))
+    return ['hygiene: commit message names a %s' % label for label, pattern in private_names()
+            if pattern.search(body)]
 
 
 def check_lock(repo, c):
@@ -205,6 +228,14 @@ def check(repo):
 
 
 def main(argv):
+    if argv[:1] == ['--version']:
+        print('hao-contract %s (contract_version %d)' % (__version__, CONTRACT_VERSION))
+        return 0
+    if len(argv) == 2 and argv[0] == 'message':
+        bad = check_message(Path(argv[1]).read_text(errors='replace'))
+        for b in bad:
+            print(b, file=sys.stderr)
+        return 1 if bad else 0
     if len(argv) >= 2 and argv[0] == 'check':
         bad = check(argv[1])
         print('\n'.join(bad) or 'hao-contract: %s keeps its contract' % argv[1])
