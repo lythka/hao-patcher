@@ -87,7 +87,6 @@ python3.14 -I tools/hao/hao build-image /path/to/new-image-repository --model Ma
 python3.14 -I tools/hao/hao build-image /path/to/new-image-repository --model MacBookPro9,2             # build it
 ```
 
-The default is the end-user build; `--assembly dev-26B131` adds root SSH and diagnostics for testing.
 [Building an image](docs/building.md) covers the inputs, what the build does and testing in QEMU;
 [architecture](docs/architecture.md) explains how the pieces fit, and [CONTRIBUTING.md](CONTRIBUTING.md) the tests
 and conventions.
