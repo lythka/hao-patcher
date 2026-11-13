@@ -26,7 +26,7 @@ nothing in place). `tests/test_edits.py` checks them against `install.py` and, w
 ## Input
 
 Row `metal_compiler_compat` is `compiler-service/` of a `tools/live-text build` (26B131:
-`store/artifacts/live-text-26B131-20261111-dd1c86b`). The service is OCLP's, the same for 26A428 and 26B131.
+`store/artifacts/live-text-26B131-20261113-fa444101`). The service is OCLP's, the same for 26A428 and 26B131.
 
 ## Verify
 
@@ -51,6 +51,7 @@ yet built into an image or booted with 26B131.
 
 ## Revisions
 
+- r6 2026-11-13 Input row `metal_compiler_compat` (26B131) now names compiler-service/ of live-text-26B131-20261113-fa444101, rebuilt from a clean fa444101 so build.json names inputs as `store/...` paths instead of the builder's home folder (the row can be published). Installed bytes that change: `libhaoMetalCompilerCompat.dylib`: its LC_UUID and ad hoc signature differ, every other byte is identical (ld derived the UUID from the build folder's absolute path, which cache/metallib translation-build used as the install name before tools/live-text sets the final one). MTLCompilerService is byte-identical.
 - r5 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r4 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the service and the library), as the hook sets them, so overlays carry them; the hook is unchanged.
 - r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in tests/test_edits.py; the hook is unchanged.

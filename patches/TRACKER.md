@@ -19,7 +19,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-icon-caches | r6 | post | experiment | caches | x |  |  |  | ok (r3) | r6 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | golden-gate-launchd-warm | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-12 Renamed from golden-gate-kernelmanager-helper-warm and made a job list; adds com.apple.mbsystema |
 | golden-gate-live-text-service | r4 | post | experiment |  | x |  |  |  | **needs** | r4 2026-11-13 `apply.sh` runs Python as `$OCLP_PYTHON` (the kit's CPython for the Mac the assembly runs on, ar |
-| golden-gate-live-text-shared | r6 | oclp-hook | experiment |  | x |  |  |  | **needs** | r6 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
+| golden-gate-live-text-shared | r7 | oclp-hook | experiment |  | x |  |  |  | **needs** | r7 2026-11-13 Input row `live_text_framework` (26B131) now names framework/ of live-text-26B131-20261113-fa444 |
 | golden-gate-metal-argbuf | r2 | oclp-hook | product |  | x |  |  |  | **needs** | r2 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | golden-gate-metal-framebuffer | r7 | oclp-hook | experiment |  | x | x |  |  | **needs** | r7 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | golden-gate-metal-libraries | r20 | oclp-hook | experiment |  | x | x |  |  | **needs** | r20 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artif |
@@ -33,7 +33,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
 | hao-opencore | r58 | post | experiment |  | x | x |  |  | **needs** | r58 2026-11-13 Input rows `kernel_repair_efi` and `kernel_repair_binding` (26B131) now name kernel-repairs-26B |
 | hao-runtime | r75 | oclp-hook | experiment |  | x | x |  |  | **needs** | r75 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built from a clean hao-runtime 1de47eb t |
-| metal-compiler-compat | r5 | oclp-hook | experiment |  | x |  |  |  | **needs** | r5 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
+| metal-compiler-compat | r6 | oclp-hook | experiment |  | x |  |  |  | **needs** | r6 2026-11-13 Input row `metal_compiler_compat` (26B131) now names compiler-service/ of live-text-26B131-20261 |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |
 | metalold-selectors | r7 | oclp-hook | product |  | x | x |  |  | ok (r3) | r7 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | rec-audio | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three kext bundles and the kernel collection link in `patch.json` `files` and `edits |

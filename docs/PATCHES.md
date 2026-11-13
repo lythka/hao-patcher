@@ -136,7 +136,7 @@ Revision r4, status experiment. [Recipe](../patches/golden-gate-live-text-servic
 
 ## golden-gate-live-text-shared
 
-Revision r6, status experiment. [Recipe](../patches/golden-gate-live-text-shared/README.md)
+Revision r7, status experiment. [Recipe](../patches/golden-gate-live-text-shared/README.md)
 
 - `usr/lib/libhelloblur.dylib`: from hao · libhelloblur; 1 edit, applied by the installer, then signed: ad hoc, once, identifier local.libhelloblur. Installed mode 0755, owner root:wheel, flags restricted.
   1. `load-live-text-runtime`: macho.add-dylib LC_LOAD_DYLIB /usr/lib/hao-live-text/LiveText.dylib.
@@ -421,7 +421,7 @@ Revision r75, status experiment. [Recipe](../patches/hao-runtime/README.md)
 
 ## metal-compiler-compat
 
-Revision r5, status experiment. [Recipe](../patches/metal-compiler-compat/README.md)
+Revision r6, status experiment. [Recipe](../patches/metal-compiler-compat/README.md)
 
 - `System/Library/Frameworks/Metal.framework/Versions/A/XPCServices/MTLCompilerService.xpc/Contents/MacOS/MTLCompilerService`: whole file from hao (row metal_compiler_compat). OCLP's legacy MTLCompilerService with a load command for libhaoMetalCompilerCompat.dylib added and re-signed ad hoc, made by tools/live-text compiler-service; installed whole, and only over the exact service it was made from. Installed mode 0755, owner root:wheel, flags restricted.
 - `System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/3802/Libraries/libhaoMetalCompilerCompat.dylib`: whole file from hao (row metal_compiler_compat). New file: the shader repair library the service loads at startup. Installed mode 0755, owner root:wheel, flags restricted.
