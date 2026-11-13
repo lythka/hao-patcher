@@ -146,4 +146,5 @@ kernel binary is not needed. The builder verifies the target kernel and Sandbox
 cache identity before compiling.
 
 ## Revisions
+- r42 2026-11-13 `build-repairs` records its inputs (capture, collection, commpage artifact) as the repository names them (`store/...`), or by file name when outside it, instead of absolute paths: a published artifact's build.json names no home folder. The repairs and the kext copy are unchanged.
 - r40 2026-11-11 Select kernel recipes by identity; derive 26B131 definitions from checked symbols/code; complete collection layouts from the current Boot KC and bind Sandbox to the actual userspace cache. Remove the unused older-kernel input. Host tests and static comparisons pass; 26B131 boot validation pending.

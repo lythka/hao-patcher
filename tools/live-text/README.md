@@ -64,6 +64,9 @@ about five minutes, most of it the MPSNDArray pass. Point row `metal_compiler_co
 and row `live_text_framework` at `NEW_BUILD/framework`. The framework installer refuses a System whose MPSNDArray
 library or `libhelloblur` is not the one the build was made from.
 
+Every `build.json` names its inputs as the repository does (`store/artifacts/...`), or by file name when they lie
+outside it (`lib/paths.py`), never by an absolute path, so the rows can be published.
+
 ## Verify
 
 ```sh

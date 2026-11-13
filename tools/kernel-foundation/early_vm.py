@@ -10,6 +10,20 @@ import runpy
 import struct
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def repo_path(path):
+    """PATH as the repository names it (relative to it, its store/ as store/...), or only its file name when it lies
+    outside both: build records name no home folder."""
+    path = Path(path).resolve()
+    for base, prefix in (((ROOT/'store').resolve(), Path('store')), (ROOT.resolve(), Path())):
+        try:
+            return str(prefix/path.relative_to(base))
+        except ValueError:
+            pass
+    return path.name
+
 
 def generate(capture_path, collection_path):
     capture = json.loads(Path(capture_path).read_text())
@@ -84,6 +98,6 @@ def generate(capture_path, collection_path):
         generate_aliases = runpy.run_path(str(Path(__file__).with_name('pv_bootstrap.py')))['generate']
         for comment, before, after in generate_aliases(capture['pv_aliases'], collection):
             patches.append(dict(patch, Comment=comment, Find=before, Replace=after))
-    return patches, dict(capture=capture, capture_path=str(Path(capture_path).resolve()),
+    return patches, dict(capture=capture, capture_path=repo_path(capture_path),
         capture_sha256=hashlib.sha256(Path(capture_path).read_bytes()).hexdigest(),
-        collection_path=str(Path(collection_path).resolve()), replacements=[dict(comment=p['Comment'], find=p['Find'].hex(), replace=p['Replace'].hex()) for p in patches])
+        collection_path=repo_path(collection_path), replacements=[dict(comment=p['Comment'], find=p['Find'].hex(), replace=p['Replace'].hex()) for p in patches])

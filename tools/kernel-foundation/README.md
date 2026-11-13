@@ -80,6 +80,7 @@ part of unit discovery: they drive a paused QEMU guest over GDB, or build a test
 inside a guest, and need a VM you supply.
 
 ## Revisions
+- r43 2026-11-13 `early_vm.py` records the capture and collection paths relative to the repository (`store/...`), or by file name when outside it, not as absolute paths. The generated patches are unchanged.
 - r42 2026-11-12 IntelCommpage reads its collection addresses from `__DATA,__ic_table` at load (checked: magic, version, size, layout, kernel UUID), so tools/kc-binder can bind it to a moved layout without a rebuild. The full trampoline prologues are checked at load. The reference table equals r41's compiled values on every recorded 26B131 collection. The kext's bytes change, so it needs a boot.
 - r41 2026-11-11 Remove unsupported filter nodes only when they are isolated roots of operations absent from the donor, with no retained references or auxiliary root tables. Fixes the 26B131 apsd profile refusing conversion (filter 110) and blocking Setup Assistant. Host decision-equivalence tests pass; the laptop accepts the converted profile in a separate probe. A full boot with the new kext remains open.
 - r40 2026-11-11 Bind the Sandbox operation layout to the supplied userspace cache UUID. Use vendored commpage source without requiring an unused older kernel binary. Kernel collection and hardware validation remain separate from host tests.

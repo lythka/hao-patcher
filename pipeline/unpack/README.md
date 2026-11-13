@@ -63,7 +63,7 @@ never copy `tree/` as it is.
 | `ripatch.c`, `Makefile` | RIDIFF10 patcher; `make` builds `build/ripatch`, the driver builds its own copy. It loads `libParallelCompression` with `dlopen` and links only libSystem |
 | `bx50full.py`, `chunklist.py`, `bomcheck.py` | BaseSystem rebuild and the checks |
 | `walk.py`, `compare.py`, `datatemplate.py`, `fillin.py`, `tccheck.py` | Single-step helpers: tree listing, payload vs pristine System, the Data template model, root-only directories from a noowners mount (edits its TSV in place), trust-cache coverage |
-| `pristine-tools/` | `mklist.py` (the lists) and the builder-VM tools `autool`, `hmeta` and `fl` (input rows in `pipeline/inputs/common/`) |
+| `pristine-tools/` | `mklist.py` (the lists) and the builder-VM tools `autool`, `hmeta` and `fl` (input rows in `pipeline/inputs/common/`); `build-fl NEW_FOLDER` builds `fl` (universal, macOS 27.0, signed with `ent.plist`) with a `build.json` naming the commit |
 
 The installer is only read; it is attached `-readonly -nobrowse` and detached
 again. None of Apple's code is included here.

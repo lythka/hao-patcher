@@ -7,6 +7,10 @@ every other file is copied byte for byte, and model.mil changes in exactly these
 """
 import hashlib
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paths import repo_path  # noqa: E402
 
 PIXEL_INPUT = 'pixel_buffer<FMT_32BGRA, shape=[480, 480]> img_input'
 TENSOR_INPUT = 'tensor_buffer<uint8, shape=[480, 480, 4], strides=[1920, 4, 1], interleave_factors=[1, 1, 1]> img_input'
@@ -46,4 +50,4 @@ def prepare(source, output):
         target.write_bytes(original.read_bytes())
     mil = output/'model.mil'
     mil.write_text(rewrite(mil.read_text()))
-    return dict(path=str(source), files=files, model_mil_sha256=sha(mil))
+    return dict(path=repo_path(source), files=files, model_mil_sha256=sha(mil))
