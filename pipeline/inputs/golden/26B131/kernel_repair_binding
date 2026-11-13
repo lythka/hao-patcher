@@ -1,2 +1,3 @@
 # Derived for Golden Gate 26B131 with Tahoe 25G342; see the artifact build.json.
-- store/artifacts/kernel-binding-26B131-r41
+# r42: the r42 repairs and header; abi_bindings and patch sites identical to r41.
+- store/artifacts/kernel-binding-26B131-r42

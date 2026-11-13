@@ -5,7 +5,11 @@
         DIR/EFI/OC/config.plist   Kernel.Patch (the four early-VM repairs) and the IntelCommpage Kernel.Add entry
         DIR/capture.json          the early-VM capture the repairs were computed from
         DIR/commpage-table.json   every collection address IntelCommpage uses, as (member, segment, offset, address)
+        DIR/commpage-table.bin    the same as IntelCommpage reads it (__DATA,__ic_table)
         DIR/bind.json             inputs, resolved points and output hashes
+  kc-binder stamp --boot-kc KC --kext KEXT [--recipe RECIPE]
+        write KC's table into IntelCommpage.kext (in place); refused for a kext without the table, of another
+        table version or layout, or compiled for another kernel
   kc-binder compare --boot-kc KC --repair-efi DIR [--binding DIR] [--abi-header FILE] [--recipe RECIPE]
         bind in memory and compare with a recorded repair artifact (kernel_repair_efi), binding profile
         (kernel_repair_binding) and commpage_abi.hpp; one line per field, exit 1 if any differs
@@ -53,13 +57,16 @@ def bind(args):
     recipe = recipe_for(args.recipe, kc)
     patches, capture, report = kcbind.bind_repairs(recipe, kc)
     table = kcbind.commpage_table(recipe, kc)
-    kcbind.abi_lines(table, foundation())  # the shape checks commpage_build.py applies to user_trap and csr
+    namespace = foundation()
+    kcbind.abi_lines(table, namespace)  # the shape checks commpage_build.py applies to user_trap and csr
+    table_bytes = kcbind.table_bytes(recipe, table, namespace)
     out = args.out
     (out/'EFI/OC').mkdir(parents=True, exist_ok=False)
     config = kcbind.config_plist(patches)
     (out/'EFI/OC/config.plist').write_bytes(config)
     (out/'capture.json').write_text(json.dumps(capture, indent=2)+'\n')
     (out/'commpage-table.json').write_text(json.dumps(table, indent=1)+'\n')
+    (out/'commpage-table.bin').write_bytes(table_bytes)
     record = dict(unit='tools/kc-binder', operation='bind', date=datetime.now(timezone.utc).isoformat(),
                   inputs=dict(boot_kc=kcbind.sha256(data), recipe=relative(recipe.path),
                               recipe_sha256=kcbind.sha256(recipe.path.read_bytes()),
@@ -73,6 +80,18 @@ def bind(args):
                   validation='Static binding only; boot of this collection is a separate check')
     (out/'bind.json').write_text(json.dumps(record, indent=2)+'\n')
     print(out)
+    return 0
+
+
+def run_stamp(args):
+    kc = kcbind.Collection(args.boot_kc.read_bytes())
+    recipe = recipe_for(args.recipe, kc)
+    kcbind.bind_repairs(recipe, kc)
+    table = kcbind.commpage_table(recipe, kc)
+    binary = args.kext/'Contents/MacOS/IntelCommpage'
+    stamped, data = kcbind.stamp(recipe, table, foundation(), binary.read_bytes())
+    binary.write_bytes(stamped)
+    print(f'{args.kext}: table {kcbind.sha256(data)} for kernel {kc.kernel.uuid.hex()}')
     return 0
 
 
@@ -110,6 +129,10 @@ def main(argv=None):
     b.add_argument('--boot-kc', type=Path, required=True)
     b.add_argument('--out', type=Path, required=True)
     b.add_argument('--recipe', type=Path)
+    s = sub.add_parser('stamp')
+    s.add_argument('--boot-kc', type=Path, required=True)
+    s.add_argument('--kext', type=Path, required=True)
+    s.add_argument('--recipe', type=Path)
     c = sub.add_parser('compare')
     c.add_argument('--boot-kc', type=Path, required=True)
     c.add_argument('--repair-efi', type=Path, required=True)
@@ -118,7 +141,7 @@ def main(argv=None):
     c.add_argument('--recipe', type=Path)
     args = parser.parse_args(argv)
     try:
-        return bind(args) if args.command == 'bind' else run_compare(args)
+        return dict(bind=bind, stamp=run_stamp, compare=run_compare)[args.command](args)
     except (OSError, ValueError, KeyError) as error:
         print(f'kc-binder: {error}', file=sys.stderr)
         return 1

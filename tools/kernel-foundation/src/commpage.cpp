@@ -30,20 +30,28 @@
 #include <IOKit/IODeviceTreeSupport.h>
 #include <libkern/c++/OSData.h>
 #include "commpage_abi.hpp"
+#include "commpage_table.h"
 #include "sandbox_profile.h"
 #include "sandbox_storage_class.h"
 #include "iosurface_snapshot.h"
 
 // Darwin 27 changed vm_map and kernel-flag layouts. Keep them opaque; call
-// its own constructors and memory-entry routines. Addresses are generated
-// from the specific target KC; no standalone-kernel data offsets are used.
+// its own constructors and memory-entry routines. Addresses come from the
+// collection address table (commpage_table.h): the build writes the reference
+// KC's values, tools/kc-binder those of the KC being booted. No
+// standalone-kernel data offsets are used.
 using Map = void *;
 using Port = void *;
 static uintptr_t slide;
 static Port handles[4];
 extern "C" {
+// Not const and externally visible: its contents are read at load, never folded into the code.
+__attribute__((used, section("__DATA,__ic_table"), aligned(8)))
+IntelCommpageTable IntelCommpage_table = IC_TABLE_REFERENCE;
 uintptr_t IntelCommpage_exec_resume;
 void IntelCommpage_map_exec();
+extern const unsigned char IntelCommpage_exec_prefix[], IntelCommpage_fixed_prefix[];
+extern const unsigned char IntelCommpage_register_prefix[], IntelCommpage_return_prefix[];
 uintptr_t IntelCommpage_fixed_resume;
 uintptr_t IntelCommpage_text32_slot, IntelCommpage_text64_slot;
 void IntelCommpage_fixed_locator();
@@ -57,6 +65,37 @@ void IntelCommpage_user_trap_original(unsigned char *);
 void IntelCommpage_user_trap(unsigned char *);
 uintptr_t IntelCommpage_iosurface_set_value_resume;
 int IntelCommpage_iosurface_set_value_original(void *,void *,IOExternalMethodArguments *);
+}
+enum : unsigned {
+#define IC_INDEX(name) ic_index##name,
+IC_SYMBOLS(IC_INDEX)
+#undef IC_INDEX
+ic_indexed
+};
+static_assert(ic_indexed == ic_symbol_count, "IC_SYMBOLS and the table's symbol count");
+#define IC_ADDRESS(name) static const auto &addr##name = IntelCommpage_table.symbols[ic_index##name];
+IC_SYMBOLS(IC_ADDRESS)
+#undef IC_ADDRESS
+static const auto &addr_kernel_header = IntelCommpage_table.kernel_header;
+static const auto &addr_iosurface_header = IntelCommpage_table.iosurface_header;
+static const auto &addr_iosurface_set_value = IntelCommpage_table.iosurface_set_value;
+static const auto &alias_slots = IntelCommpage_table.alias_slots;
+static const auto &map_slots = IntelCommpage_table.map_slots;
+static const auto &hook_sites = IntelCommpage_table.hook_sites;
+static const auto &hook_original = IntelCommpage_table.hook_original;
+// The table must be this layout's, for the kernel this kext was compiled against; nothing else is read before.
+static bool table_valid() {
+    const IntelCommpageTable &t=IntelCommpage_table;
+    if(t.magic!=ic_table_magic || t.version!=ic_table_version || t.size!=sizeof(t) ||
+       memcmp(t.counts,ic_table_counts,sizeof(t.counts)) || memcmp(t.layout,ic_table_layout,sizeof(t.layout))) {
+        printf("IntelCommpage: address table is not version %u of this layout\n",ic_table_version);
+        return false;
+    }
+    if(memcmp(t.kernel_uuid,target_uuid,sizeof(t.kernel_uuid))) {
+        printf("IntelCommpage: address table is for another kernel\n");
+        return false;
+    }
+    return true;
 }
 template<typename T> static T at(uintptr_t a) { return reinterpret_cast<T>(a+slide); }
 static void fail(const char *operation, int error) {
@@ -458,6 +497,7 @@ static void publish_os_environment() {
     chosen->release();
 }
 extern "C" kern_return_t IntelCommpage_start(kmod_info_t *,void *) {
+    if(!table_valid()) return KERN_FAILURE;
     slide=reinterpret_cast<uintptr_t>(&printf)-addr_printf;
     if(!matches_uuid(at<const mach_header_64 *>(addr_kernel_header),target_uuid)) {
         printf("IntelCommpage: target UUID mismatch\n"); return KERN_FAILURE;
@@ -466,6 +506,14 @@ extern "C" kern_return_t IntelCommpage_start(kmod_info_t *,void *) {
         if(memcmp(at<void *>(hook_sites[i]),hook_original[i],14)) {
             printf("IntelCommpage: target initializer differs\n");return KERN_FAILURE;
         }
+    }
+    // The trampolines run these copied entry bytes before resuming the kernel's function: all of them must still be
+    // the kernel's (hook_original covers only the first 14).
+    if(memcmp(at<void *>(hook_sites[4]),IntelCommpage_exec_prefix,exec_prefix_length) ||
+       memcmp(at<void *>(hook_sites[5]),IntelCommpage_fixed_prefix,fixed_prefix_length) ||
+       memcmp(at<void *>(hook_sites[6]),IntelCommpage_register_prefix,register_prefix_length) ||
+       memcmp(at<void *>(hook_sites[7]),IntelCommpage_return_prefix,return_prefix_length)) {
+        printf("IntelCommpage: target entry differs from the trampoline\n");return KERN_FAILURE;
     }
     if(MachInfo::setKernelWriting(true,nullptr)!=KERN_SUCCESS) return KERN_FAILURE;
     route(hook_sites[0],reinterpret_cast<uintptr_t>(data_init));

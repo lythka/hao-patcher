@@ -30,7 +30,7 @@ and anyone can read what each patch changes and why.
 | Packs | Hardware packs with detection and phase (installer only, or live) | [`packs/`](../packs/README.md), `patches.py packs`, `plan --packs` |
 | Materialiser | Makes each declared file once into pack overlays (files + manifest with mode, owner, flags and folders); what only the target can make is deferred, in dependency order (`deferred.json`) | `pipeline/materialize.py` |
 | Live patch | Applies overlays to a folder or the running Mac (System volume written directly, booted as a new snapshot, reverted to the one booted before): only changed files, checked, locked, rolled back on failure, revertible | [`tools/hao`](../tools/hao/README.md) |
-| Kernel binder | Computes the OpenCore kernel repairs and IntelCommpage table from a recipe and the kernel collection just linked, with no compiler on the target. The image build runs it (hao-opencore `kc.bind`) and requires the recorded repairs' bytes where those bind | [`tools/kc-binder`](../tools/kc-binder/README.md) |
+| Kernel binder | Computes the OpenCore kernel repairs and IntelCommpage table from a recipe and the kernel collection just linked, with no compiler on the target. The image build runs it (hao-opencore `kc.bind`) and requires the recorded repairs' bytes where those bind. Elsewhere it writes the table into IntelCommpage, which reads it at load (kernel-foundation r42), so a moved layout needs no rebuilt kext | [`tools/kc-binder`](../tools/kc-binder/README.md) |
 | Assembler targets | One assembler over a raw image or a whole internal disk, the disk gated by the installer's safety checks | `pipeline/stages/golden-image.py` |
 | Downloads | Pinned, resumable, content-addressed downloads; a host capability matrix | [`tools/acquire`](../tools/acquire/README.md) |
 | Release cut | Classifies every input as downloadable, reproducible, dirty, harvested or unrecorded; writes `release.json` drafts | `pipeline/release-cut` |
@@ -45,9 +45,11 @@ its declarations. Moving an input row clears that proof.
 - **Installing from these pieces.** Images are still built by the recipes' own hooks by default. `golden-run
   --from-overlays` (opt-in, [building](building.md#installing-from-the-overlays-opt-in)) installs the files of every
   recipe whose declarations are all made on the host from the overlays instead (12 of the 20 recipes of
-  `dev-bs-test`, 837 files); the rest, and everything made on the target, still run their hooks. Not yet through a
-  VM build: its comparison with a hook build is the next step. The kernel binder is used: hao-opencore installs its
-  repairs (equal to the recorded ones on every recorded 26B131 collection; not yet through a boot).
+  `dev-bs-test`, 837 files); the rest, and everything made on the target, still run their hooks. Its first VM build
+  matched a hook build except signature padding and 41 empty folders (now carried). The kernel binder is used:
+  hao-opencore installs its repairs (equal to the recorded ones on every recorded 26B131 collection). IntelCommpage
+  r42 reads its collection addresses from the table the binder writes; it passed a VM build and a QEMU boot, not
+  yet the laptop.
 - **The USB installer:** the Recovery-on-a-stick launcher, disk layout on the target, and kernel collections linked
   and bound there. Its riskiest unknowns (bundled Python, kmutil and the binder, cryptex sealing, volume groups and
   firmlinks in a Tahoe Recovery) are spikes in [`tools/recovery-spikes`](../tools/recovery-spikes/README.md), not

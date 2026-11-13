@@ -226,6 +226,99 @@ class Commpage(Case):
         self.assertEqual(len(addresses), 3+1+1+2+1+2)
 
 
+class Table(Case):
+    """IntelCommpage's load-time table (__DATA,__ic_table): what the binder writes for a collection."""
+
+    def table(self, fix=None, recipe_from=None, name='a'):
+        recipe, kc = self.bound(fix, recipe_from, name)
+        return recipe, kc, kcbind.commpage_table(recipe, kc)
+
+    def test_bytes_hold_every_table_entry_and_read_back(self):
+        f = foundation()
+        recipe, kc, table = self.table()
+        data = kcbind.table_bytes(recipe, table, f)
+        layout = kcbind.table_layout(recipe, f)
+        self.assertEqual(layout['hooks'], ['hook_a', 'hook_b'])
+        self.assertEqual(len(data), f['table_size'](layout))
+        self.assertEqual(data[:4], b'ICTB')
+        values = f['read_table'](data, layout)
+        self.assertEqual(values, kcbind.table_values(table))
+        self.assertEqual(values['symbols']['_printf'], fixture.BASE+0x100000+0x2c00)
+        self.assertEqual(values['hook_original'][1], bytes.fromhex('554889e55dc3662e0f1f84000000'))
+        self.assertEqual(values['kernel_uuid'], fixture.KERNEL_UUID)
+        # The layout id names the slots: another order is another layout.
+        other = dict(layout, symbols=list(reversed(layout['symbols'])))
+        self.assertNotEqual(f['layout_id'](other), f['layout_id'](layout))
+        with self.assertRaisesRegex(ValueError, 'layout differ'):
+            f['read_table'](data, other)
+
+    def test_every_table_line_of_the_header_is_in_the_table(self):
+        """The header lines a table entry replaces are exactly the collection-dependent lines that are not
+        CODE_LINES; their values are the table's."""
+        f = foundation()
+        recipe, kc, table = self.table()
+        lines = kcbind.abi_lines(table, f)
+        entries = set(lines)-set(kcbind.CODE_LINES)
+        self.assertEqual(entries, {'addr'+n for n in table['required']} | set(f['TABLE_DEFINITIONS']))
+        values = f['read_table'](kcbind.table_bytes(recipe, table, f), kcbind.table_layout(recipe, f))
+        self.assertIn(f'{values["symbols"]["_PE_state"]:#x}ULL', lines['addr_PE_state'])
+        self.assertIn(f'{values["hook_sites"][0]:#x}ULL', lines['hook_sites'])
+
+    def test_stamp_writes_a_moved_collections_table(self):
+        f = foundation()
+        recipe, kc, table = self.table()
+        reference = kcbind.table_bytes(recipe, table, f)
+        kext = fixture.kext_binary(reference)
+        stamped, data = kcbind.stamp(recipe, table, f, kext)
+        self.assertEqual(stamped, kext)   # the collection the kext was built for: nothing changes
+        moved = fixture.Fixture(moves=Synthetic.MOVES)
+        recipe2, kc2, table2 = self.table(moved, fixture.Fixture(), 'moved')
+        stamped, data = kcbind.stamp(recipe2, table2, f, kext)
+        self.assertNotEqual(data, reference)
+        offset, size = f['find_table'](stamped)
+        self.assertEqual(stamped[offset:offset+size], data)
+        self.assertEqual(stamped[:offset]+stamped[offset+size:], kext[:offset]+kext[offset+size:])
+        values = f['read_table'](data, kcbind.table_layout(recipe2, f))
+        self.assertEqual(values['symbols']['_printf'], fixture.BASE+0x100000+0x10000+0x2c00)
+        self.assertEqual(values['map_slots'], [fixture.BASE+0x200000-0x8000+0x20])
+
+    def test_stamp_refusals(self):
+        f = foundation()
+        recipe, kc, table = self.table()
+        reference = kcbind.table_bytes(recipe, table, f)
+        cases = {'no IntelCommpage table': fixture.kext_binary(None),
+                 'magic/version': fixture.kext_binary(reference[:4]+struct.pack('<I', 2)+reference[8:]),
+                 'layout differ': fixture.kext_binary(reference[:16]+bytes(16)+reference[32:]),
+                 'compiled for kernel': fixture.kext_binary(reference[:32]+bytes(range(0x30, 0x40))+reference[48:])}
+        for text, kext in cases.items():
+            with self.subTest(text), self.assertRaises(kcbind.BindError) as caught:
+                kcbind.stamp(recipe, table, f, kext)
+            self.assertIn(text, str(caught.exception))
+
+    def test_command_line_stamp(self):
+        f = foundation()
+        recipe, kc, table = self.table()
+        kext = self.temp/'IntelCommpage.kext'
+        (kext/'Contents/MacOS').mkdir(parents=True)
+        binary = kext/'Contents/MacOS/IntelCommpage'
+        binary.write_bytes(fixture.kext_binary(kcbind.table_bytes(recipe, table, f)))
+        moved = fixture.Fixture(moves=Synthetic.MOVES)
+        kc_path, recipe_path = fixture.Fixture().write(self.temp/'cli')
+        kc_path.write_bytes(bytes(moved.data))
+        run = lambda *a: subprocess.run([sys.executable, '-I', str(CLI), *map(str, a)],  # noqa: E731
+                                        capture_output=True, text=True)
+        result = run('stamp', '--boot-kc', kc_path, '--recipe', recipe_path, '--kext', kext)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = run('bind', '--boot-kc', kc_path, '--recipe', recipe_path, '--out', self.temp/'out')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        offset, size = f['find_table'](binary.read_bytes())
+        self.assertEqual(binary.read_bytes()[offset:offset+size], (self.temp/'out/commpage-table.bin').read_bytes())
+        binary.write_bytes(fixture.kext_binary(None))
+        result = run('stamp', '--boot-kc', kc_path, '--recipe', recipe_path, '--kext', kext)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('no IntelCommpage table', result.stderr)
+
+
 class Compare(Case):
     def test_repairs_rows_name_the_field(self):
         recipe, kc = self.bound()
@@ -351,6 +444,35 @@ class Recorded(unittest.TestCase):
         text = Path(os.environ['KC_BINDER_COMMPAGE_ABI']).read_text()
         for path, kc, recipe, _, _ in self.collections():
             self.assertRows(compare.abi_header(kcbind.commpage_table(recipe, kc), text, foundation()), path)
+
+    @unittest.skipUnless(os.environ.get('KC_BINDER_COMMPAGE_KEXT') and os.environ.get('KC_BINDER_COMMPAGE_ABI'),
+                         'KC_BINDER_COMMPAGE_KEXT and KC_BINDER_COMMPAGE_ABI not set')
+    def test_table_equals_the_compiled_values(self):
+        """The table the binder writes for each collection is byte for byte the one IntelCommpage.kext holds, and
+        its entries read back as the lines of the header (r41's IntelCommpage compiled exactly these lines)."""
+        f = foundation()
+        binary = (Path(os.environ['KC_BINDER_COMMPAGE_KEXT'])/'Contents/MacOS/IntelCommpage').read_bytes()
+        recorded = kcbind.header_definitions(Path(os.environ['KC_BINDER_COMMPAGE_ABI']).read_text())
+        for path, kc, recipe, _, _ in self.collections():
+            table = kcbind.commpage_table(recipe, kc)
+            stamped, data = kcbind.stamp(recipe, table, f, binary)
+            self.assertEqual(stamped, binary, path)
+            v = f['read_table'](data, kcbind.table_layout(recipe, f))
+            words = lambda seq: ','.join(f'{x:#x}ULL' for x in seq)  # noqa: E731
+            lines = {f'addr{n}': f'static constexpr uintptr_t addr{n} = {a:#x}ULL;' for n, a in v['symbols'].items()}
+            lines.update(
+                addr_kernel_header=f'static constexpr uintptr_t addr_kernel_header = {v["kernel_header"]:#x}ULL;',
+                addr_iosurface_header=f'static constexpr uintptr_t addr_iosurface_header = {v["iosurface_header"]:#x}ULL;',
+                addr_iosurface_set_value=('static constexpr uintptr_t addr_iosurface_set_value = '
+                                          f'{v["iosurface_set_value"]:#x}ULL;'),
+                alias_slots='static const uintptr_t alias_slots[] = {'+words(v['alias_slots'])+'};',
+                map_slots='static const uintptr_t map_slots[] = {'+words(v['map_slots'])+'};',
+                hook_sites='static const uintptr_t hook_sites[] = {'+words(v['hook_sites'])+'};',
+                hook_original='static const unsigned char hook_original[][14] = {'+','.join(
+                    '{'+','.join(str(b) for b in h)+'}' for h in v['hook_original'])+'};',
+                target_uuid='static const unsigned char target_uuid[] = {'+','.join(map(str, v['kernel_uuid']))+'};')
+            self.assertEqual(len(lines), len(table['required'])+len(f['TABLE_DEFINITIONS'])+1)
+            self.assertEqual({k: recorded.get(k) for k in lines}, lines, path)
 
     @unittest.skipUnless(os.environ.get('KC_BINDER_KERNEL') and os.environ.get('KC_BINDER_IOSURFACE_LAYOUT')
                          and have_tool('llvm-objdump'), 'KC_BINDER_KERNEL, KC_BINDER_IOSURFACE_LAYOUT, llvm-objdump')

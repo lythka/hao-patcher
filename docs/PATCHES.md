@@ -355,7 +355,7 @@ Revision r7, status experiment. [Recipe](../patches/golden-gate-windowserver-fil
 
 ## hao-opencore
 
-Revision r47, status experiment. [Recipe](../patches/hao-opencore/README.md)
+Revision r48, status experiment. [Recipe](../patches/hao-opencore/README.md)
 
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it; 5 edits, applied by the installer. Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (kc.bind reads it).
   1. `kernel-repairs`: kc.bind (applied by tools/kc-binder, against the target's linked BootKC).
@@ -368,7 +368,7 @@ Revision r47, status experiment. [Recipe](../patches/hao-opencore/README.md)
      The Intel Mac boots Darwin 27 with its Lilu-based drivers loading, PCID off, hao's arm64-only programs allowed to start and hao's crash lines on the console, the Intel commpage reporting Apple-internal CSR so OCLP's on-disk Metal loads, a panic rebooting instead of waiting for a debugger, and kernelmanagerd loading the System kernel collection without first trying, and failing, to build an auxiliary collection.
   5. `clear-boot-logging-overrides`: plist.set NVRAM:Delete:7C436110-AB2A-4BBB-A880-FE41995C9F82 = ["boot-args", "csr-active-config", "bootercfg", "bootercfg-once"].
      The next OpenCore boot deletes the firmware's boot logging overrides, so they cannot hide early-boot output.
-- `EFI/OC/Kexts/IntelCommpage.kext`: whole file from every file under it from hao · IntelCommpage.kext (row kernel_repair_efi). EFI/OC/Kexts/IntelCommpage.kext of the row, copied with ditto; src/kc_bind.py refuses unless its files are the ones the kernel_repair_binding profile lists, and unless the commpage_abi.hpp it was compiled with (row intel_commpage_abi) holds for this image's BootKC.
+- `EFI/OC/Kexts/IntelCommpage.kext`: whole file from every file under it from hao · IntelCommpage.kext (row kernel_repair_efi). EFI/OC/Kexts/IntelCommpage.kext of the row, copied with ditto; src/kc_bind.py refuses unless its files are the ones the kernel_repair_binding profile lists; its __DATA,__ic_table (r42) must equal the table for this image's BootKC, or in binder-only mode is written for it (a kext without the table: every collection-dependent line of row intel_commpage_abi must hold).
 - `EFI/OC/Kexts/HaoExec.kext`: whole file from every file under it from hao · HaoExec.kext (row hao_runtime). The row's HaoExec.kext, copied with ditto; its executable is declared on its own below: stamp_identity.py (also from the row) stamps it for this image's BootKC.
 - `EFI/OC/Kexts/HaoExec.kext/Contents/MacOS/HaoExec`: from hao · HaoExec.kext's executable (row hao_runtime); 1 edit, applied by the installer. Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (hao.stamp reads it).
   1. `bootkc-identity`: hao.stamp (applied by the hao-runtime row's stamp_identity.py, against the target's linked BootKC).

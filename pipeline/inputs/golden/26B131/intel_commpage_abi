@@ -1,2 +1,3 @@
 # commpage_abi.hpp IntelCommpage.kext (row kernel_repair_efi) was compiled with; the kernel_repair_binding profile pins it.
-8ca2e1893ca566488f83457770444d4c4a1d682bb07a72b99db10c7ea11d98a6 store/artifacts/commpage-26B131-r41/build/commpage_abi.hpp
+# r42: the load-time address table (__DATA,__ic_table); every r41 line kept with its value.
+9e389c17303fd438746e5e15b5c2853292f704b0c10f3cca3775cc9427f54d15 store/artifacts/commpage-26B131-r42/build/commpage_abi.hpp
