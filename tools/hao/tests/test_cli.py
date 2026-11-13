@@ -340,17 +340,12 @@ class BuilderTest(unittest.TestCase):
     def test_writes_stop_before_anything(self):
         host = FakeMac(root_device='disk9s1')
         ran = []
-        for fn, disk in ((BUILD.build_disk, 'disk5'), (BUILD.create_installer, 'disk4')):
-            c, _ = console('quiet', answer='nope')
-            a = ns(model='MacBookPro9,2', disk=disk, dry_run=False, minimum_bytes=10**9)
-            with self.assertRaises(CON.Stopped) as x:
-                fn(a, c, host, **({'run': ran.append} if fn is BUILD.build_disk else {}))
-            self.assertEqual(x.exception.what, 'not confirmed')
-        c, _ = console('quiet')
-        a = ns(model='MacBookPro9,2', disk='disk4', dry_run=False, minimum_bytes=10**9, confirm='ERASE')
+        # create-installer: tests/test_installer.py
+        c, _ = console('quiet', answer='nope')
+        a = ns(model='MacBookPro9,2', disk='disk5', dry_run=False)
         with self.assertRaises(CON.Stopped) as x:
-            BUILD.create_installer(a, c, host)
-        self.assertIn('cannot write yet', x.exception.what)
+            BUILD.build_disk(a, c, host, run=ran.append)
+        self.assertEqual(x.exception.what, 'not confirmed')
         self.assertEqual(ran, [])
         self.assertFalse(any(x in c for c in host.calls for x in ('eraseDisk', 'partitionDisk', 'unmountDisk')))
 
