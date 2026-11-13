@@ -13,20 +13,19 @@ Gate's ARM-only programs on the Intel CPU.
 [Gallery](docs/gallery.md) · [Progress](docs/progress.md) · [Building](docs/building.md) ·
 [Buy me a coffee](https://buymeacoffee.com/lythka)
 
-### Metal argument buffers on the Intel HD 4000
+### Accelerated Metal on the Intel HD 4000
 
-The HD 4000's legacy Metal stack has no argument buffers or ASTC textures, which Weather's maps, Safari's WebGPU,
-SceneKit and Apple's effects engine need. hao-patcher adds both to the shader compiler and the driver
+Maps draws its satellite view and 3D buildings with Apple's shader libraries, repaired so the HD 4000's legacy Metal
+compiler accepts them ([cache/metallib](cache/metallib)). Weather's maps need argument buffers and ASTC textures,
+which that legacy stack lacks; hao-patcher adds both to the shader compiler and the driver
 ([tools/metal-argbuf](tools/metal-argbuf)):
 
 <p>
-<img src="docs/images/gallery/weather-wind-map.jpg" alt="Weather wind map on the HD 4000" width="49%">
+<img src="docs/images/gallery/maps-3d-buildings.jpg" alt="Maps satellite view with 3D buildings on the HD 4000" width="49%">
 <img src="docs/images/gallery/weather-temperature-map.jpg" alt="Weather temperature map on the HD 4000" width="49%">
 </p>
 
-<img src="docs/images/gallery/safari-webgpu.jpg" alt="Safari WebGPU compute and render check passing on the HD 4000" width="98%">
-
-More in the [gallery](docs/gallery.md): the desktop, Safari and YouTube, the air-quality map, Maps in 3D and SceneKit.
+More in the [gallery](docs/gallery.md): Safari and YouTube, the wind and air-quality maps, WebGPU and SceneKit.
 
 ## Status
 
