@@ -57,10 +57,9 @@
   "libhelloblur": {
    "artifact": "libhelloblur-d471519b",
    "repo": "hao-patcher",
-   "commit": "133a9b8b",
+   "commit": "ff740d98",
    "result": "except",
-   "except": "the linker version (ld 27037.1 then, 27106.1 now) and the UUID and ad hoc signature that follow from it; every section identical",
-   "open": "133a9b8b is only on the local branch consolidate/fold-packages-20261110, not on origin"
+   "except": "the linker version (ld 27037.1 then, 27106.1 now) and the UUID and ad hoc signature that follow from it; every section identical, and patches/golden-gate-hello/build/compare.py gets the stored bytes once UUID and ld version are equal"
   }
  }
 }
