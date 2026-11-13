@@ -21,7 +21,10 @@ FILL_BLOCK = 16 << 20
 
 
 def load_install(code):
-    path = code/'patches/golden-gate-userspace/src/install.py'
+    """golden-gate-userspace's cryptex code: src/cryptex.py since the build-reuse split (r64), install.py before."""
+    src = code/'patches/golden-gate-userspace/src'
+    sys.path.insert(0, str(src))
+    path = src/'cryptex.py' if (src/'cryptex.py').exists() else src/'install.py'
     spec = importlib.util.spec_from_file_location('gg_install', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

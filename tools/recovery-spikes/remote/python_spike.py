@@ -24,7 +24,9 @@ MODULES = ['argparse', 'bz2', 'concurrent.futures', 'contextlib', 'ctypes', 'dat
            'tempfile', 'textwrap', 'threading', 'time', 'unittest', 'urllib.request', 'uuid', 'xml.etree.ElementTree',
            'zipfile', 'zlib']
 # Programs the installer's steps call; codesign is the edit engine's signer.
-TOOLS_REQUIRED = ['codesign', 'ditto', 'hdiutil', 'diskutil', 'bless', 'tar', 'install', 'chflags', 'plutil', 'shasum']
+# 25G241's NetBoot Recovery has no install(1), rsync, mkfile or shasum (laptop 2026-11-13): our tools copy and
+# hash with Python, so they are reported (tools-other), not required.
+TOOLS_REQUIRED = ['codesign', 'ditto', 'hdiutil', 'diskutil', 'bless', 'tar', 'chflags', 'plutil']
 TOOLS_INFO = ['kmutil', 'rsync', 'perl', 'mkfile', 'nvram', 'csrutil']
 SUITES = ['tools/edit-engine/tests', 'tools/kc-binder/tests', 'tools/hao/tests', 'patches/darwin27-kernel/tests']
 

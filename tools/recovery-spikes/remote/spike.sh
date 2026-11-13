@@ -8,9 +8,19 @@ set -u
 T=${1:?T}; name=${2:?NAME}; shift 2
 cd "$T" || { echo "END $name rc=1"; exit 1; }
 tab=$(printf '\t'); bad=0; n=0
+# The NetBoot Recovery has no shasum (nor openssl, nor Perl's Digest::SHA): the bundled Python hashes the uploads,
+# unpacked first into a scratch folder; its own archive is checked by the same pass before anything else runs.
+HPY=$T/.hashpy/python/bin/python3
+command -v shasum >/dev/null 2>&1 || { mkdir -p "$T/.hashpy" && tar -xzf inputs/python.tar.gz -C "$T/.hashpy"; }
+sha256() {
+    if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | cut -d' ' -f1
+    else "$HPY" -I -c 'import hashlib, sys; h = hashlib.sha256(); f = open(sys.argv[1], "rb")
+for b in iter(lambda: f.read(1 << 22), b""): h.update(b)
+print(h.hexdigest())' "$1"; fi
+}
 while IFS=$tab read -r file sha size; do
     n=$((n + 1))
-    have=$(shasum -a 256 "inputs/$file" 2>/dev/null | cut -d' ' -f1)
+    have=$(sha256 "inputs/$file" 2>/dev/null)
     [ "$have" = "$sha" ] || { echo "CHECK upload FAIL inputs/$file is '$have', want $sha"; bad=1; }
 done < inputs/manifest.tsv
 [ $bad = 0 ] || { echo "END $name rc=1"; exit 1; }

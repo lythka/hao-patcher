@@ -14,6 +14,13 @@ W=/private/var/tmp/hao-spikes
 cmd=${1:-}; [ $# -gt 0 ] && shift
 
 mem_mb() {
+    # The NetBoot Recovery (25G241) has no vm_stat: use the kernel's own page counts (free + speculative +
+    # purgeable; inactive is not exported, so this errs low).
+    if ! command -v vm_stat >/dev/null 2>&1; then
+        sysctl -n vm.pagesize vm.page_free_count vm.page_speculative_count vm.page_purgeable_count 2>/dev/null |
+            awk 'NR == 1 { ps = $1; next } { n += $1 } END { printf "%d\n", n * ps / 1048576 }'
+        return
+    fi
     vm_stat | awk '/page size of/ { for (i = 1; i <= NF; i++) if ($i == "of") ps = $(i + 1) }
         /^Pages (free|inactive|speculative|purgeable):/ { gsub(/\./, "", $NF); n += $NF }
         END { if (!ps) ps = 4096; printf "%d\n", n * ps / 1048576 }'

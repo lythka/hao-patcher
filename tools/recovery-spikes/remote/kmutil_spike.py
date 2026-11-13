@@ -227,7 +227,10 @@ def body(s):
         s.run('chown', '-R', 'root:wheel', root/'System', *(['%s/Library' % root] if (root/'Library').exists() else []))
     kernels = root/'System/Library/Kernels'
     kernels.mkdir(parents=True, exist_ok=True)
-    s.run('install', '-o', 'root', '-g', 'wheel', '-m', '644', inputs/'kernel', kernels/'kernel')
+    # the Recovery has no install(1): copy, then root:wheel 0644 as install -o root -g wheel -m 644 would
+    shutil.copyfile(inputs/'kernel', kernels/'kernel')
+    os.chown(kernels/'kernel', 0, 0)
+    os.chmod(kernels/'kernel', 0o644)
     (root/KC).mkdir(parents=True, exist_ok=True)
 
     os.chmod(inputs/'kmutil', 0o755)

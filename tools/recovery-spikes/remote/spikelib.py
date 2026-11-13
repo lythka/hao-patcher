@@ -151,7 +151,12 @@ def container_on(listing, whole):
 
 
 def mem_available_mb():
-    out = subprocess.run(['vm_stat'], capture_output=True, text=True, check=True).stdout
+    try:
+        out = subprocess.run(['vm_stat'], capture_output=True, text=True, check=True).stdout
+    except FileNotFoundError:   # the NetBoot Recovery has no vm_stat: the kernel's page counts (errs low)
+        v = [int(subprocess.run(['sysctl', '-n', k], capture_output=True, text=True, check=True).stdout)
+             for k in ('vm.pagesize', 'vm.page_free_count', 'vm.page_speculative_count', 'vm.page_purgeable_count')]
+        return v[0]*sum(v[1:])//(1 << 20)
     return parse_vm_stat(out)
 
 

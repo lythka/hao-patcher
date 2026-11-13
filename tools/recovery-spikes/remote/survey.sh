@@ -4,7 +4,7 @@
 # One "SURVEY key value" line per fact; run.sh's verdict turns them into survey.json and a RAM budget per spike.
 set -u
 s() { printf 'SURVEY %s %s\n' "$1" "$(printf '%s' "$2" | tr '\n' ' ' | sed 's/ *$//')"; }
-sha() { [ -f "$1" ] && shasum -a 256 "$1" | cut -d' ' -f1 || echo absent; }
+sha() { [ -f "$1" ] || { echo absent; return; }; command -v shasum >/dev/null 2>&1 && shasum -a 256 "$1" | cut -d' ' -f1 || echo "md5:$(md5 -q "$1")"; }
 APFS=/System/Library/Filesystems/apfs.fs/Contents/Resources
 s build "$(sw_vers -buildVersion)"
 s product "$(sw_vers -productVersion)"

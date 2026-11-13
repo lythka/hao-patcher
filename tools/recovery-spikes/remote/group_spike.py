@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from spikelib import Spike, CommandFailed, container_on, main_guard   # noqa: E402
 
-IMAGE_MB = 512
+IMAGE_MB = 3072   # APFS allows about one volume per 512 MB of container; the spike adds five or six
 # What golden-pristine's copy-altlink writes from Golden Gate's own filesystem (paths, not Apple bytes).
 LINK_TARGET = '../../System/Volumes/Preboot/Cryptexes/OS'
 ALTLINK_HEX = '/System/Volumes/Preboot/Cryptexes/Incoming/OS'.encode().hex()

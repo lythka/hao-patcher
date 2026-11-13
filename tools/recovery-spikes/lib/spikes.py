@@ -60,7 +60,7 @@ SPIKES = {
     'cryptex': dict(inputs={'python_x86_64': 'python.tar.gz', 'golden_app_cryptex': 'golden_app_cryptex.dmg',
                             'newfs_apfs_25G332': 'newfs_apfs', 'apfs_prepare_cryptex_25G332': 'apfs_prepare_cryptex'},
                     ramdisk=None, timeout=1800, required=['upload', 'python-starts']),
-    'group': dict(inputs={'python_x86_64': 'python.tar.gz', 'fl': 'fl', 'fl_noent': 'fl-noent'}, ramdisk=1536,
+    'group': dict(inputs={'python_x86_64': 'python.tar.gz', 'fl': 'fl', 'fl_noent': 'fl-noent'}, ramdisk=7168,
                   timeout=900, required=['upload', 'python-starts']),
     'kmutil': dict(inputs={'python_x86_64': 'python.tar.gz', 'tahoe_kmutil': 'kmutil', 'darwin27_kernel': 'kernel'},
                    ramdisk=768, timeout=2700,
@@ -142,6 +142,50 @@ def code_tar(out, stage_kc_binder=True):
     return head, dirty
 
 
+# The NetBoot Recovery's shared cache has no libedit, libncurses or libpanel (laptop, 25G241, 2026-11-13: python3.12
+# aborts "Library not loaded: /usr/lib/libpanel.5.4.dylib"). Python's core never needs them (only readline/curses
+# do), so the Recovery bundle is the pinned one with those three LC_LOAD_DYLIB made LC_LOAD_WEAK_DYLIB in
+# bin/python3.12, re-signed ad hoc. Declared here, made on the host from the pinned row; no Apple file is involved.
+WEAK_IN_RECOVERY = ('libedit', 'libncurses', 'libpanel')
+
+
+def weaken_dylibs(path, names=WEAK_IN_RECOVERY):
+    """Turn LC_LOAD_DYLIB commands naming any of NAMES into LC_LOAD_WEAK_DYLIB in a thin x86_64 Mach-O; returns the
+    install names changed."""
+    import struct
+    b = bytearray(Path(path).read_bytes())
+    if struct.unpack_from('<I', b, 0)[0] != 0xfeedfacf:
+        raise ValueError('%s: not a thin 64-bit Mach-O' % path)
+    ncmds, off, changed = struct.unpack_from('<I', b, 16)[0], 32, []
+    for _ in range(ncmds):
+        cmd, size = struct.unpack_from('<II', b, off)
+        if cmd == 0xc:
+            name = bytes(b[off + struct.unpack_from('<I', b, off + 8)[0]:off + size]).split(b'\0')[0].decode()
+            if any(n in name for n in names):
+                struct.pack_into('<I', b, off, 0x80000018)
+                changed.append(name)
+        off += size
+    Path(path).write_bytes(bytes(b))
+    return changed
+
+
+def recovery_python(source, target):
+    """TARGET = SOURCE's python-build-standalone tar with bin/python3.12 weakened for the Recovery and re-signed."""
+    import tarfile, tempfile
+    if not tarfile.is_tarfile(source):     # test fixtures stand in for the archive with a few bytes
+        shutil.copyfile(source, target)
+        return
+    with tempfile.TemporaryDirectory() as t:
+        with tarfile.open(source) as tar:
+            tar.extractall(t, filter='tar')
+        exe = Path(t)/'python'/'bin'/'python3.12'
+        if not weaken_dylibs(exe):
+            raise ValueError('%s: none of %s linked' % (exe, ', '.join(WEAK_IN_RECOVERY)))
+        subprocess.run(['codesign', '-f', '-s', '-', str(exe)], check=True, capture_output=True)
+        with tarfile.open(target, 'w:gz') as tar:
+            tar.add(Path(t)/'python', arcname='python')
+
+
 def stage(spike, folder):
     folder = Path(folder)
     inputs = folder/'inputs'
@@ -151,7 +195,10 @@ def stage(spike, folder):
     for row, dest in SPIKES[spike]['inputs'].items():
         source = resolve_row(LOCK, rows, row)
         target = inputs/dest
-        shutil.copyfile(source, target)
+        if dest == 'python.tar.gz':
+            recovery_python(source, target)
+        else:
+            shutil.copyfile(source, target)
         os.chmod(target, 0o755 if dest != 'python.tar.gz' and not dest.endswith('.dmg') else 0o644)
         if dest in SIGN:
             subprocess.run(['codesign', '-s', '-', '-f', str(target)], check=True, capture_output=True)
