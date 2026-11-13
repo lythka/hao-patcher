@@ -104,6 +104,7 @@ the 26B131 sets; not built into an image or booted yet. Before that: the rule is
 cpio). Not built into an image or booted.
 
 ## Revisions
+- r4 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r3 2026-11-13 26B131 input row user_template_golden_gate (harvest of benchtest's first login on image 3b2291a: 336 containers, 31 chronod descriptors, 3 Reminders stores) and status experiment; in golden-gate-26B131, dev-bs-test and dev-metal27 after golden-gate-user-seed. apply.sh unchanged.
 - r2 2026-11-11 Back for 26B131 with BETA7's full rule (personality flag on every container, no sandbox profile cache, chronod reduced to its descriptor cache without PeopleWidget), made on the host by cache/seeds/template from a collect-template.sh harvest and checked by apply.sh. Root cause of the 4d1c48c login storm: a54ec244 removed the template, so the first login made 328 containers and secinitd retried each personality (this commit).
 - r1 2026-11-06 From user-template r5's rule without its container list, for a 27.0 first-login harvest (mac27 dea52005; removed by a54ec244).

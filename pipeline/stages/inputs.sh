@@ -4,7 +4,7 @@
 #   SHARE/pristine      payload.yaa, links.txt, firmlinks_payload (unpack), sys/data lists, firmlinks + root_uuid metadata, tools
 #   SHARE/oclp    OCLP source at commit OCLP (git archive of $OCLP_REPO) + the Universal-Binaries.dmg it expects
 #   SHARE/kdk     the build's KDK, expanded (System/Library/Extensions + SystemVersion.plist), cached in $CACHE
-#   SHARE/py SHARE/site   arm64 CPython + the site-packages OCLP imports
+#   SHARE/py SHARE/py-x86_64 SHARE/site   arm64 and x86_64 CPython + the site-packages OCLP imports (universal)
 #   SHARE/patches.txt   the set's image patches that apply to this target and build (pipeline/patches.py plan)
 #   SHARE/optional.json the set's optional patches that ran or were skipped, with the reason
 #   SHARE/hooks/NN-<name>  the set's oclp-hook patches (patches/<name>/src, OCLP runs its hook.sh SYS DATA) and
@@ -34,7 +34,15 @@ else
     cp -c $(common fl) $SHARE/pristine/fl
 fi
 
-git -C $OCLP_REPO archive $OCLP | tar -x -C $SHARE/oclp
+# OCLP's source at the assembly's commit: from the repository (git archive), or, on a Mac without git (an Intel Mac
+# on macOS 27 has no command-line tools), from the archive the assets folder carries: store/oclp-source/OCLP.tar
+# (git archive of that commit) with OCLP.commit holding the full commit.
+OCLP_TAR=${OCLP_TAR:-$TOP/store/oclp-source/$OCLP.tar}
+if [[ -f $OCLP_TAR ]] && { [[ ! -d $OCLP_REPO/.git && ! -f $OCLP_REPO/HEAD ]] || ! command -v git >/dev/null 2>&1 || ! git --version >/dev/null 2>&1; }; then
+    tar -x -C $SHARE/oclp -f $OCLP_TAR; OCLP_FULL=$(cat ${OCLP_TAR:r}.commit)
+else
+    git -C $OCLP_REPO archive $OCLP | tar -x -C $SHARE/oclp; OCLP_FULL=$(git -C $OCLP_REPO rev-parse $OCLP)
+fi
 cp $(common psp_$($L psp $SHARE/oclp)) $SHARE/oclp/Universal-Binaries.dmg
 
 KDK=$($L kdk-name $KDKDMG); K=$CACHE/kdk-${${KDK:r}##*_}
@@ -49,9 +57,13 @@ if [[ ! -f $K/System/Library/CoreServices/SystemVersion.plist ]]; then
 fi
 ditto $K $SHARE/kdk/$KDK
 
-PY=$CACHE/python/arm64
-[[ -x $PY/python/bin/python3.12 ]] || { rm -rf $PY; mkdir -p $PY; tar -xzf $(common python_arm64) -C $PY; }
-ditto $PY/python $SHARE/py; ditto $(common python_site) $SHARE/site
+# Both CPythons: SHARE/py (arm64) and SHARE/py-x86_64; the assembly copies the one for the Mac it runs on to its py/.
+for arch dir in arm64 py x86_64 py-x86_64; do
+    PY=$CACHE/python/$arch
+    [[ -x $PY/python/bin/python3.12 ]] || { rm -rf $PY; mkdir -p $PY; tar -xzf $(common python_$arch) -C $PY; }
+    ditto $PY/python $SHARE/$dir
+done
+ditto $(common python_site) $SHARE/site
 
 # A patch input: the Golden Gate build's row (GOLDEN_LOCK, golden-first only), else the donor build's, else common's.
 # Optional patches whose rows are not there, or whose group is in SKIP_OPTIONAL (space-separated), are left out of the
@@ -76,7 +88,7 @@ while read -r stage name ins; do
 done < $SHARE/patches.txt
 $L target $TARGET oclp_hardware_profile > $SHARE/profile.json
 {
-    echo "oclp $(git -C $OCLP_REPO rev-parse $OCLP) ($OCLP), PatcherSupportPkg $($L psp $SHARE/oclp)"
+    echo "oclp $OCLP_FULL ($OCLP), PatcherSupportPkg $($L psp $SHARE/oclp)"
     echo "kdk $KDK ($(shasum -a 256 $KDKDMG | cut -c1-16))"
     echo "set ${SET:t:r}: $(python3 -I $TOP/pipeline/patches.py revisions $(cut -d' ' -f2 $SHARE/patches.txt))"
     echo "foundation $FOUNDATION"

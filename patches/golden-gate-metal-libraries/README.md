@@ -111,6 +111,7 @@ matching Tungsten library. A complete image with every library, shader-cache
 re-keying and full-workload performance remain open.
 
 ## Revisions
+- r20 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/test_edits.py; the hook is unchanged.
 - r18 2026-11-12 26B131 artifact from cache/metallib r56: cube and 1D sampler-form reads converted, which changes SceneKit (both), VFX and CoreRE; the other six libraries are byte-identical. SceneKit renders on the laptop (test scene with a cube-map environment, shadows, SSAO; the r55 library crashes it), and Weather renders with the new VFX and CoreRE libraries.
 - r17 2026-11-12 26B131 artifact adds SceneKit (macOS and iOSSupport, cache/metallib r55); the other nine libraries are byte-identical.

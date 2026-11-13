@@ -323,7 +323,9 @@ class Staging(Case):
         row = script.index('"$P/src/repair_binding.py" bind')
         mine = script.index('"$P/src/kc_bind.py"')
         self.assertLess(row, mine)
-        self.assertTrue(script[:row].rstrip().endswith('if /private/var/ssdshare/py/bin/python3.12 -I'))
+        self.assertTrue(script[:row].rstrip().endswith('if "$PY" -I'))
+        # the kit's CPython for the Mac the assembly runs on (golden-image.py sets OCLP_PYTHON), else the VM share's
+        self.assertIn('PY=${OCLP_PYTHON:-/private/var/ssdshare/py/bin/python3.12}', script[:row])
         for argument in ('--binder "$P/build"', '--row "$P/inputs/kernel_repair_efi"',
                          '--profile "$P/inputs/kernel_repair_binding/profile.json"',
                          '--abi-header "$P/inputs/intel_commpage_abi"', '--row-bound "$ROW_BOUND"',

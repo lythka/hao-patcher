@@ -60,6 +60,18 @@
    "commit": "ff740d98",
    "result": "except",
    "except": "the linker version (ld 27037.1 then, 27106.1 now) and the UUID and ad hoc signature that follow from it; every section identical, and patches/golden-gate-hello/build/compare.py gets the stored bytes once UUID and ld version are equal"
+  },
+  "wifip2p_compat": {
+   "artifact": "wifip2p-compat-26B131-20261113-20822cf11958",
+   "repo": "hao-patcher",
+   "commit": "9e30dace",
+   "result": "identical"
+  },
+  "metal_argbuf": {
+   "artifact": "metal-argbuf-26B131-20261112-48bd596235e9",
+   "repo": "hao-patcher",
+   "commit": "9e30dace",
+   "result": "identical"
   }
  }
 }

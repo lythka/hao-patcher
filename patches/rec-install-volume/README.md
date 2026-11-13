@@ -48,5 +48,6 @@ NEEDS VALIDATION: the Recovery builds and its generated chunklist verifies (0 ba
 Recovery volume, Cmd-R and a full reinstall have not been tested.
 
 ## Revisions
+- r5 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r4 2026-11-12 Declare the Recovery dmg and chunklist in `patch.json` `files`; the recipe is unchanged.
 - r3 2026-11-10 Initial public release.

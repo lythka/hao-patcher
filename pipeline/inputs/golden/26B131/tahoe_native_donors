@@ -2,4 +2,4 @@
 # same donor-inputs output as minimal-native-25G342-26B131 (recipe-cache-images.json = its recipe.json plus intel-donors'
 # os_cache/cache_images) with --cache = row tahoe_os_cache_x86_64h: identical entries plus Tahoe's CoreWiFi, cut from the
 # x86_64h OS cache at its own path (cache-images.json holds the extraction and check.py records).
-- store/artifacts/minimal-native-25G342-26B131-corewifi-r3
+81dd7a913a10e7cdca3109858f3159902ca08c98c002959238215919ed1d933a store/artifacts/minimal-native-25G342-26B131-corewifi-r3

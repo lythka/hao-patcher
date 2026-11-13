@@ -36,6 +36,7 @@ golden-gate-live-text-service's and this recipe's, applied to the base config of
 
 ## Revisions
 
+- r3 2026-11-13 `apply.sh` runs Python as `$OCLP_PYTHON` (the kit's CPython for the Mac the assembly runs on, arm64 or x86_64), falling back to the builder VM's share copy; same Python version and bytes written.
 - r2 2026-11-13 The declared boot-args follow hao-opencore r52 (no ic_csr_internal=1); script unchanged.
 
 - r1 2026-11-13 The measurement boot arguments and the OpenCore file log, moved out of hao-opencore (r50) into this dev-only recipe.

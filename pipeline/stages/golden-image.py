@@ -156,8 +156,13 @@ class DiskTarget(Target):
     the disk and fails if anything stays mounted. The container fills the disk, so size_bytes is a minimum."""
     kind = 'disk'
 
-    def __init__(self, disk, minimum_bytes, mount_root, confirm=None, sources=()):
+    POLICIES = ('internal', 'external')
+
+    def __init__(self, disk, minimum_bytes, mount_root, confirm=None, sources=(), policy='internal'):
         super().__init__(mount_root)
+        if policy not in self.POLICIES:
+            raise ValueError('disk policy %r: one of %s' % (policy, ', '.join(self.POLICIES)))
+        self.policy = policy
         disk = str(disk)
         self.name = disk[6:] if disk.startswith('/dev/r') else disk[5:] if disk.startswith('/dev/') else disk
         self.minimum_bytes = minimum_bytes
@@ -185,14 +190,21 @@ class DiskTarget(Target):
             return 'diskutil info failed'
         if not info.get('WholeDisk'):
             return 'not a whole disk'
-        if not info.get('Internal'):
-            return 'not internal'
         if info.get('VirtualOrPhysical') == 'Virtual':
             return 'virtual (disk image / RAM disk)'
-        if info.get('Removable') or info.get('RemovableMedia') or info.get('Ejectable'):
-            return 'removable'
-        if info.get('BusProtocol') == 'USB':
-            return 'USB'
+        internal = bool(info.get('Internal'))
+        removable = bool(info.get('Removable') or info.get('RemovableMedia') or info.get('Ejectable'))
+        if self.policy == 'internal':
+            # hao install: the Mac's own disk, from the installer's Recovery
+            if not internal:
+                return 'not internal'
+            if removable:
+                return 'removable'
+            if info.get('BusProtocol') == 'USB':
+                return 'USB'
+        elif internal and not removable:
+            # hao build-disk: the user's external SSD (USB, Thunderbolt), never the Mac's own disk
+            return 'internal: this build writes only to an external disk'
         names = [self.name]+self.containers(plist)
         if self.on(plist('diskutil','info','-plist','/').get('DeviceIdentifier',''),names):
             return 'holds the running system'
@@ -233,7 +245,7 @@ class DiskTarget(Target):
         return dict(disk='/dev/'+self.name)
 
     def record(self):
-        return dict(target=dict(kind=self.kind, disk='/dev/'+self.name, minimum_bytes=self.minimum_bytes,
+        return dict(target=dict(kind=self.kind, disk='/dev/'+self.name, policy=self.policy, minimum_bytes=self.minimum_bytes,
                                 accepted=self.whole is not None))
 
 
@@ -250,7 +262,7 @@ def target_for(config):
         raise ValueError('configuration must name exactly one target: image or disk')
     if 'disk' in config:
         return DiskTarget(config['disk'],config['size_bytes'],mounts,confirm=config.get('confirm_disk'),
-                          sources=source_paths(config))
+                          sources=source_paths(config),policy=config.get('disk_policy','internal'))
     return ImageTarget(config['image'],config['size_bytes'],mounts)
 
 

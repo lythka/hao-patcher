@@ -342,6 +342,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r69 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r68 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 397b267 (hao-runtime-26B131-20261113-397b2675d037). No recipe change.
 - r67 2026-11-13 wifip2p_compat (20822cf11958): add/removeAWDLDiscoveryClient succeed as no-ops instead of ENOTSUP. The call is new in 27.x and advisory; Tahoe's mDNSResponder never makes it and OCLP's wifip2pd brings AWDL up on its own, so mDNSResponder now behaves as Tahoe's does for AirDrop.
 - r66 2026-11-13 wifip2p_compat (7eaffe614b3b): adds -[AWDLServiceDiscoveryManager add/removeAWDLDiscoveryClient:forService:error:] to OCLP's class (ENOTSUP); 27.x's mDNSResponder sent them at every AWDL service registration (AirDrop) and crashed on the unrecognized selector, 16 times in one session, taking DNS and Bonjour down. Plus 10 Wi-Fi Aware / WiFiP2PUIAgent stand-ins. make now checks OCLP's classes against their method lists read on the laptop (oclp-methods.txt), so such a gap fails the build instead of being "unverified". AirDrop over AWDL still needs a bridge to OCLP's discovery calls.

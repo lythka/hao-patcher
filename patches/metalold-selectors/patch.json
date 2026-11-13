@@ -1,5 +1,5 @@
 {
- "revision": 6,
+ "revision": 7,
  "stage": "oclp-hook",
  "applies": {
   "models": [
@@ -16,7 +16,7 @@
  "status": "product",
  "validated": true,
  "validated_revision": 3,
- "validated_digest": "78f16f715e78f329662ba3e0de77b61bc446b6a096ca96728c8747599c1d28fc",
+ "validated_digest": "642b6c0637a933aa75372ce0ce27ea28fbcfd5dcd3d310786423caa402fdff7f",
  "files": [
   {
    "path": "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver",

@@ -1,2 +1,2 @@
 # macOS 27.2.1 (26B131) own x86_64 Metal for every process on the HD 4000: root/ of tools/metal-adapter make.py installed (d399c6f3) from the pinned 26B131 Rosetta cache and OCLP MetalOld (build.json names every file's hash).
-- store/artifacts/metal27-installed-26B131-20261113-d399c6f3
+ee0a9671dee425d39e6a848cdc00997c9117a824a0aa1eb720764197034d1e3c store/artifacts/metal27-installed-26B131-20261113-d399c6f3

@@ -1,5 +1,5 @@
 {
- "revision": 5,
+ "revision": 6,
  "stage": "post",
  "applies": {
   "models": [
@@ -16,7 +16,7 @@
  "validated": true,
  "optional": "caches",
  "validated_revision": 3,
- "validated_digest": "70aa39012b80a50da4cdfbb0137e202074e672e923f67c3fed31f17b318d99e2",
+ "validated_digest": "f8ea3d665549b8f2fb3c8267d7d0560925b4dd19c0ed2513016b1208fa507540",
  "files": [
   {
    "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user",

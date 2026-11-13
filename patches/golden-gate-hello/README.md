@@ -44,6 +44,7 @@ NEEDS VALIDATION: on a MacBookPro9,2 the Language Chooser played hello and MTLCo
 without a crash; frame rate on the HD 4000 and `textFragment_watchPreview` are untested.
 
 ## Revisions
+- r7 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r6 2026-11-12 The `libhelloblur` source and builder are in `build/` (from the hello-render recipe); the row and the hook are unchanged.
 - r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel and `restricted` on Metal, the hello library (0644) and libhelloblur), as the hook sets them, so overlays carry them; the hook is unchanged.
 - r4 2026-11-12 Declare the Metal wrapper edits in `edits/metal.json` and the three files in `patch.json` `files`; the hook is unchanged.

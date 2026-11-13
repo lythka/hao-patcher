@@ -1,2 +1,2 @@
 # Tahoe native donors, 27-first: only roots 27.0 cannot supply in x86_64 (pipeline/unpack/donor-inputs --target-system).
-- store/artifacts/di-native-donors-25G342-27first-20261110
+dc1329e3f805aa9698483abd800f5c589ce4693c2bc4651679983cf7f6e553a1 store/artifacts/di-native-donors-25G342-27first-20261110

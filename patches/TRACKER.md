@@ -11,36 +11,36 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | darwin27-kernel | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare the kernel's install mode, 0644 (golden-pristine.sh installs it `-m 644`); the hook is u |
 | darwin27-sandbox-disk-space | r3 | oclp-hook | experiment |  |  | x |  |  | **needs** | r3 2026-11-12 Declare the system.sb rule in `edits/system-sb.json` (edit-engine text.insert, unless already pr |
 | dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
-| dev-diagnostics | r2 | post | dev |  |  |  |  |  | **needs** | r2 2026-11-13 The declared boot-args follow hao-opencore r52 (no ic_csr_internal=1); script unchanged. |
+| dev-diagnostics | r3 | post | dev |  |  |  |  |  | **needs** | r3 2026-11-13 `apply.sh` runs Python as `$OCLP_PYTHON` (the kit's CPython for the Mac the assembly runs on, ar |
 | golden-gate-corespotlight-compat | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both daemo |
 | golden-gate-dyld-internal | r1 | oclp-hook | experiment |  | x |  |  |  | **needs** | r1 2026-11-13 internalInstall() answers true in dyld only (owner chose this over the boot-arg, 2026-11-13). |
-| golden-gate-font-registry | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
-| golden-gate-hello | r6 | oclp-hook | experiment |  | x | x |  |  | **needs** | r6 2026-11-12 The `libhelloblur` source and builder are in `build/` (from the hello-render recipe); the row an |
-| golden-gate-icon-caches | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
+| golden-gate-font-registry | r6 | post | experiment | caches | x |  |  |  | ok (r3) | r6 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
+| golden-gate-hello | r7 | oclp-hook | experiment |  | x | x |  |  | **needs** | r7 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
+| golden-gate-icon-caches | r6 | post | experiment | caches | x |  |  |  | ok (r3) | r6 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | golden-gate-launchd-warm | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-12 Renamed from golden-gate-kernelmanager-helper-warm and made a job list; adds com.apple.mbsystema |
-| golden-gate-live-text-service | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the config edit in edits/config.json; the hook is unchanged. |
-| golden-gate-live-text-shared | r5 | oclp-hook | experiment |  | x |  |  |  | **needs** | r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on libhellobl |
-| golden-gate-metal-argbuf | r1 | oclp-hook | product |  | x |  |  |  | **needs** | r1 2026-11-12 Initial recipe. |
-| golden-gate-metal-framebuffer | r6 | oclp-hook | experiment |  | x | x |  |  | **needs** | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the driver |
-| golden-gate-metal-libraries | r19 | oclp-hook | experiment |  | x | x |  |  | **needs** | r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/t |
-| golden-gate-metal27 | r2 | oclp-hook | dev |  |  |  |  |  | **needs** | r2 2026-11-13 README: dyld loads cache roots because golden-gate-dyld-internal makes it an internal install (n |
-| golden-gate-native-identities | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-13 `native_identities.py` reads each executable's headers and code signature only, and a slice's by |
+| golden-gate-live-text-service | r4 | post | experiment |  | x |  |  |  | **needs** | r4 2026-11-13 `apply.sh` runs Python as `$OCLP_PYTHON` (the kit's CPython for the Mac the assembly runs on, ar |
+| golden-gate-live-text-shared | r6 | oclp-hook | experiment |  | x |  |  |  | **needs** | r6 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
+| golden-gate-metal-argbuf | r2 | oclp-hook | product |  | x |  |  |  | **needs** | r2 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
+| golden-gate-metal-framebuffer | r7 | oclp-hook | experiment |  | x | x |  |  | **needs** | r7 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
+| golden-gate-metal-libraries | r20 | oclp-hook | experiment |  | x | x |  |  | **needs** | r20 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artif |
+| golden-gate-metal27 | r3 | oclp-hook | dev |  |  |  |  |  | **needs** | r3 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
+| golden-gate-native-identities | r5 | oclp-hook | experiment |  | x | x |  |  | **needs** | r5 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | golden-gate-root-launchservices | r1 | post | experiment | boot-seeds |  |  |  |  | **needs** | r1 2026-11-12 New: install root's LaunchServices store and auth.db from a builder boot of the same image (row  |
-| golden-gate-shader-caches | r13 | post | experiment | caches | x |  |  |  | **needs** | r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) f |
+| golden-gate-shader-caches | r14 | post | experiment | caches | x |  |  |  | **needs** | r14 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artif |
 | golden-gate-user-seed | r8 | post | experiment | caches | x |  |  |  | **needs** | r8 2026-11-13 Tests and README only: the seed chain includes golden-gate-user-template; README names it. seed. |
-| golden-gate-user-template | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-13 26B131 input row user_template_golden_gate (harvest of benchtest's first login on image 3b2291a: |
-| golden-gate-userspace | r68 | oclp-hook | experiment |  | x | x |  |  | **needs** | r68 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 397b267 (hao-runt |
+| golden-gate-user-template | r4 | post | experiment |  | x |  |  |  | **needs** | r4 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
+| golden-gate-userspace | r69 | oclp-hook | experiment |  | x | x |  |  | **needs** | r69 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artif |
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
-| hao-opencore | r53 | post | experiment |  | x | x |  |  | **needs** | r53 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 397b267 (hao-runt |
-| hao-runtime | r72 | oclp-hook | experiment |  | x | x |  |  | **needs** | r72 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 397b267 (hao-runt |
-| metal-compiler-compat | r4 | oclp-hook | experiment |  | x |  |  |  | **needs** | r4 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the servic |
+| hao-opencore | r55 | post | experiment |  | x | x |  |  | **needs** | r55 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artif |
+| hao-runtime | r73 | oclp-hook | experiment |  | x | x |  |  | **needs** | r73 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artif |
+| metal-compiler-compat | r5 | oclp-hook | experiment |  | x |  |  |  | **needs** | r5 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |
-| metalold-selectors | r6 | oclp-hook | product |  | x | x |  |  | ok (r3) | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the librar |
+| metalold-selectors | r7 | oclp-hook | product |  | x | x |  |  | ok (r3) | r7 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | rec-audio | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three kext bundles and the kernel collection link in `patch.json` `files` and `edits |
 | rec-bluetooth-input | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the four kext bundles, btpower, its plist and the kernel collection link in `patch.json` |
 | rec-brightness-keys | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare brightkeys and its plist in `patch.json` `files`; the recipe is unchanged. |
 | rec-display-ethernet | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the two kext bundles and the kernel collection link in `patch.json` `files` and `edits/k |
-| rec-install-volume | r4 | post | product |  |  |  |  |  | **needs** | r4 2026-11-12 Declare the Recovery dmg and chunklist in `patch.json` `files`; the recipe is unchanged. |
+| rec-install-volume | r5 | post | product |  |  |  |  |  | **needs** | r5 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifa |
 | rec-language-list | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the three files in the Language Chooser's folder in `patch.json` `files`; the recipe is  |
 | rec-power | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |
 | rec-progress-phase | r2 | recovery | product |  |  |  | x |  | **needs** | r2 2026-11-12 Declare the installed files in `patch.json` `files` (Recovery BaseSystem root); the recipe is un |

@@ -104,6 +104,7 @@ built image remain open, and nothing has been checked on 26B131.
 
 ## Revisions
 
+- r7 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged; validated_digest carried forward for that reason.
 - r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the library and the driver), as the hook sets them, so overlays carry them; the hook is unchanged. Keeps r3's validation: what it installs is unchanged (validated_digest).
 - r5 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the hook is unchanged.
 - r4 2026-11-12 Declare the driver's weak load command in `edits/driver.json` and the two files in `patch.json` `files`; the hook is unchanged. Keeps r3's validation: what it installs is unchanged (validated_digest).

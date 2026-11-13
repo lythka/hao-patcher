@@ -1,5 +1,13 @@
 #!/bin/sh
-# ssdimg launcher: needs Python 3.14+ (built-in zstd).
+# ssdimg launcher: needs Python 3.14+ (built-in zstd). SSDIMG_PYTHON, else the first python3.14 found: PATH, Homebrew
+# on Apple silicon (/opt/homebrew) and on Intel (/usr/local), python.org's universal2 framework.
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-PY="${SSDIMG_PYTHON:-/opt/homebrew/bin/python3.14}"
+PY="${SSDIMG_PYTHON:-}"
+if [ -z "$PY" ]; then
+    for candidate in "$(command -v python3.14 2>/dev/null)" /opt/homebrew/bin/python3.14 /usr/local/bin/python3.14 \
+            /Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14; do
+        if [ -n "$candidate" ] && [ -x "$candidate" ]; then PY=$candidate; break; fi
+    done
+fi
+[ -n "$PY" ] || { echo 'ssdimg: needs Python 3.14 (python.org or Homebrew), or SSDIMG_PYTHON' >&2; exit 2; }
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" exec "$PY" -m ssdimg "$@"

@@ -1,0 +1,4 @@
+# x86_64 CPython 3.12.14 (python-build-standalone install_only, release 20260924): the kit's Python where the assembly
+# runs on an Intel Mac (hao build-disk on an Intel host, hao install in the target's Recovery). Same archive as
+# tools/recovery-spikes' python_x86_64, proven in the laptop's Recovery (spike python, 2026-11-13).
+0d6a4a299908123f00bc844df737603f047ff9eba14fda6cad83f3cf3cb3a2af store/artifacts/python-x86_64-3.12.14-20261109-0d6a4a299908/cpython-3.12.14+20260924-x86_64-apple-darwin-install_only.tar.gz

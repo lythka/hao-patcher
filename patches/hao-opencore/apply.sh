@@ -4,12 +4,15 @@
 # from that archive. This recipe adds only the image's kernel
 # repairs, kexts and configuration.
 set -eu
+# The kit's Python for the Mac the assembly runs on (golden-image.py sets OCLP_PYTHON); the builder VM's share copy
+# for the legacy runner.
+PY=${OCLP_PYTHON:-/private/var/ssdshare/py/bin/python3.12}
 # kmutil embeds its build directory and a fresh enclosing UUID. The recorded repairs bind unchanged
 # only after verifying the complete referenced kernel/kext segment closure (repair_binding.py, the reference).
 REPAIR_WORK=$(mktemp -d /private/var/tmp/kernel-repairs.XXXXXX)
 trap 'rm -rf "$REPAIR_WORK"' EXIT
 ROW_BOUND=
-if /private/var/ssdshare/py/bin/python3.12 -I "$P/src/repair_binding.py" bind \
+if "$PY" -I "$P/src/repair_binding.py" bind \
     --profile "$P/inputs/kernel_repair_binding/profile.json" \
     --artifact "$P/inputs/kernel_repair_efi" \
     --boot-kc "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc" \
@@ -22,7 +25,7 @@ else
 fi
 # kc-binder (staged by make.sh) computes the repairs from this BootKC. It refuses unless they equal the recorded
 # repairs bound above, or, when those refused, unless IntelCommpage's compiled addresses hold for this BootKC.
-/private/var/ssdshare/py/bin/python3.12 -I "$P/src/kc_bind.py" \
+"$PY" -I "$P/src/kc_bind.py" \
     --binder "$P/build" \
     --boot-kc "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc" \
     --row "$P/inputs/kernel_repair_efi" \
@@ -34,20 +37,20 @@ fi
 ditto "$REPAIR_WORK/bound/EFI/OC/Kexts/IntelCommpage.kext" "$ESP/EFI/OC/Kexts/IntelCommpage.kext"
 ditto "$P/inputs/hao_runtime/HaoExec.kext" "$ESP/EFI/OC/Kexts/HaoExec.kext"
 # Bind HaoExec to the kernel collection this image boots (it stays inactive on any other kernel).
-/private/var/ssdshare/py/bin/python3.12 -I "$P/inputs/hao_runtime/stamp_identity.py" \
+"$PY" -I "$P/inputs/hao_runtime/stamp_identity.py" \
     "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc" "$ESP/EFI/OC/Kexts/HaoExec.kext"
-/private/var/ssdshare/py/bin/python3.12 -I "$P/src/repairs.py" \
+"$PY" -I "$P/src/repairs.py" \
     "$ESP/EFI/OC/config.plist" "$REPAIR_WORK/bound" \
     "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc"
-/private/var/ssdshare/py/bin/python3.12 -I "$P/src/early_kexts.py" \
+"$PY" -I "$P/src/early_kexts.py" \
     "$SYS" "$ESP" "$P/src/early-kexts.txt"
 # The image's dyld counts as an internal install by itself (golden-gate-dyld-internal: internalInstall() answers true),
 # so it loads OCLP's on-disk Metal roots without the ic_csr_internal boot-arg, which made every process see an
 # Apple-internal build (mobileassetd then asked Apple's internal asset server: no Spotlight, Siri or language assets).
 # Without that dyld, dropping the boot-arg would leave 27's Metal in place of OCLP's: refuse.
-/private/var/ssdshare/py/bin/python3.12 -I -c 'import sys; sys.exit(0 if bytes.fromhex("554889e5bf1000000031c00f1f0085c00f94c05dc3") in open(sys.argv[1], "rb").read() else 1)' "$SYS/usr/lib/dyld" || {
+"$PY" -I -c 'import sys; sys.exit(0 if bytes.fromhex("554889e5bf1000000031c00f1f0085c00f94c05dc3") in open(sys.argv[1], "rb").read() else 1)' "$SYS/usr/lib/dyld" || {
     echo "hao-opencore: $SYS/usr/lib/dyld lacks the internalInstall edit (golden-gate-dyld-internal missing from the set): OCLP's Metal roots would not load without ic_csr_internal" >&2; exit 1; }
-/private/var/ssdshare/py/bin/python3.12 - "$ESP/EFI/OC/config.plist" <<'PYCONFIG'
+"$PY" - "$ESP/EFI/OC/config.plist" <<'PYCONFIG'
 import os,plistlib,sys
 p=sys.argv[1]
 with open(p,'rb') as f:d=plistlib.load(f)

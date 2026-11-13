@@ -51,6 +51,7 @@ yet built into an image or booted with 26B131.
 
 ## Revisions
 
+- r5 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r4 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the service and the library), as the hook sets them, so overlays carry them; the hook is unchanged.
 - r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in tests/test_edits.py; the hook is unchanged.
 - r2 2026-11-11 Restored from darwin27-live-text-fixes v0.2.0 into tools/live-text; row metal_compiler_compat for 26B131 (selected by dev-bs-test).

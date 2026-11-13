@@ -2,4 +2,4 @@
 # the benchtest account's first login on image 3b2291a (2026-11-13, collect-template.sh, sha256 fe0cb1df...).
 # 336 containers (305 personality flags added, 137 sandbox profiles and 11,392 symlinks removed), 2 group containers,
 # chronod cache with 31 descriptors from 27 extensions (2 PeopleWidget rows removed), 3 Reminders stores.
-- store/artifacts/user-template-26B131-20261113-96e70e178981
+4e8121b72f80cea0c8453c7758429714329466a04d168635a74417d9a1131cec store/artifacts/user-template-26B131-20261113-96e70e178981

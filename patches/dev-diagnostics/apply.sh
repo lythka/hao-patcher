@@ -3,7 +3,10 @@
 # out of every end-user image. hao-runtime's diagnostic boot arguments (cost time on every translated native call)
 # and OpenCore's log file on the EFI partition (early-boot evidence collected from Recovery).
 set -eu
-/private/var/ssdshare/py/bin/python3.12 - "$ESP/EFI/OC/config.plist" <<'PYCONFIG'
+# The kit's Python for the Mac the assembly runs on (golden-image.py sets OCLP_PYTHON); the builder VM's share copy
+# for the legacy runner.
+PY=${OCLP_PYTHON:-/private/var/ssdshare/py/bin/python3.12}
+"$PY" - "$ESP/EFI/OC/config.plist" <<'PYCONFIG'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,'rb') as f:d=plistlib.load(f)
