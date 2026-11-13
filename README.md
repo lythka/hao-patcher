@@ -26,7 +26,7 @@ SceneKit and Apple's effects engine need. hao-patcher adds both to the shader co
 
 <img src="docs/images/gallery/safari-webgpu.jpg" alt="Safari WebGPU compute and render check passing on the HD 4000" width="98%">
 
-More in the [gallery](docs/gallery.md): the air-quality map, Maps in 3D and SceneKit.
+More in the [gallery](docs/gallery.md): the desktop, Safari and YouTube, the air-quality map, Maps in 3D and SceneKit.
 
 ## Status
 

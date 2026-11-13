@@ -1,9 +1,25 @@
 # Gallery
 
-macOS 27.2.1 (26B131) on the development platform, a 2012 MacBook Pro (Intel HD 4000), 2026-11-12. Weather and
+macOS 27.2.1 (26B131) on the development platform, a 2012 MacBook Pro (Intel HD 4000), 2026-11-11 and 11-12. Weather and
 WebGPU need Metal argument buffers and ASTC textures, which the HD 4000's legacy Metal stack does not provide;
 [tools/metal-argbuf](../tools/metal-argbuf) implements them in the shader compiler and the driver. Maps and SceneKit
 need their shader libraries repaired for the old compiler ([cache/metallib](../cache/metallib)).
+
+## The desktop
+
+About This Mac, Control Center and the desktop widgets (the Wi-Fi network name is hidden):
+
+![About This Mac, Control Center and widgets on a 2012 MacBook Pro running macOS 27.2.1](images/gallery/about-this-mac.jpg)
+
+## Safari
+
+apple.com:
+
+![Safari showing apple.com](images/gallery/safari-apple.jpg)
+
+YouTube in 720p60 with hardware video decoding (Stats for nerds: 3 dropped frames of 2602):
+
+![Safari playing a YouTube video with the Stats for nerds overlay](images/gallery/safari-youtube.jpg)
 
 ## Weather
 
