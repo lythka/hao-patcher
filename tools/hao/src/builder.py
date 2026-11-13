@@ -180,6 +180,16 @@ def build_image(a, c, run=subprocess.call):
     if a.dry_run:
         c.done('dry run: nothing built')
         return 0
+    if not getattr(a, 'allow_unresolved_swaps', False):
+        open_swaps = runpy.run_path(str(TOP / 'pipeline' / 'swaps.py'))['unresolved']()
+        for r in open_swaps:
+            c.item('%s  %s  swapped %s, only on the laptop' % (r['path'], r['sha256'][:12], r['date']), 'quiet',
+                   ev='swap.open', path=r['path'], sha256=r['sha256'])
+        if open_swaps:
+            raise Stopped('%d live-swapped fixes are in no recipe' % len(open_swaps),
+                          why='an image built now would lose them at the next push',
+                          options=['put each into a recipe or row, or mark it dropped, in pipeline/live-swaps.tsv',
+                                   'build anyway: --allow-unresolved-swaps'], untouched='nothing was built')
     rc = run(cmd)
     if rc:
         raise Stopped('golden-run failed (exit %d)' % rc, why='the image was not committed',

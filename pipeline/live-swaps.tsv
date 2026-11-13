@@ -1,0 +1,4 @@
+# Resolutions of live swaps on the test laptop (pipeline/swaps.py). One line per swapped file:
+# SHA256<TAB>/LAPTOP/PATH<TAB>row NAME | recipe NAME | dropped: WHY
+# "row"/"recipe": the fix now ships in images that way. "dropped": the swap was an experiment not to keep.
+# hao-runtime files under /usr/lib/hao/ need no line when the hao_runtime row's payload has the same bytes.

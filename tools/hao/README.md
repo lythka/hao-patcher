@@ -32,7 +32,9 @@ hao install /dev/diskN [--dry-run]              # on the target, from the stick'
   ROOT (default `/`); manifests come from overlay folders or `ROOT/private/var/db/hao/manifests`.
 - **build-image** resolves the Mac, the release assembly of its target (`TARGET-GOLDEN`, or `--assembly`) and the
   recipes per pack, then runs `pipeline/golden-run` (builder VM; `--overlay-system` adds `--from-overlays`). It builds
-  every pack the target detects; a profile with other packs is refused (golden-run has no pack choice yet).
+  every pack the target detects; a profile with other packs is refused (golden-run has no pack choice yet). It stops
+  while a fix proven by a live swap on the laptop is in no recipe (`pipeline/swaps.py`, below the list);
+  `--allow-unresolved-swaps` builds anyway.
 - **build-disk**, **create-installer**, **install** (`src/builder.py`) resolve the same plan and check the disk with
   `src/disks.py` (ssdinstall's checks: whole, physical disk, not the running system's or the inputs', big enough;
   `external` for build-disk and the stick, `internal` for install), then ask for the typed confirmation (`--confirm`

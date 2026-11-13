@@ -290,10 +290,32 @@ class BuilderTest(unittest.TestCase):
     def test_build_image_runs_golden_run(self):
         c, _ = console('quiet')
         ran = []
-        a = ns(model='MacBookPro9,2', out='/r', overlay_system='/sys', overlay_store=None, dry_run=False)
+        a = ns(model='MacBookPro9,2', out='/r', overlay_system='/sys', overlay_store=None, dry_run=False,
+               allow_unresolved_swaps=True)
         BUILD.build_image(a, c, run=lambda cmd: ran.append(cmd) or 0)
         self.assertEqual(ran[0][2:], [str(TOP / 'pipeline/golden-run'), str(TOP / 'pipeline/assemblies/mbp92-26B131.json'),
                                       '--repo', '/r', '--from-overlays', '--overlay-system', '/sys'])
+
+    def test_build_image_stops_on_unresolved_swaps(self):
+        with tempfile.TemporaryDirectory() as d:
+            ledger = Path(d) / 'ledger.tsv'
+            ledger.write_text('2026-11-13 10:00:00\t/usr/libexec/airportd\t%s\t755\t/src\tdev\n' % ('ab' * 32))
+            old = os.environ.get('HAO_SWAP_LEDGER')
+            os.environ['HAO_SWAP_LEDGER'] = str(ledger)
+            try:
+                c, out = console('quiet')
+                ran = []
+                a = ns(model='MacBookPro9,2', out='/r', overlay_system=None, overlay_store=None, dry_run=False)
+                with self.assertRaises(CON.Stopped) as x:
+                    BUILD.build_image(a, c, run=ran.append)
+                self.assertIn('live-swapped', x.exception.what)
+                self.assertEqual(ran, [])
+                self.assertIn('/usr/libexec/airportd', out.getvalue())
+            finally:
+                if old is None:
+                    os.environ.pop('HAO_SWAP_LEDGER', None)
+                else:
+                    os.environ['HAO_SWAP_LEDGER'] = old
 
     def test_build_disk_gate_and_dry_run(self):
         c, out = console('files')

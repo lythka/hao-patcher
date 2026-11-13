@@ -2,7 +2,7 @@
 """build: build the image an assembly describes, with whichever runner it names. Flip OS or model by picking another
 assembly; every choice (target, OS build, donors, OCLP, set, image repository) lives in the assembly file.
 
-  pipeline/build ASSEMBLY [--latest] [--repo DIR] [--dry-run]
+  pipeline/build ASSEMBLY [--latest] [--repo DIR] [--dry-run] [--allow-unresolved-swaps]
 
 ASSEMBLY is pipeline/assemblies/NAME.json or a path. Its "runner" picks the pipeline:
   golden (default)  pipeline/golden-run ASSEMBLY --repo REPO: a Golden Gate (macOS 27) image with hao
@@ -12,6 +12,8 @@ REPO is --repo, else the assembly's "repo" (relative to the checkout, e.g. store
 --latest (golden only): run `pipeline/latest hao_runtime GOLDEN_BUILD` first. When that changes the row, the build
 stops so the change can be checked and committed (CLAUDE.md); run again afterwards.
 --dry-run prints the command without running it.
+Before building, pipeline/swaps.py check: a fix proven only by a live swap on the laptop (laptop-swap's ledger) must
+have a resolution in pipeline/live-swaps.tsv, or the build stops; --allow-unresolved-swaps builds anyway.
 """
 import json, os, subprocess, sys
 
@@ -42,7 +44,7 @@ def command(path, a, repo):
 
 
 def main(argv):
-    flags = {a for a in argv if a in ('--latest', '--dry-run')}
+    flags = {a for a in argv if a in ('--latest', '--dry-run', '--allow-unresolved-swaps')}
     rest = [a for a in argv if a not in flags]
     repo = None
     if '--repo' in rest:
@@ -69,6 +71,9 @@ def main(argv):
     print(' '.join('%s=%s' % kv for kv in env.items()) + (' ' if env else '') + ' '.join(cmd))
     if '--dry-run' in flags:
         return 0
+    if '--allow-unresolved-swaps' not in flags and subprocess.run([sys.executable, '-I', os.path.join(P, 'swaps.py'),
+                                                                   'check']).returncode:
+        sys.exit('build: stopped before building (or pass --allow-unresolved-swaps)')
     return subprocess.run(cmd, env=dict(os.environ, **env)).returncode
 
 
