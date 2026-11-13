@@ -349,7 +349,7 @@ def cmd_assets(a, c):
             c.item('%-34s %s' % (what, where), 'files')
         c.done('%d inputs and tools in %s' % (len(made), a.folder))
         return 0
-    problems = ASSETS.check(path, Path(a.folder).expanduser().resolve())
+    problems = ASSETS.check(path, Path(a.folder).expanduser().resolve(), here=a.here)
     for p in problems:
         c.item(p, 'quiet', ev='asset.problem', problem=p)
     if problems:
@@ -409,6 +409,7 @@ def main():
     q = sub.add_parser('assets', help='the assets folder a fresh clone builds from')
     q.add_argument('op', choices=['make', 'check']); q.add_argument('folder')
     q.add_argument('--store', help='make: the store to take the inputs from (default this checkout\'s)')
+    q.add_argument('--here', action='store_true', help='check: for a build on this Mac without the builder VM')
     builder_args(q, disk=False)
     q.set_defaults(fn=guarded(cmd_assets))
     q = sub.add_parser('build-disk'); builder_args(q); kit_args(q)
