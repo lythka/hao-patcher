@@ -14,8 +14,10 @@ the spec's "entitlements_from" names when it has one. A file inside a declared t
 The result goes to DIR/<pack>/files/<path>, and DIR/<pack>/manifest.json records sha256, mode, owner and flags
 (the format tools/hao reads). Install attributes come from the declaration's "install" first; a file taken from a
 tar member (source "ARCHIVE!MEMBER") otherwise keeps the member's mode and numeric owner, as the hooks' `tar -xp
---numeric-owner` does, and the manifest's "dirs" carries the tar's own folders above it (mode and owner) for the
-folders hao has to create; anything else is root:wheel, 0755 for a Mach-O and 0644 otherwise, with no flags.
+--numeric-owner` does, and the manifest's "dirs" carries every folder entry of that tar (mode, owner and mtime),
+empty ones included, since `tar -x` creates them all (the report entry of the recipe's first file from that tar lists
+them as "dirs", so an install plan knows which recipe creates them); anything else is root:wheel, 0755 for a Mach-O
+and 0644 otherwise, with no flags.
 
 A path is "deferred" when it can only be made on the target (kc.link, kc.bind, cryptex.build, hao.embed-stub,
 hao.stamp, files the hook generates) and "unresolved" when its source isn't found; both are reported with the reason, never
@@ -169,23 +171,22 @@ class Sources:
     def member_attrs(self, row, source):
         """(attributes, folders) of a tar member SOURCE ("ARCHIVE!MEMBER") of ROW, as `tar -xp --numeric-owner`
         installs it: {'mode', 'owner': 'UID:GID', 'mtime'} (the member's modification time, which `tar -x` keeps)
-        and {folder: {'mode', 'owner'}} for every folder above it the tar holds (relative to the tar's root, which is
-        the install root). None, {} for anything that is not a tar member."""
+        and archive_dirs(): every folder the tar holds, above the member or not. None, {} for anything that is not a
+        tar member."""
         archive, _, member = (source or '').partition('!')
         if not member or not self.rows.get(row):
             return None, {}
-        members = self._members(Path(self.rows[row]) / archive)
-        info = members.get(member)
+        info = self._members(Path(self.rows[row]) / archive).get(member)
         if info is None:
             return None, {}
-        attrs = lambda m: {'mode': '%04o' % (m.mode & 0o7777), 'owner': '%d:%d' % (m.uid, m.gid)}
-        dirs, parent = {}, os.path.dirname(member)
-        while parent:
-            m = members.get(parent) or members.get(parent + '/')
-            if m is not None and m.isdir():
-                dirs[parent] = attrs(m)
-            parent = os.path.dirname(parent)
-        return dict(attrs(info), mtime=int(info.mtime)), dirs
+        return member_meta(info), self.archive_dirs(row, archive)
+
+    def archive_dirs(self, row, archive):
+        """{folder: {'mode', 'owner', 'mtime'}} for every folder entry of the tar ARCHIVE in ROW (relative to the
+        tar's root, which is the install root), empty ones included: `tar -xp --numeric-owner` creates each."""
+        members = self._members(Path(self.rows[row]) / archive)
+        return {name.rstrip('/'): member_meta(m) for name, m in sorted(members.items())
+                if m.isdir() and name.rstrip('/') not in ('', '.')}
 
     def row_tree(self, row, path, source=None):
         src = self.rows.get(row)
@@ -198,6 +199,11 @@ class Sources:
                 return {str(Path(path, f.relative_to(cand))): f.read_bytes()
                         for f in sorted(cand.rglob('*')) if f.is_file() and not f.is_symlink()}
         raise Unresolved('row %s has no folder for %s' % (row, path))
+
+
+def member_meta(info):
+    """{'mode', 'owner': 'UID:GID', 'mtime'} of a tar member, as `tar -xp --numeric-owner` leaves it."""
+    return {'mode': '%04o' % (info.mode & 0o7777), 'owner': '%d:%d' % (info.uid, info.gid), 'mtime': int(info.mtime)}
 
 
 def sign(data, sign_spec, original, sources=None):
@@ -270,15 +276,16 @@ def compose(entry, root, sources, store, repo, facts=None):
 
 
 def origin_attrs(entry, sources):
-    """(attributes, folders) the file's last whole-file origin installs it with, when nothing edits it after that
-    origin and the origin is a tar member (member_attrs); else (None, {})."""
+    """(attributes, folders, archive) the file's last whole-file origin installs it with, when nothing edits it
+    after that origin and the origin is a tar member (member_attrs; ARCHIVE is (row, tar)); else (None, {}, None)."""
     last = entry['writers'][-1]
     if last['action'] != 'origin' or last.get('tree') or not last['origin'].get('row'):
-        return None, {}
+        return None, {}, None
     try:
-        return sources.member_attrs(last['origin']['row'], last.get('source'))
+        attrs, dirs = sources.member_attrs(last['origin']['row'], last.get('source'))
     except (OSError, tarfile.TarError):
-        return None, {}
+        return None, {}, None
+    return attrs, dirs, ((last['origin']['row'], last['source'].partition('!')[0]) if attrs else None)
 
 
 def replaces(entry, sources):
@@ -322,6 +329,7 @@ def _materialize(ledger, root, sources, out, store_dir, pack_of, phase_of, repo,
     out = Path(out)
     store = STORE.Store(store_dir)
     manifests, report = {}, []
+    carried = set()                                   # (recipe, row, tar): a report entry lists that tar's folders
     for path, entry in sorted(ledger.items()):
         if only and path not in only:
             continue
@@ -347,7 +355,7 @@ def _materialize(ledger, root, sources, out, store_dir, pack_of, phase_of, repo,
             continue
         m = manifests.setdefault(pack, {'format': 1, 'pack': pack, 'phase': phase_of(pack), 'files': {}})
         install = next((w.get('install') for w in reversed(entry['writers']) if w.get('install')), None) or {}
-        member, dirs = origin_attrs(entry, sources)
+        member, dirs, archive = origin_attrs(entry, sources)
         member = member or {}
         for p, data in files.items():
             dest = out / pack / 'files' / p
@@ -370,6 +378,9 @@ def _materialize(ledger, root, sources, out, store_dir, pack_of, phase_of, repo,
             r.update(replaces(entry, sources))
         if own:
             r['declared_separately'] = own
+        if archive and dirs and (last,) + archive not in carried:
+            carried.add((last,) + archive)
+            r['dirs'] = sorted(dirs)                  # the recipe's `tar -x` creates these, files under them or not
         report.append(r)
         emit({'ev': 'made', 'path': path, 'pack': pack, 'files': len(files)})
     for pack, m in manifests.items():

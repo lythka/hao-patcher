@@ -165,10 +165,15 @@ class Materialize(unittest.TestCase):
         self.assertEqual((self.d / 'out/base/files' / METAL).read_bytes(), ref.read_bytes())
 
     def test_tar_members_keep_their_mode_owner_and_folders(self):
-        # as `tar -xp --numeric-owner`: the member's mode and numeric owner, and the tar's folders above it
+        # as `tar -xp --numeric-owner`: the member's mode and numeric owner, and every folder of the tar (above it
+        # or empty: C/fe and C/fe/31001 hold no file, `tar -x` makes them all the same)
         with tarfile.open(self.d / 'rows' / 'caches' / 'setup.tar', 'w') as t:
-            for name, mode, uid in (('private', 0o755, 0), ('private/var/zz', 0o711, 0), ('private/var/zz/C', 0o700, 248)):
+            for name, mode, uid, mtime in (('private', 0o755, 0, 0), ('private/var/zz', 0o711, 0, 0),
+                                           ('private/var/zz/C', 0o700, 248, 1600000000),
+                                           ('private/var/zz/C/fe', 0o755, 248, 1600000100),
+                                           ('./private/var/zz/C/fe/31001/', 0o750, 248, 1600000200)):
                 info = tarfile.TarInfo(name); info.type = tarfile.DIRTYPE; info.mode = mode; info.uid = info.gid = uid
+                info.mtime = mtime
                 t.addfile(info)
             data = b'index'
             info = tarfile.TarInfo('private/var/zz/C/store.index'); info.size = len(data)
@@ -183,9 +188,14 @@ class Materialize(unittest.TestCase):
         m = json.loads((out / 'base/manifest.json').read_text())
         self.assertEqual({k: m['files']['private/var/zz/C/store.index'][k] for k in ('mode', 'owner', 'flags')},
                          {'mode': '0600', 'owner': '248:248', 'flags': []})
-        self.assertEqual(m['dirs'], {'private': {'mode': '0755', 'owner': '0:0'},
-                                     'private/var/zz': {'mode': '0711', 'owner': '0:0'},
-                                     'private/var/zz/C': {'mode': '0700', 'owner': '248:248'}})
+        self.assertEqual(m['dirs'], {'private': {'mode': '0755', 'owner': '0:0', 'mtime': 0},
+                                     'private/var/zz': {'mode': '0711', 'owner': '0:0', 'mtime': 0},
+                                     'private/var/zz/C': {'mode': '0700', 'owner': '248:248', 'mtime': 1600000000},
+                                     'private/var/zz/C/fe': {'mode': '0755', 'owner': '248:248', 'mtime': 1600000100},
+                                     'private/var/zz/C/fe/31001': {'mode': '0750', 'owner': '248:248',
+                                                                   'mtime': 1600000200}})
+        self.assertEqual(report['private/var/zz/C/store.index']['dirs'], sorted(m['dirs']))   # the recipe makes them
+        self.assertNotIn('dirs', report['private/var/c/store.index'])        # data.tar has no folder entries
         self.assertEqual(m['files']['private/var/zz/C/store.index']['mtime'], 1700000000)   # tar -x keeps it
         self.assertNotIn('mtime', m['files']['private/var/c/store.index'])           # installed with `install`
         self.assertEqual(m['files']['private/var/c/store.index']['mode'], '0640')       # a declaration wins
@@ -200,6 +210,12 @@ class Materialize(unittest.TestCase):
         self.assertIn(('private/var/zz/C/store.index', 248, 248), calls)
         self.assertIn(('private/var/zz/C', 248, 248), calls)
         self.assertEqual(oct((self.d / 'target/private/var/zz/C').stat().st_mode & 0o777), '0o700')
+        empty = self.d / 'target/private/var/zz/C/fe/31001'                   # no file in it, created all the same
+        self.assertEqual(sorted(empty.iterdir()), [])
+        self.assertEqual(oct(empty.stat().st_mode & 0o777), '0o750')
+        self.assertIn(('private/var/zz/C/fe/31001', 248, 248), calls)
+        self.assertEqual((empty.stat().st_mtime, empty.parent.stat().st_mtime, empty.parent.parent.stat().st_mtime),
+                         (1600000200, 1600000100, 1600000000))               # as tar -x leaves them, files and all
 
     def test_a_stamp_inside_its_own_tree_is_deferred_after_the_kernel_collection(self):
         kext = self.d / 'rows' / 'payload' / 'HaoExec.kext' / 'Contents'

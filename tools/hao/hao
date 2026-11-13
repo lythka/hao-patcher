@@ -52,6 +52,8 @@ def printer(level):
         if k == 'plan':
             print('%d to write, %d to set attributes on, %d already current' % (ev['write'], ev.get('attrs', 0),
                                                                                 ev['same']))
+            if ev.get('folders'):
+                print('%d folders to create' % ev['folders'])
             if ev['needs_recovery']:
                 print('needs Recovery (installer-only packs, not applied live): %s' % ', '.join(ev['needs_recovery']))
             for f in ev.get('needs_recovery_files', []):

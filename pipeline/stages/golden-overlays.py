@@ -11,7 +11,9 @@ of the file comes from the overlays the file there now must be the one the mater
 input: refused if not; a replaced file: recorded); then it is written as tools/hao writes a file (a new file
 renamed over the old one, the old one's flags cleared first), folders it creates get the manifest's "dirs"
 attributes, and mode, owner and flags are the manifest's, the mtime too when the manifest dates the file (a tar
-member). The result must hash to the plan's sha256. The EFI partition (FAT) takes only the bytes. A Data path is
+member). Before the files, every folder of the step's "dirs" that is missing (all the folders the recipe's tar holds,
+empty ones included, as its `tar -x` creates them) is made, parents first; once the files are in, each folder made
+gets the mtime "dirs" dates it with. The result must hash to the plan's sha256. The EFI partition (FAT) takes only the bytes. A Data path is
 checked against the image's own firmlinks before it is written there.
 
 Nothing here runs on the host: golden-image.py calls it inside the builder VM only.
@@ -67,6 +69,17 @@ def install(plan, files, recipe, roots, livepatch, attributes=None):
     attributes = attributes or livepatch.Attributes(lookup)   # owners by name: the image's own passwd/group
     links = image_firmlinks(roots['system'])
     record = {'recipe': recipe, 'files': [], 'warnings': [], 'folders': []}
+    dirs = step.get('dirs', {})
+    made = {}                                                # volume -> folders created on it
+    for d, meta in sorted(dirs.items()):                     # parents first: every folder its tar holds, empty or not
+        volume = meta.get('volume')
+        if volume in (None, 'esp'):                          # a plan without volumes: folders above files only
+            continue
+        if volume not in roots:
+            raise ValueError('%s: no %s volume given' % (d, volume))
+        volume_check(d, volume, links)
+        created = made.setdefault(volume, [])
+        livepatch._folders(lambda rel, r=Path(roots[volume]): r / rel, d, dirs, attributes, created, itself=True)
     for f in step['files']:
         path, volume = f['path'], f['volume']
         if volume not in roots:
@@ -92,7 +105,7 @@ def install(plan, files, recipe, roots, livepatch, attributes=None):
             shutil.copyfile(source, target)
             not_set = ['mode', 'owner', 'flags']
         else:
-            livepatch._folders(lambda rel: root / rel, path, step.get('dirs', {}), attributes, record['folders'])
+            livepatch._folders(lambda rel: root / rel, path, dirs, attributes, made.setdefault(volume, []))
             not_set = livepatch._install(source, target, attributes.wanted(f, '0644'), attributes)
             if 'mtime' in f:
                 os.utime(target, (f['mtime'], f['mtime']), follow_symlinks=False)
@@ -101,6 +114,9 @@ def install(plan, files, recipe, roots, livepatch, attributes=None):
             raise ValueError('%s: wrote %s, expected %s' % (path, after, f['sha256']))
         record['files'].append({'path': path, 'volume': volume, 'before': before, 'after': after,
                                 'not_set': not_set})
+    for volume, created in sorted(made.items()):         # a tar folder's mtime, once its files are in (as tar -x)
+        livepatch._folder_times(lambda rel, r=Path(roots[volume]): r / rel, created, dirs)
+        record['folders'] += created
     return record
 
 

@@ -12,7 +12,8 @@ in set order, is then one of:
 
   overlay  every file it declares was made on the host and nothing it writes waits for the target: its hook does
            not run; the guest (pipeline/stages/golden-overlays.py) installs its files, checked by sha256, with the
-           manifest's mode, owner, flags (and a tar member's mtime)
+           manifest's mode, owner, flags (and a tar member's mtime), and creates every folder its tar
+           holds, empty ones included, as its `tar -x` would
   hook     anything else (no declarations, a path deferred to the target or unresolved, a writer the set skips, a
            post recipe writing System, or --hook NAME): its hook runs exactly as without --from-overlays, and so do
            the deferred steps inside it (kernel collections, cryptex, HaoExec stamp, kc.bind, native-identities)
@@ -128,7 +129,7 @@ def schedule(rows, ledger, report, manifests, *, force_hook=(), links=None):
                 if foreign:
                     why = '%s is also written by %s, which this build leaves out' % (p, ', '.join(foreign))
                     break
-                for f in r.get('paths', [p]):
+                for f in r.get('paths', [p]) + r.get('dirs', []):
                     v = volume_of(f, stage, links)
                     if v is None or (stage == 'post' and v == 'system'):
                         why = '%s: a %s recipe cannot install it here (%s)' % (
@@ -170,13 +171,17 @@ def schedule(rows, ledger, report, manifests, *, force_hook=(), links=None):
     for m in manifests.values():
         for d, a in m.get('dirs', {}).items():
             dirs.setdefault(d, a)
+    created = {}                                   # recipe -> the folders its `tar -x` creates (report "dirs")
+    for r in report:
+        if r['outcome'] == 'made' and r.get('dirs'):
+            created.setdefault(r.get('recipe'), set()).update(r['dirs'])
     steps = []
     for stage, name in rows:
         step = {'name': name, 'stage': stage, 'mode': mode[name], 'reason': reason[name]}
         if mode[name] == 'overlay':
             step['files'] = sorted(files_of[name], key=lambda f: f['path'])
-            step['dirs'] = {d: a for d, a in sorted(dirs.items())
-                            if any(f['path'].startswith(d + '/') for f in step['files'])}
+            step['dirs'] = {d: dict(a, volume=volume_of(d, stage, links)) for d, a in sorted(dirs.items())
+                            if d in created.get(name, ()) or any(f['path'].startswith(d + '/') for f in step['files'])}
         steps.append(step)
     deferred = [dict(r, runs_in=r.get('recipe')) for r in report if r['outcome'] == 'deferred'
                 and r.get('recipe') in order]

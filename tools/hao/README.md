@@ -14,7 +14,9 @@ a folder root, or to the running Mac (`--live`):
   (`attrs`); owners are `user:group` by name (looked up in ROOT's own `private/etc/passwd` and `group`, then
   this system's) or by number (`248:248`, as `tar --numeric-owner` keeps them); flags are chflags names
   (`restricted`, `schg`, `uchg`, `sunlnk`, `hidden`, `nodump`). Folders it creates get the manifest's `dirs`
-  mode and owner (a cache folder owned by a system account), else root:wheel 0755
+  mode and owner (a cache folder owned by a system account), else root:wheel 0755; every missing `dirs` folder
+  is created, empty ones too (a tar's folder entries, as `tar -x` makes them), and gets its `mtime` once the
+  files inside it are written
 - owners and system flags need root: without root they are left as they are and the record says which
   (`not_set`), so a run as a normal user is never a proof of attributes
 - backs up every replaced file and records every new one (before writing it), so `--revert` restores replaced

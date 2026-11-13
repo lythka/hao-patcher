@@ -147,8 +147,10 @@ class FromOverlays(unittest.TestCase):
         rows = self.d / 'rows'; rows.mkdir()
         (rows / 'one.dylib').write_bytes(b'\xcf\xfa\xed\xfe one')
         with tarfile.open(rows / 'data.tar', 'w') as t:
-            for name, mode, uid in (('Library', 0o755, 0), ('Library/Caches', 0o755, 0), ('Library/Caches/m', 0o700, 248)):
+            for name, mode, uid in (('Library', 0o755, 0), ('Library/Caches', 0o755, 0), ('Library/Caches/m', 0o700, 248),
+                                    ('Library/Caches/n', 0o755, 248), ('Library/Caches/n/fe', 0o755, 248)):
                 info = tarfile.TarInfo(name); info.type = tarfile.DIRTYPE; info.mode = mode; info.uid = info.gid = uid
+                info.mtime = 1600000000                     # n and n/fe hold nothing: tar -x makes them anyway
                 t.addfile(info)
             info = tarfile.TarInfo('Library/Caches/m/cache'); info.size = 5
             info.mode, info.uid, info.gid, info.mtime = 0o600, 248, 248, 1700000000
@@ -216,6 +218,7 @@ class FromOverlays(unittest.TestCase):
         os.chmod(Path(hooks['data'], 'Library/Caches/m/cache'), 0o600)
         os.chmod(Path(hooks['data'], 'Library/Caches/m'), 0o700)
         os.utime(Path(hooks['data'], 'Library/Caches/m/cache'), (1700000000, 1700000000))
+        Path(hooks['data'], 'Library/Caches/n/fe').mkdir(parents=True)
         # the overlay build, as golden-image.py runs it: zfix and caches from the overlays, gen on its "hook"
         roots = self.image('overlay')
         calls = []
@@ -229,6 +232,13 @@ class FromOverlays(unittest.TestCase):
         self.assertIn(('chown', 'm', 248, 248), calls)                              # and its folder's, from "dirs"
         self.assertEqual(os.stat(Path(roots['data'], 'Library/Caches/m/cache')).st_mtime, 1700000000)
         self.assertEqual(oct(os.stat(Path(roots['data'], 'Library/Caches/m')).st_mode & 0o777), '0o700')
+        self.assertIn(('chown', 'fe', 248, 248), calls)                             # an empty tar folder, made too
+        self.assertEqual(os.stat(Path(roots['data'], 'Library/Caches/n/fe')).st_mtime, 1600000000)
+        self.assertEqual(os.stat(Path(roots['data'], 'Library/Caches/m')).st_mtime, 1600000000)  # after its file
+        caches = next(s for s in plan['steps'] if s['name'] == 'caches')
+        self.assertEqual(sorted(caches['dirs']), ['Library', 'Library/Caches', 'Library/Caches/m', 'Library/Caches/n',
+                                                  'Library/Caches/n/fe'])
+        self.assertEqual({a['volume'] for a in caches['dirs'].values()}, {'data'})
         # owners and flags were recorded, not set (no root): compare content, modes, links and mtimes
         a = {v: O['tree'](hooks[v]) for v in hooks}
         b = {v: O['tree'](roots[v]) for v in roots}

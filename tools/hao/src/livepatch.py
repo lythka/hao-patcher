@@ -9,7 +9,9 @@ An overlay is one pack's materialised files: OVERLAY/manifest.json + OVERLAY/fil
 A file is written when its content differs, and only its attributes are set when the content is the same but its
 mode, owner or flags are not the manifest's. "owner" is USER:GROUP by name (looked up in ROOT's own
 private/etc/passwd and group first, then this system's) or by number (UID:GID, as `tar --numeric-owner` keeps
-them). "flags" are chflags names (FLAG_BITS). "dirs" gives the mode and owner of folders hao has to create.
+them). "flags" are chflags names (FLAG_BITS). "dirs" lists folders the pack installs (a tar's folder entries, empty
+ones included): hao creates each that is missing, parents first, with its mode and owner, and its "mtime" when it
+has one once the files inside it are written; a folder above a file that "dirs" does not list is 0755 root:wheel.
 
 Owners and system flags (restricted, schg, sunlnk) can only be set by root. Without root, hao sets the mode and the
 user flags, and records per file what it could not set ("not_set"; the done event counts them) rather than
@@ -280,11 +282,14 @@ def plan(overlays, root, mode='live', attributes=None, resolve=None, classify=No
             fix, cannot = attributes.differs(target, row['want'])
             row['attrs'], row['cannot'] = fix, cannot
             (out['attrs'] if fix else out['same']).append(row)
+    out['mkdirs'] = [d for d in sorted(out['dirs']) if not resolve(d).is_dir()
+                     and not (classify and mode == 'live' and classify(d))]
     return out
 
 
 def plan_event(p):
     return {'ev': 'plan', 'write': len(p['write']), 'attrs': len(p['attrs']), 'same': len(p['same']),
+            'folders': len(p['mkdirs']),
             'needs_recovery': p['needs_recovery'], 'needs_recovery_files': p['needs_recovery_files']}
 
 
@@ -370,10 +375,10 @@ class Lock:
         self.path.unlink(missing_ok=True)
 
 
-def _folders(resolve, rel, dirs, attributes, created):
-    """Create the missing folders above REL, each with the mode and owner the manifest's DIRS gives it (else
-    0755 root:wheel); every folder created is appended to CREATED."""
-    parts = Path(rel).parent.parts
+def _folders(resolve, rel, dirs, attributes, created, itself=False):
+    """Create the missing folders above REL (and REL itself when ITSELF), parents first, each with the mode and
+    owner the manifest's DIRS gives it (else 0755 root:wheel); every folder created is appended to CREATED."""
+    parts = Path(rel).parts if itself else Path(rel).parent.parts
     for i in range(len(parts)):
         sub = '/'.join(parts[:i + 1])
         folder = resolve(sub)
@@ -383,6 +388,15 @@ def _folders(resolve, rel, dirs, attributes, created):
         created.append(sub)
         meta = dirs.get(sub, {'mode': '0755', 'owner': DEFAULT_OWNER})
         attributes.apply(folder, attributes.wanted(meta, '0755'))
+
+
+def _folder_times(resolve, created, dirs):
+    """Give each folder of CREATED the mtime DIRS dates it with (a tar folder's, as `tar -x` leaves it), deepest
+    first, once nothing more is written inside it."""
+    for sub in sorted(set(created), key=lambda s: (-s.count('/'), s)):
+        mtime = dirs.get(sub, {}).get('mtime')
+        if mtime is not None:
+            os.utime(resolve(sub), (mtime, mtime), follow_symlinks=False)
 
 
 def _install(source, target, want, attributes):
@@ -433,7 +447,7 @@ def apply(overlays, root, state, *, mode='live', backend=None, on_event=None, no
         backend.check_records(records(state))
         p = plan(overlays, root, mode, attributes, resolve=backend.booted_path, classify=classify)
         emit(plan_event(p))
-        if not (p['write'] or p['attrs']) and not backend.record_noop:
+        if not (p['write'] or p['attrs'] or p['mkdirs']) and not backend.record_noop:
             for ev in deferred_report(deferred or [], phases, classify, False):
                 emit(ev)
             emit({'ev': 'done', 'id': None, 'written': 0, 'attrs': 0, 'same': len(p['same']), 'not_set': 0,
@@ -504,6 +518,9 @@ def _same_plan(booted, live):
 
 
 def _write(p, record, folder, resolve, attributes, emit):
+    for d in p['mkdirs']:                           # every missing folder of the manifests' "dirs", files or not
+        _folders(resolve, d, p['dirs'], attributes, record['folders'], itself=True)
+        _save(folder, record)
     for row in p['write']:
         target = resolve(row['path'])
         now_sha = sha256_file(target) if target.is_file() and not target.is_symlink() else None
@@ -543,6 +560,7 @@ def _write(p, record, folder, resolve, attributes, emit):
         entry.update(after=_attrs_record(attributes.current(target)), not_set=sorted(set(skipped + row['cannot'])))
         _save(folder, record)
         emit({'ev': 'file.attrs', 'path': row['path'], 'pack': row['pack'], 'keys': row['attrs']})
+    _folder_times(resolve, record['folders'], p['dirs'])
 
 
 def _save(folder, record):

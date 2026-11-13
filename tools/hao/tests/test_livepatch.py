@@ -206,6 +206,31 @@ class Attributes(Base):
         LP.revert(self.root, self.state, attributes=attrs)
         self.assertFalse((self.root / 'private').exists())                          # folders it made go too
 
+    def test_empty_folders_of_dirs_are_created_dated_and_reverted(self):
+        # a tar's folder entries with no file under them (com.apple.metalfe): created all the same, parents first
+        attrs, calls = self.recorder()
+        o = self.manifest_overlay(
+            {'private/var/folders/zz/x/C/a/store.index': (b'index', {'mode': '0600', 'owner': '248:248'})},
+            dirs={'private/var/folders/zz/x/C': {'mode': '0700', 'owner': '248:248', 'mtime': 1600000000},
+                  'private/var/folders/zz/x/C/b': {'mode': '0755', 'owner': '248:248', 'mtime': 1600000100},
+                  'private/var/folders/zz/x/C/b/fe': {'mode': '0750', 'owner': '248:248', 'mtime': 1600000200}})
+        p = LP.plan([o], self.root)
+        self.assertEqual(p['mkdirs'], ['private/var/folders/zz/x/C', 'private/var/folders/zz/x/C/b',
+                                       'private/var/folders/zz/x/C/b/fe'])
+        self.assertEqual(LP.plan_event(p)['folders'], 3)
+        rec = LP.apply([o], self.root, self.state, now=T0, attributes=attrs)
+        fe = self.root / 'private/var/folders/zz/x/C/b/fe'
+        self.assertEqual(sorted(fe.iterdir()), [])
+        self.assertEqual(oct(os.stat(fe).st_mode & 0o7777), '0o750')
+        self.assertIn(('chown', fe, 248, 248), calls)
+        self.assertEqual([os.stat(f).st_mtime for f in (fe, fe.parent, fe.parent.parent)],
+                         [1600000200, 1600000100, 1600000000])     # C dated after its file went in
+        self.assertEqual(rec['folders'][-3:], ['private/var/folders/zz/x/C/b', 'private/var/folders/zz/x/C/b/fe',
+                                               'private/var/folders/zz/x/C/a'])
+        self.assertEqual(LP.plan([o], self.root)['mkdirs'], [])     # present now: nothing to make
+        LP.revert(self.root, self.state, attributes=attrs)
+        self.assertFalse((self.root / 'private').exists())
+
     def test_attributes_alone_are_set_and_reverted(self):
         os.chmod(self.metal, 0o644)
         o = self.manifest_overlay({'System/Library/Frameworks/Metal.framework/Versions/A/Metal':
