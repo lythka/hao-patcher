@@ -494,20 +494,59 @@ def boot_efi_archive(prepared,repository):
     return archive
 
 
-def capture_workspace(state,output,command):
-    assembled(output)
+def commit_image(state,image,prepared,command):
+    """Capture the raw IMAGE into state['repository'] (ssdimg init when new, capture, fsck, commit) and archive the
+    prepared boot EFI folder PREPARED next to it when it carries the kernel repairs."""
     repository=Path(state['repository'])
     ssdimg=Path(os.environ.get('SSDIMG',str(TOP/'tools/bin/ssdimg')))
-    with readonly_workspace(state,command) as image:
-        if not (repository/'image.json').exists():command([ssdimg,'init',repository])
-        command([ssdimg,'-C',repository,'capture','--force',image])
-        command([ssdimg,'-C',repository,'fsck'])
-        command([ssdimg,'-C',repository,'commit','-m','Golden Gate '+state['recipe']['golden_build']+'; '+state['commit']])
-    prepared=output/'guest/boot-efi'
+    if not (repository/'image.json').exists():command([ssdimg,'init',repository])
+    command([ssdimg,'-C',repository,'capture','--force',image])
+    command([ssdimg,'-C',repository,'fsck'])
+    command([ssdimg,'-C',repository,'commit','-m','Golden Gate '+state['recipe']['golden_build']+'; '+state['commit']])
     if prepared.exists() and json.loads((prepared/'manifest.json').read_text())['kernel_repairs_applied']:
         archive=boot_efi_archive(prepared,repository)
         state['boot_efi']=dict(path=archive,sha256=digest(archive),manifest=json.loads((prepared/'manifest.json').read_text()))
+
+
+def capture_workspace(state,output,command):
+    assembled(output)
+    with readonly_workspace(state,command) as image:
+        commit_image(state,image,output/'guest/boot-efi',command)
     state.update(status='committed',capture_source='read-only stopped builder workspace',capture_tool_sha256=digest(Path(__file__)))
+
+
+def capture_kit(record,local,repository):
+    """After golden-assemble.sh KIT LOCAL built the raw image LOCAL/target.img from the kit of RECORD (golden-run
+    --stage-kit), on another Mac or in its Recovery with LOCAL then reachable here: keep its sealed cryptex images
+    (collect_kit), check the assembler's record (LOCAL/work/build.json: assembled, nothing left attached) and the image
+    (a regular file of the assembly's size), and commit it to REPOSITORY as a VM build does. A disk target needs no
+    capture: the disk is the result."""
+    record=Path(record).resolve();local=Path(local).resolve()
+    state=json.loads((record/'build.json').read_text())
+    if state.get('status') not in ('kit staged','kit assembled'):
+        raise RuntimeError('%s is no staged kit (status %r)'%(record,state.get('status')))
+    work=local/'work'
+    result=json.loads((work/'build.json').read_text())
+    if result.get('status')!='assembled' or result.get('attached_device') is not None:
+        raise RuntimeError('the kit assembly in %s is not assembled and detached'%local)
+    image=local/'target.img'
+    if image.is_symlink() or not image.is_file() or image.stat().st_size!=state['recipe']['size_bytes']:
+        raise ValueError('%s is missing, a link, or not %d bytes'%(image,state['recipe']['size_bytes']))
+    if state.get('status')=='kit staged':
+        state=collect_kit(record)
+    output=record/'kit-output';output.mkdir(exist_ok=True)
+    shutil.copytree(work,output/'guest',dirs_exist_ok=True,symlinks=True)   # the assembler's record and logs, as a VM build keeps them
+    def command(args,**kwargs):
+        print('+ '+shlex.join(map(str,args)),flush=True)
+        return subprocess.run(list(map(str,args)),check=True,**kwargs)
+    state['repository']=str(Path(repository).resolve())
+    try:
+        commit_image(state,image,work/'boot-efi',command)
+        state.update(status='committed',capture_source='kit assembly '+str(local),capture_tool_sha256=digest(Path(__file__)))
+    finally:
+        write(record/'build.json',state)
+    print('Golden image committed: '+state['repository'],flush=True)
+    return state
 
 
 def collect_kit(record):
@@ -557,6 +596,9 @@ def main():
     parser.add_argument('--stage-kit',action='store_true',
                         help='stage the relocatable kit in --work (WORK/share) and stop: no builder VM, no --repo; '
                              'golden-assemble.sh assembles it on the Mac that has the target (hao build-disk, install)')
+    parser.add_argument('--capture-kit',type=Path,metavar='RECORD',
+                        help='commit the image golden-assemble.sh built in --local LOCAL from the kit of RECORD to --repo')
+    parser.add_argument('--local',type=Path,help='the LOCAL folder golden-assemble.sh assembled in, for --capture-kit')
     parser.add_argument('--collect-kit',type=Path,metavar='RECORD',
                         help='after golden-assemble.sh ran the kit of RECORD: store the sealed cryptex images it made')
     parser.add_argument('--no-cryptex-cache',action='store_true',
@@ -569,7 +611,10 @@ def main():
         overlays=dict(system=args.overlay_system,store=args.overlay_store,hooks=args.overlay_hook)
     elif args.overlay_system or args.overlay_hook:parser.error('--overlay-system and --overlay-hook need --from-overlays')
     signal.signal(signal.SIGTERM,lambda *_:(_ for _ in ()).throw(KeyboardInterrupt('terminated')))
-    if args.collect_kit:
+    if args.capture_kit:
+        if args.recipe or not args.repo or not args.local:parser.error('--capture-kit takes the record, --local and --repo')
+        capture_kit(args.capture_kit,args.local,args.repo)
+    elif args.collect_kit:
         if args.recipe or args.repo or args.capture_record:parser.error('--collect-kit takes only the record')
         print(json.dumps(collect_kit(args.collect_kit).get('cryptex_cache',{}),indent=2))
     elif args.capture_record:
