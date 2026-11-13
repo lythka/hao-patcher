@@ -7,7 +7,7 @@ A file is installed with the attributes its declaration gives (*installed*: mode
 without them gets root:wheel, 0755 for a Mach-O, 0644 otherwise, no flags (a tar member keeps its own mode and owner).
 A file made on the target lists what it is made *after* there.
 
-34 of 34 patches declare their files so far.
+35 of 35 patches declare their files so far.
 
 ## darwin27-kernel
 
@@ -152,6 +152,14 @@ Revision r3, status experiment. [Recipe](../patches/golden-gate-native-identitie
 - `usr/lib/hao/originals/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer`: whole file from Tahoe donor. Copy of Tahoe's Apple-signed WindowServer from the native donors (the original the re-signed 27.x WindowServer was made from); path computed at build time by native_identities.py scan; root:wheel 0644. Made after every overlay file installed first.
 - `usr/lib/hao/originals/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd`: whole file from Apple. Copy of Golden Gate's own Apple-signed corespotlightd (before golden-gate-corespotlight-compat re-signs it); path computed at build time by native_identities.py scan; root:wheel 0644. Made after every overlay file installed first.
 - `usr/lib/hao/originals/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/managedcorespotlightd`: whole file from Apple. Copy of Golden Gate's own Apple-signed managedcorespotlightd (before golden-gate-corespotlight-compat re-signs it); path computed at build time by native_identities.py scan; root:wheel 0644. Made after every overlay file installed first.
+
+## golden-gate-root-launchservices
+
+Revision r1, status experiment. [Recipe](../patches/golden-gate-root-launchservices/README.md)
+
+- `private/var/db/auth.db`: whole file from hao (row root_launchservices_golden_gate). Authd's rule database as this image's authd wrote it in a builder boot (root 600).
+- `private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/0/com.apple.LaunchServices.dv/com.apple.LaunchServices-35651614-v2.csstore`: whole file from hao (row root_launchservices_golden_gate). Root's LaunchServices store as this image's lsd wrote it in a builder boot (root 644); schema 35651614 is 26B131's.
+- `private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/0/com.apple.LaunchServices.dv/SystemDataOnly-com.apple.LaunchServices-35651614-v2.csstore`: whole file from hao (row root_launchservices_golden_gate). Lsd's saved system content database from the same boot (root 644).
 
 ## golden-gate-shader-caches
 

@@ -1,0 +1,47 @@
+{
+ "revision": 1,
+ "stage": "post",
+ "applies": {
+  "models": [
+   "MacBookPro9,2"
+  ],
+  "builds": [
+   "25G342"
+  ]
+ },
+ "inputs": [
+  "root_launchservices_golden_gate"
+ ],
+ "status": "experiment",
+ "validated": false,
+ "optional": "boot-seeds",
+ "files": [
+  {
+   "path": "private/var/db/auth.db",
+   "origin": {
+    "kind": "hao",
+    "row": "root_launchservices_golden_gate",
+    "note": "authd's rule database as this image's authd wrote it in a builder boot (root 600)"
+   },
+   "source": "auth.db"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/0/com.apple.LaunchServices.dv/com.apple.LaunchServices-35651614-v2.csstore",
+   "origin": {
+    "kind": "hao",
+    "row": "root_launchservices_golden_gate",
+    "note": "root's LaunchServices store as this image's lsd wrote it in a builder boot (root 644); schema 35651614 is 26B131's"
+   },
+   "source": "ls/com.apple.LaunchServices-35651614-v2.csstore"
+  },
+  {
+   "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/0/com.apple.LaunchServices.dv/SystemDataOnly-com.apple.LaunchServices-35651614-v2.csstore",
+   "origin": {
+    "kind": "hao",
+    "row": "root_launchservices_golden_gate",
+    "note": "lsd's saved system content database from the same boot (root 644)"
+   },
+   "source": "ls/SystemDataOnly-com.apple.LaunchServices-35651614-v2.csstore"
+  }
+ ]
+}
