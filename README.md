@@ -24,7 +24,7 @@ SceneKit and Apple's effects engine need. hao-patcher adds both to the shader co
 <img src="docs/images/gallery/weather-temperature-map.jpg" alt="Weather temperature map on the HD 4000" width="49%">
 </p>
 
-<img src="docs/images/argbuf-webgpu.jpg" alt="Safari WebGPU compute and render check passing on the HD 4000" width="98%">
+<img src="docs/images/gallery/safari-webgpu.jpg" alt="Safari WebGPU compute and render check passing on the HD 4000" width="98%">
 
 More in the [gallery](docs/gallery.md): the air-quality map, Maps in 3D and SceneKit.
 
