@@ -41,12 +41,15 @@ boot the image in [QEMU](../../tools/qemu-vm/README.md) before installing it on 
 hao-runtime and do not replace image boot and application checks.
 
 ## Validation
+NEEDS VALIDATION: the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r65 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
+
 Laptop 2026-11-12, image d131d5b (26B131): hao d9ea9bd runs the image's ARM programs to a logged-in desktop; the 1-byte Swift enum that aborted Weather.app on 7d0b612 (hao 4e68804) now passes. Not working: Weather.app aborts at the Swift value boundary on `Optional<(Bool) -> ()>`.
 Laptop 2026-11-11, image 4d1c48c (26B131): the 7415a0b payload (r59) runs the image's ARM programs; hao 790720d (this revision's payload) swapped live fixes rapportd's and Control Center's crash loops, and its AOT caches load. Not yet exercised: the u3 units' Weather/Photos cases.
 Earlier: earlier payloads booted Golden Gate through translated launchd to the desktop, and a Golden
 Gate-first image reached SSH; the current profile needs a fresh image and application pass.
 
 ## Revisions
+- r68 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runtime-26B131-20261112-273ba980b829). No recipe change.
 - r67 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the hook is unchanged.
 - r66 2026-11-12 Declare the installed files and folders in patch.json and its test (the embedding stays a manifest-derived list); the hook and what it installs are unchanged.
 - r65 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804 + the Swift value walk passes values under 8 bytes, which aborted Weather, StocksWidget, NewsTag and NewsToday2 on 7d0b612). No recipe change.

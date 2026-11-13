@@ -1,5 +1,5 @@
 {
- "revision": 67,
+ "revision": 68,
  "stage": "oclp-hook",
  "applies": {
   "models": [
@@ -14,9 +14,7 @@
   "hao_runtime"
  ],
  "status": "experiment",
- "validated": true,
- "validated_revision": 65,
- "validated_digest": "8ba6f310a77c15f24ea6fdac732e13f90d19cf65d2f73d56552d42c1def67d9c",
+ "validated": false,
  "files": [
   {
    "path": "usr/libexec/hao",

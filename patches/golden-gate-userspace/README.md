@@ -282,6 +282,8 @@ creation logs in automatically (authd accepts loginwindow's `FUSAutologinDataKey
 unlisted ad hoc one.
 
 ## Validation
+NEEDS VALIDATION: the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r58 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
+
 Laptop 2026-11-12, image d131d5b (26B131): r58 boots to a logged-in desktop (automatic login); Stocks, News, Photos and Podcasts run. Weather.app still aborts in hao (see hao-runtime). Image 7d0b612 (r57) booted the same way on 2026-11-11.
 Laptop 2026-11-11, image 4d1c48c (26B131): r46 Setup's own Wi-Fi join, r47 Spotlight without the Swift SIGBUS, r48 automatic login, r49 Safari; r51's Tahoe CoreWiFi auto-joins live and at boot; r52's hao 790720d fixes rapportd and Control Center live. Not yet exercised: the u3 units' Weather/Photos cases, SearchHelper's own identity.
 Earlier: host tests cover the current recipe (r48's carrier runs against this Mac's x86_64 cache; no image
@@ -307,6 +309,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r61 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runtime-26B131-20261112-273ba980b829). No recipe change.
 - r60 2026-11-12 Declare the original file each renamed wrapper starts from ("input") for pipeline/materialize.py; the hook is unchanged.
 - r59 2026-11-12 Declare the files and edits in patch.json and edits/*.json (cache repairs, renamed wrappers, WindowServer, disabled job, cryptex builds, hao stubs); the hook and what it installs are unchanged.
 - r58 2026-11-11 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime d9ea9bd (4e68804 + the Swift value walk passes values under 8 bytes, which aborted Weather, StocksWidget, NewsTag and NewsToday2 on 7d0b612). No recipe change.

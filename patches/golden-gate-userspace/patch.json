@@ -1,5 +1,5 @@
 {
- "revision": 60,
+ "revision": 61,
  "stage": "oclp-hook",
  "applies": {
   "models": [
@@ -11,7 +11,7 @@
   ]
  },
  "status": "experiment",
- "validated": true,
+ "validated": false,
  "inputs": [
   "golden_gate_userspace",
   "display_state_shim",
@@ -22,8 +22,6 @@
   "codeid_carrier",
   "hao_runtime"
  ],
- "validated_revision": 58,
- "validated_digest": "c3cf52e0c5c6861a7c49d40b48405e4bb6313b3ac112735e7675906e59d1e833",
  "files": [
   {
    "path": "usr/lib/dss_shim.dylib",

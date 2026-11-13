@@ -151,7 +151,7 @@ Revision r7, status experiment. [Recipe](../patches/golden-gate-user-seed/README
 
 ## golden-gate-userspace
 
-Revision r60, status experiment. [Recipe](../patches/golden-gate-userspace/README.md)
+Revision r61, status experiment. [Recipe](../patches/golden-gate-userspace/README.md)
 
 - `usr/lib/dss_shim.dylib`: whole file from hao (row display_state_shim). New file: the display-state shim (tools/display-state-shim), installed by the display installer helper; WindowServer loads it.
 - `System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211`: whole file from hao (row io80211_compat). The IO80211 compatibility library (src/io80211), installed under the framework's own name over OCLP's Modern Wireless wrapper; it re-exports the wrapper, kept as IO80211OCLP.dylib.
@@ -320,7 +320,7 @@ Revision r6, status experiment. [Recipe](../patches/golden-gate-windowserver-fil
 
 ## hao-opencore
 
-Revision r41, status experiment. [Recipe](../patches/hao-opencore/README.md)
+Revision r42, status experiment. [Recipe](../patches/hao-opencore/README.md)
 
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it; 4 edits, applied by the installer
   1. `debug-log-to-file`: plist.set Misc:Debug:Target = 65.
@@ -336,7 +336,7 @@ Revision r41, status experiment. [Recipe](../patches/hao-opencore/README.md)
 
 ## hao-runtime
 
-Revision r67, status experiment. [Recipe](../patches/hao-runtime/README.md)
+Revision r68, status experiment. [Recipe](../patches/hao-runtime/README.md)
 
 - `usr/libexec/hao`: whole file from hao (row hao_runtime). The hao launcher that runs ARM64 programs on Intel (payload root/usr/libexec/hao, copied by hao-install.py).
 - `usr/lib/hao/libhao.dylib`: whole file from hao (row hao_runtime). Hao runtime library (payload root).

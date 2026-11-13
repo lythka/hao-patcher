@@ -22,10 +22,10 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-native-identities | r2 | oclp-hook | experiment |  | x | x |  |  | ok (r1) | r2 2026-11-12 Declare the files it writes (the list, the record and the three expected originals) in patch.jso |
 | golden-gate-shader-caches | r13 | post | experiment | caches | x |  |  |  | **needs** | r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) f |
 | golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
-| golden-gate-userspace | r60 | oclp-hook | experiment |  | x | x |  |  | ok (r58) | r60 2026-11-12 Declare the original file each renamed wrapper starts from ("input") for pipeline/materialize.p |
+| golden-gate-userspace | r61 | oclp-hook | experiment |  | x | x |  |  | **needs** | r61 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runt |
 | golden-gate-windowserver-filter | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r6 2026-11-12 Declare the display-state shim's load command and the installed library in edits/dss-shim.json a |
-| hao-opencore | r41 | post | experiment |  | x | x |  |  | ok (r40) | r41 2026-11-12 Declare the config keys with fixed values (edits/config.json) and the IntelCommpage and HaoExec |
-| hao-runtime | r67 | oclp-hook | experiment |  | x | x |  |  | ok (r65) | r67 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the |
+| hao-opencore | r42 | post | experiment |  | x | x |  |  | **needs** | r42 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runt |
+| hao-runtime | r68 | oclp-hook | experiment |  | x | x |  |  | **needs** | r68 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 273ba98 (hao-runt |
 | metal-compiler-compat | r3 | oclp-hook | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the two installed files in patch.json `files` (whole-file origins) and test them in test |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |
 | metalold-selectors | r5 | oclp-hook | product |  | x | x |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source") for pipeline/materialize.py; the  |

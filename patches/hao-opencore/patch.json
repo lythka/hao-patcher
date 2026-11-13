@@ -1,5 +1,5 @@
 {
-  "revision": 41,
+  "revision": 42,
   "stage": "post",
   "applies": {
     "models": [
@@ -16,9 +16,7 @@
     "kernel_repair_binding"
   ],
   "status": "experiment",
-  "validated": true,
-  "validated_revision": 40,
-  "validated_digest": "9185bb8c03582cf01eeaedcce989e14b014a342ff068e48a271f3512706116cc",
+  "validated": false,
   "files": [
     {
       "path": "EFI/OC/config.plist",
