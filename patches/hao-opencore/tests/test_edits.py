@@ -111,12 +111,12 @@ class Config(unittest.TestCase):
     def test_same_values_as_apply_sh_on_a_synthetic_oclp_config(self):
         self.check(oclp_config())
 
-    def test_dev_builds_add_two_statistics_arguments_after_hao_crash(self):
+    def test_boot_args_are_the_end_user_ones_in_every_build(self):
         data = oclp_config()
-        release = plistlib.loads(script_output(data))['NVRAM']['Add'][APPLE]['boot-args']
-        dev = plistlib.loads(script_output(data, '1'))['NVRAM']['Add'][APPLE]['boot-args']
-        self.assertEqual(release, PLIST['edits'][2]['args']['value'])
-        self.assertEqual(dev, release.replace('hao_crash=1 ', 'hao_crash=1 %s ' % DEV_ARGS))
+        for dev in (None, '1'):
+            args = plistlib.loads(script_output(data, dev))['NVRAM']['Add'][APPLE]['boot-args']
+            self.assertEqual(args, PLIST['edits'][1]['args']['value'])
+            self.assertFalse(set(DEV_ARGS.split()) & set(args.split()))
 
     @unittest.skipUnless(os.environ.get('HAO_OPENCORE_INPUT'), 'set HAO_OPENCORE_INPUT to the base config.plist')
     def test_same_values_as_apply_sh_on_the_real_base_config(self):
@@ -130,9 +130,14 @@ class Config(unittest.TestCase):
         image = plistlib.loads(Path(os.environ['HAO_OPENCORE_IMAGE_CONFIG']).read_bytes())
         out, _ = engine.apply(PLIST, Path(os.environ['HAO_OPENCORE_INPUT']).read_bytes(), repo=str(TOP))
         declared = plistlib.loads(out)
-        # The image is a dev build: its boot-args carry the two statistics arguments, nothing else differs.
-        args = declared['NVRAM']['Add'][APPLE]['boot-args']
-        declared['NVRAM']['Add'][APPLE]['boot-args'] = args.replace('hao_crash=1 ', 'hao_crash=1 %s ' % DEV_ARGS)
+        # Later writers of the file in the set: golden-gate-live-text-service, and in a bench image dev-diagnostics
+        # (pack dev, when the image's boot-args carry its switches).
+        later = ['golden-gate-live-text-service']
+        if DEV_ARGS in image['NVRAM']['Add'][APPLE]['boot-args']:
+            later.append('dev-diagnostics')
+        for name in later:
+            out, _ = engine.apply(S.load(TOP / 'patches' / name / 'edits/config.json'), out, repo=str(TOP))
+        declared = plistlib.loads(out)
         # Declared by kc.bind (tests/test_kc_bind.py): the four kernel repairs and IntelCommpage; not declared: HaoExec.
         patches = image['Kernel']['Patch']
         self.assertEqual(patches[:len(base['Kernel']['Patch'])], base['Kernel']['Patch'])

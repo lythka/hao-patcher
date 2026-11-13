@@ -175,15 +175,35 @@ def applies(want, ledger):
     return named_recipes(want.get('writers', [])) <= applied
 
 
-def lint(ledger, expected):
+def dev_recipes(packs_dir=os.path.join(TOP, 'packs')):
+    """Recipes of opt-in packs (pack dev, dev trials): bench images only."""
+    out = set()
+    for n in sorted(os.listdir(packs_dir)) if os.path.isdir(packs_dir) else []:
+        if n.endswith('.json'):
+            with open(os.path.join(packs_dir, n)) as f:
+                p = json.load(f)
+            if p.get('opt_in'):
+                out.update(p.get('recipes', []))
+    return out
+
+
+def lint(ledger, expected, dev=None):
     """Problems: refused chains not in EXPECTED ({path: {"chain", "writers"}}, shared by every set), stale expected
-    entries (only those whose recipes this set all applies), and every entry's own problems."""
+    entries (only those whose recipes this set all applies), and every entry's own problems. A dev set's chain may
+    end in writers of opt-in packs (DEV, default dev_recipes()): it is then the expected chain plus those, e.g.
+    dev-diagnostics after the end-user writers of EFI/OC/config.plist."""
+    dev = dev_recipes() if dev is None else set(dev)
     bad = []
     for path, e in sorted(ledger.items()):
         bad += ['%s: %s' % (path, p) for p in e['problems']]
         if e['chain']:
             want = expected.get(path)
             got = {'chain': e['chain'], 'writers': writer_names(e)}
+            names = got['writers']
+            while want and names and names[-1] in dev and names != want['writers']:
+                names = names[:-1]
+            if want and want.get('chain') == got['chain'] and names == want['writers']:
+                continue
             if want != got:
                 bad.append('%s: %s by %s is not in ledger-expected.json%s' % (
                     path, e['chain'], ' -> '.join(got['writers']), ' (expected %s)' % json.dumps(want) if want else ''))

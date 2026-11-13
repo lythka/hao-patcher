@@ -57,9 +57,9 @@ It changes nothing when the row already names the newest payload; otherwise chec
 | `oclp` | Selected OCLP integration revision |
 | `skip_optional` | Optional, e.g. `["caches"]`: optional recipe groups to leave out ([optional cache recipes](../../docs/building.md#optional-cache-recipes)) |
 
-A build is a dev build when its set includes a recipe with status `dev` (`dev-access`);
-golden-run then sets `IMAGE_DEV_BUILD=1` for the recipes (otherwise `0`), and dev-only diagnostics
-follow it.
+A dev (bench) image differs from an end-user image only by the recipes of pack `dev` (`packs/dev.json`: `dev-access`,
+`dev-diagnostics`), which only sets named `dev-*` hold; `patches.py check` refuses a status-`dev` recipe outside an
+opt-in pack or in any other set. There is no build-wide dev switch.
 
 The runner creates its own builder clone and takes the builder lock. The guest
 verifies that the attached workspace is the intended external USB device before

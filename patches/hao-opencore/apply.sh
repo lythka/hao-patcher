@@ -58,29 +58,24 @@ for key in ('bootercfg', 'bootercfg-once'):
 # debug=0x100 waits for a debugger after a panic; the machine then needs a person to power-cycle it.
 # Without it a panic reboots into the NetBoot default and the panic text stays in NVRAM (aapl,panic-info).
 # -v and startup_debug=1 (verbose text on screen, extra kernel startup logging) are off: the early-boot
-# evidence is OpenCore's file log on the ESP (below) and the unified log.
+# evidence is the unified log (and, in bench images, OpenCore's file log from dev-diagnostics).
 args=[a for a in n.get('boot-args','').split() if a not in ('debug=0x100', '-v', 'startup_debug=1')]
 # amfi_get_out_of_my_way=1: hao gives each arm64-only program an ad-hoc signed x86_64 slice carrying the
 # program's own (Apple-private) entitlements; AMFIPass alone kills such a PID 1 (experimental sets only).
-# hao_crash: hao's crash lines (cheap, every build). hao_diag_time (dev): mach-clock stamps and phase lines on hao's
-# lines, PID 1's pre-Data lines kept and flushed by the bridge_stats report. hao_nx_stats/hao_bridge_stats: NX fault tables and bridge
-# statistics, the diagnostics the QEMU runs use; they cost time on every translated native call, so only dev builds
-# (golden-run sets IMAGE_DEV_BUILD=1 when the set has a status-dev recipe) get them.
-dev=os.environ.get('IMAGE_DEV_BUILD')=='1'
+# hao_crash: hao's crash lines (cheap, every build). The measurement switches (hao_nx_stats, hao_bridge_stats,
+# hao_diag_time) are dev-diagnostics' (pack dev): bench images only.
 for arg in ('-lilubetaall', '-pmap_pcid_disable', 'amfi_get_out_of_my_way=1',
-            'hao_crash=1') + (('hao_nx_stats=1', 'hao_bridge_stats=1', 'hao_diag_time=1') if dev else ()) + (
+            'hao_crash=1',
             # IntelCommpage reports CSR_ALLOW_APPLE_INTERNAL so 27.0's dyld honours OCLP's on-disk Metal roots.
             'ic_csr_internal=1',
             # kernelmanagerd skips the boot-time Aux KC build. 27's kmutil cannot build an x86_64 collection, so the
             # build (of the codeless AppleMobileDevice) failed at every boot and held the System KC back ~18 s.
-            'auxKCAtBoot=false',):
+            'auxKCAtBoot=false'):
     if arg not in args:args.append(arg)
 n['boot-args']=' '.join(args)
-# Keep boot.efi/OpenCore evidence on the ESP for collection from Recovery.
-# Target: 0x01 logging, 0x02 on screen, 0x40 file. The log goes to the ESP file only; the screen shows no OpenCore
-# text (OCLP's base config sets 0x02 with its debug log).
-d['Misc']['Debug']['Target'] = (d['Misc']['Debug']['Target'] | 0x41) & ~0x02
-d['Misc']['Debug']['DisplayLevel'] |= 0x40
+# No OpenCore log in an end-user image (Target 0: no logging, no file writes at boot, nothing on screen). Bench
+# images get the file log on the ESP from dev-diagnostics (pack dev).
+d['Misc']['Debug']['Target'] = 0
 # A normal boot shows nothing but the Apple logo (owner 2026-11-13): no boot.efi/apfs.efi debug lines.
 d['Misc']['Debug']['AppleDebug'] = False
 with open(p,'wb') as f:plistlib.dump(d,f)

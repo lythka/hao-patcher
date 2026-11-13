@@ -11,6 +11,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | darwin27-kernel | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare the kernel's install mode, 0644 (golden-pristine.sh installs it `-m 644`); the hook is u |
 | darwin27-sandbox-disk-space | r3 | oclp-hook | experiment |  |  | x |  |  | **needs** | r3 2026-11-12 Declare the system.sb rule in `edits/system-sb.json` (edit-engine text.insert, unless already pr |
 | dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
+| dev-diagnostics | r1 | post | dev |  |  |  |  |  | **needs** | r1 2026-11-13 The measurement boot arguments and the OpenCore file log, moved out of hao-opencore (r50) into t |
 | golden-gate-corespotlight-compat | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both daemo |
 | golden-gate-font-registry | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
 | golden-gate-hello | r6 | oclp-hook | experiment |  | x | x |  |  | **needs** | r6 2026-11-12 The `libhelloblur` source and builder are in `build/` (from the hello-render recipe); the row an |
@@ -27,7 +28,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-user-seed | r7 | post | experiment | caches | x |  |  |  | **needs** | r7 2026-11-12 Declare the installed files in patch.json `files` (generated at install); the hook is unchanged. |
 | golden-gate-userspace | r64 | oclp-hook | experiment |  | x | x |  |  | **needs** | r64 2026-11-13 Split the cryptex image build into `src/cryptex.py` and reuse a sealed OS/App image pair built  |
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
-| hao-opencore | r49 | post | experiment |  | x | x |  |  | **needs** | r49 2026-11-13 A normal boot shows only the Apple logo: `Misc.Debug.AppleDebug` false, and images use the Open |
+| hao-opencore | r50 | post | experiment |  | x | x |  |  | **needs** | r50 2026-11-13 End-user configuration only: `Misc.Debug.Target` 0 (no OpenCore log, no file writes at boot) an |
 | hao-runtime | r70 | oclp-hook | experiment |  | x | x |  |  | **needs** | r70 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runt |
 | metal-compiler-compat | r4 | oclp-hook | experiment |  | x |  |  |  | **needs** | r4 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the servic |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |

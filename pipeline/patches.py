@@ -329,6 +329,43 @@ def check(root=os.path.join(TOP, 'patches'), sets_dir=os.path.join(TOP, 'pipelin
                 bad.append('%s: status %s, but set %s ships to people (product patches only)' % (name, p.get('status'), s))
     if os.path.abspath(str(root)) == os.path.join(TOP, 'patches'):
         bad += pack_problems(load_packs(), root)
+        bad += dev_problems(load_packs(), root, sets_dir)
+    return bad
+
+
+def is_dev_set(name):
+    """Sets that may hold status-dev recipes: bench images (dev-*) and the legacy Tahoe bench set (*-dev)."""
+    return name.startswith('dev-') or name.endswith('-dev')
+
+
+def dev_problems(packs, root=os.path.join(TOP, 'patches'), sets_dir=os.path.join(TOP, 'pipeline', 'sets')):
+    """An end-user image carries nothing of a bench image's: every status-dev recipe is in an opt-in pack, only dev
+    sets hold one, and no other recipe switches on a build-wide dev flag (IMAGE_DEV_BUILD is gone)."""
+    bad = []
+    opt_in = {r for p in packs.values() if p.get('opt_in') for r in p.get('recipes', [])}
+    dev = set()
+    for name in patch_names(root):
+        f = os.path.join(directory(name, root), 'patch.json')
+        if os.path.isfile(f) and json.load(open(f)).get('status') == 'dev':
+            dev.add(name)
+            if name not in opt_in:
+                bad.append('%s: status dev, but in no opt-in pack (packs/dev.json)' % name)
+    for s in sorted(os.listdir(sets_dir)) if os.path.isdir(sets_dir) else []:
+        if s.endswith('.txt') and not is_dev_set(s[:-4]):
+            for name in names(os.path.join(sets_dir, s)):
+                if name in dev:
+                    bad.append('set %s: %s is a dev recipe; only dev-* sets may hold one' % (s[:-4], name))
+    for name in patch_names(root):
+        if name in opt_in:
+            continue
+        for dirpath, dirs, files in os.walk(directory(name, root)):
+            dirs[:] = [x for x in dirs if x not in ('tests', '__pycache__', 'build')]
+            for fn in files:
+                if fn.endswith(('.sh', '.py')):
+                    with open(os.path.join(dirpath, fn), errors='replace') as fh:
+                        if 'IMAGE_DEV_BUILD' in fh.read():
+                            bad.append('%s: %s reads IMAGE_DEV_BUILD; dev-only content belongs in pack dev'
+                                       % (name, os.path.relpath(os.path.join(dirpath, fn), root)))
     return bad
 
 DIGEST_SKIP = {'README.md', 'patch.json', 'edits', 'tests'}

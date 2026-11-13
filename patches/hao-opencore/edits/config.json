@@ -4,7 +4,7 @@
  "origin": {
   "kind": "oclp",
   "name": "OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it",
-  "note": "in the image's EFI partition, not in the System volume. Not declared here (no edit kind for it yet): the HaoExec.kext entry appended to Kernel.Add (plist.set cannot append), the early Tahoe kext entries (none on any recorded build), and removal of bootercfg and bootercfg-once from NVRAM.Add (OCLP's config has neither). The boot-args value is the one a build without a dev recipe writes: dev builds (IMAGE_DEV_BUILD=1) add hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 after hao_crash=1"
+  "note": "in the image's EFI partition, not in the System volume. Not declared here (no edit kind for it yet): the HaoExec.kext entry appended to Kernel.Add (plist.set cannot append), the early Tahoe kext entries (none on any recorded build), and removal of bootercfg and bootercfg-once from NVRAM.Add (OCLP's config has neither). The boot-args value is the end-user one; dev-diagnostics (pack dev) adds the measurement switches in bench images"
  },
  "applied_by": "installer",
  "edits": [
@@ -24,7 +24,7 @@
    "evidence": "apply.sh runs src/kc_bind.py on the image's BootKernelExtensions.kc, which refuses unless kc-binder's config.plist is byte-identical to the recorded kernel_repair_efi repairs src/repair_binding.py binds to that BootKC (or, when those refuse it, unless IntelCommpage's compiled addresses hold for it); src/repairs.py installs the result. tests/test_kc_bind.py (HAO_OPENCORE_BOOT_KC and the row variables) proves the bytes on the recorded 26B131 collections"
   },
   {
-   "id": "debug-log-to-file",
+   "id": "no-opencore-log",
    "kind": "op",
    "op": "plist.set",
    "args": {
@@ -33,23 +33,9 @@
      "Debug",
      "Target"
     ],
-    "value": 65
+    "value": 0
    },
-   "reason": "OpenCore's DEBUG log goes to the file on the EFI partition only and nothing is printed on screen, so early-boot evidence can be collected from Recovery"
-  },
-  {
-   "id": "debug-log-info-lines",
-   "kind": "op",
-   "op": "plist.set",
-   "args": {
-    "key": [
-     "Misc",
-     "Debug",
-     "DisplayLevel"
-    ],
-    "value": 2147483714
-   },
-   "reason": "the OpenCore file log also records informational lines, so it shows the result of each kernel patch"
+   "reason": "an end-user image writes no OpenCore log and shows no OpenCore text (Target 0: logging off; it also saves the file writes at every boot); bench images get the file log from dev-diagnostics (pack dev)"
   },
   {
    "id": "boot-args",

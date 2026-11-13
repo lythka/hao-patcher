@@ -43,19 +43,17 @@ class BootLoggingTests(unittest.TestCase):
         self.assertEqual(result['NVRAM']['Delete']['other-guid'], ['existing'])
         self.assertIn('hao_crash=1', added['boot-args'].split())
         self.assertNotIn('-v', added['boot-args'].split())
-        self.assertEqual(result['Misc']['Debug']['Target'], 65)
+        self.assertEqual(result['Misc']['Debug']['Target'], 0)     # no OpenCore log in an end-user image
 
-    def test_hao_statistics_only_in_dev_builds(self):
+    def test_no_measurement_switches_whatever_the_environment(self):
+        # hao-runtime's measurement switches are dev-diagnostics' (pack dev); hao-opencore writes the same boot-args
+        # in every build, IMAGE_DEV_BUILD or not.
         release = ('-lilubetaall -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 '
                    'ic_csr_internal=1 auxKCAtBoot=false').split()
-        for dev in (None, '0'):
+        for dev in (None, '0', '1'):
             with self.subTest(dev=dev):
                 args = self.apply(self.fixture(), dev)['NVRAM']['Add'][APPLE]['boot-args'].split()
                 self.assertEqual(['keepsyms=1'] + release, args)
-        # Dev builds: the release boot-args plus the two statistics arguments after hao_crash=1.
-        args = self.apply(self.fixture(), '1')['NVRAM']['Add'][APPLE]['boot-args'].split()
-        self.assertEqual(['keepsyms=1', '-lilubetaall', '-pmap_pcid_disable', 'amfi_get_out_of_my_way=1', 'hao_crash=1',
-                          'hao_nx_stats=1', 'hao_bridge_stats=1', 'hao_diag_time=1', 'ic_csr_internal=1', 'auxKCAtBoot=false'], args)
 
     def test_missing_or_consumed_overrides_still_deleted_idempotently(self):
         value = self.fixture()

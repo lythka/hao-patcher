@@ -1,0 +1,14 @@
+{
+ "revision": 1,
+ "stage": "post",
+ "applies": "any",
+ "inputs": [],
+ "status": "dev",
+ "validated": false,
+ "files": [
+  {
+   "path": "EFI/OC/config.plist",
+   "edits": "edits/config.json"
+  }
+ ]
+}

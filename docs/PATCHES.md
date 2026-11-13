@@ -7,7 +7,7 @@ A file is installed with the attributes its declaration gives (*installed*: mode
 without them gets root:wheel, 0755 for a Mach-O, 0644 otherwise, no flags (a tar member keeps its own mode and owner).
 A file made on the target lists what it is made *after* there.
 
-36 of 36 patches declare their files so far.
+37 of 37 patches declare their files so far.
 
 ## darwin27-kernel
 
@@ -40,6 +40,18 @@ Revision r4, status dev. [Recipe](../patches/dev-access/README.md)
 - `private/var/root/.testssh/authorized_keys`: whole file from hao (row test_authorized_key). Data volume; the bench host's public key, root:wheel 0600.
 - `private/var/root/.testssh/sshd_config`: whole file from hao. Data volume; src/sshd_config: root by key only, no passwords, UsePAM no; root:wheel 0644.
 - `Library/LaunchDaemons/local.testssh.plist`: whole file from hao. Data volume; src/local.testssh.plist: launchd runs sshd -i per connection on port 22; root:wheel 0644.
+
+## dev-diagnostics
+
+Revision r1, status dev. [Recipe](../patches/dev-diagnostics/README.md)
+
+- `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, after hao-opencore (and golden-gate-live-text-service); 3 edits, applied by the installer.
+  1. `diagnostic-boot-args`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 ic_csr_internal=1 auxKCAtBoot=false".
+     Hao-runtime's measurement switches after hao_crash=1: hao_nx_stats and hao_bridge_stats (NX fault tables, bridge statistics) and hao_diag_time (phase lines and usage counters boot-gantt reads); they cost time on every translated native call, so only bench images carry them.
+  2. `opencore-log-to-file`: plist.set Misc:Debug:Target = 65.
+     OpenCore's log goes to a file on the EFI partition (0x41), nothing on screen, so a bench boot's early evidence can be collected from Recovery; an end-user image writes no OpenCore log.
+  3. `opencore-log-info-lines`: plist.set Misc:Debug:DisplayLevel = 2147483714.
+     The file log includes OpenCore's info lines (DisplayLevel 0x40).
 
 ## golden-gate-corespotlight-compat
 
@@ -364,20 +376,18 @@ Revision r7, status experiment. [Recipe](../patches/golden-gate-windowserver-fil
 
 ## hao-opencore
 
-Revision r49, status experiment. [Recipe](../patches/hao-opencore/README.md)
+Revision r50, status experiment. [Recipe](../patches/hao-opencore/README.md)
 
-- `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it; 6 edits, applied by the installer. Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (kc.bind reads it).
+- `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, as pipeline/stages/build-efi.py generates it; 5 edits, applied by the installer. Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (kc.bind reads it).
   1. `kernel-repairs`: kc.bind (applied by tools/kc-binder, against the target's linked BootKC).
      The Darwin 27 kernel starts on Ivy Bridge: the kernel repairs in Kernel.Patch (on 26B131: early VM range initialization, ascending early kernel-map bounds, the bootstrap physical-page alias code and its registration call) and the IntelCommpage.kext Kernel.Add entry, computed by tools/kc-binder from the BootKC this image links.
-  2. `debug-log-to-file`: plist.set Misc:Debug:Target = 65.
-     OpenCore's DEBUG log goes to the file on the EFI partition only and nothing is printed on screen, so early-boot evidence can be collected from Recovery.
-  3. `debug-log-info-lines`: plist.set Misc:Debug:DisplayLevel = 2147483714.
-     The OpenCore file log also records informational lines, so it shows the result of each kernel patch.
-  4. `boot-args`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 ic_csr_internal=1 auxKCAtBoot=false".
+  2. `no-opencore-log`: plist.set Misc:Debug:Target = 0.
+     An end-user image writes no OpenCore log and shows no OpenCore text (Target 0: logging off; it also saves the file writes at every boot); bench images get the file log from dev-diagnostics (pack dev).
+  3. `boot-args`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 ic_csr_internal=1 auxKCAtBoot=false".
      The Intel Mac boots Darwin 27 with its Lilu-based drivers loading, PCID off, hao's arm64-only programs allowed to start and hao's crash lines on the console, the Intel commpage reporting Apple-internal CSR so OCLP's on-disk Metal loads, a panic rebooting instead of waiting for a debugger, and kernelmanagerd loading the System kernel collection without first trying, and failing, to build an auxiliary collection.
-  5. `clear-boot-logging-overrides`: plist.set NVRAM:Delete:7C436110-AB2A-4BBB-A880-FE41995C9F82 = ["boot-args", "csr-active-config", "bootercfg", "bootercfg-once"].
+  4. `clear-boot-logging-overrides`: plist.set NVRAM:Delete:7C436110-AB2A-4BBB-A880-FE41995C9F82 = ["boot-args", "csr-active-config", "bootercfg", "bootercfg-once"].
      The next OpenCore boot deletes the firmware's boot logging overrides, so they cannot hide early-boot output.
-  6. `no-apple-debug`: plist.set Misc:Debug:AppleDebug = false.
+  5. `no-apple-debug`: plist.set Misc:Debug:AppleDebug = false.
      A normal boot shows only the Apple logo (owner 2026-11-13): no boot.efi or apfs.efi debug lines; the OpenCore archive is the RELEASE build unless the assembly asks for debug.
 - `EFI/OC/Kexts/IntelCommpage.kext`: whole file from every file under it from hao · IntelCommpage.kext (row kernel_repair_efi). EFI/OC/Kexts/IntelCommpage.kext of the row, copied with ditto; src/kc_bind.py refuses unless its files are the ones the kernel_repair_binding profile lists; its __DATA,__ic_table (r42) must equal the table for this image's BootKC, or in binder-only mode is written for it (a kext without the table: every collection-dependent line of row intel_commpage_abi must hold).
 - `EFI/OC/Kexts/HaoExec.kext`: whole file from every file under it from hao · HaoExec.kext (row hao_runtime). The row's HaoExec.kext, copied with ditto; its executable is declared on its own below: stamp_identity.py (also from the row) stamps it for this image's BootKC.

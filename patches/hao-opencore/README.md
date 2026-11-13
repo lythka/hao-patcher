@@ -2,17 +2,18 @@
 
 Configures the image's OpenCore so the MacBookPro9,2 boots the Darwin 27.0 x86_64 kernel: the kernel repairs and
 IntelCommpage that let this kernel start on Ivy Bridge hardware, `HaoExec` for arm64-only programs, early Tahoe
-display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments below.
+display and Ethernet drivers, and the boot arguments below. It writes the end-user configuration: no OpenCore log
+and no measurement switches. Bench images add those with `dev-diagnostics` (pack `dev`).
 
 ## How it works
 
 `apply.sh` edits the image's OCLP ESP (`$ESP/EFI/OC`):
 
-- OpenCore.efi, OpenRuntime.efi and every other OpenCore binary are already the official OpenCore 1.0.5 DEBUG
-  release (the donor's version) when this runs: `pipeline/stages/build-efi.py` replaces all of them in OCLP's
-  generated EFI from the `opencore_debug` archive. The DEBUG build makes the ESP log record each kernel patch result.
-  `Misc.Debug.Target` keeps logging (0x01) and the file log (0x40) and clears on-screen output (0x02), which OCLP's
-  base config enables.
+- OpenCore.efi, OpenRuntime.efi and every other OpenCore binary are already the official OpenCore 1.0.5 release
+  golden-run chose (RELEASE unless the assembly says `"opencore": "debug"`) when this runs:
+  `pipeline/stages/build-efi.py` replaces all of them in OCLP's generated EFI. `Misc.Debug.Target` is 0: no OpenCore
+  log and nothing on screen (OCLP's base config logs to the screen). `dev-diagnostics` turns the ESP file log on in
+  bench images.
 - The kernel repairs (early VM range initialization, ascending early kernel-map bounds, bootstrap physical-page
   aliases) are RIP-relative code tied to one collection layout, and kmutil gives every build a new enclosing UUID
   and build paths. Two binders run on this image's BootKC:
@@ -69,12 +70,14 @@ display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments
 | `-pmap_pcid_disable` | Disables PCID in the target kernel's pmap; part of the boot configuration known to work. |
 | `amfi_get_out_of_my_way=1` | `hao-runtime` signs each program's x86_64 slice ad hoc with its own entitlements, including Apple-private ones (launchd: Preboot, graftdmg, trust caches). With AMFIPass alone, AMFI rejects `/sbin/launchd` and the kernel panics. |
 | `hao_crash=1` | hao's crash lines on the console. |
-| `hao_nx_stats=1 hao_bridge_stats=1` | Dev builds only (`IMAGE_DEV_BUILD=1`, set by golden-run when the set has a status `dev` recipe such as `dev-access`): hao's NX fault tables and bridge statistics. They cost time on every translated native call. |
 | `ic_csr_internal=1` | IntelCommpage reports `CSR_ALLOW_APPLE_INTERNAL`. 27.0's x86_64 dyld scans the disk for shared-cache overrides only when `csr_check(0x10)` succeeds, and the booter drops that bit from NVRAM; without it OCLP's on-disk Metal and MetalOld never load. |
 | `auxKCAtBoot=false` | kernelmanagerd skips building an auxiliary kernel collection at boot and loads the System collection at once. 27's kmutil cannot build an x86_64 collection ("unsupported arch: x86_64 / Unsupported collection kind"), so the build of the only candidate, 27's codeless `AppleMobileDevice.kext` (from 27's Data template), failed at every boot and held the System collection, and with it the Capri framebuffer and WindowServer, back 18.5 s (23 s on the first boot). The codeless kext's personality still loads. Details: [Aux KC gate](#aux-kc-gate). |
 
+`hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1` (hao's measurement switches) are never written here: only
+`dev-diagnostics` adds them, in bench images.
+
 `-v`, `startup_debug=1` and `debug=0x100` are removed if the base config has them: early-boot evidence comes from
-the ESP log and the unified log, and without `debug=0x100` a panic reboots and leaves `aapl,panic-info` in NVRAM
+the unified log (and the ESP log in bench images), and without `debug=0x100` a panic reboots and leaves `aapl,panic-info` in NVRAM
 instead of waiting for a debugger.
 
 This patch has status `experiment` because of `amfi_get_out_of_my_way=1`; it is never part of a shipped set.
@@ -163,7 +166,9 @@ must still die with VM guard flavor 13 (status 137), which shows the fix leaves 
 has a 15-second alarm. Finally load a website in Safari and scroll, navigate and reload.
 
 ## Validation
-NEEDS VALIDATION: r48 installs the r42 IntelCommpage on 26B131. It reads its collection addresses from its own table
+NEEDS VALIDATION: r50 writes `Misc.Debug.Target` 0 and never the measurement switches (host tests); not built or
+booted yet. With dev-diagnostics after it, a bench image's config.plist is unchanged (the real-config test on the
+2026-11-13 bench image passes). r48 installs the r42 IntelCommpage on 26B131. It reads its collection addresses from its own table
 at load, so the kext's bytes are new. The table equals r41's compiled values on all 12 recorded 26B131 KCs (host
 tests), but the kext has not been booted (QEMU, then the laptop). config.plist is byte-identical to r47's. r45 binds the repairs with tools/kc-binder (host tests: byte-identical config.plist on the 26B131
 bootstrap KC and nine recorded image KCs; no VM build yet). r44 adds `auxKCAtBoot=false` (not booted yet; see Verify). the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r40 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
@@ -178,6 +183,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r50 2026-11-13 End-user configuration only: `Misc.Debug.Target` 0 (no OpenCore log, no file writes at boot) and no measurement switches in any build; `IMAGE_DEV_BUILD` is gone. Bench images get `hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1` and the ESP file log from the new `dev-diagnostics` recipe (pack `dev`). Edits `debug-log-to-file` (65) and `debug-log-info-lines` replaced by `no-opencore-log` (0).
 - r49 2026-11-13 A normal boot shows only the Apple logo: `Misc.Debug.AppleDebug` false, and images use the OpenCore 1.0.5 RELEASE archive (row `opencore_release`; golden-run picks it unless the assembly says `"opencore": "debug"`). The DEBUG build printed its early lines and apfs.efi's on screen.
 - r48 2026-11-12 Input rows `kernel_repair_efi`, `kernel_repair_binding` and `intel_commpage_abi` (26B131) now name r42: IntelCommpage reads its collection addresses from `__DATA,__ic_table` at load. kc_bind.py writes this BootKC's table into it in `binder-only` mode instead of refusing a moved layout, and in `binder` mode requires the table to equal the kext's own. config.plist is unchanged. The IntelCommpage binary is new.
 - r47 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runtime-26B131-20261112-0a2c2aad4755). No recipe change.

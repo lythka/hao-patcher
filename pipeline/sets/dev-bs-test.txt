@@ -1,4 +1,4 @@
-# dev-bs-test: macOS 27.2.1 (26B131) laptop bench image = golden-gate's recipes for 26B131 + root SSH (dev-access).
+# dev-bs-test: macOS 27.2.1 (26B131) laptop bench image = golden-gate's recipes for 26B131 + pack dev (root SSH, measurement settings).
 # Selected by pipeline/assemblies/dev-26B131.json. Same rules and base layers as golden-gate.txt: run order is exactly
 # this file's order, darwin27-kernel then golden-gate-userspace first, every post after every oclp-hook.
 # The three Live Text recipes need 26B131 rows (inputs/golden/26B131): exp-*.json with 26A428 stop at them.
@@ -30,3 +30,4 @@ golden-gate-font-registry         # fontd registries of this build: Setup's in p
 golden-gate-shader-caches         # HD 4000 Metal caches harvested from this build: system accounts in place, user trees into PerUserSeed/metal
 golden-gate-icon-caches           # IconServices store and root/Setup indexes harvested from this build; user index into PerUserSeed/is
 dev-access                        # dev only: root SSH with the bench host's key, so a test boot can be checked unattended
+dev-diagnostics                   # dev only: hao-runtime measurement boot-args and the OpenCore file log (after hao-opencore)

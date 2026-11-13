@@ -218,6 +218,45 @@ class Packs(unittest.TestCase):
                                      patches.plan(setfile, target, build, packs=patches.detect_packs(target)), s)
 
 
+class DevPack(unittest.TestCase):
+    """An end-user image carries nothing of a bench image's: dev recipes live in opt-in packs and dev sets only."""
+
+    def test_bench_set_is_the_end_user_set_plus_pack_dev(self):
+        sets = TOP / 'pipeline/sets'
+        dev = patches.load_packs()['dev']
+        self.assertTrue(dev['opt_in'])
+        for bench, end_user, extra in (('dev-bs-test', 'golden-gate-26B131', ()),
+                                       ('dev-metal27', 'golden-gate-26B131', ('golden-gate-metal27',))):
+            b, e = patches.names(sets / (bench + '.txt')), patches.names(sets / (end_user + '.txt'))
+            self.assertEqual([n for n in b if n not in dev['recipes'] and n not in extra], e, bench)
+            self.assertEqual(sorted(set(b) - set(e) - set(extra)), sorted(dev['recipes']), bench)
+        self.assertNotIn('dev', patches.detect_packs(TOP / 'pipeline/targets/mbp92.json'))
+
+    def test_the_repository_passes(self):
+        self.assertEqual(patches.dev_problems(patches.load_packs()), [])
+
+    def test_refusals(self):
+        with tempfile.TemporaryDirectory() as d:
+            root, sets = Path(d) / 'patches', Path(d) / 'sets'
+            for name, status, script in (('probe', 'dev', ''), ('fix', 'product', 'x=$IMAGE_DEV_BUILD\n'),
+                                         ('ok', 'product', '')):
+                (root / name).mkdir(parents=True)
+                (root / name / 'patch.json').write_text(json.dumps({'status': status}))
+                (root / name / 'apply.sh').write_text(script)
+            sets.mkdir()
+            (sets / 'release.txt').write_text('ok\nprobe\n')
+            (sets / 'dev-bench.txt').write_text('ok\nprobe\n')
+            got = '\n'.join(patches.dev_problems({}, str(root), str(sets)))
+            self.assertIn('probe: status dev, but in no opt-in pack', got)
+            self.assertIn('set release: probe is a dev recipe', got)
+            self.assertNotIn('set dev-bench', got)
+            self.assertIn('fix: fix/apply.sh reads IMAGE_DEV_BUILD', got)
+            packs = {'dev': {'opt_in': True, 'recipes': ['probe']}}
+            (sets / 'release.txt').write_text('ok\n')
+            (root / 'fix' / 'apply.sh').write_text('')
+            self.assertEqual(patches.dev_problems(packs, str(root), str(sets)), [])
+
+
 class Format(unittest.TestCase):
     """patches.check: patch.json keys and values, required README sections, Validation agrees with "validated",
     shipping sets select product patches only."""

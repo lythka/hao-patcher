@@ -61,6 +61,10 @@ class Ledger(unittest.TestCase):
         self.assertEqual(led[METAL]['chain'], 'chain')
         self.assertEqual(led[METAL]['signs'], 2)
         self.assertIn('chain by oclp -> a -> b', L['lint'](led, {})[0])
+        # an opt-in (dev) writer may only extend an expected chain at its end
+        self.assertEqual(L['lint'](led, {METAL: {'chain': 'chain', 'writers': ['oclp', 'a']}}, dev={'b'}), [])
+        self.assertTrue(L['lint'](led, {METAL: {'chain': 'chain', 'writers': ['oclp', 'a']}}, dev=()))
+        self.assertTrue(L['lint'](led, {METAL: {'chain': 'chain', 'writers': ['oclp', 'b']}}, dev={'a'}))
         self.assertEqual(L['lint'](led, {METAL: {'chain': 'chain', 'writers': ['oclp', 'a', 'b']}}), [])
 
     def test_two_origins_and_dead_edits(self):
@@ -166,7 +170,7 @@ class Repository(unittest.TestCase):
 
     def test_shipped_sets_have_only_expected_chains(self):
         # a new chain, or a listed one that was collapsed, means: update pipeline/ledger-expected.json on purpose.
-        # dev-bs-test (golden-gate-26B131 + dev access) has the same chains and passes with the same entries
+        # dev-bs-test (golden-gate-26B131 + pack dev) has the same chains, dev-diagnostics appended to config.plist's
         for name in ('golden-gate-26B131', 'dev-bs-test'):
             setfile = TOP / 'pipeline/sets' / (name + '.txt')
             led = L['build'](setfile, TOP / 'pipeline/targets/mbp92.json', '25G342')
