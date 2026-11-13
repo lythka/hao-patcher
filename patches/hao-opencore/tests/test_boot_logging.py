@@ -49,7 +49,7 @@ class BootLoggingTests(unittest.TestCase):
         # hao-runtime's measurement switches are dev-diagnostics' (pack dev); hao-opencore writes the same boot-args
         # in every build, IMAGE_DEV_BUILD or not.
         release = ('-lilubetaall -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 '
-                   'ic_csr_internal=1 auxKCAtBoot=false').split()
+                   'auxKCAtBoot=false').split()
         for dev in (None, '0', '1'):
             with self.subTest(dev=dev):
                 args = self.apply(self.fixture(), dev)['NVRAM']['Add'][APPLE]['boot-args'].split()
@@ -61,6 +61,19 @@ class BootLoggingTests(unittest.TestCase):
         result = self.apply(value)
         self.assertEqual(self.apply(result), result)
         self.assertEqual(result['NVRAM']['Delete'][APPLE], ['boot-args', 'bootercfg', 'bootercfg-once'])
+
+
+class DyldGate(unittest.TestCase):
+    def test_apply_refuses_a_dyld_without_the_internal_install_edit(self):
+        # the boot-arg is gone only because the image's dyld answers internalInstall() itself; apply.sh checks the
+        # same bytes hao's live patcher reads (tools/hao/src/livepatch.py DYLD_INTERNAL_EDITED)
+        import runpy
+        top = Path(__file__).resolve().parents[3]
+        edited = runpy.run_path(str(top / 'tools/hao/src/livepatch.py'))['DYLD_INTERNAL_EDITED']
+        text = (Path(__file__).resolve().parents[1] / 'apply.sh').read_text()
+        self.assertIn(edited.hex(), text)
+        self.assertLess(text.index(edited.hex()), text.index("<<'PYCONFIG'"))
+        self.assertNotIn("'ic_csr_internal=1',", SCRIPT)
 
 
 if __name__ == '__main__': unittest.main()

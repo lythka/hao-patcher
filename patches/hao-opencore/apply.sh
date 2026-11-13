@@ -41,6 +41,12 @@ ditto "$P/inputs/hao_runtime/HaoExec.kext" "$ESP/EFI/OC/Kexts/HaoExec.kext"
     "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc"
 /private/var/ssdshare/py/bin/python3.12 -I "$P/src/early_kexts.py" \
     "$SYS" "$ESP" "$P/src/early-kexts.txt"
+# The image's dyld counts as an internal install by itself (hao-runtime's replace/dyld: internalInstall() answers true),
+# so it loads OCLP's on-disk Metal roots without the ic_csr_internal boot-arg, which made every process see an
+# Apple-internal build (mobileassetd then asked Apple's internal asset server: no Spotlight, Siri or language assets).
+# Without that dyld, dropping the boot-arg would leave 27's Metal in place of OCLP's: refuse.
+/private/var/ssdshare/py/bin/python3.12 -I -c 'import sys; sys.exit(0 if bytes.fromhex("554889e5bf1000000031c00f1f0085c00f94c05dc3") in open(sys.argv[1], "rb").read() else 1)' "$SYS/usr/lib/dyld" || {
+    echo "hao-opencore: $SYS/usr/lib/dyld lacks the internalInstall edit (hao_runtime payload too old): OCLP's Metal roots would not load without ic_csr_internal" >&2; exit 1; }
 /private/var/ssdshare/py/bin/python3.12 - "$ESP/EFI/OC/config.plist" <<'PYCONFIG'
 import os,plistlib,sys
 p=sys.argv[1]
@@ -59,15 +65,13 @@ for key in ('bootercfg', 'bootercfg-once'):
 # Without it a panic reboots into the NetBoot default and the panic text stays in NVRAM (aapl,panic-info).
 # -v and startup_debug=1 (verbose text on screen, extra kernel startup logging) are off: the early-boot
 # evidence is the unified log (and, in bench images, OpenCore's file log from dev-diagnostics).
-args=[a for a in n.get('boot-args','').split() if a not in ('debug=0x100', '-v', 'startup_debug=1')]
+args=[a for a in n.get('boot-args','').split() if a not in ('debug=0x100', '-v', 'startup_debug=1', 'ic_csr_internal=1')]
 # amfi_get_out_of_my_way=1: hao gives each arm64-only program an ad-hoc signed x86_64 slice carrying the
 # program's own (Apple-private) entitlements; AMFIPass alone kills such a PID 1 (experimental sets only).
 # hao_crash: hao's crash lines (cheap, every build). The measurement switches (hao_nx_stats, hao_bridge_stats,
 # hao_diag_time) are dev-diagnostics' (pack dev): bench images only.
 for arg in ('-lilubetaall', '-pmap_pcid_disable', 'amfi_get_out_of_my_way=1',
             'hao_crash=1',
-            # IntelCommpage reports CSR_ALLOW_APPLE_INTERNAL so 27.0's dyld honours OCLP's on-disk Metal roots.
-            'ic_csr_internal=1',
             # kernelmanagerd skips the boot-time Aux KC build. 27's kmutil cannot build an x86_64 collection, so the
             # build (of the codeless AppleMobileDevice) failed at every boot and held the System KC back ~18 s.
             'auxKCAtBoot=false'):

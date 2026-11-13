@@ -70,8 +70,13 @@ and no measurement switches. Bench images add those with `dev-diagnostics` (pack
 | `-pmap_pcid_disable` | Disables PCID in the target kernel's pmap; part of the boot configuration known to work. |
 | `amfi_get_out_of_my_way=1` | `hao-runtime` signs each program's x86_64 slice ad hoc with its own entitlements, including Apple-private ones (launchd: Preboot, graftdmg, trust caches). With AMFIPass alone, AMFI rejects `/sbin/launchd` and the kernel panics. |
 | `hao_crash=1` | hao's crash lines on the console. |
-| `ic_csr_internal=1` | IntelCommpage reports `CSR_ALLOW_APPLE_INTERNAL`. 27.0's x86_64 dyld scans the disk for shared-cache overrides only when `csr_check(0x10)` succeeds, and the booter drops that bit from NVRAM; without it OCLP's on-disk Metal and MetalOld never load. |
 | `auxKCAtBoot=false` | kernelmanagerd skips building an auxiliary kernel collection at boot and loads the System collection at once. 27's kmutil cannot build an x86_64 collection ("unsupported arch: x86_64 / Unsupported collection kind"), so the build of the only candidate, 27's codeless `AppleMobileDevice.kext` (from 27's Data template), failed at every boot and held the System collection, and with it the Capri framebuffer and WindowServer, back 18.5 s (23 s on the first boot). The codeless kext's personality still loads. Details: [Aux KC gate](#aux-kc-gate). |
+
+`ic_csr_internal=1` is no longer written, and removed if present: 27's x86_64 dyld scans the disk for shared-cache
+overrides (OCLP's on-disk Metal and MetalOld) only when it counts as an internal install. It used to make IntelCommpage
+report `CSR_ALLOW_APPLE_INTERNAL` to every process, so os_variant made the whole system an Apple-internal build
+(mobileassetd asked Apple's internal asset server: no Spotlight, Siri or language assets). Now hao-runtime's dyld
+answers internalInstall() itself, and `apply.sh` refuses an image whose dyld lacks that edit.
 
 `hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1` (hao's measurement switches) are never written here: only
 `dev-diagnostics` adds them, in bench images.
@@ -166,7 +171,8 @@ must still die with VM guard flavor 13 (status 137), which shows the fix leaves 
 has a 15-second alarm. Finally load a website in Safari and scroll, navigate and reload.
 
 ## Validation
-NEEDS VALIDATION: r50 writes `Misc.Debug.Target` 0 and never the measurement switches (host tests); not built or
+NEEDS VALIDATION: r52 drops `ic_csr_internal=1` (host tests); needs a laptop boot proving OCLP's Metal still loads
+(dyld edit) and mobileassetd uses the public asset server. r50 writes `Misc.Debug.Target` 0 and never the measurement switches (host tests); not built or
 booted yet. With dev-diagnostics after it, a bench image's config.plist is unchanged (the real-config test on the
 2026-11-13 bench image passes). r48 installs the r42 IntelCommpage on 26B131. It reads its collection addresses from its own table
 at load, so the kext's bytes are new. The table equals r41's compiled values on all 12 recorded 26B131 KCs (host
@@ -183,6 +189,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r52 2026-11-13 No `ic_csr_internal=1` (removed if present): the image's dyld counts as internal itself (hao-runtime's replace/dyld, internalInstall() edit), so only dyld sees an internal install and mobileassetd uses the public asset server; `apply.sh` refuses an image whose dyld lacks the edit.
 - r51 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 43af852 (hao-runtime-26B131-20261113-43af85296aa9). No recipe change.
 - r50 2026-11-13 End-user configuration only: `Misc.Debug.Target` 0 (no OpenCore log, no file writes at boot) and no measurement switches in any build; `IMAGE_DEV_BUILD` is gone. Bench images get `hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1` and the ESP file log from the new `dev-diagnostics` recipe (pack `dev`). Edits `debug-log-to-file` (65) and `debug-log-info-lines` replaced by `no-opencore-log` (0).
 - r49 2026-11-13 A normal boot shows only the Apple logo: `Misc.Debug.AppleDebug` false, and images use the OpenCore 1.0.5 RELEASE archive (row `opencore_release`; golden-run picks it unless the assembly says `"opencore": "debug"`). The DEBUG build printed its early lines and apfs.efi's on screen.

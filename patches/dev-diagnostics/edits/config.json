@@ -19,7 +19,7 @@
      "7C436110-AB2A-4BBB-A880-FE41995C9F82",
      "boot-args"
     ],
-    "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 ic_csr_internal=1 auxKCAtBoot=false"
+    "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 -nokcmismatchpanic -pmap_pcid_disable amfi_get_out_of_my_way=1 hao_crash=1 hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 auxKCAtBoot=false"
    },
    "reason": "hao-runtime's measurement switches after hao_crash=1: hao_nx_stats and hao_bridge_stats (NX fault tables, bridge statistics) and hao_diag_time (phase lines and usage counters boot-gantt reads); they cost time on every translated native call, so only bench images carry them"
   },

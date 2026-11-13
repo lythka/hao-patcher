@@ -421,6 +421,25 @@ class ApplyRevert(Live):
         self.assertEqual([f['path'] for f in rec['needs_recovery_files']], [KEXT])
         self.assertIn(METAL, [e['path'] for e in events if e['ev'] == 'file.write'])
 
+    def test_cache_images_are_written_when_hao_dyld_is_edited(self):
+        """Without the CSR bit (no ic_csr_internal boot-arg), an installed dyld whose internalInstall() answers true
+        (hao-runtime's replace/dyld) loads roots too: the cache's Metal is written live; an unedited dyld waits."""
+        self.host.csr = 0x803
+        dyld = self.host.booted / 'usr/lib/dyld'
+        dyld.parent.mkdir(parents=True, exist_ok=True)
+        dyld.write_bytes(b'\0' * 64 + LP.DYLD_INTERNAL_EDITED + b'\0' * 64)
+        rec, events = self.apply()
+        self.assertEqual((self.host.live / METAL).read_bytes(), b'patched metal')
+        self.assertEqual([f['path'] for f in rec['needs_recovery_files']], [KEXT])
+
+    def test_unedited_dyld_without_csr_bit_keeps_cache_images_for_recovery(self):
+        self.host.csr = 0x803
+        dyld = self.host.booted / 'usr/lib/dyld'
+        dyld.parent.mkdir(parents=True, exist_ok=True)
+        dyld.write_bytes(bytes.fromhex('554889e5bf10000000e84475feff85c00f94c05dc3'))
+        rec, events = self.apply()
+        self.assertIn(METAL, [f['path'] for f in rec['needs_recovery_files']])
+
     def test_second_apply_writes_nothing(self):
         self.apply()
         self.host.reboot()

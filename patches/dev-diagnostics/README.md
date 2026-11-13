@@ -36,4 +36,6 @@ golden-gate-live-text-service's and this recipe's, applied to the base config of
 
 ## Revisions
 
+- r2 2026-11-13 The declared boot-args follow hao-opencore r52 (no ic_csr_internal=1); script unchanged.
+
 - r1 2026-11-13 The measurement boot arguments and the OpenCore file log, moved out of hao-opencore (r50) into this dev-only recipe.

@@ -219,6 +219,18 @@ CACHE_MAP_DIRS = ('System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld', 'Sy
                   'System/Library/dyld')
 CACHE_REASON = 'in the dyld shared cache (dyld maps the cache\'s copy; the installer rebuilds the cache)'
 CSR_ALLOW_APPLE_INTERNAL = 0x10
+# dyld4::SyscallDelegate::internalInstall() with its csr_check(CSR_ALLOW_APPLE_INTERNAL) call replaced by xor eax,eax
+# (hao-runtime's replace/dyld): dyld alone counts as internal and honours on-disk roots, without the ic_csr_internal
+# boot-arg that made every process see an Apple-internal build.
+DYLD_INTERNAL_EDITED = bytes.fromhex('554889e5bf1000000031c00f1f0085c00f94c05dc3')
+
+
+def dyld_honours_roots(dyld):
+    """Whether the dyld at DYLD carries the internalInstall edit (False when it is missing or unreadable)."""
+    try:
+        return DYLD_INTERNAL_EDITED in Path(dyld).read_bytes()
+    except OSError:
+        return False
 
 
 class Classifier:
@@ -226,8 +238,9 @@ class Classifier:
     cache as the .map files beside the caches under BOOTED (the running system's root) list it.
 
     CACHE_ROOTS: dyld on this system loads a file at a cache image's path instead of the cache's copy (an on-disk
-    root). macOS dyld looks for such roots only when csr_check(CSR_ALLOW_APPLE_INTERNAL) succeeds, which hao's images
-    arrange (IntelCommpage's ic_csr_internal=1; it is how OCLP's Metal wrapper and MetalOld replace 27's Metal). Then
+    root). macOS dyld looks for such roots only when it counts as an internal install: hao's dyld is edited to (see
+    dyld_honours_roots), and older images make csr_check(CSR_ALLOW_APPLE_INTERNAL) succeed for every process
+    (IntelCommpage's ic_csr_internal=1). It is how OCLP's Metal wrapper and MetalOld replace 27's Metal. Then
     a cache image is written live like any other file: each process loads the new file when it next starts."""
 
     def __init__(self, booted=None, cache_roots=False):
