@@ -274,8 +274,11 @@ class Compare(unittest.TestCase):
 
     def test_kinds(self):
         ident, rec = 'usr/lib/hao/native-identities', 'System/Library/CoreServices/golden-gate-native-identities.json'
-        record = lambda o, w: json.dumps({'rows': [{'path': 'p', 'observed': o, 'reference': 'ref1'}],
-                                          'sources': ['/tmp/x' + o], 'list_sha256': o, 'skipped': {'q': w}}).encode()
+        tmp = lambda o: '/private/var/tmp/native-identities.' + o + 'Q1/fs'       # kc-hook.sh's mktemp, per build
+        record = lambda o, w: json.dumps({'rows': [{'path': 'p', 'observed': o, 'reference': 'ref1',
+                                                    'source': tmp(o) + '/p'}],
+                                          'sources': [tmp(o)], 'list_sha256': o,
+                                          'skipped': {'q': tmp(o) + ': ' + w}}).encode()
         a_root, a = self.tree('hook', {'same': b'x', 'content': b'a', 'noisy': b'1', 'gone': b'g', ident:
                                        b'# list\naaaa  ref1  x86_64  usr/lib/hao/originals/p\n', 'link': ('l', 'x'),
                                        rec: record('aaaa', 'why'), 'rec2.json': record('aaaa', 'why')})

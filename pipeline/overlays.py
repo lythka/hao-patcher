@@ -36,6 +36,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import sys
@@ -50,6 +51,9 @@ MACHO = (b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe', b'\xca\xfe\xba\xbf')
 DERIVED_COLUMNS = {'usr/lib/hao/native-identities': 0}     # column keyed on installed CDHashes (observed)
 # golden-gate-native-identities' record: the same rows, keyed on installed CDHashes, made in a temporary folder
 DERIVED_KEYS = {'System/Library/CoreServices/golden-gate-native-identities.json': ('observed', 'list_sha256', 'sources')}
+# ... whose temporary folder (kc-hook.sh's mktemp) also appears inside each row's "source" and the skip reasons
+DERIVED_TEMP = {'System/Library/CoreServices/golden-gate-native-identities.json':
+                re.compile(rb'/private/var/tmp/native-identities\.[A-Za-z0-9]+')}
 
 
 class PlanError(ValueError):
@@ -317,6 +321,8 @@ def _derived(path, a, b):
     if path in DERIVED_COLUMNS:
         return _masked(a, DERIVED_COLUMNS[path]) == _masked(b, DERIVED_COLUMNS[path])
     if path in DERIVED_KEYS:
+        if path in DERIVED_TEMP:
+            a, b = (DERIVED_TEMP[path].sub(b'TEMP', x) for x in (a, b))
         x = _without(a, DERIVED_KEYS[path])
         return x is not None and x == _without(b, DERIVED_KEYS[path])
     return False
