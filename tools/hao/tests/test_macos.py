@@ -330,7 +330,7 @@ class ApplyRevert(Live):
             [SNAP, '-s', pre, '-v', MNT],
             [MAC.DISKUTIL, 'apfs', 'listSnapshots', '-plist', 'disk1s5'],
             [MAC.DISKUTIL, 'apfs', 'listSnapshots', '-plist', 'disk1s5'],
-            [MAC.BLESS, '--mount', MNT, '--create-snapshot'],
+            [MAC.BLESS, '--folder', MNT + '/System/Library/CoreServices', '--bootefi', '--create-snapshot'],
             [MAC.DISKUTIL, 'apfs', 'listSnapshots', '-plist', 'disk1s5'],
             [MAC.UMOUNT, MNT],
             [MAC.LSOF, '-n', '-P', '-w', '-d', 'txt', '-F', 'pcn'],
@@ -403,9 +403,10 @@ class ApplyRevert(Live):
             'com.apple.bless.') and s['SnapshotName'] != BOOTED]
         self.new_calls()
         rec, events = self.revert()
-        self.assertIn([MAC.BLESS, '--mount', MNT, '--create-snapshot'], self.new_calls())
+        self.assertIn([MAC.BLESS, '--folder', MNT + '/System/Library/CoreServices', '--bootefi', '--create-snapshot'],
+                      self.new_calls())
         self.assertEqual(rec['reverted_to']['kind'], 'new')
-        self.assertIn('neither the booted nor the hao-pre snapshot', [e for e in events if e['ev'] == 'warning'][0]['text'])
+        self.assertIn('could not be made the boot snapshot', [e for e in events if e['ev'] == 'warning'][0]['text'])
         self.host.reboot()
         self.assertEqual((self.host.booted / ASCII).read_bytes(), b'ascii table\n')
 
@@ -462,19 +463,24 @@ class Rollback(Live):
         self.assertFalse(any(c[0] == MAC.BLESS for c in self.host.calls))
         self.assertEqual(LP.records(self.state)[0]['state'], 'rolled-back')
 
-    def test_a_revert_cut_short_can_be_run_again(self):
+    def test_a_refused_root_to_boots_a_new_snapshot_of_the_restored_volume(self):
+        # laptop 2026-11-12: apfs_systemsnapshot needs an entitlement root lacks (-s was refused there)
         self.apply()
         self.host.reboot()
         self.host.fail = lambda argv: (1, 'fs_snapshot_root failed') if argv[:2] == [SNAP, '-r'] else None
-        with self.assertRaisesRegex(LP.PatchError, 'fs_snapshot_root failed'):
-            self.revert()
-        self.assertEqual(self.host.calls[-1], [MAC.UMOUNT, MNT])
-        self.assertEqual(LP.records(self.state)[0]['state'], 'applied')      # files back, boot snapshot not yet
-        self.host.fail = lambda argv: None
         rec, _ = self.revert()
-        self.assertEqual((rec['state'], rec['snapshot_reverted_to']), ('reverted', BOOTED))
+        self.assertEqual(rec['state'], 'reverted')
+        self.assertNotEqual(rec['snapshot_reverted_to'], BOOTED)
+        self.assertTrue(any(c[0] == MAC.BLESS for c in self.host.calls))
         self.host.reboot()
         self.assertEqual((self.host.booted / ASCII).read_bytes(), b'ascii table\n')
+
+    def test_a_refused_pre_snapshot_still_patches(self):
+        self.host.fail = lambda argv: (255, 'fs_snapshot_create: Operation not permitted') if argv[:2] == [SNAP, '-s'] else None
+        rec, events = self.apply()
+        self.assertEqual(rec['state'], 'applied')
+        self.assertIsNone(rec.get('snapshot_pre'))
+        self.assertTrue(any(e.get('ev') == 'warning' and 'no named snapshot' in e.get('text', '') for e in events))
 
     def test_no_lsof_still_records_the_patch(self):
         self.host.fail = lambda argv: (1, 'lsof: not found') if argv[0] == MAC.LSOF else None

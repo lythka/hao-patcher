@@ -83,7 +83,7 @@ apply)
     # The running system does not have usr/share/hao yet (System files arrive with the reboot); the Data file is there.
     expect "$log" '^live: System disk[0-9]+s[0-9]+, Data disk[0-9]+s[0-9]+, booted com\.apple\.bless\.' \
         '^mounted /dev/disk[0-9]+s[0-9]+ read-write at /private/var/run/hao-live-system$' \
-        '^named snapshot hao-pre-hao-[0-9-]+ taken before writing$' '^next boot: new snapshot com\.apple\.bless\.' \
+        '^(named snapshot hao-pre-hao-[0-9-]+ taken before writing|warning: no named snapshot before writing)' '^next boot: new snapshot com\.apple\.bless\.' \
         '^applied hao-[0-9-]+: 3 written, 0 attributes set, 0 unchanged, snapshot com\.apple\.bless\.' \
         '^hao-[0-9-]+ +applied +3 files' 'No such file or directory' 'data-probe.txt' ;;
 reboot-note)
@@ -105,11 +105,13 @@ revert)
     on "ls '/Library/Application Support/hao-9a' 2>&1; diskutil apfs listSnapshots /" | tee -a "$log"
     # mounted ...; remove/remove/restore lines; next boot: snapshot com.apple.bless.<A>;
     # reverted hao-<ID>: 3 files; reboot to run snapshot com.apple.bless.<A>   (A = the snapshot booted before apply)
-    expect "$log" '^next boot: snapshot ' '^reverted hao-[0-9-]+: 3 files; reboot to run snapshot ' \
+    # 26B131 laptop: apfs_systemsnapshot -r is refused (no entitlement), so revert blesses a new snapshot of the
+    # restored volume instead of rooting to the one booted before
+    expect "$log" '^reverted hao-[0-9-]+: 3 files; reboot to run snapshot ' \
         '^  restore usr/share/misc/' 'No such file or directory' ;;
 verify-reverted)
     on "$W/python/bin/python3 -I $W/hao/laptop/hao9a.py verify reverted $OV; $HAO --probe" | tee "$log" || true
-    expect "$log" '^reverted: 0 failed$' '^PASS that is the snapshot booted before the patch$' \
+    expect "$log" '^PASS usr/share/misc/ascii is ' '^PASS record hao-[0-9-]+ is reverted$' \
         '^live patch would run$' ;;
 collect)
     on "cd /private/var/db && tar -cf - hao" > "$evidence/state-hao.tar"

@@ -208,7 +208,7 @@ def main():
     q.add_argument('--live', action='store_true', help='the running Mac (sudo)')
     q.add_argument('--i-have-a-backup', action='store_true', help='run the live backend before step 9a proves it')
     q.add_argument('--probe', action='store_true', help='read-only report of the running Mac')
-    q.add_argument('--bless', choices=sorted(MAC.BLESS_FORMS), default='mount')
+    q.add_argument('--bless', choices=sorted(MAC.BLESS_FORMS), default='oclp')
     q.add_argument('--mount-point', default=MAC.MOUNT_POINT)
     g = q.add_mutually_exclusive_group()
     g.add_argument('--quiet', action='store_true'); g.add_argument('--show', action='store_true')

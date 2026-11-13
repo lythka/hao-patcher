@@ -101,8 +101,8 @@ def verify(phase, out):
                 (rec.get('reverted_to') or {}).get('name'), (rec.get('reverted_to') or {}).get('kind')))
             check(booted == (rec.get('snapshot_booted') or {}).get('name'),
                   'that is the snapshot booted before the patch')
-        snaps = plistlib.loads(subprocess.run(['/usr/sbin/diskutil', 'apfs', 'listSnapshots', '-plist',
-                                               rec['system_device']], capture_output=True, check=True).stdout)
+        snaps = plistlib.loads(subprocess.run(['/usr/sbin/diskutil', 'apfs', 'listSnapshots', '-plist', '/'],
+                                              capture_output=True, check=True).stdout)   # needs a mount point
         names = [s.get('SnapshotName') for s in snaps.get('Snapshots', [])]
         for kind in ('snapshot_booted', 'snapshot_pre'):
             name = (rec.get(kind) or {}).get('name')

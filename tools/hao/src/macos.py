@@ -48,6 +48,8 @@ DATA_PREFIX = '/System/Volumes/Data'                 # how the kernel may report
 CSR_ALLOW_UNRESTRICTED_FS = 0x2
 CSR_ALLOW_UNAUTHENTICATED_ROOT = 0x800
 PRE = 'hao-pre-'
+# Default 'oclp': on Intel, bless refuses snapshot options without --bootefi (laptop 2026-11-12: "Can't use snapshot
+# options without --bootefi").
 BLESS_FORMS = {
     'mount': lambda mnt: [BLESS, '--mount', mnt, '--create-snapshot'],
     'oclp': lambda mnt: [BLESS, '--folder', mnt + '/System/Library/CoreServices', '--bootefi', '--create-snapshot'],
@@ -135,10 +137,19 @@ def mounts(host):
     return out
 
 
-def snapshots(host, device):
+def snapshots(host, device, mount=None):
+    """The snapshots of the APFS volume DEVICE. diskutil only lists them for a volume with a mount point (laptop,
+    2026-11-12: `listSnapshots disk1s2` fails with -69854 "A disk with a mount point is required" for the booted
+    System volume, whose snapshot, not the volume, is mounted at /), so MOUNT (e.g. "/") is asked when DEVICE fails."""
+    try:
+        listing = _plist(host, DISKUTIL, 'apfs', 'listSnapshots', '-plist', device)
+    except Exception:
+        if not mount:
+            raise
+        listing = _plist(host, DISKUTIL, 'apfs', 'listSnapshots', '-plist', mount)
     return [{'name': s.get('SnapshotName'), 'uuid': s.get('SnapshotUUID'), 'xid': s.get('SnapshotXID'),
              'root_to': s.get('RootTo'), 'revert_to': s.get('RevertTo'), 'purgeable': s.get('Purgeable')}
-            for s in _plist(host, DISKUTIL, 'apfs', 'listSnapshots', '-plist', device).get('Snapshots', [])]
+            for s in listing.get('Snapshots', [])]
 
 
 def boot_time(host):
@@ -176,7 +187,10 @@ def discover(host):
         (systems if 'System' in roles else datas).append((v, info))
     found = []
     for v, info in systems:
-        snaps = snapshots(host, v['DeviceIdentifier'])
+        try:   # "/" is the booted snapshot of exactly one System volume: only that one may answer through it
+            snaps = snapshots(host, v['DeviceIdentifier'], '/' if len(systems) == 1 else None)
+        except Exception:
+            continue
         if any(s['uuid'] == f['booted']['uuid'] for s in snaps):
             found.append((v, info, snaps))
     if len(found) != 1:
@@ -257,7 +271,7 @@ class MacOSLiveBackend(LP.DirectoryBackend):
     record_noop = False                 # nothing to write: no mount, no snapshot, no record
     separate_write_volume = True        # the plan is made from / and checked again on the mounted volume
 
-    def __init__(self, host=None, *, acknowledged=False, mount_point=MOUNT_POINT, bless='mount'):
+    def __init__(self, host=None, *, acknowledged=False, mount_point=MOUNT_POINT, bless='oclp'):
         super().__init__()
         if bless not in BLESS_FORMS:
             raise LP.PatchError('--bless is one of %s' % ', '.join(BLESS_FORMS))
@@ -360,17 +374,31 @@ class MacOSLiveBackend(LP.DirectoryBackend):
 
     # ---- snapshots
     def _snapshots(self):
-        return snapshots(self.host, self.facts['system']['device'])
+        return snapshots(self.host, self.facts['system']['device'], '/')
 
     def _root_to(self, name):
-        self.host.run([APFS_SYSTEMSNAPSHOT, '-r', name, '-v', self.mount_point])
+        """Tag NAME to root from on the next boot; False when the system refuses (apfs_systemsnapshot needs an
+        entitlement root may lack, as -s does on the laptop)."""
+        r = self.host.run([APFS_SYSTEMSNAPSHOT, '-r', name, '-v', self.mount_point], check=False)
+        if r.returncode:
+            self.emit({'ev': 'warning', 'text': 'apfs_systemsnapshot -r %s refused: %s' % (name, _text(r).strip())})
+            return False
         s = next((s for s in self._snapshots() if s['name'] == name), None)
         if s is not None and s['root_to'] is False:
             self.emit({'ev': 'warning', 'text': 'listSnapshots does not show %s as RootTo after tagging it' % name})
+        return True
 
     def before_write(self, patch_id):
+        """A named snapshot before writing, when the system allows it. On the laptop (2026-11-12, 26B131, csr
+        0x813) apfs_systemsnapshot -s fails "fs_snapshot_create: Operation not permitted" (it needs an entitlement
+        root lacks), so it is best effort: revert then roots to the snapshot booted before, or blesses a new
+        snapshot of the restored volume."""
         name = PRE + patch_id
-        self.host.run([APFS_SYSTEMSNAPSHOT, '-s', name, '-v', self.mount_point])
+        r = self.host.run([APFS_SYSTEMSNAPSHOT, '-s', name, '-v', self.mount_point], check=False)
+        if r.returncode:
+            self.emit({'ev': 'warning', 'text': 'no named snapshot before writing (%s); revert will use the booted '
+                       'snapshot or a new one of the restored volume' % _text(r).strip().splitlines()[0]})
+            return None
         s = next((s for s in self._snapshots() if s['name'] == name), None)
         if s is None:
             raise LP.PatchError('apfs_systemsnapshot -s %s succeeded but listSnapshots does not list it' % name)
@@ -429,15 +457,16 @@ class MacOSLiveBackend(LP.DirectoryBackend):
         for kind in ('snapshot_booted', 'snapshot_pre'):
             name = (record.get(kind) or {}).get('name')
             if name and name in names:
-                self._root_to(name)
+                if not self._root_to(name):
+                    break          # refused: boot a new snapshot of the restored volume instead
                 self.reverted_to = {'name': name, 'kind': kind}
                 self.emit({'ev': 'snapshot', 'kind': 'root-to', 'name': name})
                 return name
         s = self._bless()          # neither survived: boot a new snapshot of the restored volume
         name = s['name'] if s else None
         self.reverted_to = {'name': name, 'kind': 'new'}
-        self.emit({'ev': 'warning', 'text': 'neither the booted nor the hao-pre snapshot of %s exists: booting a new '
-                   'snapshot (%s) of the restored volume' % (record['id'], name)})
+        self.emit({'ev': 'warning', 'text': 'the snapshot booted before %s could not be made the boot snapshot (gone, '
+                   'or root-to refused): booting a new snapshot (%s) of the restored volume' % (record['id'], name)})
         return name
 
     def after_revert(self, record):
