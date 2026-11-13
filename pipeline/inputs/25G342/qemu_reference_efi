@@ -1,2 +1,2 @@
 # OVMF/OpenCore EFI tree for QEMU, the base of tools/kernel-foundation vm-esp --reference.
-- store/inputs/qemu-reference-20261022
+989cb8718de9fa88ef443b06a4a2d735c4b47c622e736b42bbc215f1d1ecbdef store/inputs/qemu-reference-20261022

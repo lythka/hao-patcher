@@ -43,7 +43,11 @@ class RowShapes(unittest.TestCase):
         for row, scripts in rows_read_as_folders().items():
             for f in row_files(row):
                 lines = [l for l in open(f).read().splitlines() if l.strip() and not l.lstrip().startswith('#')]
-                if lines and not lines[0].startswith('- '):
+                # a folder row: '- PATH', or a sealed folder row (its sha256 is the folder's content hash), whose
+                # PATH is a folder; a row whose PATH is a file stages that file as inputs/ROW
+                parts = lines[0].split() if lines else []
+                target = os.path.join(TOP, os.path.expanduser(parts[1])) if len(parts) > 1 else ''
+                if lines and not lines[0].startswith('- ') and not os.path.isdir(target) and os.path.exists(target):
                     bad.append('%s: %s (a file row) but %s read files inside it'
                                % (os.path.relpath(f, TOP), lines[0][:80], ', '.join(scripts)))
         self.assertEqual(bad, [])

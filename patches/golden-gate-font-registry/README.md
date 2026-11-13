@@ -37,6 +37,7 @@ the earlier Tahoe image project): that fontd adopts a seeded registry without a 
 r2 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r1's, so the result above stands.
 
 ## Revisions
+- r6 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged; validated_digest carried forward for that reason.
 - r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) for pipeline/materialize.py; the hook is unchanged.
 - r4 2026-11-12 Declare the installed files in patch.json `files` (whole files from the row; test derives them from the artifact manifest); the hook is unchanged.
 - r3 2026-11-11 Row `font_registry_golden_gate` (26B131) now names the pack from the 4d1c48c laptop harvest. No recipe change.

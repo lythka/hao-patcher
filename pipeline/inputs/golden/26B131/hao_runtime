@@ -3,4 +3,4 @@
 # Units u4.1; libhao 6DC78A24; 965 AOT caches. Adds since 43af852: gssd fix (os_log_set_client_type not applied, 2fad084)
 # and fatal fault reports on their own 256 KB stack (6394002). Since 0a2c2aa also lazy AOT and usage lines.
 # check: payload os_build=26B131 layout_version=1 manifest_sha256=8135b4aa23f9cd4abd8c7e24bed176956eb45bdaa855137ffa2eaa7d16eb7e24
-- store/artifacts/hao-runtime-26B131-20261113-397b2675d037/payload
+cb906b4b4aa1a59f36f76f6e127d639631a15f97228626caba19811fe6b43a9b store/artifacts/hao-runtime-26B131-20261113-397b2675d037/payload

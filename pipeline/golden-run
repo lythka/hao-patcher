@@ -33,6 +33,21 @@ GUEST = '/private/var/ssdshare'
 KIT = runpy.run_path(str(TOP/'pipeline/kit.py'))
 
 
+def source_identity():
+    """{commit, dirty} of this checkout: from git, or on a Mac without git from TOP/.hao-source (written when the
+    source archive was fetched: {"commit": ..., "source": URL}); dirty is then None (unknown)."""
+    try:
+        commit=subprocess.run(['git','-C',str(TOP),'rev-parse','HEAD'],capture_output=True,text=True,check=True).stdout.strip()
+        dirty=bool(subprocess.run(['git','-C',str(TOP),'status','--porcelain'],capture_output=True,text=True,check=True).stdout)
+        return dict(commit=commit,dirty=dirty)
+    except (OSError,subprocess.CalledProcessError):
+        marker=TOP/'.hao-source'
+        if marker.is_file():
+            data=json.loads(marker.read_text())
+            return dict(commit=data['commit'],dirty=None,source=data.get('source'))
+        raise SystemExit('golden-run: no git and no .hao-source: cannot say which source this build is from')
+
+
 def opencore_row_of(recipe):
     """The OpenCore archive row: RELEASE by default (a normal boot shows no OpenCore text; owner 2026-11-13), DEBUG
     only when the assembly says "opencore": "debug" (diagnosis: early OpenCore lines on screen, full ESP log)."""
@@ -333,8 +348,7 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
     state=dict(unit='pipeline',operation='golden-first',recipe=recipe,recipe_sha256=digest(recipe_path),
                workspace=str(TOP),work=str(work),repository=str(repository) if repository else None,guest_local=local,
                guest_workspace=dict(workspace,image=str(workspace_image)),
-               commit=subprocess.check_output(['git','-C',str(TOP),'rev-parse','HEAD'],text=True).strip(),
-               dirty=bool(subprocess.check_output(['git','-C',str(TOP),'status','--porcelain'],text=True)),
+               **source_identity(),
                status='staging',validation='BUILD ONLY; QEMU/native/fresh-install acceptance remains separate')
     shutil.copy2(recipe_path,record/'assembly.json')
     write(record/'build.json',state)

@@ -1,2 +1,2 @@
 # Kernel repair binding profile (schema 2: only members the repairs use must match), from tools/kernel-fixes inputs.
-- store/artifacts/kernel-repair-binding-26A428-20261110-schema2
+1f13e4fcae40ab72522421afcb3694ac4f1c2eb98cd6c8359aa0f5bfe7e42289 store/artifacts/kernel-repair-binding-26A428-20261110-schema2

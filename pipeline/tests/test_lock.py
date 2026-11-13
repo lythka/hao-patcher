@@ -107,6 +107,53 @@ class Lock(unittest.TestCase):
         self.assertEqual(lock('psp', self.d / 'oclp').stdout.strip(), '2.0.2')
 
 
+    def tree(self):
+        t = self.d / 'tree'; (t / 'sub').mkdir(parents=True)
+        (t / 'a').write_bytes(b'abc'); (t / 'sub' / 'b').write_bytes(b'def'); os.symlink('a', t / 'ln')
+        return t
+
+    def test_folder_row_is_checked_by_content(self):
+        t = self.tree()
+        h = lock('hash', t).stdout.strip()
+        self.assertRegex(h, '^[0-9a-f]{64}$')
+        p = self.write('tree %s %s\n' % (h, t))
+        self.assertEqual(lock('path', p, 'tree').stdout.strip(), str(t))
+        for change in (lambda: (t / 'sub' / 'b').write_bytes(b'xyz'),     # content
+                       lambda: os.chmod(t / 'a', 0o755),                  # mode
+                       lambda: (t / 'sub' / 'new').write_bytes(b''),      # added file
+                       lambda: os.rename(t / 'ln', t / 'ln2')):           # name
+            change()
+            r = lock('path', p, 'tree'); self.assertNotEqual(r.returncode, 0, change); self.assertIn('is not', r.stderr)
+            h2 = lock('hash', t).stdout.strip(); self.assertNotEqual(h2, h)
+            p = self.write('tree %s %s\n' % (h2, t)); h = h2
+
+    def test_hashed_row_that_is_missing_stops(self):
+        r = lock('path', self.write('tree %s %s\n' % ('0' * 64, self.d / 'gone')), 'tree')
+        self.assertNotEqual(r.returncode, 0); self.assertIn('is not there', r.stderr)
+
+    def test_seal_writes_the_hash_and_keeps_comments(self):
+        t = self.tree(); d = self.d / 'lockdir'; d.mkdir()
+        (d / 'tree').write_text('# made by x\n- %s   # note\n' % t)
+        r = lock('seal', d, 'tree'); self.assertEqual(r.returncode, 0, r.stderr)
+        h = lock('hash', t).stdout.strip()
+        self.assertEqual((d / 'tree').read_text(), '# made by x\n%s %s   # note\n' % (h, t))
+        self.assertEqual(lock('path', d, 'tree').stdout.strip(), str(t))
+        r = lock('seal', d, 'tree'); self.assertNotEqual(r.returncode, 0); self.assertIn('already', r.stderr)
+
+    def test_store_rows_carry_a_hash(self):
+        """A row under store/ names what it holds by sha256 (a folder's content_sha256), so a build record and a
+        release say what was built and every read checks it; '-' is only for a file of this checkout (the commit pins
+        it) or a row whose artifact is not made yet (its path does not exist, so no build can read it)."""
+        L = __import__('runpy').run_path(str(TOP / 'pipeline/lock.py'))
+        bad = []
+        for d, _, files in os.walk(TOP / 'pipeline/inputs'):
+            if files:
+                for name, (sha, p) in L['rows'](d).items():
+                    if sha == '-' and not L['in_checkout'](p) and os.path.exists(p):
+                        bad.append('%s/%s' % (os.path.relpath(d, TOP), name))
+        self.assertEqual(bad, [], 'seal with: python3.14 -I pipeline/lock.py seal LOCK NAME')
+
+
 class Key(unittest.TestCase):
     """lock.py key: cache keys of what the inputs are, not of where the store is or of row comments."""
     def setUp(self):

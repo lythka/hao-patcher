@@ -46,6 +46,7 @@ DISK_STEPS = ('Lay out the disk', 'Copy macOS', 'Add Intel support from Tahoe', 
               'Make it bootable')
 STEPS = {
     'build-image': ('Prepare packs', 'Assemble in the builder VM', 'Commit the image'),
+    'build-image-here': ('Prepare the kit', 'Assemble the image on this Mac', 'Keep the reusable parts'),
     'build-disk': HOST_STEPS + DISK_STEPS,
     'create-installer': HOST_STEPS + ('Write the USB stick',),
     'install': DISK_STEPS,
@@ -60,6 +61,7 @@ DISK_DETAIL = {
     'Seal': 'cryptex container and seal, snapshot',
     'Make it bootable': 'OpenCore to the EFI partition, bless',
 }
+HERE_STEPS = ('Prepare the kit', 'Assemble the image on this Mac', 'Keep the reusable parts')
 NOT_WIRED = 'writing the USB stick (its Recovery, launcher and kit partition) is not built yet'
 BUILDS = Path.home() / 'Library' / 'Caches' / 'hao' / 'builds'
 AMFI_RELAXED = re.compile(r'(^|\s)(amfi_get_out_of_my_way=(1|0x1)|amfi=0x80)(\s|$)')
@@ -248,7 +250,7 @@ def use_assets(a, c, path):
     else:
         store.symlink_to(folder)
         c.item('store  -> %s' % folder, 'files')
-    problems = ASSETS.check(path, folder)
+    problems = ASSETS.check(path, folder, here=bool(getattr(a, 'here', False)))
     for p in problems:
         c.item(p, 'quiet', ev='asset.problem', problem=p)
     if problems:
@@ -268,10 +270,63 @@ def export_image(a, c, repo, run=subprocess.call):
     c.item('raw image  %s' % out, 'steps', ok=True)
 
 
-def build_image(a, c, run=subprocess.call):
+def build_image_here(a, c, host, path, groups, run=subprocess.call):
+    """build-image --here: no builder VM. Stage the kit, assemble it on this Mac into a raw image file, keep the sealed
+    cryptex images for the next build; the image file is the result (REPO is then the .img path). The Mac needs what
+    the VM gives the assembly (root, SIP's filesystem protection off, AMFI relaxed): an Intel Mac booted from the hao
+    installer or a hao image, as the North Star's "same assembler against a raw image"."""
+    out = Path(a.out).expanduser().resolve()
+    if out.exists():
+        raise Stopped('%s exists' % out, options=['name a new image file'], untouched='nothing was built')
+    why = environment_refusal(host)
+    if why:
+        raise Stopped('this Mac cannot assemble an image: %s' % why,
+                      why='the build formats APFS and makes firmlinks, which macOS allows only with System Integrity '
+                          'Protection and AMFI relaxed, as in the installer\'s Recovery or a hao image',
+                      options=['run it as root on a Mac started from the hao installer or a hao image',
+                               'or build in the builder VM on an Apple silicon Mac (without --here)'],
+                      untouched='nothing was built')
+    steps = HERE_STEPS
+    c.steps(len(steps))
+    work = Path(getattr(a, 'work', None) or BUILDS / datetime.datetime.now().strftime('%Y%m%d-%H%M%S')).resolve()
+    # the build's scripts call python3: this Python (the bundled CPython on a Mac without developer tools)
+    os.environ['PATH'] = str(Path(sys.executable).parent) + os.pathsep + os.environ.get('PATH', '')
+    record = work / 'record'
+    golden = str(TOP / 'pipeline' / 'golden-run')
+    c.step(steps[0])
+    cmd = [sys.executable, '-I', golden, str(path), '--stage-kit', '--work', str(work / 'stage'), '--record', str(record)]
+    c.event('command', argv=cmd)
+    if run(cmd):
+        raise Stopped('preparing the kit failed', options=['the record is in %s' % record], untouched='nothing was built')
+    kit = work / 'stage' / 'share'
+    local = work / 'local'
+    c.step(steps[1])
+    cmd = ['sh', str(kit / 'assembly-source' / 'golden-assemble.sh'), str(kit), str(local)]
+    c.event('command', argv=cmd)
+    rc = run(cmd)
+    if rc:
+        raise Stopped('assembling the image failed (exit %d)' % rc,
+                      options=['the assembler\'s record and logs: %s' % (local / 'work')])
+    c.step(steps[2])
+    if run([sys.executable, '-I', golden, '--collect-kit', str(record)]):
+        c.warning('the sealed cryptex images were not kept for reuse; the next build makes them again')
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if run(['mv', str(local / 'target.img'), str(out)]):
+        raise Stopped('moving the image to %s failed' % out, options=['it is at %s' % (local / 'target.img')])
+    c.done('image built: %s' % out, image=str(out), record=str(record))
+    return 0
+
+
+def build_image(a, c, run=subprocess.call, host=None):
     profile, path, asm, groups = resolve(a, c, 'build-image')
     if getattr(a, 'assets', None):
         use_assets(a, c, path)
+    if getattr(a, 'here', False):
+        if a.dry_run:
+            show_steps(c, 'build-image-here', groups)
+            c.done('dry run: nothing built')
+            return 0
+        return build_image_here(a, c, host or MAC.SystemHost(), path, groups, run)
     patches = runpy.run_path(str(TOP / 'pipeline' / 'patches.py'))
     full = _quiet(patches['detect_packs'], str(TOP / 'pipeline/targets' / (asm['target'] + '.json')))
     if sorted(full) != sorted(profile['packs']):

@@ -29,7 +29,8 @@
         APFS clones; the stand-in for hao fetch plus the on-Mac producers until those run from the downloads
   hao assets check DIR (--model M)                            every input present with its pinned hash
         build-image --assets DIR links a fresh clone's store to DIR and checks it first; --export FILE also writes
-        the committed image as one raw disk image file
+        the committed image as one raw disk image file; --here builds on this Mac without the builder VM (an Intel
+        Mac started from hao: root, SIP and AMFI relaxed) straight into the raw image file REPO.img
   hao build-disk /dev/diskN (--model M | --profile F) [--kit KIT] [--work DIR] [--local DIR] [--dry-run]
         [--confirm diskN]   (sudo; an external SSD) stage the kit (or take KIT) and build macOS 27 onto the disk
   hao install /dev/diskN --kit KIT [--profile F] [--local DIR] [--dry-run] [--confirm ERASE]
@@ -394,7 +395,11 @@ def main():
     q.add_argument('--allow-unresolved-swaps', action='store_true', help='build although live swaps are unresolved')
     q.add_argument('--assets', help='the assets folder (every input, laid out as the store); a fresh clone builds from it')
     q.add_argument('--export', help='also write the committed image as one raw disk image FILE')
-    q.set_defaults(fn=guarded(lambda a, c: BUILD.build_image(a, c)))
+    q.add_argument('--here', action='store_true',
+                   help='no builder VM: stage the kit and assemble on this Mac into the raw image file REPO (.img); '
+                        'needs root, SIP filesystem protection off and AMFI relaxed (a Mac started from hao)')
+    q.add_argument('--work', help='--here: build folder (default ~/Library/Caches/hao/builds/DATE)')
+    q.set_defaults(fn=guarded(lambda a, c: BUILD.build_image(a, c, host=MAC.SystemHost())))
     q = sub.add_parser('assets', help='the assets folder a fresh clone builds from')
     q.add_argument('op', choices=['make', 'check']); q.add_argument('folder')
     q.add_argument('--store', help='make: the store to take the inputs from (default this checkout\'s)')

@@ -75,6 +75,7 @@ Photos' Live Text was never seen working. Not yet built into an image or booted 
 
 ## Revisions
 
+- r6 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on libhelloblur), as the hook sets them, so overlays carry them; the hook is unchanged.
 - r4 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) for pipeline/materialize.py; the hook is unchanged.
 - r3 2026-11-12 Declare the runtime files and the libhelloblur load command in edits/libhelloblur.json; the hook is unchanged.

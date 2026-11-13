@@ -1,7 +1,9 @@
 #!/usr/bin/python3 -I
 """lock.py: read inputs locks and target files (plain data) for the pipeline's shell stages.
 
-  lock.py path LOCK NAME          the row's path; a row with a sha256 is checked against the file
+  lock.py path LOCK NAME          the row's path; a row with a sha256 is checked against the file or folder
+  lock.py hash PATH               a row's sha256 for PATH: a file's sha256, or a folder's content_sha256
+  lock.py seal LOCK NAME          give the '- PATH' row NAME in folder LOCK the sha256 of what PATH holds now
                                   (LOCK may be a target .json: NAME is then a key holding {"path", "sha256"})
   lock.py target TARGET KEY       a value from targets/<model>.json (dotted KEY; objects print as JSON)
   lock.py kdk-name DMG            Kernel_Debug_Kit_26.7.2_build_25G330.dmg -> KDK_26.7.2_25G330.kdk
@@ -25,7 +27,7 @@ except `# check: KIND key=value ...` (see checks: a folder row checked by its ow
 single file of `NAME SHA256-or-- PATH` rows is also read (tests, one-off locks). PATH may start with ~; a relative
 PATH (`store/...`, `patches/...`) is relative to the repository root.
 """
-import hashlib, json, os, re, sys
+import hashlib, json, os, re, stat, sys
 
 TOP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -109,13 +111,67 @@ def check_row(lock, name, p):
     return bad
 
 
+def content_sha256(top):
+    """sha256 over a folder: one line per entry in sorted walk order (relative name, permission bits, and the file's
+    sha256, the link's target text, or 'dir'). Ownership and times are left out: the builder stages as root."""
+    h = hashlib.sha256()
+    for d, dirs, files in os.walk(top):
+        dirs.sort()
+        for f in sorted(files + dirs):
+            p = os.path.join(d, f)
+            st = os.lstat(p)
+            if stat.S_ISLNK(st.st_mode):
+                body = 'link ' + os.readlink(p)
+            elif stat.S_ISDIR(st.st_mode):
+                body = 'dir'
+            elif stat.S_ISREG(st.st_mode):
+                body = 'file ' + sha256(p)
+            else:
+                sys.exit('%s: not a file, folder or symlink' % p)
+            h.update(('%s %04o %s\n' % (os.path.relpath(p, top), stat.S_IMODE(st.st_mode), body)).encode())
+    return h.hexdigest()
+
+
+def row_sha256(p):
+    """What a row's sha256 column says about PATH: the file's sha256 or the folder's content_sha256."""
+    if os.path.isdir(p):
+        return content_sha256(p)
+    return sha256(p)
+
+
+def in_checkout(p):
+    """A tracked path of this checkout (pinned by the commit), not something in the store."""
+    rp = os.path.realpath(p)
+    top = os.path.realpath(TOP)
+    store = os.path.realpath(os.path.join(TOP, 'store'))
+    return rp.startswith(top + os.sep) and not rp.startswith(store + os.sep)
+
+
+def seal(lock, name):
+    """Write the sha256 of what a '- PATH' row's PATH holds now into the row (comments kept)."""
+    f = os.path.join(lock, name)
+    want, p = rows(lock)[name]
+    if want != '-':
+        sys.exit('%s already has a sha256' % f)
+    if not os.path.exists(p):
+        sys.exit('%s: %s is not there' % (f, p))
+    h = row_sha256(p)
+    lines = open(f).read().splitlines()
+    i = next(i for i, l in enumerate(lines) if l.split() and not l.lstrip().startswith('#'))
+    lines[i] = h + lines[i].lstrip()[1:]
+    open(f, 'w').write('\n'.join(lines) + '\n')
+    return '%s %s' % (h, name)
+
+
 def path(lock, name):
     r = rows(lock) if not lock.endswith('.json') else \
         {k: (v['sha256'], resolve(v['path'])) for k, v in json.load(open(lock)).items() if isinstance(v, dict) and 'path' in v}
     if name not in r:
         sys.exit('%s has no row %s' % (lock, name))
     want, p = r[name]
-    if want != '-' and sha256(p) != want:
+    if want != '-' and not os.path.exists(p):
+        sys.exit('%s: %s is not there (%s)' % (lock, p, name))
+    if want != '-' and row_sha256(p) != want:
         sys.exit('%s: %s is not %s (%s)' % (lock, p, want, name))
     bad = check_row(lock, name, p)
     if bad:
@@ -257,5 +313,5 @@ def psp(src):
 
 if __name__ == '__main__':
     cmd, args = sys.argv[1], sys.argv[2:]
-    print({'path': path, 'target': target, 'kdk-name': kdk_name, 'psp': psp, 'key': key, 'key-lines': key_lines,
+    print({'path': path, 'hash': row_sha256, 'seal': seal, 'target': target, 'kdk-name': kdk_name, 'psp': psp, 'key': key, 'key-lines': key_lines,
            'oclp-keys': oclp_keys}[cmd](*args))

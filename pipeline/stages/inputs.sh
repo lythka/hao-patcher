@@ -34,7 +34,15 @@ else
     cp -c $(common fl) $SHARE/pristine/fl
 fi
 
-git -C $OCLP_REPO archive $OCLP | tar -x -C $SHARE/oclp
+# OCLP's source at the assembly's commit: from the repository (git archive), or, on a Mac without git (an Intel Mac
+# on macOS 27 has no command-line tools), from the archive the assets folder carries: store/oclp-source/OCLP.tar
+# (git archive of that commit) with OCLP.commit holding the full commit.
+OCLP_TAR=${OCLP_TAR:-$TOP/store/oclp-source/$OCLP.tar}
+if [[ -f $OCLP_TAR ]] && { [[ ! -d $OCLP_REPO/.git && ! -f $OCLP_REPO/HEAD ]] || ! command -v git >/dev/null 2>&1 || ! git --version >/dev/null 2>&1; }; then
+    tar -x -C $SHARE/oclp -f $OCLP_TAR; OCLP_FULL=$(cat ${OCLP_TAR:r}.commit)
+else
+    git -C $OCLP_REPO archive $OCLP | tar -x -C $SHARE/oclp; OCLP_FULL=$(git -C $OCLP_REPO rev-parse $OCLP)
+fi
 cp $(common psp_$($L psp $SHARE/oclp)) $SHARE/oclp/Universal-Binaries.dmg
 
 KDK=$($L kdk-name $KDKDMG); K=$CACHE/kdk-${${KDK:r}##*_}
@@ -80,7 +88,7 @@ while read -r stage name ins; do
 done < $SHARE/patches.txt
 $L target $TARGET oclp_hardware_profile > $SHARE/profile.json
 {
-    echo "oclp $(git -C $OCLP_REPO rev-parse $OCLP) ($OCLP), PatcherSupportPkg $($L psp $SHARE/oclp)"
+    echo "oclp $OCLP_FULL ($OCLP), PatcherSupportPkg $($L psp $SHARE/oclp)"
     echo "kdk $KDK ($(shasum -a 256 $KDKDMG | cut -c1-16))"
     echo "set ${SET:t:r}: $(python3 -I $TOP/pipeline/patches.py revisions $(cut -d' ' -f2 $SHARE/patches.txt))"
     echo "foundation $FOUNDATION"

@@ -119,5 +119,6 @@ NEEDS VALIDATION: never installed. The pieces passed on the laptop in one test p
 the installed builds passed the host replay (same requests as r4, silent). Not yet booted as the system's Metal.
 
 ## Revisions
+- r3 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r2 2026-11-13 README: dyld loads cache roots because golden-gate-dyld-internal makes it an internal install (no ic_csr_internal boot argument since hao-opencore r52). No file change.
 - r1 2026-11-13 New dev-only trial: 27.2.1's own Metal for every process (Metal27, the installed shim and stand-in from tools/metal-adapter d399c6f3), pack metal27-trial, set dev-metal27.

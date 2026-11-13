@@ -1,5 +1,5 @@
 {
- "revision": 5,
+ "revision": 6,
  "stage": "post",
  "applies": {
   "models": [
@@ -16,7 +16,7 @@
  "validated": true,
  "optional": "caches",
  "validated_revision": 3,
- "validated_digest": "3d35e1b0df478bc4842ee5b6d251a43baa5e7c2f2609e0e4c4a5a2c3d634ea38",
+ "validated_digest": "1d3b4656730f3788aa31546fbd9aa42518495789237a9e2d6173744ca91add16",
  "files": [
   {
    "path": "Library/Caches/com.apple.iconservices.store/007F36FE-7D6C-3B42-BF6A-5D1CC54204B0.isdata",

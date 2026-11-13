@@ -1,3 +1,3 @@
 # Full unpack of the 25G342 InstallAssistant.pkg (pipeline/unpack/unpack-installer), for the Tahoe-first runner
 # (pipeline/run ... 25G342-tahoe ...). The 25G342 folder's unpack row is a reduced donor extract and stays as it is.
-- store/inputs/25G342/unpack-full/unpack
+f541e94af7afd09556fb9f692d959216fe2dd5c841c62e87b371b1721a25e18d store/inputs/25G342/unpack-full/unpack

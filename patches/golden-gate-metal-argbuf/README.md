@@ -41,4 +41,5 @@ them). No image built with this recipe has booted yet.
 
 ## Revisions
 
+- r2 2026-11-13 Input rows record their content sha256 (folder rows sealed with `lock.py seal`); the same artifacts at the same paths, so what this recipe installs is unchanged.
 - r1 2026-11-12 Initial recipe.

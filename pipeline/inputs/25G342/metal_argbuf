@@ -3,4 +3,4 @@
 # (that iCBE, which the wrapper re-exports) and libargbuf.dylib. Rebuild the wrapper if that iCBE changes.
 # Folder content sha256 0879facf3e8d9680bd24610205342a97b2a690e2287a5d107150b6cc3f133bb8 (harden/hashed-folder-rows' lock.py
 # hash); a plain "- PATH" folder row until that branch lands and seals every folder row.
-- store/artifacts/metal-argbuf-26B131-20261112-48bd596235e9
+0879facf3e8d9680bd24610205342a97b2a690e2287a5d107150b6cc3f133bb8 store/artifacts/metal-argbuf-26B131-20261112-48bd596235e9

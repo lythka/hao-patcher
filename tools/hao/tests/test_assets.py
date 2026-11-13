@@ -104,5 +104,81 @@ class BuildImageAssets(unittest.TestCase):
         self.assertTrue(ran[0][0].endswith('tools/bin/ssdimg'))
 
 
+class FakeHost:
+    def __init__(self, uid=0, csr=0x803, args='amfi_get_out_of_my_way=1'):
+        self.uid, self.csr, self.args = uid, csr, args
+
+    def euid(self):
+        return self.uid
+
+    def csr_config(self):
+        return self.csr
+
+    def run(self, argv, check=True, timeout=120):
+        import subprocess
+        return subprocess.CompletedProcess(argv, 0, ('boot-args\t%s\n' % self.args).encode(), b'')
+
+
+class BuildImageHere(unittest.TestCase):
+    def test_stages_assembles_into_an_image_file_and_collects(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / 'Desktop' / 'macOS.img'
+            ran = []
+
+            def run(cmd):
+                cmd = [str(x) for x in cmd]; ran.append(cmd)
+                if '--stage-kit' in cmd:
+                    (Path(cmd[cmd.index('--work') + 1]) / 'share').mkdir(parents=True)
+                if cmd[0] == 'sh':
+                    local = Path(cmd[3]); local.mkdir(parents=True); (local / 'target.img').write_bytes(b'img')
+                if cmd[0] == 'mv':
+                    os.replace(cmd[1], cmd[2])
+                return 0
+            c, out_text = console()
+            a = mock.Mock(out=str(out), work=d + '/work')
+            path = os.environ.get('PATH')
+            try:
+                self.assertEqual(0, BUILD.build_image_here(a, c, FakeHost(), Path('a.json'), {}, run=run))
+            finally:
+                os.environ['PATH'] = path
+            stage, assemble, collect, move = ran
+            self.assertIn('--stage-kit', stage)
+            self.assertEqual(['sh'], assemble[:1]); self.assertEqual(4, len(assemble))   # image target: no --disk
+            self.assertIn('--collect-kit', collect)
+            self.assertEqual(b'img', out.read_bytes())
+            self.assertIn('image built', out_text.getvalue())
+
+    def test_refuses_an_everyday_mac_and_an_existing_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            ran = []
+            for host, why in ((FakeHost(uid=501), 'root'), (FakeHost(csr=0), 'filesystem protection'),
+                              (FakeHost(args='-v'), 'AMFI')):
+                c, _ = console()
+                with self.assertRaises(CON.Stopped) as x:
+                    BUILD.build_image_here(mock.Mock(out=d + '/new.img', work=None), c, host, Path('a.json'), {},
+                                           run=ran.append)
+                self.assertIn(why, x.exception.what)
+            (Path(d) / 'old.img').write_bytes(b'')
+            with self.assertRaises(CON.Stopped):
+                BUILD.build_image_here(mock.Mock(out=d + '/old.img', work=None), console()[0], FakeHost(),
+                                       Path('a.json'), {}, run=ran.append)
+            self.assertEqual([], ran)
+
+
+class OclpArchive(unittest.TestCase):
+    def test_check_here_wants_the_oclp_source_archive_not_the_vm(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = Path(d)
+            asm = store / 'a.json'; asm.write_text('{"oclp": "abc123"}')
+            with mock.patch.object(ASSETS, 'rows', lambda *_: []):
+                self.assertEqual(['builder: missing oclp-source/abc123.tar (and .commit)'],
+                                 ASSETS.check(asm, store, here=True))
+                (store / 'oclp-source').mkdir()
+                (store / 'oclp-source/abc123.tar').write_bytes(b'')
+                (store / 'oclp-source/abc123.commit').write_text('abc123full\n')
+                self.assertEqual([], ASSETS.check(asm, store, here=True))
+                self.assertEqual(len(ASSETS.TOOLS), len(ASSETS.check(asm, store)))   # the VM build wants the VM
+
+
 if __name__ == '__main__':
     unittest.main()
