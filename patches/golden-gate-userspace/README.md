@@ -342,6 +342,7 @@ are filtered out ... Known network is found nearby but not joined"); after a reb
 auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
 
 ## Revisions
+- r66 2026-11-13 wifip2p_compat (7eaffe614b3b): adds -[AWDLServiceDiscoveryManager add/removeAWDLDiscoveryClient:forService:error:] to OCLP's class (ENOTSUP); 27.x's mDNSResponder sent them at every AWDL service registration (AirDrop) and crashed on the unrecognized selector, 16 times in one session, taking DNS and Bonjour down. Plus 10 Wi-Fi Aware / WiFiP2PUIAgent stand-ins. make now checks OCLP's classes against their method lists read on the laptop (oclp-methods.txt), so such a gap fails the build instead of being "unverified". AirDrop over AWDL still needs a bridge to OCLP's discovery calls.
 - r65 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 43af852 (hao-runtime-26B131-20261113-43af85296aa9). No recipe change.
 - r64 2026-11-13 Split the cryptex image build into `src/cryptex.py` and reuse a sealed OS/App image pair built earlier from the same inputs, code and builder tools (`src/cryptex_cache.py`, `--cryptex-cache` from golden-run's `GOLDEN_CRYPTEX_CACHE`); without it the hook builds the images as before. The log says how long the build took.
 - r63 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runtime-26B131-20261112-0a2c2aad4755). No recipe change.

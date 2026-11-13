@@ -59,11 +59,12 @@ class Library(unittest.TestCase):
         self.assertIn('WiFiAwareDatapathInfo', CLASSES)
 
     def test_exports_and_load_commands(self):
-        self.assertEqual(exports(self.lib), sorted(f'_OBJC_{kind}_$_{name}' for name in CLASSES
-                                                   for kind in ('CLASS', 'METACLASS')))
+        self.assertEqual(exports(self.lib), sorted([f'_OBJC_{kind}_$_{name}' for name in CLASSES
+                                                    for kind in ('CLASS', 'METACLASS')] + ['_WiFiP2PCompatMethodsAdded']))
         libs = sh('otool', '-L', self.lib).splitlines()[1:]
         self.assertEqual(sorted(line.split()[0] for line in libs),
-                         [f'{FRAMEWORK}/WiFiPeerToPeer', f'{FRAMEWORK}/WiFiPeerToPeerOCLP.dylib',
+                         ['/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation',
+                          f'{FRAMEWORK}/WiFiPeerToPeer', f'{FRAMEWORK}/WiFiPeerToPeerOCLP.dylib',
                           '/usr/lib/libSystem.B.dylib', '/usr/lib/libobjc.A.dylib'])
         self.assertTrue(any('WiFiPeerToPeerOCLP.dylib' in line and 'reexport' in line for line in libs))
         self.assertEqual(sh('otool', '-D', self.lib).splitlines()[-1], f'{FRAMEWORK}/WiFiPeerToPeer')
@@ -96,10 +97,14 @@ class Library(unittest.TestCase):
         folder = self.tmp/'methods'
         folder.mkdir()
         (self.tmp/'empty2.c').write_text('int wifip2p_compat_test_stand_in;\n')
-        sh('xcrun', 'clang', '-arch', 'x86_64', '-dynamiclib', '-install_name', f'{FRAMEWORK}/WiFiPeerToPeerOCLP.dylib',
+        sh('xcrun', 'clang', '-arch', 'x86_64', '-dynamiclib', '-install_name', '@rpath/WiFiPeerToPeerOCLP.dylib',
            self.tmp/'empty2.c', '-o', folder/'WiFiPeerToPeerOCLP.dylib')
         sh('codesign', '-f', '-s', '-', folder/'WiFiPeerToPeerOCLP.dylib')
         shutil.copy(self.lib, folder/'WiFiPeerToPeer')
+        # @rpath names: under DYLD_LIBRARY_PATH the host's own cached WiFiPeerToPeer (which has these classes) would win
+        sh('install_name_tool', '-id', '@rpath/WiFiPeerToPeer', '-change', f'{FRAMEWORK}/WiFiPeerToPeerOCLP.dylib',
+           '@rpath/WiFiPeerToPeerOCLP.dylib', folder/'WiFiPeerToPeer')
+        sh('codesign', '-f', '-s', '-', folder/'WiFiPeerToPeer')
         # What 27.x's WiFiAgent does in -[CWWiFiAgent init] outside the system context, then at teardown.
         (self.tmp/'agent.m').write_text(
             '#import <objc/NSObject.h>\n#import <stdio.h>\n'
@@ -112,9 +117,50 @@ class Library(unittest.TestCase):
             ' printf("%d\\n", (int)[a respondsToSelector:@selector(activate)]); return 0; }\n')
         probe = self.tmp/'agent'
         sh('xcrun', 'clang', '-arch', 'x86_64', '-fobjc-arc', self.tmp/'agent.m', folder/'WiFiPeerToPeer', '-lobjc',
-           '-o', probe)
+           f'-Wl,-rpath,{folder}', '-o', probe)
         sh('codesign', '-f', '-s', '-', probe)
-        self.assertEqual(sh(probe, env={**os.environ, 'DYLD_LIBRARY_PATH': str(folder)}).strip(), '1')
+        self.assertEqual(sh(probe).strip(), '1')
+
+    def test_methods_added_to_oclp_classes(self):
+        """kMethods lands on OCLP's own classes at load: mDNSResponder's AWDL registration answers NO + ENOTSUP instead of
+        an unrecognized selector (the crash loop of 2026-11-13), and an OCLP method that exists is never replaced. The
+        copies get @rpath install names: under DYLD_LIBRARY_PATH the host's own cached WiFiPeerToPeer would win."""
+        folder = self.tmp/'oclp-classes'
+        folder.mkdir()
+        (self.tmp/'oclp.m').write_text(
+            '#import <objc/NSObject.h>\n'
+            '__attribute__((visibility("default"))) @interface AWDLServiceDiscoveryManager : NSObject @end\n'
+            '@implementation AWDLServiceDiscoveryManager\n'
+            '- (int)removeAWDLDiscoveryClient:(id)c forService:(id)s error:(id *)e { return 7; }\n@end\n'
+            '__attribute__((visibility("default"))) @interface WiFiAwarePublisher : NSObject @end\n'
+            '@implementation WiFiAwarePublisher @end\n')
+        sh('xcrun', 'clang', '-arch', 'x86_64', '-dynamiclib', '-install_name', '@rpath/WiFiPeerToPeerOCLP.dylib',
+           self.tmp/'oclp.m', '-lobjc', '-o', folder/'WiFiPeerToPeerOCLP.dylib')
+        sh('codesign', '-f', '-s', '-', folder/'WiFiPeerToPeerOCLP.dylib')
+        shutil.copy(self.lib, folder/'WiFiPeerToPeer')
+        sh('install_name_tool', '-id', '@rpath/WiFiPeerToPeer', '-change', f'{FRAMEWORK}/WiFiPeerToPeerOCLP.dylib',
+           '@rpath/WiFiPeerToPeerOCLP.dylib', folder/'WiFiPeerToPeer')
+        sh('codesign', '-f', '-s', '-', folder/'WiFiPeerToPeer')
+        (self.tmp/'mdns.m').write_text(
+            '#import <Foundation/Foundation.h>\n#import <objc/message.h>\n#import <objc/runtime.h>\n'
+            'extern unsigned WiFiP2PCompatMethodsAdded;\n'
+            'int main(void) { id m = [objc_getClass("AWDLServiceDiscoveryManager") new]; NSError *e = nil;\n'
+            ' BOOL ok = ((BOOL (*)(id, SEL, id, id, NSError **))objc_msgSend)(m,\n'
+            '   sel_registerName("addAWDLDiscoveryClient:forService:error:"), @"client", @"_airdrop._tcp", &e);\n'
+            ' int kept = ((int (*)(id, SEL, id, id, NSError **))objc_msgSend)(m,\n'
+            '   sel_registerName("removeAWDLDiscoveryClient:forService:error:"), nil, nil, NULL);\n'
+            ' __block long code = 0; id p = [objc_getClass("WiFiAwarePublisher") new];\n'
+            ' ((void (*)(id, SEL, id, id, void (^)(NSError *)))objc_msgSend)(p,\n'
+            '   sel_registerName("activatePairingModeWithConfig:delegate:completionHandler:"), nil, nil,\n'
+            '   ^(NSError *x) { code = x.code; });\n'
+            ' printf("%d %ld %d %u %ld\\n", ok, (long)e.code, kept, WiFiP2PCompatMethodsAdded, code); return 0; }\n')
+        probe = self.tmp/'mdns'
+        sh('xcrun', 'clang', '-arch', 'x86_64', '-fobjc-arc', self.tmp/'mdns.m', folder/'WiFiPeerToPeer',
+           '-framework', 'Foundation', f'-Wl,-rpath,{folder}', '-o', probe)
+        sh('codesign', '-f', '-s', '-', probe)
+        # add: NO + ENOTSUP (45); remove: OCLP's own method kept (7); added: add + the 2 publisher methods (the other
+        # classes are not in this fake OCLP library); pairing: ENOTSUP to its completion block
+        self.assertEqual(sh(probe).split(), ['0', '45', '7', '3', '45'])
 
     @unittest.skipUnless(shutil.which('ipsw'), 'needs ipsw')
     def test_method_check_reads_the_stand_ins(self):

@@ -12,6 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 import plistlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -41,9 +42,49 @@ def build(out):
     run('xcrun', 'clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O2', '-Wall', '-Wextra', '-Werror',
         '-dynamiclib', '-fvisibility=hidden', '-Wl,-not_for_dyld_shared_cache',
         '-install_name', f'{FRAMEWORK}/{LEAF}', '-compatibility_version', '1.0.0', '-current_version', '1.0.0',
-        f'-Wl,-reexport_library,{HERE/"WiFiPeerToPeerOCLP.tbd"}', '-lobjc', HERE/'wifip2p_compat.m', '-o', binary)
+        f'-Wl,-reexport_library,{HERE/"WiFiPeerToPeerOCLP.tbd"}', '-lobjc', '-framework', 'Foundation',
+        HERE/'wifip2p_compat.m', '-o', binary)
     run('codesign', '-f', '-s', '-', binary)
     return binary
+
+
+def known_oclp_methods(path=HERE/'oclp-methods.txt'):
+    """{class: {'-sel', '+sel'}}: OCLP's real method lists, read on a running image (offline they are unreadable)."""
+    out = {}
+    for line in path.read_text().splitlines():
+        if line and not line.startswith('#'):
+            cls, sel = line.split('\t')
+            out.setdefault(cls, set()).add(sel)
+    return out
+
+
+def added_methods(source=HERE/'wifip2p_compat.m'):
+    """{class: {'-sel'}} the compat library adds at load (its kMethods table)."""
+    out = {}
+    for cls, sel in re.findall(r'\{"(\w+)",\s*"([\w:]+)",\s*"', source.read_text()):
+        out.setdefault(cls, set()).add('-' + sel)
+    return out
+
+
+def oclp_method_gaps(record):
+    """Errors for selectors a 27.x client names on an OCLP class that neither OCLP's recorded method list nor kMethods
+    answers. An unverified class with no recorded list is an error too: record it (oclp-methods.txt)."""
+    known, added, errors = known_oclp_methods(), added_methods(), []
+    for line in record.get('methods', {}).get('unverified', []):
+        m = re.match(r'OCLP (\S+) (\w+): own methods unreadable offline; clients name (.*)$', line)
+        if not m:
+            continue
+        cls, named = m.group(2), [s.strip() for s in m.group(3).split(',')]
+        if cls not in known:
+            errors.append('MISSING method list: OCLP class %s is not in oclp-methods.txt (clients name %s)'
+                          % (cls, ', '.join(named)))
+            continue
+        for sel in named:
+            if sel not in known[cls] and sel not in added.get(cls, set()):
+                errors.append('MISSING method: -[%s %s] named by a 27.x client; OCLP lacks it and kMethods does not add it'
+                              % (cls, sel.lstrip('+-')) if sel.startswith('-') else
+                              'MISSING method: +[%s %s] named by a 27.x client' % (cls, sel.lstrip('+')))
+    return errors
 
 
 def main(root, system, cache, oclp):
@@ -58,6 +99,7 @@ def main(root, system, cache, oclp):
     with tempfile.TemporaryDirectory(prefix='wifip2p-compat-') as tmp:
         binary = build(tmp)
         record = coverage.check(cache, system, oclp, binary, LEAF, REEXPORTED, REPLACED)
+        record['errors'] += oclp_method_gaps(record)
         if record['errors']:
             sys.exit('\n'.join(record['errors']))
         digest = hashlib.sha256(binary.read_bytes()).hexdigest()
