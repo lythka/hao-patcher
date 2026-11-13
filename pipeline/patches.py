@@ -166,12 +166,18 @@ def detect_packs(target, packs=None):
     if os.path.isfile(profile):
         with open(profile) as f:
             patchsets = set(json.load(f).get('patchset_order', []))
+    return select_packs(patchsets, t.get('board_id'), packs)
+
+
+def select_packs(patchsets, board_id, packs=None):
+    """Names of the packs a Mac selects from its OCLP patch sets and board id (hao detect uses it on the target)."""
+    packs = load_packs() if packs is None else packs
     out = []
     for name, p in packs.items():
         if p.get('opt_in'):
             continue                   # selected only by name (--packs NAME,...), never by detection
         d = p.get('detect', {})
-        if d.get('any_intel') or patchsets & set(d.get('oclp_patchsets', [])) or t.get('board_id') in d.get('board_ids', []):
+        if d.get('any_intel') or set(patchsets) & set(d.get('oclp_patchsets', [])) or board_id in d.get('board_ids', []):
             out.append(name)
     return out
 

@@ -1,0 +1,14 @@
+{
+ "format": 1,
+ "about": "hao detect: which OCLP patch sets a PCI device implies, used only when no recorded OCLP profile (tools/oclp-hardware/profiles) names the Mac's model. OCLP's own detection is the authority; these rules cover the devices of the proven MacBookPro9,2 and say so in the profile (patchsets_source).",
+ "rules": [
+  {"role": "gpu", "class": "0300", "vendor": "8086", "devices": ["0152", "0156", "015a", "0162", "0166", "016a"],
+   "family": "Intel Ivy Bridge (HD 2500/4000)",
+   "patchsets": ["Metal 3802 Common", "Metal 3802 .metallibs Tahoe", "Big Sur GVA", "Monterey OpenCL",
+                 "Big Sur OpenCL", "Tahoe Graphics", "Intel Ivy Bridge"]},
+  {"role": "wifi", "class": "0280", "vendor": "14e4", "devices": ["4331"],
+   "family": "Broadcom BCM4331", "patchsets": ["Modern Wireless Common"]},
+  {"role": "audio", "class": "0403", "vendor": "8086", "devices": ["1e20"],
+   "family": "Intel 7 Series HDA", "patchsets": ["Modern Audio"]}
+ ]
+}

@@ -18,12 +18,27 @@
   hao explain [NAME | PATH]                                   what a declared file comes from and every edit
   hao inspect STORE PATH                                      original and patched files side by side
 
+  hao detect [--out FILE]                                     this Mac's hardware, OCLP patch sets and packs, as a
+        profile file for --profile (run it on the target: its Recovery or an installed macOS; read-only)
+  hao fetch RELEASE.json [--cache DIR] [--verify] [--host-check]  download (or check) every file the release pins
+  hao verify [ROOT] [--manifests DIR|FILE]...                 every installed pack file against its manifest
+  hao build-image REPO (--model M | --profile F) [--assembly NAME] [--overlay-system ROOT] [--dry-run]
+        assemble an image in the builder VM (pipeline/golden-run), committed to the image repository REPO
+  hao build-disk /dev/diskN (--model M | --profile F) [--dry-run] [--confirm diskN]   (sudo; external SSD)
+  hao create-installer /dev/diskN (--model M | --profile F) [--dry-run] [--confirm ERASE]  (sudo; USB stick)
+  hao install /dev/diskN [--profile F] [--dry-run] [--confirm ERASE]  (on the target, from the stick's Recovery)
+        build-disk, create-installer and install check the disk and show their plan; their disk steps wait for
+        the relocatable kit (workflow plan step 16) and stop, before writing, until it exists.
+
+Detail levels for every command: --quiet, default, --show (files), --show-edits (edits), --log json.
+
 --state defaults to ROOT/private/var/db/hao, and with --live to /private/var/db/hao. Deferred steps come from
 --deferred FILE, else from deferred.json beside the overlays (the materialiser's output folder), when there is one.
 """
 import argparse
 import json
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 
@@ -32,6 +47,13 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE / 'src'))
 import livepatch as LP   # noqa: E402
 import macos as MAC      # noqa: E402
+import console as CON    # noqa: E402
+import detect as DETECT  # noqa: E402
+import verify as VERIFY  # noqa: E402
+import builder as BUILD  # noqa: E402
+
+ACQUIRE = REPO / 'tools' / 'acquire'
+CACHE = Path.home() / 'Library' / 'Caches' / 'hao'
 
 
 def _snap(s):
@@ -199,6 +221,108 @@ def cmd_patch(a):
         return 1
 
 
+def guarded(fn):
+    """Run FN(a, console); a Stopped check prints its report and exits 1."""
+    def run(a):
+        c = CON.Console(CON.level_of(a))
+        try:
+            return fn(a, c)
+        except CON.Stopped as x:
+            c.stopped(x)
+            return 1
+        except (LP.PatchError, DETECT.DetectError) as x:
+            c.stopped(CON.Stopped(str(x)))
+            return 1
+    return run
+
+
+def cmd_detect(a, c, host=None):
+    p = DETECT.profile(DETECT.facts(host or MAC.SystemHost()))
+    p['target'] = DETECT.target_for_model(p['model'])[0]
+    DETECT.show(c, p)
+    if a.out:
+        Path(a.out).write_text(json.dumps(p, indent=1) + '\n')
+        c.done('profile written to %s' % a.out, profile=a.out)
+    elif c.level != 'json':
+        print(json.dumps(p, indent=1))
+    return 0
+
+
+def cmd_fetch(a, c):
+    acquire = runpy.run_path(str(ACQUIRE / 'acquire'))
+    if a.host_check:
+        r = subprocess.run([sys.executable, '-I', str(ACQUIRE / 'host-check')] + (['--json'] if c.level == 'json'
+                                                                                 else []))
+        if r.returncode:
+            return r.returncode
+    try:
+        rows = acquire['load'](a.release)
+    except acquire['AcquireError'] as x:
+        raise CON.Stopped(str(x))
+    c.banner('hao fetch  %d files pinned by %s' % (len(rows), a.release), release=a.release, cache=str(a.cache))
+    if a.verify:
+        bad = [r['name'] for r in rows if not acquire['intact'](a.cache, r)]
+        for r in rows:
+            c.item('%-44s %s' % (r['name'], 'missing or damaged' if r['name'] in bad else 'sha256'),
+                   ok=r['name'] not in bad, ev='file.verify', name=r['name'], intact=r['name'] not in bad)
+        if bad:
+            raise CON.Stopped('%d of %d files are missing or damaged' % (len(bad), len(rows)),
+                              options=['hao fetch %s' % a.release])
+        c.done('all %d files present and intact' % len(rows))
+        return 0
+
+    def on(ev):
+        k = ev['ev']
+        if k == 'progress':
+            return
+        c.event('fetch.' + k, **{x: y for x, y in ev.items() if x != 'ev'})
+        if k in ('ok', 'reused'):
+            c.item('%-44s %s' % (ev['name'], 'reused' if k == 'reused' else 'sha256'), ok=True)
+        elif k == 'mirror-failed':
+            c.item('%-44s %s: %s' % (ev['name'], ev['url'], ev['error']), 'files')
+    try:
+        acquire['fetch'](rows, a.cache, on_event=on)
+    except acquire['AcquireError'] as x:
+        raise CON.Stopped(str(x), why='a file that is not the pinned one is never used', untouched='nothing kept')
+    c.done('%d files present and checked in %s' % (len(rows), a.cache))
+    return 0
+
+
+def cmd_verify(a, c):
+    root = Path(a.root)
+    found = VERIFY.manifests(a.manifests, root)
+    c.banner('hao verify  %s against %d pack manifests' % (root, len(found)), root=str(root))
+
+    def on(row):
+        c.event('file.verify', **row)
+        if 'problem' in row:
+            c.item('%-10s %-22s %s%s' % (row['problem'], row['pack'], row['path'],
+                                          '  (%s)' % ', '.join(row['keys']) if row.get('keys') else ''), 'steps')
+        else:
+            c.item('%-10s %-22s %s' % ('ok', row['pack'], row['path']), 'files')
+    r = VERIFY.verify(root, found, on_file=on)
+    for pack, n in r['packs'].items():
+        c.print('  %-22s %d files' % (pack, n), 'files')
+    if r['problems']:
+        raise CON.Stopped('%d of %d files differ from their manifests' % (len(r['problems']),
+                                                                          len(r['problems']) + r['ok']),
+                          why='these files are not the ones the packs installed',
+                          options=['see which: hao verify --show', 'put them back: hao patch OVERLAY... (or the '
+                                   'installer for installer-phase packs)'])
+    c.done('%d files match their manifests' % r['ok'])
+    return 0
+
+
+def builder_args(q, disk=True):
+    if disk:
+        q.add_argument('disk', nargs='?')
+        q.add_argument('--confirm', help='the typed confirmation, given ahead (scripts)')
+    g = q.add_mutually_exclusive_group()
+    g.add_argument('--model'); g.add_argument('--profile')
+    q.add_argument('--assembly'); q.add_argument('--dry-run', action='store_true')
+    CON.add_level_flags(q)
+
+
 def main():
     p = argparse.ArgumentParser(prog='hao', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='action', required=True)
@@ -222,6 +346,24 @@ def main():
     q = sub.add_parser('inspect'); q.add_argument('store'); q.add_argument('path')
     q.set_defaults(fn=lambda a: subprocess.call([sys.executable, '-I', str(REPO / 'tools/edit-engine/edit-engine'),
                                                  'inspect', a.store, a.path]))
+    q = sub.add_parser('detect'); q.add_argument('--out'); CON.add_level_flags(q)
+    q.set_defaults(fn=guarded(cmd_detect))
+    q = sub.add_parser('fetch'); q.add_argument('release'); q.add_argument('--cache', type=Path, default=CACHE)
+    q.add_argument('--verify', action='store_true'); q.add_argument('--host-check', action='store_true')
+    CON.add_level_flags(q); q.set_defaults(fn=guarded(cmd_fetch))
+    q = sub.add_parser('verify'); q.add_argument('root', nargs='?', default='/')
+    q.add_argument('--manifests', action='append', default=[]); CON.add_level_flags(q)
+    q.set_defaults(fn=guarded(cmd_verify))
+    q = sub.add_parser('build-image'); q.add_argument('out', metavar='REPO'); builder_args(q, disk=False)
+    q.add_argument('--overlay-system'); q.add_argument('--overlay-store')
+    q.set_defaults(fn=guarded(lambda a, c: BUILD.build_image(a, c)))
+    q = sub.add_parser('build-disk'); builder_args(q)
+    q.set_defaults(fn=guarded(lambda a, c: BUILD.build_disk(a, c, MAC.SystemHost())))
+    q = sub.add_parser('create-installer'); builder_args(q)
+    q.add_argument('--minimum-bytes', type=int, default=32 * 10 ** 9)
+    q.set_defaults(fn=guarded(lambda a, c: BUILD.create_installer(a, c, MAC.SystemHost())))
+    q = sub.add_parser('install'); builder_args(q)
+    q.set_defaults(fn=guarded(lambda a, c: BUILD.install(a, c, MAC.SystemHost())))
     a = p.parse_args()
     return a.fn(a)
 

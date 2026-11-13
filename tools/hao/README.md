@@ -1,7 +1,45 @@
 # hao
 
-The user commands of the hao builder (workflow plan, step 9a on). Today: `hao patch` (live updates and revert),
-`hao explain` and `hao inspect`.
+The user commands of the hao builder (workflow plan, step 9a on): `hao patch` (live updates and revert), `hao explain`,
+`hao inspect`, and the builder and installer commands below (`detect`, `fetch`, `verify`, `build-image`, `build-disk`,
+`create-installer`, `install`).
+
+Every command has the five detail levels of the console mockups (`src/console.py`): `--quiet` (progress and the one
+question), default (one line per step with its check), `--show` (one line per file or repair), `--show-edits` (origin
+and reason of each change), `--log json` (every event as a JSON line). A failed check stops the command with what
+happened, why it matters, what was left untouched and what to do next (exit 1).
+
+## The builder and installer commands
+
+```sh
+hao detect [--out mac.json]                     # on the target: model, board id, GPU/Wi-Fi/audio, patch sets, packs
+hao fetch RELEASE.json [--cache DIR] [--verify] [--host-check]
+hao verify [ROOT] [--manifests OVERLAY_DIR|MANIFEST]...
+hao build-image REPO --model MacBookPro9,2 [--overlay-system ROOT] [--dry-run]
+sudo hao build-disk /dev/diskN --model MacBookPro9,2 [--dry-run]     # output (b): an external SSD
+sudo hao create-installer /dev/diskN --model MacBookPro9,2 [--dry-run]  # output (a): the USB stick
+hao install /dev/diskN [--dry-run]              # on the target, from the stick's Recovery
+```
+
+- **detect** (`src/detect.py`, read-only) reads `sysctl`, `ioreg` (board id, PCI devices). Patch sets come from the
+  model's recorded OCLP profile (`tools/oclp-hardware/profiles`), else from `data/detect-rules.json` (PCI ids of the
+  proven laptop's devices only; an unknown GPU, Wi-Fi or audio device is named in a note). Packs follow from
+  `packs/*.json` (`pipeline/patches.py select_packs`); `any_intel` packs only on an Intel Mac. The profile file is what
+  `--profile` takes; `--model` builds the same profile from the recorded one without the Mac.
+- **fetch** runs `tools/acquire` (content-addressed cache, default `~/Library/Caches/hao`); `--verify` checks only,
+  `--host-check` runs `tools/acquire/host-check` first.
+- **verify** (`src/verify.py`, read-only) checks every file of the pack manifests (sha256, mode, owner, flags) under
+  ROOT (default `/`); manifests come from overlay folders or `ROOT/private/var/db/hao/manifests`.
+- **build-image** resolves the Mac, the release assembly of its target (`TARGET-GOLDEN`, or `--assembly`) and the
+  recipes per pack, then runs `pipeline/golden-run` (builder VM; `--overlay-system` adds `--from-overlays`). It builds
+  every pack the target detects; a profile with other packs is refused (golden-run has no pack choice yet).
+- **build-disk**, **create-installer**, **install** (`src/builder.py`) resolve the same plan and check the disk with
+  `src/disks.py` (ssdinstall's checks: whole, physical disk, not the running system's or the inputs', big enough;
+  `external` for build-disk and the stick, `internal` for install), then ask for the typed confirmation (`--confirm`
+  gives it ahead). Their disk steps are not wired yet: after the checks they stop before writing anything, until the
+  relocatable kit exists (golden-run's staged inputs and guest config relative to a kit folder, plus an x86_64 Python;
+  workflow plan step 16). Our dev host never runs them against its own disks: they run in the builder VM or on the
+  laptop.
 
 ## hao patch
 
