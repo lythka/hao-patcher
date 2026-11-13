@@ -122,6 +122,25 @@ class Optional(unittest.TestCase):
         self.assertIn('no patch of optional group none', full.stderr)
 
 
+class MissingRow(unittest.TestCase):
+    """missing_row reads a row's sha256 as lock.py does: a file's sha256, or a sealed folder row's content hash."""
+    def test_sealed_folder_row_is_checked_by_content(self):
+        import runpy
+        lock = runpy.run_path(str(TOP / 'pipeline' / 'lock.py'))
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d); folder = d / 'art'; (folder / 'sub').mkdir(parents=True)
+            (folder / 'a').write_bytes(b'a'); (folder / 'sub' / 'b').write_bytes(b'b')
+            f = d / 'one.bin'; f.write_bytes(b'x')
+            locks = d / 'lock'; locks.mkdir()
+            (locks / 'folder_row').write_text('%s %s\n' % (lock['row_sha256'](str(folder)), folder))
+            (locks / 'file_row').write_text('%s %s\n' % (hashlib.sha256(b'x').hexdigest(), f))
+            self.assertIsNone(patches.missing_row('folder_row', [str(locks)]))
+            self.assertIsNone(patches.missing_row('file_row', [str(locks)]))
+            (folder / 'sub' / 'b').write_bytes(b'changed')
+            with self.assertRaises(ValueError):
+                patches.missing_row('folder_row', [str(locks)])
+
+
 class Repo(unittest.TestCase):
     def test_shipped_sets_plan_for_every_target_and_build(self):
         for s in (TOP / 'pipeline/sets').glob('*.txt'):
