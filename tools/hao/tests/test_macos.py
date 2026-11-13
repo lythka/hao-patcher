@@ -410,6 +410,17 @@ class ApplyRevert(Live):
         self.host.reboot()
         self.assertEqual((self.host.booted / ASCII).read_bytes(), b'ascii table\n')
 
+    def test_cache_images_are_written_when_dyld_loads_roots(self):
+        """With CSR_ALLOW_APPLE_INTERNAL reported (ic_csr_internal=1 on hao's images) dyld loads a file at a cache
+        image's path instead of the cache's copy, so the cache's Metal is written like any file; kexts still wait."""
+        self.host.csr = 0x813
+        rec, events = self.apply()
+        self.assertEqual((self.host.live / METAL).read_bytes(), b'patched metal')
+        self.assertEqual((self.host.booted / METAL).read_bytes(), b'cached metal')
+        self.assertFalse((self.host.live / KEXT).exists())
+        self.assertEqual([f['path'] for f in rec['needs_recovery_files']], [KEXT])
+        self.assertIn(METAL, [e['path'] for e in events if e['ev'] == 'file.write'])
+
     def test_second_apply_writes_nothing(self):
         self.apply()
         self.host.reboot()

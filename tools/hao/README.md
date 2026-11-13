@@ -27,7 +27,9 @@ a folder root, or to the running Mac (`--live`):
   kernel collection members (`System/Library/Extensions`, `Library/Extensions`, the KCs, the kernel), images of
   the dyld shared cache (from the `.map` beside the running system's cache), the cryptex, Preboot, the booter
   and the EFI partition. They are listed as needing Recovery; `--installer` applies them (installer or on-disk
-  Recovery)
+  Recovery). A cache image is written live when the system reports `CSR_ALLOW_APPLE_INTERNAL` (0x10; hao's
+  images do, `ic_csr_internal=1`): dyld then loads the file at its path instead of the cache's copy (an on-disk
+  root, as OCLP's Metal wrapper is), so it takes effect like any other file
 - the target-side steps of `deferred.json` (beside the overlays, or `--deferred`) are reported in their order
   after the writes: `needs-recovery`, or `not-run` (live-capable, but hao has no live runner for any yet);
   `stale` marks one made from the installed files (native-identities) when the patch wrote files
