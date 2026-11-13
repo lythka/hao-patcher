@@ -15,6 +15,11 @@ and anyone can read what each patch changes and why.
   listed on purpose.
 - **Releases are frozen kits.** A release names exact inputs, recipe revisions and expected outputs, and is cut
   only from clean, recorded producers after a laptop boot.
+- **A normal boot looks like a stock Mac's.** Only the Apple logo: OpenCore's RELEASE build, no debug text, no
+  verbose boot. Diagnosis builds that show logs are explicit opt-ins. The installer's Recovery is meant to look like
+  a stock macOS 27 Recovery too.
+- **Boot is fast, first boot included.** Every image's boot is measured from the kernel to the first screen, and its
+  critical path is named before it counts as good.
 - **Hardware support comes in packs.** A generic Intel base, plus packs chosen by OCLP-style detection. Only HD 4000
   (MacBookPro9,2) is proven.
 
