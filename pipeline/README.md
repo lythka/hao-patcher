@@ -13,6 +13,7 @@ covers prerequisites, commands, output and validation.
 | `materialize.py`, `overlays.py` | Declared files made into pack overlays; with `golden-run --from-overlays`, which recipes install from them instead of their hooks, and the image tree comparison |
 | `inputs/`, `targets/`, `sets/` | Input rows, hardware profile and patch sets |
 | `lock.py` | Reads input rows and target files; cache keys for `run` |
+| `python-site` | Row `python_site` (the site-packages OCLP imports in the builder) made from the pinned PyPI wheel rows `python_site_*`: `make OUT`, `check SITE` |
 | `vm/` | Maintenance VM lifecycle |
 | [`unpack/`](unpack/README.md) | Installer extraction for donor preparation |
 | `recovery` | Offline Recovery build |
