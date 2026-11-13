@@ -4,14 +4,22 @@
   hao patch OVERLAY... --root ROOT [--state DIR] [--installer] [--dry-run] [--quiet | --show | --log json]
         apply pack overlays to ROOT: only files whose sha256 differs are written, each checked before and
         after; replaced files are backed up and new ones recorded, so --revert undoes both. Without
-        --installer, packs whose phase is "installer" are not applied and are listed as needing Recovery.
+        --installer, packs whose phase is "installer" (and kernel collection members, dyld cache images, the
+        cryptex, the booter and EFI files of any pack) are not applied and are listed as needing Recovery.
   hao patch --revert --root ROOT [--state DIR] [--id ID]      undo the newest (or the named) patch
-  hao patch --list [--state DIR]                              applied and reverted patches
+  hao patch --list [--root ROOT | --live] [--state DIR]       applied and reverted patches
+  hao patch --probe [--log json]                              read-only: the running Mac's System and Data
+        volumes, snapshots, SIP, mounts, and which steps of a live patch would work
+  hao patch OVERLAY... --live [--dry-run] --i-have-a-backup [--bless mount|oclp] [--mount-point DIR]
+  hao patch --revert --live --i-have-a-backup
+        the running Mac's own System volume (sudo): written directly, booted as a new snapshot after a reboot,
+        reverted by booting the snapshot that ran before. Not proven yet (step 9a laptop run): it refuses to
+        write without --i-have-a-backup; --dry-run and --probe only read.
   hao explain [NAME | PATH]                                   what a declared file comes from and every edit
   hao inspect STORE PATH                                      original and patched files side by side
 
---state defaults to ROOT/private/var/db/hao. The live system backend (snapshot + bless) is not proven yet, so
-ROOT is a folder (a fixture, or a volume mounted read-write by the operator).
+--state defaults to ROOT/private/var/db/hao, and with --live to /private/var/db/hao. Deferred steps come from
+--deferred FILE, else from deferred.json beside the overlays (the materialiser's output folder), when there is one.
 """
 import argparse
 import json
@@ -23,6 +31,11 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE / 'src'))
 import livepatch as LP   # noqa: E402
+import macos as MAC      # noqa: E402
+
+
+def _snap(s):
+    return s if isinstance(s, str) or s is None else s.get('name')
 
 
 def printer(level):
@@ -31,6 +44,9 @@ def printer(level):
         if level == 'json':
             print(json.dumps(ev), flush=True)
             return
+        if k == 'warning':
+            print('warning: %s' % ev['text'], file=sys.stderr, flush=True)
+            return
         if level == 'quiet' and k not in ('done', 'reverted'):
             return
         if k == 'plan':
@@ -38,6 +54,16 @@ def printer(level):
                                                                                 ev['same']))
             if ev['needs_recovery']:
                 print('needs Recovery (installer-only packs, not applied live): %s' % ', '.join(ev['needs_recovery']))
+            for f in ev.get('needs_recovery_files', []):
+                print('  %-6s %-22s %s  (%s)' % ('later', f['pack'], f['path'], f['reason']))
+        elif k == 'live':
+            print('live: System %s, Data %s, booted %s (sealed: %s)' % (ev['system'], ev['data'], ev['booted'],
+                                                                         ev['sealed']))
+        elif k == 'mount':
+            print('mounted %s read-write at %s' % (ev['device'], ev['point']))
+        elif k == 'snapshot':
+            print({'pre': 'named snapshot %s taken before writing', 'boot': 'next boot: new snapshot %s',
+                   'root-to': 'next boot: snapshot %s'}[ev['kind']] % ev['name'])
         elif k == 'file.write':
             print('  %-6s %-22s %s' % ('new' if ev['new'] else 'write', ev['pack'], ev['path']))
             if level == 'show':
@@ -47,44 +73,124 @@ def printer(level):
         elif k == 'file.revert':
             print('  %-6s %s' % ('remove' if ev['removed'] else 'attrs' if ev.get('attrs_only') else 'restore',
                                  ev['path']))
+        elif k == 'rolled-back':
+            print('rolled back %s: %d files put back (%s)' % (ev['id'], ev['files'], ev['error']))
+        elif k == 'restart':
+            who = 'pid %s %s' % (ev['pid'], ev['command']) if ev['kind'] == 'process' else \
+                  'launchd %s/%s' % (ev['domain'], ev['label'])
+            print('  %-7s %s uses %s' % ('reboot' if ev['when'] == 'reboot' else 'restart', who, ev['path']))
+        elif k == 'deferred':
+            if level == 'show' or ev['status'] != 'needs-recovery' or ev['stale']:
+                print('  %-14s %s  (%s)%s' % (ev['status'], ev['path'], ev['reason'],
+                                              ' stale: made from the installed files' if ev['stale'] else ''))
         elif k == 'done':
+            if ev['id'] is None:
+                print('nothing to do: %d files already current' % ev['same'])
+                return
             print('applied %s: %d written, %d attributes set, %d unchanged%s' % (
                 ev['id'], ev['written'], ev.get('attrs', 0), ev['same'],
-                ', snapshot ' + ev['snapshot'] if ev['snapshot'] else ''))
+                ', snapshot ' + _snap(ev['snapshot']) if _snap(ev['snapshot']) else ''))
             if ev.get('not_set'):
                 print('not root: owners and system flags of %d files were not set (see the record)' % ev['not_set'])
-            print('undo: hao patch --revert --root ROOT --id %s' % ev['id'])
+            if ev.get('reboot'):
+                print('reboot to run it; undo: sudo hao patch --revert --live --i-have-a-backup')
+            else:
+                print('undo: hao patch --revert --root ROOT --id %s' % ev['id'])
         elif k == 'reverted':
-            print('reverted %s: %d files' % (ev['id'], ev['files']))
+            print('reverted %s: %d files%s' % (ev['id'], ev['files'],
+                                               '; reboot to run snapshot %s' % ev['snapshot'] if ev.get('reboot') else ''))
     return emit
 
 
+def print_probe(r, level):
+    if level == 'json':
+        print(json.dumps(r, indent=1, default=str))
+        return
+    f = r['facts']
+    print('machine %s, euid %d, csr %s, authenticated root %s, boot %s' % (
+        r['machine'], r['euid'], 'unknown' if r['csr'] is None else '0x%x' % r['csr'], r['authenticated_root'],
+        r['boot']))
+    print('booted: %s (%s) from %s, sealed: %s' % (f['booted'].get('name'), f['booted'].get('uuid'),
+                                                   f.get('root_device'), f.get('sealed')))
+    if f.get('system'):
+        print('System volume: %s "%s"; Data volume: %s at %s' % (f['system']['device'], f['system']['name'],
+                                                               (f.get('data') or {}).get('device'),
+                                                               (f.get('data') or {}).get('mount')))
+    for m in f.get('system_mounts', []):
+        print('System volume mounted at %s (%s)' % (m['point'], ', '.join(m['options'])))
+    print('snapshots of the System volume:')
+    for s in f.get('snapshots', []):
+        print('  %s %-60s xid %s%s' % ('*' if s.get('booted') else ' ', s['name'], s['xid'],
+                                       ', RootTo' if s.get('root_to') else ''))
+    for rec in r['records']:
+        print('hao %s %s, snapshot %s (booted before: %s)' % (rec['id'], rec['state'], rec['snapshot'],
+                                                            rec['booted_before']))
+    for s in r['steps']:
+        print('%-4s %s: %s' % ('ok' if s['ok'] else 'NO', s['step'], s['why']))
+    print('live patch would %s' % ('run' if r['ok'] else 'be refused'))
+
+
+def deferred_entries(a):
+    path = Path(a.deferred) if a.deferred else None
+    if path is None and a.overlays:
+        parents = {Path(o).resolve().parent for o in a.overlays}
+        if len(parents) == 1 and (parents.pop() / 'deferred.json').is_file():
+            path = Path(a.overlays[0]).resolve().parent / 'deferred.json'
+    return json.loads(path.read_text()) if path else []
+
+
 def cmd_patch(a):
-    root = Path(a.root) if a.root else None
-    state = Path(a.state) if a.state else (root / 'private/var/db/hao' if root else None)
     level = 'json' if a.log == 'json' else 'quiet' if a.quiet else 'show' if a.show else 'steps'
     try:
+        if a.probe:
+            r = MAC.probe(MAC.SystemHost(), a.state or MAC.STATE, a.mount_point)
+            print_probe(r, level)
+            return 0 if r['ok'] else 3
+        if a.live and a.root:
+            print('hao: --live patches the running system; --root is for a folder', file=sys.stderr)
+            return 2
+        root = Path('/') if a.live else Path(a.root) if a.root else None
+        state = Path(a.state) if a.state else Path(MAC.STATE) if a.live else (root / 'private/var/db/hao' if root
+                                                                                else None)
         if a.list:
             for r in LP.records(state):
-                print('%-22s %-9s %3d files  packs %s' % (r['id'], r['state'], len(r['files']), ', '.join(r['packs'])))
+                print('%-22s %-11s %3d files  packs %s%s' % (r['id'], r['state'], len(r['files']), ', '.join(r['packs']),
+                                                            '  snapshot ' + r['snapshot'] if r.get('snapshot') else ''))
             return 0
         if root is None:
-            print('hao: --root is required', file=sys.stderr)
+            print('hao: --root (a folder) or --live (this Mac) is required', file=sys.stderr)
             return 2
+        backend = MAC.MacOSLiveBackend(acknowledged=a.i_have_a_backup, mount_point=a.mount_point,
+                                       bless=a.bless) if a.live else None
         if a.revert:
-            LP.revert(root, state, patch_id=a.id, on_event=printer(level))
+            LP.revert(root, state, patch_id=a.id, backend=backend, on_event=printer(level))
             return 0
+        if not a.overlays:
+            print('hao: no overlays given', file=sys.stderr)
+            return 2
         overlays = [LP.load_overlay(o) for o in a.overlays]
+        deferred = deferred_entries(a)
+        mode = 'installer' if a.installer else 'live'
         if a.dry_run:
-            p = LP.plan(overlays, root, 'installer' if a.installer else 'live')
-            printer(level)({'ev': 'plan', 'write': len(p['write']), 'attrs': len(p['attrs']), 'same': len(p['same']),
-                            'needs_recovery': p['needs_recovery']})
+            emit = printer(level)
+            if backend:
+                for problem in backend.inspect():
+                    emit({'ev': 'warning', 'text': 'a live patch would be refused: ' + problem})
+                p = LP.plan(overlays, root, mode, backend.attributes(root), resolve=backend.booted_path,
+                            classify=backend.classifier(root))
+            else:
+                p = LP.plan(overlays, root, mode, classify=LP.Classifier(root) if mode == 'live' else None)
+            emit(LP.plan_event(p))
             for row in p['write']:
                 print('  %-6s %-22s %s' % ('new' if row['old_sha256'] is None else 'write', row['pack'], row['path']))
             for row in p['attrs']:
                 print('  %-6s %-22s %s  (%s)' % ('attrs', row['pack'], row['path'], ', '.join(row['attrs'])))
+            classify = backend.classifier(root) if backend else LP.Classifier(root)
+            for ev in LP.deferred_report(deferred, {m['pack']: m['phase'] for m in overlays}, classify,
+                                         bool(p['write'])):
+                emit(ev)
             return 0
-        LP.apply(overlays, root, state, mode='installer' if a.installer else 'live', on_event=printer(level))
+        LP.apply(overlays, root, state, mode=mode, backend=backend, on_event=printer(level), deferred=deferred)
         return 0
     except LP.PatchError as x:
         print('hao patch: %s' % x, file=sys.stderr)
@@ -96,9 +202,14 @@ def main():
     sub = p.add_subparsers(dest='action', required=True)
     q = sub.add_parser('patch')
     q.add_argument('overlays', nargs='*')
-    q.add_argument('--root'); q.add_argument('--state'); q.add_argument('--id')
+    q.add_argument('--root'); q.add_argument('--state'); q.add_argument('--id'); q.add_argument('--deferred')
     q.add_argument('--installer', action='store_true'); q.add_argument('--dry-run', action='store_true')
     q.add_argument('--revert', action='store_true'); q.add_argument('--list', action='store_true')
+    q.add_argument('--live', action='store_true', help='the running Mac (sudo)')
+    q.add_argument('--i-have-a-backup', action='store_true', help='run the live backend before step 9a proves it')
+    q.add_argument('--probe', action='store_true', help='read-only report of the running Mac')
+    q.add_argument('--bless', choices=sorted(MAC.BLESS_FORMS), default='mount')
+    q.add_argument('--mount-point', default=MAC.MOUNT_POINT)
     g = q.add_mutually_exclusive_group()
     g.add_argument('--quiet', action='store_true'); g.add_argument('--show', action='store_true')
     g.add_argument('--log', choices=['json'])

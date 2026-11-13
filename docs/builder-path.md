@@ -29,7 +29,7 @@ and anyone can read what each patch changes and why.
 | Ledger | One origin and ordered writes per declared file; known chains in `pipeline/ledger-expected.json`, one list for every set (a chain is expected by its path and writers) | `pipeline/ledger.py` |
 | Packs | Hardware packs with detection and phase (installer only, or live) | [`packs/`](../packs/README.md), `patches.py packs`, `plan --packs` |
 | Materialiser | Makes each declared file once into pack overlays (files + manifest with mode, owner, flags and folders); what only the target can make is deferred, in dependency order (`deferred.json`) | `pipeline/materialize.py` |
-| Live patch | Applies overlays to a system: only changed files, checked, locked, revertible | [`tools/hao`](../tools/hao/README.md) |
+| Live patch | Applies overlays to a folder or the running Mac (System volume written directly, booted as a new snapshot, reverted to the one booted before): only changed files, checked, locked, rolled back on failure, revertible | [`tools/hao`](../tools/hao/README.md) |
 | Kernel binder | Computes the OpenCore kernel repairs and IntelCommpage table from a recipe and the kernel collection just linked, with no compiler on the target | [`tools/kc-binder`](../tools/kc-binder/README.md) |
 | Assembler targets | One assembler over a raw image or a whole internal disk, the disk gated by the installer's safety checks | `pipeline/stages/golden-image.py` |
 | Downloads | Pinned, resumable, content-addressed downloads; a host capability matrix | [`tools/acquire`](../tools/acquire/README.md) |
@@ -48,7 +48,8 @@ its declarations. Moving an input row clears that proof.
   and bound there.
 - **A first release.** Inputs built from uncommitted trees or harvested from a running laptop block a cut until
   they are rebuilt or approved.
-- **On the laptop:** the live patch's snapshot and revert, and the replacement Metal stack.
+- **On the laptop:** the live patch's snapshot and revert (`tools/hao/laptop/run-9a.sh`), and the replacement Metal
+  stack.
 
 ## Verify
 

@@ -114,9 +114,44 @@ class ApplyRevert(Base):
             LP.apply([self.metal_pack()], self.root, self.state)
 
     def test_live_backend_is_not_proven(self):
+        import macos
         with self.assertRaisesRegex(LP.PatchError, 'not proven yet'):
-            LP.apply([self.metal_pack()], self.root, self.state, backend=LP.MacOSLiveBackend())
+            LP.apply([self.metal_pack()], self.root, self.state, backend=macos.MacOSLiveBackend(host=object()))
         self.assertEqual(self.metal.read_bytes(), b'oclp metal')
+
+    def test_a_failure_part_way_puts_back_what_was_written(self):
+        real, n = LP._install, []
+
+        def install(*args):
+            n.append(1)
+            if len(n) == 2:
+                raise OSError(28, 'No space left on device')
+            return real(*args)
+        LP._install = install
+        try:
+            with self.assertRaisesRegex(OSError, 'No space left'):
+                LP.apply([self.metal_pack()], self.root, self.state, now=T0)
+        finally:
+            LP._install = real
+        self.assertEqual(self.metal.read_bytes(), b'oclp metal')
+        self.assertFalse((self.root / 'usr/lib/libhelloblur.dylib').exists())
+        self.assertEqual([r['state'] for r in LP.records(self.state)], ['rolled-back'])
+        self.assertFalse((self.state / 'lock').exists())
+
+    def test_kernel_collection_members_and_cache_images_wait_for_recovery(self):
+        cache = self.root / 'System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld'
+        cache.mkdir(parents=True)
+        (cache / 'dyld_shared_cache_x86_64h.map').write_text('mapping EX 1KB 0x0\n/usr/lib/libcached.dylib\n')
+        o = LP.load_overlay(self.overlay('metal-3802', 'live-capable', {
+            'System/Library/Extensions/A.kext/Contents/MacOS/A': b'k', 'usr/lib/libcached.dylib': b'c',
+            'usr/lib/libhelloblur.dylib': b'new'}))
+        p = LP.plan([o], self.root, 'live', classify=LP.Classifier(self.root))
+        self.assertEqual([r['path'] for r in p['write']], ['usr/lib/libhelloblur.dylib'])
+        self.assertEqual({f['path']: f['reason'].split(' (')[0] for f in p['needs_recovery_files']},
+                         {'System/Library/Extensions/A.kext/Contents/MacOS/A': 'a kernel collection member',
+                          'usr/lib/libcached.dylib': 'in the dyld shared cache'})
+        p = LP.plan([o], self.root, 'installer', classify=LP.Classifier(self.root))
+        self.assertEqual(len(p['write']), 3)
 
 
 class Attributes(Base):

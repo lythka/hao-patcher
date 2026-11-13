@@ -15,11 +15,17 @@ Owners and system flags (restricted, schg, sunlnk) can only be set by root. With
 user flags, and records per file what it could not set ("not_set"; the done event counts them) rather than
 failing: that is how the fixture tests run, and why a non-root run is never a proof of attributes.
 
+In live mode nothing of an installer-phase pack is written, nor any file of a live-capable pack that only the
+installer can make take effect (Classifier: kernel collection members, dyld shared cache images, the cryptex, the
+booter, the EFI partition); both are listed as needing Recovery.
+
 State lives in STATE (on the target: /private/var/db/hao): a lock, and one folder per applied patch holding its
 record (every file's sha256 and attributes before and after, which files and folders were new) and a backup of
 every replaced file, so revert restores replaced files and their attributes and removes files and folders the patch
-added. A Backend snapshots and blesses after a patch and returns to the snapshot on revert; the default
-DirectoryBackend does neither (a plain folder root, tests).
+added. Each file is entered in the record before it is written, so a failure part way undoes every write of the
+patch (state 'rolled-back'). A backend says where files are read and written and snapshots around the writes:
+DirectoryBackend (a plain folder root, tests) does neither; macos.MacOSLiveBackend writes the booted Mac's System
+volume and boots it as a new snapshot.
 """
 import datetime
 import hashlib
@@ -187,14 +193,66 @@ class Attributes:
         return skipped
 
 
-def plan(overlays, root, mode='live', attributes=None):
-    """{'write': [...], 'attrs': [...], 'same': [...], 'needs_recovery': [packs]}: files whose content differs,
-    files whose content is right but whose mode, owner or flags are not, and files that need nothing. In live mode
-    installer-phase packs are not applied (they touch kexts, the cryptex or the EFI partition) and are listed
-    instead."""
+# Paths no live patch writes, whatever pack they are in: what reads them is made on the installer (the kernel
+# collections, the dyld shared cache, the cryptex, the booter in Preboot, the EFI partition). Structural, not
+# version-specific: these are where macOS keeps those things on every release hao supports.
+INSTALLER_PATHS = (
+    ('System/Library/Extensions/', 'a kernel collection member (the installer links the kernel collections)'),
+    ('Library/Extensions/', 'a kernel collection member (the installer links the auxiliary kernel collection)'),
+    ('System/Library/KernelCollections/', 'a kernel collection (linked on the installer)'),
+    ('System/Library/Kernels/', 'the kernel (linked into the kernel collections on the installer)'),
+    ('System/Library/PrelinkedKernels/', 'a prelinked kernel (made on the installer)'),
+    ('System/Library/dyld/', 'the dyld shared cache (made on the installer)'),
+    ('System/Library/Caches/com.apple.dyld/', 'the dyld shared cache (made on the installer)'),
+    ('System/Cryptexes/', 'in the cryptex (sealed on the installer)'),
+    ('System/Volumes/', 'on another volume (Preboot, the cryptex: written by the installer)'),
+    ('private/preboot/', 'on the Preboot volume (written by the installer)'),
+    ('System/Library/CoreServices/boot.efi', 'the booter (bless copies it to Preboot; changed on the installer)'),
+    ('usr/standalone/', 'a booter file (changed on the installer)'),
+    ('EFI/', 'on the EFI partition (written by the installer)'),
+)
+# Where dyld's cache maps are (OCLP-era Intel layouts and the macOS 13+ cryptex): every line of a .map that starts
+# with / is an image the cache holds, and dyld maps the cache's copy of it, not the file at its path.
+CACHE_MAP_DIRS = ('System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld', 'System/Cryptexes/OS/System/Library/dyld',
+                  'System/Library/dyld')
+CACHE_REASON = 'in the dyld shared cache (dyld maps the cache\'s copy; the installer rebuilds the cache)'
+
+
+class Classifier:
+    """Why a path may not be written live (None when it may): INSTALLER_PATHS, and membership of the dyld shared
+    cache as the .map files beside the caches under BOOTED (the running system's root) list it."""
+
+    def __init__(self, booted=None):
+        self.cached = set()
+        self.maps = []
+        for d in CACHE_MAP_DIRS if booted is not None else ():
+            folder = Path(booted) / d
+            for m in sorted(folder.glob('*.map')) if folder.is_dir() else ():
+                self.maps.append(str(m))
+                for line in m.read_text(errors='replace').splitlines():
+                    if line.startswith('/'):
+                        self.cached.add(line.strip().lstrip('/'))
+
+    def __call__(self, path):
+        for prefix, reason in INSTALLER_PATHS:
+            if path == prefix.rstrip('/') or path.startswith(prefix):
+                return reason
+        if path in self.cached:
+            return CACHE_REASON
+        return None
+
+
+def plan(overlays, root, mode='live', attributes=None, resolve=None, classify=None):
+    """{'write': [...], 'attrs': [...], 'same': [...], 'needs_recovery': [packs], 'needs_recovery_files': [...]}:
+    files whose content differs, files whose content is right but whose mode, owner or flags are not, and files that
+    need nothing. In live mode installer-phase packs are not applied (they touch kexts, the cryptex or the EFI
+    partition) and are listed instead, and so is every file CLASSIFY (live mode only) gives a reason for: a kernel
+    collection member or dyld cache image in a live-capable pack. RESOLVE maps a path to the file to compare
+    (default ROOT/path)."""
     root = Path(root)
     attributes = attributes or Attributes(root)
-    out = {'write': [], 'attrs': [], 'same': [], 'needs_recovery': [], 'dirs': {}}
+    resolve = resolve or (lambda p: root / p)
+    out = {'write': [], 'attrs': [], 'same': [], 'needs_recovery': [], 'needs_recovery_files': [], 'dirs': {}}
     seen = {}
     for m in overlays:
         if mode == 'live' and m['phase'] == 'installer':
@@ -206,7 +264,11 @@ def plan(overlays, root, mode='live', attributes=None):
             if path in seen:
                 raise PatchError('%s is in packs %s and %s' % (path, seen[path], m['pack']))
             seen[path] = m['pack']
-            target = root / path
+            why = classify(path) if classify and mode == 'live' else None
+            if why:
+                out['needs_recovery_files'].append({'path': path, 'pack': m['pack'], 'reason': why})
+                continue
+            target = resolve(path)
             old = sha256_file(target) if target.is_file() and not target.is_symlink() else None
             row = {'path': path, 'pack': m['pack'], 'source': str(Path(m['folder']) / 'files' / path),
                    'sha256': meta['sha256'], 'old_sha256': old, 'mode': meta.get('mode'),
@@ -221,30 +283,73 @@ def plan(overlays, root, mode='live', attributes=None):
     return out
 
 
+def plan_event(p):
+    return {'ev': 'plan', 'write': len(p['write']), 'attrs': len(p['attrs']), 'same': len(p['same']),
+            'needs_recovery': p['needs_recovery'], 'needs_recovery_files': p['needs_recovery_files']}
+
+
 class DirectoryBackend:
-    """No snapshots: the root is a plain folder (tests, or a volume the operator mounted read-write)."""
+    """No snapshots: the root is a plain folder (tests, or a volume the operator mounted read-write). Every hook of
+    the live backend exists here as a no-op, so apply and revert run the same steps for both."""
     name = 'directory'
+    record_noop = True              # a patch that changes nothing still gets a record (and an id)
+    separate_write_volume = False   # booted_path and path are the same file
+
+    def __init__(self):
+        self.emit = lambda e: None
 
     def prepare(self, root):
         if not Path(root).is_dir():
             raise PatchError('%s is not a folder' % root)
+        self.root = Path(root)
+
+    def attributes(self, root):
+        return Attributes(root)
+
+    def classifier(self, root):
+        return Classifier(root)
+
+    def booted_path(self, rel):
+        """The file as the running system sees it (what the plan compares)."""
+        return self.root / rel
+
+    def path(self, rel):
+        """The file hao writes."""
+        return self.root / rel
+
+    def check_records(self, recs):
+        pass
+
+    def describe(self):
+        return {}
+
+    def open_write(self):
+        pass
+
+    def close_write(self):
+        pass
+
+    def before_write(self, patch_id):
+        return None
 
     def snapshot(self, root, name):
         return None
 
+    def choose_revert(self, applied, patch_id):
+        if patch_id:
+            applied = [r for r in applied if r['id'] == patch_id]
+        if not applied:
+            raise PatchError('nothing to revert%s' % (' named ' + patch_id if patch_id else ''))
+        return applied[-1]
+
     def revert(self, root, record):
         return None
 
+    def after_apply(self, record):
+        return {}
 
-class MacOSLiveBackend:
-    """The running system volume: mount read-write, then bless --create-snapshot with a named snapshot.
-    Not proven yet (workflow plan step 9a laptop run), so it refuses to run."""
-    name = 'macos-live'
-
-    def prepare(self, root):
-        raise PatchError('the live macOS backend is not proven yet: it runs only in the step 9a laptop run')
-
-    snapshot = revert = prepare
+    def after_revert(self, record):
+        return {}
 
 
 class Lock:
@@ -265,13 +370,13 @@ class Lock:
         self.path.unlink(missing_ok=True)
 
 
-def _folders(root, rel, dirs, attributes, created):
+def _folders(resolve, rel, dirs, attributes, created):
     """Create the missing folders above REL, each with the mode and owner the manifest's DIRS gives it (else
     0755 root:wheel); every folder created is appended to CREATED."""
     parts = Path(rel).parent.parts
     for i in range(len(parts)):
         sub = '/'.join(parts[:i + 1])
-        folder = Path(root) / sub
+        folder = resolve(sub)
         if folder.is_dir():
             continue
         folder.mkdir()
@@ -293,17 +398,47 @@ def _attrs_record(a):
     return {'mode': '%04o' % a['mode'], 'uid': a['uid'], 'gid': a['gid'], 'flags': flag_names(a['flags'])}
 
 
-def apply(overlays, root, state, *, mode='live', backend=None, on_event=None, now=None, attributes=None):
-    """Write every file of PLAN that differs, set attributes that differ, then snapshot. Returns the record."""
+def deferred_report(entries, phases, classify, written):
+    """Each deferred.json entry (in its order, which already puts native-identities after the overlays) with what
+    happens to it here: 'needs-recovery' (its pack is installer-phase or unknown, or its path is installer-only) or
+    'not-run' (target-side and live-capable, but hao has no live runner for it yet). 'stale' marks an entry made
+    after the overlays (keyed on the installed files) when this patch wrote files: it no longer matches them."""
+    out = []
+    for e in entries:
+        why = classify(e['path']) if classify else None
+        phase = phases.get(e.get('pack'))
+        if phase != 'live-capable' or why:
+            status, reason = 'needs-recovery', why or ('pack %s is %s' % (e.get('pack'), phase or 'not given'))
+        else:
+            status, reason = 'not-run', 'no live runner for it yet: %s' % e.get('reason', '')
+        out.append({'ev': 'deferred', 'path': e['path'], 'pack': e.get('pack'), 'status': status, 'reason': reason,
+                    'after': e.get('after', []), 'stale': bool(written and 'overlays' in e.get('after', []))})
+    return out
+
+
+def apply(overlays, root, state, *, mode='live', backend=None, on_event=None, now=None, attributes=None,
+          deferred=None):
+    """Write every file of PLAN that differs, set attributes that differ, then snapshot. Returns the record (None
+    when the backend keeps no record of a patch that changes nothing). A failure after the first write undoes every
+    write of this patch (record state 'rolled-back') and raises."""
     backend = backend or DirectoryBackend()
     emit = on_event or (lambda e: None)
+    backend.emit = emit
     root, state = Path(root), Path(state)
-    attributes = attributes or Attributes(root)
     backend.prepare(root)
+    attributes = attributes or backend.attributes(root)
+    classify = backend.classifier(root) if mode == 'live' else None
+    phases = {m['pack']: m['phase'] for m in overlays}
     with Lock(state):
-        p = plan(overlays, root, mode, attributes)
-        emit({'ev': 'plan', 'write': len(p['write']), 'attrs': len(p['attrs']), 'same': len(p['same']),
-              'needs_recovery': p['needs_recovery']})
+        backend.check_records(records(state))
+        p = plan(overlays, root, mode, attributes, resolve=backend.booted_path, classify=classify)
+        emit(plan_event(p))
+        if not (p['write'] or p['attrs']) and not backend.record_noop:
+            for ev in deferred_report(deferred or [], phases, classify, False):
+                emit(ev)
+            emit({'ev': 'done', 'id': None, 'written': 0, 'attrs': 0, 'same': len(p['same']), 'not_set': 0,
+                  'snapshot': None, 'needs_recovery': p['needs_recovery'], 'reboot': False})
+            return None
         stamp = (now or datetime.datetime.now()).strftime('%Y%m%d-%H%M%S')
         patch_id = 'hao-%s' % stamp
         folder, n = state / 'patches' / patch_id, 1
@@ -314,51 +449,100 @@ def apply(overlays, root, state, *, mode='live', backend=None, on_event=None, no
         (folder / 'backup').mkdir(parents=True)
         record = {'id': patch_id, 'root': str(root), 'mode': mode, 'backend': backend.name,
                   'packs': sorted({m['pack'] for m in overlays if m['pack'] not in p['needs_recovery']}),
-                  'needs_recovery': p['needs_recovery'], 'files': [], 'folders': [], 'state': 'writing',
-                  'privileged': attributes.privileged}
+                  'needs_recovery': p['needs_recovery'], 'needs_recovery_files': p['needs_recovery_files'],
+                  'files': [], 'folders': [], 'state': 'writing', 'privileged': attributes.privileged}
+        record.update(backend.describe())
         _save(folder, record)
-        for row in p['write']:
-            target = root / row['path']
-            now_sha = sha256_file(target) if target.is_file() and not target.is_symlink() else None
-            if now_sha != row['old_sha256']:
-                raise PatchError('%s changed while patching' % row['path'])
-            before = None
-            if now_sha is not None:
-                before = _attrs_record(attributes.current(target))
-                backup = folder / 'backup' / row['path']
-                backup.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(target, backup)
-            _folders(root, row['path'], p['dirs'], attributes, record['folders'])
-            skipped = _install(row['source'], target, row['want'], attributes)
-            after = sha256_file(target)
-            if after != row['sha256']:
-                raise PatchError('%s: wrote %s, expected %s' % (row['path'], after, row['sha256']))
-            record['files'].append(dict({k: row[k] for k in ('path', 'pack', 'sha256', 'old_sha256')},
-                                        before=before, after=_attrs_record(attributes.current(target)),
-                                        not_set=skipped))
+        try:
+            backend.open_write()
+            if backend.separate_write_volume:
+                _same_plan(p, plan(overlays, root, mode, attributes, resolve=backend.path, classify=classify))
+            record['snapshot_pre'] = backend.before_write(patch_id)
             _save(folder, record)
-            emit({'ev': 'file.write', 'path': row['path'], 'pack': row['pack'], 'new': now_sha is None,
-                  'sha256': row['sha256'], 'old_sha256': now_sha})
-        for row in p['attrs']:
-            target = root / row['path']
-            if sha256_file(target) != row['sha256']:
-                raise PatchError('%s changed while patching' % row['path'])
-            before = _attrs_record(attributes.current(target))
-            skipped = attributes.apply(target, row['want'])
-            record['files'].append(dict({k: row[k] for k in ('path', 'pack', 'sha256')}, old_sha256=row['sha256'],
-                                        attrs_only=True, before=before,
-                                        after=_attrs_record(attributes.current(target)),
-                                        not_set=sorted(set(skipped + row['cannot']))))
+            _write(p, record, folder, backend.path, attributes, emit)
+            record['snapshot'] = backend.snapshot(root, patch_id)
+        except BaseException as x:
+            try:
+                _undo(record, folder, backend.path, attributes, emit)
+            except Exception as y:
+                record['state'] = 'rollback-failed'
+                record['error'] = '%s; rollback failed: %s' % (x, y)
+                _save(folder, record)
+                backend.close_write()
+                raise PatchError('%s; rolling back failed too: %s (record %s)' % (x, y, folder)) from x
+            record['state'] = 'rolled-back'
+            record['error'] = str(x)
             _save(folder, record)
-            emit({'ev': 'file.attrs', 'path': row['path'], 'pack': row['pack'], 'keys': row['attrs']})
-        record['snapshot'] = backend.snapshot(root, patch_id)
+            emit({'ev': 'rolled-back', 'id': patch_id, 'files': len(record['files']), 'error': str(x)})
+            backend.close_write()
+            raise
+        backend.close_write()
         record['state'] = 'applied'
+        record.update(backend.after_apply(record))
         _save(folder, record)
-        emit({'ev': 'done', 'id': patch_id, 'written': sum(1 for f in record['files'] if not f.get('attrs_only')),
+        written = [f for f in record['files'] if not f.get('attrs_only')]
+        for ev in deferred_report(deferred or [], phases, classify, bool(written)):
+            emit(ev)
+        emit({'ev': 'done', 'id': patch_id, 'written': len(written),
               'attrs': sum(1 for f in record['files'] if f.get('attrs_only')), 'same': len(p['same']),
               'not_set': sum(1 for f in record['files'] if f.get('not_set')),
-              'snapshot': record['snapshot'], 'needs_recovery': p['needs_recovery']})
+              'snapshot': record['snapshot'], 'needs_recovery': p['needs_recovery'],
+              'reboot': bool(record.get('reboot'))})
         return record
+
+
+def _same_plan(booted, live):
+    """The plan made from the running system and the one made from the volume hao writes must agree file by file:
+    a difference means something wrote the volume without making a snapshot of it (or a patch is waiting for a
+    reboot), and hao would record the wrong 'before'."""
+    a = {r['path']: r['old_sha256'] for r in booted['write'] + booted['attrs'] + booted['same']}
+    b = {r['path']: r['old_sha256'] for r in live['write'] + live['attrs'] + live['same']}
+    for path in sorted(set(a) | set(b)):
+        if a.get(path) != b.get(path):
+            raise PatchError('%s differs between the running system and its System volume (written since boot '
+                             'without a snapshot?): not patching' % path)
+
+
+def _write(p, record, folder, resolve, attributes, emit):
+    for row in p['write']:
+        target = resolve(row['path'])
+        now_sha = sha256_file(target) if target.is_file() and not target.is_symlink() else None
+        if now_sha != row['old_sha256']:
+            raise PatchError('%s changed while patching' % row['path'])
+        before = None
+        if now_sha is not None:
+            before = _attrs_record(attributes.current(target))
+            backup = folder / 'backup' / row['path']
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(target, backup)
+            if sha256_file(backup) != now_sha:
+                raise PatchError('%s: the backup does not match the file' % row['path'])
+        entry = dict({k: row[k] for k in ('path', 'pack', 'sha256', 'old_sha256')}, before=before, pending=True)
+        record['files'].append(entry)               # recorded before the write, so a rollback undoes it too
+        _save(folder, record)
+        _folders(resolve, row['path'], p['dirs'], attributes, record['folders'])
+        skipped = _install(row['source'], target, row['want'], attributes)
+        after = sha256_file(target)
+        if after != row['sha256']:
+            raise PatchError('%s: wrote %s, expected %s' % (row['path'], after, row['sha256']))
+        entry.pop('pending')
+        entry.update(after=_attrs_record(attributes.current(target)), not_set=skipped)
+        _save(folder, record)
+        emit({'ev': 'file.write', 'path': row['path'], 'pack': row['pack'], 'new': now_sha is None,
+              'sha256': row['sha256'], 'old_sha256': now_sha})
+    for row in p['attrs']:
+        target = resolve(row['path'])
+        if sha256_file(target) != row['sha256']:
+            raise PatchError('%s changed while patching' % row['path'])
+        entry = dict({k: row[k] for k in ('path', 'pack', 'sha256')}, old_sha256=row['sha256'], attrs_only=True,
+                     before=_attrs_record(attributes.current(target)), pending=True)
+        record['files'].append(entry)
+        _save(folder, record)
+        skipped = attributes.apply(target, row['want'])
+        entry.pop('pending')
+        entry.update(after=_attrs_record(attributes.current(target)), not_set=sorted(set(skipped + row['cannot'])))
+        _save(folder, record)
+        emit({'ev': 'file.attrs', 'path': row['path'], 'pack': row['pack'], 'keys': row['attrs']})
 
 
 def _save(folder, record):
@@ -382,51 +566,62 @@ def _restore_attrs(target, before, attributes):
     attributes.apply(target, want)
 
 
+def _undo(record, folder, resolve, attributes, emit):
+    """Put every file of RECORD back (newest first): replaced files from the backup, checked against their recorded
+    sha256, with their attributes; new files removed; then the folders the patch made, when empty."""
+    for f in reversed(record['files']):
+        target = resolve(f['path'])
+        target.with_name('.hao-patch-' + target.name).unlink(missing_ok=True)    # a copy cut short
+        if f['old_sha256'] is None:
+            if target.exists() or target.is_symlink():
+                attributes.clear_flags(target)
+            target.unlink(missing_ok=True)
+        elif not f.get('attrs_only'):
+            backup = folder / 'backup' / f['path']
+            tmp = target.with_name('.hao-revert-' + target.name)
+            shutil.copyfile(backup, tmp)
+            if target.exists():
+                attributes.clear_flags(target)
+            os.replace(tmp, target)
+            if sha256_file(target) != f['old_sha256']:
+                raise PatchError('%s: restored file does not match its recorded sha256' % f['path'])
+        if f['old_sha256'] is not None and f.get('before'):
+            _restore_attrs(target, f['before'], attributes)
+        emit({'ev': 'file.revert', 'path': f['path'], 'removed': f['old_sha256'] is None,
+              'attrs_only': bool(f.get('attrs_only'))})
+    for sub in reversed(record.get('folders', [])):
+        try:
+            resolve(sub).rmdir()                   # only when empty: something else may have been put there
+        except OSError:
+            pass
+
+
 def revert(root, state, *, patch_id=None, backend=None, on_event=None, attributes=None):
     """Undo the newest applied patch (or PATCH_ID): restore replaced files and their attributes, remove added files
-    and folders, check each."""
+    and folders, check each; then the backend boots the system as it was (the live backend: the snapshot that was
+    booted before the patch)."""
     backend = backend or DirectoryBackend()
     emit = on_event or (lambda e: None)
+    backend.emit = emit
     root, state = Path(root), Path(state)
-    attributes = attributes or Attributes(root)
     backend.prepare(root)
+    attributes = attributes or backend.attributes(root)
     with Lock(state):
-        applied = [r for r in records(state) if r['state'] == 'applied']
-        if patch_id:
-            applied = [r for r in applied if r['id'] == patch_id]
-        if not applied:
-            raise PatchError('nothing to revert%s' % (' named ' + patch_id if patch_id else ''))
-        record = applied[-1]
+        record = backend.choose_revert([r for r in records(state) if r['state'] == 'applied'], patch_id)
         folder = state / 'patches' / record['id']
-        for f in reversed(record['files']):
-            target = root / f['path']
-            if target.is_file() and sha256_file(target) != f['sha256']:
-                raise PatchError('%s changed after %s: not reverting it' % (f['path'], record['id']))
-        for f in reversed(record['files']):
-            target = root / f['path']
-            if f['old_sha256'] is None:
-                if target.exists():
-                    attributes.clear_flags(target)
-                target.unlink(missing_ok=True)
-            elif not f.get('attrs_only'):
-                backup = folder / 'backup' / f['path']
-                tmp = target.with_name('.hao-revert-' + target.name)
-                shutil.copyfile(backup, tmp)
-                attributes.clear_flags(target)
-                os.replace(tmp, target)
-                if sha256_file(target) != f['old_sha256']:
-                    raise PatchError('%s: restored file does not match its recorded sha256' % f['path'])
-            if f['old_sha256'] is not None and f.get('before'):
-                _restore_attrs(target, f['before'], attributes)
-            emit({'ev': 'file.revert', 'path': f['path'], 'removed': f['old_sha256'] is None,
-                  'attrs_only': bool(f.get('attrs_only'))})
-        for sub in reversed(record.get('folders', [])):
-            try:
-                (root / sub).rmdir()                   # only when empty: something else may have been put there
-            except OSError:
-                pass
-        backend.revert(root, record)
+        backend.open_write()
+        try:
+            for f in reversed(record['files']):
+                target = backend.path(f['path'])     # as the patch left it, or already put back (a revert re-run)
+                if target.is_file() and sha256_file(target) not in (f['sha256'], f['old_sha256']):
+                    raise PatchError('%s changed after %s: not reverting it' % (f['path'], record['id']))
+            _undo(record, folder, backend.path, attributes, emit)
+            record['snapshot_reverted_to'] = backend.revert(root, record)
+        finally:
+            backend.close_write()
         record['state'] = 'reverted'
+        record.update(backend.after_revert(record))
         _save(folder, record)
-        emit({'ev': 'reverted', 'id': record['id'], 'files': len(record['files'])})
+        emit({'ev': 'reverted', 'id': record['id'], 'files': len(record['files']),
+              'snapshot': record.get('snapshot_reverted_to'), 'reboot': bool(record.get('reboot'))})
         return record
