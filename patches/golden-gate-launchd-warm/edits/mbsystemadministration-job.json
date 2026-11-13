@@ -1,0 +1,24 @@
+{
+ "format": 1,
+ "path": "System/Library/LaunchDaemons/com.apple.mbsystemadministration.plist",
+ "origin": {"kind": "apple", "name": "Golden Gate System volume"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "setup-service-until-setup-done",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["KeepAlive"], "value": {"PathState": {"/private/var/db/.AppleSetupDone": false}}},
+   "reason": "while Setup has not been done (/private/var/db/.AppleSetupDone missing), Setup Assistant's system service starts with launchd, so it is listening when loginwindow asks for it before the first Setup pane, instead of starting then (4.2 s under hao) while the screen waits; once Setup is done it starts on demand, as Apple's"
+  },
+  {
+   "id": "setup-service-interactive",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["POSIXSpawnType"], "value": "Interactive"},
+   "reason": "the service starts at the priority of the loginwindow that waits for it, not at background priority"
+  }
+ ],
+ "sign": null,
+ "expect": {"34d524fba4f5694a0383c45b117325e0980ce84a0914d92313dc457ff5e80227": "1e78a41874eda9f2440de0663a41b39b95ab38258345cdd71548559cf604d1e9"}
+}

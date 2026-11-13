@@ -1,0 +1,38 @@
+{
+ "format": 1,
+ "path": "System/Library/xpc/launchd.plist",
+ "origin": {"kind": "apple", "name": "Golden Gate System volume, after golden-gate-userspace (hybridsearchd disabled)"},
+ "applied_by": "installer",
+ "edits": [
+  {
+   "id": "helper-run-at-load",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["LaunchDaemons", "/System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist", "RunAtLoad"], "value": true},
+   "reason": "kernelmanager_helper starts with launchd, so it has finished its start-up when kernelmanagerd asks it about the kexts OpenCore injects, instead of starting then (10 s under hao) while the kernel's driver requests wait; launchd's job cache carries the same entry as the job plist"
+  },
+  {
+   "id": "helper-interactive",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["LaunchDaemons", "/System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist", "POSIXSpawnType"], "value": "Interactive"},
+   "reason": "the helper runs at the priority of kernelmanagerd itself, not at background priority, while it serves the boot's kext requests; launchd's job cache carries the same entry as the job plist"
+  },
+  {
+   "id": "setup-service-until-setup-done",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["LaunchDaemons", "/System/Library/LaunchDaemons/com.apple.mbsystemadministration.plist", "KeepAlive"], "value": {"PathState": {"/private/var/db/.AppleSetupDone": false}}},
+   "reason": "while Setup has not been done (/private/var/db/.AppleSetupDone missing), Setup Assistant's system service starts with launchd, so it is listening when loginwindow asks for it before the first Setup pane, instead of starting then (4.2 s under hao) while the screen waits; once Setup is done it starts on demand, as Apple's; launchd's job cache carries the same entry as the job plist"
+  },
+  {
+   "id": "setup-service-interactive",
+   "kind": "op",
+   "op": "plist.set",
+   "args": {"key": ["LaunchDaemons", "/System/Library/LaunchDaemons/com.apple.mbsystemadministration.plist", "POSIXSpawnType"], "value": "Interactive"},
+   "reason": "the service starts at the priority of the loginwindow that waits for it, not at background priority; launchd's job cache carries the same entry as the job plist"
+  }
+ ],
+ "sign": null,
+ "expect": {"5c0e3b840669b2881a1a204a978e4b6616c64e63e86ed6ae2f7af5e1acf0fd28": "e4433c0a568ac20e321248a1c5d8dfc21e9a71808f5bacf5f3385be72176570e"}
+}

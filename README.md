@@ -160,7 +160,7 @@ Each fix has an installation recipe in `patches/` and its source and builder in 
 | Tahoe CoreWiFi for Tahoe's airportd | native Tahoe donor + `golden-gate-userspace` (compat library) | [tools/tahoe-donors](tools/tahoe-donors), hao-tools `tools/cache-dylib`, [patches/golden-gate-userspace/src/corewifi](patches/golden-gate-userspace/src/corewifi) |
 | ARM-only programs | `hao-runtime`, `hao-opencore` | [hao-runtime](https://github.com/lythka/hao-runtime) payload |
 | Apple code identity of hao and re-signed programs | `golden-gate-userspace` (carrier in Security), `golden-gate-native-identities` | [patches/golden-gate-userspace/src/codeid](patches/golden-gate-userspace/src/codeid), hao-runtime `libhao_codeid` |
-| Boot time: no failing Aux KC build, kernel-manager helper started early | `hao-opencore` (`auxKCAtBoot=false`), `golden-gate-kernelmanager-helper-warm` | [patches/golden-gate-kernelmanager-helper-warm](patches/golden-gate-kernelmanager-helper-warm) |
+| Boot time: no failing Aux KC build; kernel-manager helper and, before Setup, Setup's system service started early | `hao-opencore` (`auxKCAtBoot=false`), `golden-gate-launchd-warm` | [patches/golden-gate-launchd-warm](patches/golden-gate-launchd-warm) |
 | Live Text (Vision text recognition) | `metal-compiler-compat`, `golden-gate-live-text-shared`, `golden-gate-live-text-service` | [tools/live-text](tools/live-text), [cache/metallib](cache/metallib) |
 | Metal argument buffers and ASTC textures (HD 4000) | recipe in progress | [tools/metal-argbuf](tools/metal-argbuf) |
 | macOS 27's own Metal on the HD 4000 (adapter in place of MetalOld) | laptop test only | [tools/metal-adapter](tools/metal-adapter) |

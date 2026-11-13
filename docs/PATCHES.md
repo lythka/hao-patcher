@@ -82,20 +82,29 @@ Revision r5, status experiment. [Recipe](../patches/golden-gate-icon-caches/READ
 - `Library/Application Support/PerUserSeed/is/__cache_info__`: whole file from hao (row icon_caches_golden_gate). User's index from user/; golden-gate-user-seed copies it into each new account.
 - `Library/Application Support/PerUserSeed/is/store.index`: whole file from hao (row icon_caches_golden_gate). User's index from user/; golden-gate-user-seed copies it into each new account.
 
-## golden-gate-kernelmanager-helper-warm
+## golden-gate-launchd-warm
 
-Revision r1, status experiment. [Recipe](../patches/golden-gate-kernelmanager-helper-warm/README.md)
+Revision r2, status experiment. [Recipe](../patches/golden-gate-launchd-warm/README.md)
 
 - `System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist`: from Apple · Golden Gate System volume; 2 edits, applied by the installer. Installed mode 0644, owner root:wheel, flags restricted.
   1. `helper-run-at-load`: plist.set RunAtLoad = true.
      Kernelmanager_helper starts with launchd, so it has finished its start-up when kernelmanagerd asks it about the kexts OpenCore injects, instead of starting then (10 s under hao) while the kernel's driver requests wait.
   2. `helper-interactive`: plist.set POSIXSpawnType = "Interactive".
      The helper runs at the priority of kernelmanagerd itself, not at background priority, while it serves the boot's kext requests.
-- `System/Library/xpc/launchd.plist`: from Apple · Golden Gate System volume, after golden-gate-userspace (hybridsearchd disabled); 2 edits, applied by the installer. Installed mode 0644, owner root:wheel, flags restricted.
+- `System/Library/LaunchDaemons/com.apple.mbsystemadministration.plist`: from Apple · Golden Gate System volume; 2 edits, applied by the installer. Installed mode 0644, owner root:wheel, flags restricted.
+  1. `setup-service-until-setup-done`: plist.set KeepAlive = {"PathState": {"/private/var/db/.AppleSetupDone": false}}.
+     While Setup has not been done (/private/var/db/.AppleSetupDone missing), Setup Assistant's system service starts with launchd, so it is listening when loginwindow asks for it before the first Setup pane, instead of starting then (4.2 s under hao) while the screen waits; once Setup is done it starts on demand, as Apple's.
+  2. `setup-service-interactive`: plist.set POSIXSpawnType = "Interactive".
+     The service starts at the priority of the loginwindow that waits for it, not at background priority.
+- `System/Library/xpc/launchd.plist`: from Apple · Golden Gate System volume, after golden-gate-userspace (hybridsearchd disabled); 4 edits, applied by the installer. Installed mode 0644, owner root:wheel, flags restricted.
   1. `helper-run-at-load`: plist.set LaunchDaemons:/System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist:RunAtLoad = true.
-     Kernelmanager_helper starts with launchd, so it has finished its start-up when kernelmanagerd asks it about the kexts OpenCore injects; launchd's job cache carries the same entry as the job plist.
+     Kernelmanager_helper starts with launchd, so it has finished its start-up when kernelmanagerd asks it about the kexts OpenCore injects, instead of starting then (10 s under hao) while the kernel's driver requests wait; launchd's job cache carries the same entry as the job plist.
   2. `helper-interactive`: plist.set LaunchDaemons:/System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist:POSIXSpawnType = "Interactive".
-     The helper runs at the priority of kernelmanagerd itself, not at background priority; launchd's job cache carries the same entry as the job plist.
+     The helper runs at the priority of kernelmanagerd itself, not at background priority, while it serves the boot's kext requests; launchd's job cache carries the same entry as the job plist.
+  3. `setup-service-until-setup-done`: plist.set LaunchDaemons:/System/Library/LaunchDaemons/com.apple.mbsystemadministration.plist:KeepAlive = {"PathState": {"/private/var/db/.AppleSetupDone": false}}.
+     While Setup has not been done (/private/var/db/.AppleSetupDone missing), Setup Assistant's system service starts with launchd, so it is listening when loginwindow asks for it before the first Setup pane, instead of starting then (4.2 s under hao) while the screen waits; once Setup is done it starts on demand, as Apple's; launchd's job cache carries the same entry as the job plist.
+  4. `setup-service-interactive`: plist.set LaunchDaemons:/System/Library/LaunchDaemons/com.apple.mbsystemadministration.plist:POSIXSpawnType = "Interactive".
+     The service starts at the priority of the loginwindow that waits for it, not at background priority; launchd's job cache carries the same entry as the job plist.
 
 ## golden-gate-live-text-service
 

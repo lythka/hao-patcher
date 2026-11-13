@@ -15,7 +15,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-font-registry | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
 | golden-gate-hello | r6 | oclp-hook | experiment |  | x | x |  |  | **needs** | r6 2026-11-12 The `libhelloblur` source and builder are in `build/` (from the hello-render recipe); the row an |
 | golden-gate-icon-caches | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
-| golden-gate-kernelmanager-helper-warm | r1 | oclp-hook | experiment |  | x |  |  |  | **needs** | r1 2026-11-12 New: kernelmanager_helper RunAtLoad, Interactive (job plist and launchd job cache), so the helpe |
+| golden-gate-launchd-warm | r2 | oclp-hook | experiment |  | x |  |  |  | **needs** | r2 2026-11-12 Renamed from golden-gate-kernelmanager-helper-warm and made a job list; adds com.apple.mbsystema |
 | golden-gate-live-text-service | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-12 Declare the config edit in edits/config.json; the hook is unchanged. |
 | golden-gate-live-text-shared | r5 | oclp-hook | experiment |  | x |  |  |  | **needs** | r5 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on libhellobl |
 | golden-gate-metal-framebuffer | r6 | oclp-hook | experiment |  | x | x |  |  | **needs** | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the driver |

@@ -56,7 +56,7 @@
    "writers": [
     "apple",
     "golden-gate-userspace",
-    "golden-gate-kernelmanager-helper-warm"
+    "golden-gate-launchd-warm"
    ]
   },
   "usr/lib/dss_shim.dylib": {

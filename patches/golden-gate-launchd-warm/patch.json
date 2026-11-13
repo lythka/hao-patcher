@@ -1,5 +1,5 @@
 {
- "revision": 1,
+ "revision": 2,
  "stage": "oclp-hook",
  "applies": {"models": ["MacBookPro9,2"], "builds": ["25G332", "25G342"]},
  "status": "experiment",
@@ -7,7 +7,12 @@
  "files": [
   {
    "path": "System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist",
-   "edits": "edits/job.json",
+   "edits": "edits/kernelmanager-helper-job.json",
+   "install": {"mode": "0644", "owner": "root:wheel", "flags": ["restricted"]}
+  },
+  {
+   "path": "System/Library/LaunchDaemons/com.apple.mbsystemadministration.plist",
+   "edits": "edits/mbsystemadministration-job.json",
    "install": {"mode": "0644", "owner": "root:wheel", "flags": ["restricted"]}
   },
   {

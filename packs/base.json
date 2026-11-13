@@ -14,7 +14,7 @@
   "darwin27-sandbox-disk-space",
   "hao-runtime",
   "golden-gate-userspace",
-  "golden-gate-kernelmanager-helper-warm",
+  "golden-gate-launchd-warm",
   "golden-gate-corespotlight-compat",
   "golden-gate-native-identities",
   "hao-opencore",
