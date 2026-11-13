@@ -1,0 +1,19 @@
+# Inputs of the Recovery spikes (pipeline/lock.py single-file format: NAME SHA256 PATH, PATH from the repository
+# root). Rows that mirror a pipeline input row must stay equal to it (tests/test_spikes.py checks MIRRORS).
+#
+# python-build-standalone 3.12.14 x86_64 (upstream release 20260924), the archive tools/hao/laptop/run-9a.sh uses.
+python_x86_64 0d6a4a299908123f00bc844df737603f047ff9eba14fda6cad83f3cf3cb3a2af store/artifacts/python-x86_64-3.12.14-20261109-0d6a4a299908/cpython-3.12.14+20260924-x86_64-apple-darwin-install_only.tar.gz
+# = pipeline/inputs/25G342/tahoe_kmutil: Tahoe's kmutil, the linker darwin27-kernel's kc-hook.sh runs.
+tahoe_kmutil 8117f0996bd735792bac41c5a4233e41d12562a7e81170e5ef81e93a352179f9 store/inputs/25G342/donor-inputs/tree/usr/bin/kmutil
+# = pipeline/inputs/golden/26B131/darwin27_kernel: the Golden Gate 26B131 x86_64 kernel.
+darwin27_kernel 3c9317518535791503970fbec322b9bba70e91f3a233536205ccd77b047ffc83 store/artifacts/kernel-foundation-26B131-20261111-3c9317518535/payload/kernel
+# = pipeline/inputs/common/fl and fl-noent: the firmlink tool golden-pristine.sh runs, with and without
+# com.apple.private.apfs.set-firmlink (pipeline/unpack/pristine-tools/fl.c, ent.plist).
+fl 3fa90beb3862a7e8c3a1bc1571b636ca592dadb7e50934dab5b989c6ebd5c609 store/inputs/pristine-tools/fl
+fl_noent 119251c1656a0cf37a1c10f6d5c2ddb30cf77389a110cff33781b0071ceebb54 store/inputs/pristine-tools/fl-noent
+# Tahoe 25G332's APFS tools from the unpacked installer, carried in case the Recovery's own are missing or differ.
+apfs_prepare_cryptex_25G332 56b639990c9a3ddf30d064649d4f4d449049cacf0838e7e0d9c9934d07d59c32 store/inputs/25G332/unpack/tree/System/Library/Filesystems/apfs.fs/Contents/Resources/apfs_prepare_cryptex
+newfs_apfs_25G332 c35a3bfc2ce36461cd25ea06494ae8371c25ff700a5ee49eec6a6dd1a0be838a store/inputs/25G332/unpack/tree/System/Library/Filesystems/apfs.fs/Contents/Resources/newfs_apfs
+# Golden Gate 26B131's AppOS cryptex (app.dmg of row golden_gate_userspace's payload), the image the cryptex spike
+# rebuilds and seals as install_app_cryptex does.
+golden_app_cryptex a20efe96a8f94370f95062c83fca934125e4e5f4c4b752c52034c8622f71bfea store/artifacts/golden-gate-userspace-26B131-20261111-233e85a09887/payload/app.dmg

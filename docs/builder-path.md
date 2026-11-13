@@ -49,7 +49,9 @@ its declarations. Moving an input row clears that proof.
   VM build: its comparison with a hook build is the next step. The kernel binder is used: hao-opencore installs its
   repairs (equal to the recorded ones on every recorded 26B131 collection; not yet through a boot).
 - **The USB installer:** the Recovery-on-a-stick launcher, disk layout on the target, and kernel collections linked
-  and bound there.
+  and bound there. Its riskiest unknowns (bundled Python, kmutil and the binder, cryptex sealing, volume groups and
+  firmlinks in a Tahoe Recovery) are spikes in [`tools/recovery-spikes`](../tools/recovery-spikes/README.md), not
+  yet run on the laptop.
 - **A first release.** Inputs built from uncommitted trees or harvested from a running laptop block a cut until
   they are rebuilt or approved.
 - **On the laptop:** the live patch's snapshot and revert (`tools/hao/laptop/run-9a.sh`), and the replacement Metal
