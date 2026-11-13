@@ -14,7 +14,8 @@ then common) and classified, without changing anything:
   reproducible  an artifact whose build.json names a clean commit of a producer found here (hao-patcher, hao-runtime,
                 hao-tools, or the repository the store belongs to), or a tracked, committed source file
   dirty         built from a tree with uncommitted changes
-  harvested     made from a running laptop (caches, seeds): a release can ship it, a user cannot make it again
+  harvested     made from a running laptop (caches, seeds): never shipped; left out of a release with a note (the
+                target makes its own caches at first boot)
   reproducible-except  rebuilt from a clean commit, identical except a documented stamp (pipeline/reproductions.json);
                 a cut accepts it and lists the difference as a note
   unrecorded    no build.json, or no producer commit in it
@@ -141,11 +142,16 @@ def release_json(assembly, results, overlays=None):
         plan = patches['plan'](TOP / 'pipeline/sets' / (a['patch_set'] + '.txt'),
                                TOP / 'pipeline/targets' / (a['target'] + '.json'), a['donor_build'], locks=None)
     packs = patches['load_packs']()
+    # harvested rows (caches made on a running laptop) never ship: their recipes are dev-only in a release, and the
+    # target makes its own caches at first boot (workflow plan decision, 2026-11-12)
+    left_out = ['%s: %s' % (row, d) for row, c, d, _ in results if c == 'harvested']
     refusals = ['%s: %s (%s)' % (row, c, d) for row, c, d, _ in results
-                if c not in ('download', 'reproducible', 'reproducible-except')]
+                if c not in ('download', 'reproducible', 'reproducible-except', 'harvested')]
     notes = ['%s: %s' % (row, d) for row, c, d, _ in results if c == 'reproducible-except']
     downloads, assets = [], []
     for row, c, detail, hit in results:
+        if c == 'harvested':
+            continue
         sha, path = hit[1] if hit else ('-', None)
         size = os.path.getsize(path) if path and os.path.isfile(path) else None
         item = {'row': row, 'sha256': sha, 'size': size}
@@ -160,12 +166,20 @@ def release_json(assembly, results, overlays=None):
            'recipes': {name: patches['revision'](name) for _, name, _ in plan},
            'packs': {n: {'phase': p['phase'], 'recipes': p.get('recipes', [])} for n, p in sorted(packs.items())},
            'downloads': downloads, 'assets': [{k.rstrip('_'): v for k, v in x.items()} for x in assets],
-           'refusals': refusals, 'notes': notes}
+           'refusals': refusals, 'notes': notes, 'left_out': left_out}
+    harvested_rows = {row for row, c, _, _ in results if c == 'harvested'}
+    dev_only = sorted(name for _, name, inputs in plan if harvested_rows & set(inputs))
+    out['dev_only_recipes'] = dev_only
     if overlays:
+        ledger_mod = runpy.run_path(str(TOP / 'pipeline' / 'ledger.py'))
+        led = ledger_mod['build'](TOP / 'pipeline/sets' / (a['patch_set'] + '.txt'),
+                                  TOP / 'pipeline/targets' / (a['target'] + '.json'), a['donor_build'])
+        skip = [p for p, e in led.items() if e['writers'][-1]['recipe'] in dev_only]
         expected = {}
         for m in sorted(Path(overlays).glob('*/manifest.json')):
             man = json.loads(m.read_text())
-            expected[man['pack']] = {p: f['sha256'] for p, f in sorted(man['files'].items())}
+            expected[man['pack']] = {p: f['sha256'] for p, f in sorted(man['files'].items())
+                                     if not any(p == s or p.startswith(s.rstrip('/') + '/') for s in skip)}
         out['expected_outputs'] = expected    # compared after a build, not fatal: a difference is a note
     return out
 
@@ -205,7 +219,7 @@ def main(argv):
         for _, c, _ in results:
             counts[c] = counts.get(c, 0) + 1
         print('\nrelease-cut: %d rows: %s' % (len(results), ', '.join('%d %s' % (n, c) for c, n in sorted(counts.items()))))
-    return 0 if all(c in ('download', 'reproducible', 'reproducible-except') for _, c, _ in results) else 1
+    return 0 if all(c in ('download', 'reproducible', 'reproducible-except', 'harvested') for _, c, _ in results) else 1
 
 
 if __name__ == '__main__':

@@ -29,7 +29,7 @@ class ReleaseCut(unittest.TestCase):
         classes = {x['class'] for x in json.loads(r.stdout)}
         self.assertLessEqual(classes, {'download', 'reproducible', 'reproducible-except', 'dirty', 'harvested',
                                        'unrecorded', 'missing'})
-        self.assertEqual(r.returncode, 0 if classes <= {'download', 'reproducible', 'reproducible-except'} else 1)
+        self.assertEqual(r.returncode, 0 if classes <= {'download', 'reproducible', 'reproducible-except', 'harvested'} else 1)
 
 
 class Reproductions(unittest.TestCase):
