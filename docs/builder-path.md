@@ -2,7 +2,7 @@
 
 Where hao-patcher is going, and which parts already exist. Today an image is built on the maintainer's Mac
 inside an arm64 builder VM (`docs/building.md`). The goal is a release a user downloads and runs on their own Mac,
-with no VM, no Apple silicon and no second machine. It makes either a USB installer that installs macOS 27 on an Intel
+with no VM, no Apple silicon and no second machine ([building without Apple silicon](#building-without-apple-silicon)). It makes either a USB installer that installs macOS 27 on an Intel
 Mac through its Recovery, or a complete macOS 27 disk built straight onto an external SSD that the Intel Mac boots
 as is. Anyone can read what each patch changes and why.
 
@@ -46,6 +46,47 @@ as is. Anyone can read what each patch changes and why.
 `validated_revision` and `validated_digest` let a recipe keep a boot test's proof across revisions that only change
 its declarations. Moving an input row clears that proof.
 
+## Building without Apple silicon
+
+Nobody building or installing a release needs an Apple silicon Mac or a virtual machine. Each part of the build
+falls on one side of this line:
+
+| Made once, frozen in a release | Made on the user's Intel Mac, every build |
+|---|---|
+| What needs Xcode 27, its Swift or its Metal tools, which run only on Apple silicon: the hao runtime payload, the Metal library repairs, the compiled shims. Published in HaoSupportPkg, pinned by hash, reused, never rebuilt by users. | Apple's files downloaded and checked, unpacked, every declared edit applied once (the artifact store reuses unchanged results), the image assembled, the kernel collections linked with Tahoe's `kmutil` and the kernel repairs bound to them. |
+
+No build step runs macOS 27's own arm64 programs: its files are only read, edited and signed. What the assembly
+needs from the Mac it runs on is the build environment the builder VM has today (System Integrity Protection off,
+AMFI relaxed) and the right to format the target disk. A user's everyday macOS gives neither, so the assembly runs
+in the installer's Recovery.
+
+**The installer's Recovery is Golden Gate's own.** The macOS 27 BaseSystem, started by OpenCore on our Darwin 27
+x86_64 kernel with Tahoe's Intel kexts and hao for its arm64-only programs. It installs the macOS it looks like, with
+the same kernel. Its first stage boots to a shell in QEMU (`tools/gg-recovery`); next is fitting it in OpenCore's
+4 GiB ramdisk limit. The Tahoe Recovery stays as the fallback, and for Macs with too little memory to hold it.
+
+**The kit.** The assembly reads one staged folder, the kit: Apple's unpacked files, the donor and pack inputs, the
+recipes, and an arm64 and an x86_64 CPython. Paths inside it are relative, so the same kit assembles in the builder
+VM, on an Intel Mac or in the target's Recovery, onto an image file or a whole disk. Sealed cryptex images are kept
+and reused between builds, keyed on their inputs and on the builder's tools.
+
+## Where it stands
+
+| Command | What it does | State |
+|---|---|---|
+| `hao detect` | the Mac, its devices and packs | works |
+| `hao fetch` / `hao verify` | pinned downloads; checks an installed system against its manifests | works |
+| `hao create-installer` | on any Mac: download, unpack, prepare packs, write the USB stick | checks and plan only; writing the stick is not built |
+| `hao install` | on the target, from the stick: lay out the disk, copy macOS, add Intel support, apply packs, link the kernel, seal, make it bootable | every step exists in the image build; running it outside the builder VM comes with the kit |
+| `hao build-disk` | the same assembly onto an external SSD | checks and plan only, as `install` |
+| `hao build-image` | an image file, for development | works, in the builder VM |
+| `hao patch` / `--revert` | live updates of packs on the running Mac, undone by snapshot | works on a folder; on the running Mac it waits for a laptop proof of snapshot and revert |
+| `hao explain` / `hao inspect` | where a file came from and each change made to it | works |
+
+Every command shows its work at five levels, from progress bars (`--quiet`) through steps (default), files
+(`--show`) and edits (`--show-edits`) to a JSON trace (`--log json`), and a failed check stops with what happened,
+why it matters, what was left untouched and what to do next.
+
 ## Not done yet
 
 - **Installing from these pieces.** Images are still built by the recipes' own hooks by default. `golden-run
@@ -56,12 +97,14 @@ its declarations. Moving an input row clears that proof.
   hao-opencore installs its repairs (equal to the recorded ones on every recorded 26B131 collection). IntelCommpage
   r42 reads its collection addresses from the table the binder writes; it passed a VM build and a QEMU boot, not
   yet the laptop.
-- **The USB installer:** the Recovery-on-a-stick launcher, disk layout on the target, and kernel collections linked
-  and bound there. Its riskiest unknowns (bundled Python, kmutil and the binder, cryptex sealing, volume groups and
-  firmlinks in a Tahoe Recovery) are spikes in [`tools/recovery-spikes`](../tools/recovery-spikes/README.md), not
-  yet run on the laptop.
-- **A first release.** Inputs built from uncommitted trees or harvested from a running laptop block a cut until
-  they are rebuilt or approved.
+- **The kit**, then `hao install` and `hao build-disk` writing through it, proven first in the Tahoe Recovery on the
+  laptop.
+- **The USB installer:** the Recovery-on-a-stick launcher in Golden Gate's Recovery. Its riskiest unknowns (bundled
+  Python, kmutil and the binder, cryptex sealing, volume groups and firmlinks) pass in the laptop's Tahoe Recovery
+  ([`tools/recovery-spikes`](../tools/recovery-spikes/README.md)); they run again in Golden Gate's.
+- **A first release.** `pipeline/release-cut --dry-run` lists every input a cut would refuse: today one built from
+  a checkout with uncommitted changes and one without a build record. Caches harvested from a running laptop never
+  ship; a release warms them up on the first boot instead (not built yet).
 - **On the laptop:** the live patch's snapshot and revert (`tools/hao/laptop/run-9a.sh`), and the replacement Metal
   stack.
 
