@@ -86,7 +86,7 @@ work; the dependency split above does not claim those paths are complete.
 | `tahoe_native_donors`, `tahoe_extensions_donors`, `tahoe_boot_donors`, `tahoe_driverkit_donors`, `tahoe_recovery_donors` | [`tools/tahoe-donors`](../tools/tahoe-donors/README.md) from the 25G342 installer and KDK |
 | `oclp_hardware` | [`tools/oclp-hardware`](../tools/oclp-hardware/README.md) from PatcherSupportPkg 2.0.5 and OCLP's `RSRRepair` |
 | OCLP integration source | [`tools/oclp-integration`](../tools/oclp-integration/README.md) from the declared upstream OCLP revision |
-| Kernel, Metal, display, CoreSpotlight and audio fixes | Each fix's builder; see the [fix table](../README.md#fixes) |
+| Kernel, Metal, display, CoreSpotlight and audio fixes | Each fix's builder; see the [fix table](progress.md#fixes) |
 | `hao_runtime` | A [hao-runtime](https://github.com/lythka/hao-runtime) image payload |
 | Builder helpers | Python 3.14 on the host; the arm64 Python archive and helper tools named in `pipeline/inputs/common/` for the builder VM |
 
