@@ -10,6 +10,7 @@ detected Mac uses. Each `NAME.json` has:
 | `phase` | `installer` (touches kexts, the cryptex or the EFI partition: only from the installer or the on-disk Recovery) or `live-capable` (`hao patch` may apply it to the running system) |
 | `proven_on` | models a boot test proved it on |
 | `recipes` | member recipes; a recipe is in at most one pack, and a recipe in no pack applies as before |
+| `opt_in` | optional, `true`: never selected by detection (`--packs auto`), only by name; for dev-only trials (`metal27-trial`) |
 
 ```sh
 python3.14 -I pipeline/patches.py packs pipeline/targets/mbp92.json                        # detected packs

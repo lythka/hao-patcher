@@ -133,9 +133,12 @@ def pack_problems(packs, root=os.path.join(TOP, 'patches')):
     known = set(patch_names(root))
     for name, p in packs.items():
         where = 'packs/%s.json' % name
-        unknown = set(p) - {'format', 'description', 'detect', 'oclp_patchsets', 'phase', 'proven_on', 'recipes'}
+        unknown = set(p) - {'format', 'description', 'detect', 'oclp_patchsets', 'phase', 'proven_on', 'recipes',
+                            'opt_in'}
         if unknown:
             bad.append('%s: unknown keys %s' % (where, ', '.join(sorted(unknown))))
+        if 'opt_in' in p and p['opt_in'] is not True:
+            bad.append('%s: opt_in is true or absent' % where)
         if p.get('format') != 1 or p.get('phase') not in PHASES:
             bad.append('%s: needs format 1 and phase %s' % (where, ' or '.join(PHASES)))
         d = p.get('detect')
@@ -165,6 +168,8 @@ def detect_packs(target, packs=None):
             patchsets = set(json.load(f).get('patchset_order', []))
     out = []
     for name, p in packs.items():
+        if p.get('opt_in'):
+            continue                   # selected only by name (--packs NAME,...), never by detection
         d = p.get('detect', {})
         if d.get('any_intel') or patchsets & set(d.get('oclp_patchsets', [])) or t.get('board_id') in d.get('board_ids', []):
             out.append(name)

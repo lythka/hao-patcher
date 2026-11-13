@@ -1,0 +1,15 @@
+{
+ "format": 1,
+ "description": "Dev-only trial: macOS 27.2.1's own x86_64 Metal for every process on the HD 4000 (tools/metal-adapter's installed builds) over OCLP's Metal wrapper. Never detected: select it by name (--packs metal27-trial).",
+ "detect": {
+  "board_ids": [
+   "Mac-6F01561E16C75D06"
+  ]
+ },
+ "opt_in": true,
+ "phase": "live-capable",
+ "proven_on": [],
+ "recipes": [
+  "golden-gate-metal27"
+ ]
+}

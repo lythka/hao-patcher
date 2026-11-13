@@ -197,6 +197,17 @@ class Packs(unittest.TestCase):
                      'z.json: hao-runtime is already in pack y'):
             self.assertIn(want, got)
 
+    def test_opt_in_packs_are_never_detected(self):
+        defs = dict(self.DEFS, trial={'format': 1, 'detect': {'board_ids': ['Mac-6F01561E16C75D06']},
+                                      'phase': 'live-capable', 'opt_in': True, 'recipes': ['c']})
+        defs.pop('other')
+        self.assertEqual(sorted(patches.detect_packs(TOP / 'pipeline/targets/mbp92.json', defs)), ['base', 'gpu'])
+        self.assertEqual(patches.pack_problems({'t': dict(defs['trial'], opt_in=False, recipes=[])}),
+                         ['packs/t.json: opt_in is true or absent'])
+        real = patches.load_packs()
+        self.assertTrue(real['metal27-trial']['opt_in'])
+        self.assertNotIn('metal27-trial', patches.detect_packs(TOP / 'pipeline/targets/mbp92.json'))
+
     def test_mbp92_plan_is_unchanged_with_detected_packs(self):
         target = TOP / 'pipeline/targets/mbp92.json'
         for s in ('golden-gate-26B131', 'golden-gate'):

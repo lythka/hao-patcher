@@ -1,0 +1,13 @@
+{
+ "what": "The files golden-gate-metal27 replaces, by sha256: install.py refuses any other",
+ "System/Library/Frameworks/Metal.framework/Versions/A/Metal": {
+  "780af59c91311ab7fbaa626578e7259a1e2b6ca8e0b1aac9277b063becd35eff": "OCLP's Metal wrapper (PatcherSupportPkg 2.0.5) with golden-gate-hello's edits (edits/metal.json expect)",
+  "9841dc3d5c5062ea1bfa404f3fef3f2c178fda3322892249283c61e04ee1f230": "OCLP's Metal wrapper (PatcherSupportPkg 2.0.5), unedited"
+ },
+ "needs": [
+  "System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/3802/MTLCompiler",
+  "System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/31001/MTLCompiler",
+  "System/Library/PrivateFrameworks/GPUCompiler.framework/Versions/31001/Libraries/libLLVM_helper.dylib",
+  "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver"
+ ]
+}
