@@ -152,6 +152,13 @@ class ApplyRevert(Base):
                           'usr/lib/libcached.dylib': 'in the dyld shared cache'})
         p = LP.plan([o], self.root, 'installer', classify=LP.Classifier(self.root))
         self.assertEqual(len(p['write']), 3)
+        # where dyld loads on-disk roots of cache images (CSR_ALLOW_APPLE_INTERNAL), only the kext waits
+        p = LP.plan([o], self.root, 'live', classify=LP.Classifier(self.root, cache_roots=True))
+        self.assertEqual([r['path'] for r in p['write']], ['usr/lib/libcached.dylib', 'usr/lib/libhelloblur.dylib'])
+        self.assertEqual([f['path'] for f in p['needs_recovery_files']],
+                         ['System/Library/Extensions/A.kext/Contents/MacOS/A'])
+        self.assertEqual(LP.Classifier(self.root, cache_roots=True)('System/Library/dyld/x'),
+                         'the dyld shared cache (made on the installer)')
 
 
 class Attributes(Base):

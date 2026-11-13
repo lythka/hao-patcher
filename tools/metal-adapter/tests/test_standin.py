@@ -143,6 +143,15 @@ class Standin(Harness):
         self.assertIn(b'-fmodules-cache-path="/tmp/run/metalfe"', o)
         self.assertNotIn(b'/var/folders', o)
 
+    def test_req13_language_versions_above_3_0_become_3_0(self):
+        opts = '-std=metal3.2 -x -std=metal4.0 -std=metal3.0 -std=macos-metal2.4 -std=metal2.4 -std=metal3.10 -O2'
+        r = self.put('f.req13', self.req13(opts))
+        rc, s, err = self.run_h('req13', r, env={'HAO_FE_MODULE_CACHE': ''})
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(len(s), r.stat().st_size)
+        self.assertIn(b'-std=metal3.0 -x -std=metal3.0 -std=metal3.0 -std=macos-metal2.4 -std=metal2.4 '
+                      b'-std=metal3.10 -O2\0', s)
+
     def test_req13_without_module_cache_keeps_its_size(self):
         r = self.put('e.req13', self.req13('-std=metal4.1 -fmodules-cache-path="/x/com.apple.metalfe"'))
         rc, s, err = self.run_h('req13', r, env={'HAO_FE_MODULE_CACHE': ''})

@@ -18,8 +18,8 @@ user flags, and records per file what it could not set ("not_set"; the done even
 failing: that is how the fixture tests run, and why a non-root run is never a proof of attributes.
 
 In live mode nothing of an installer-phase pack is written, nor any file of a live-capable pack that only the
-installer can make take effect (Classifier: kernel collection members, dyld shared cache images, the cryptex, the
-booter, the EFI partition); both are listed as needing Recovery.
+installer can make take effect (Classifier: kernel collection members, dyld shared cache images unless dyld loads
+on-disk roots there, the cryptex, the booter, the EFI partition); both are listed as needing Recovery.
 
 State lives in STATE (on the target: /private/var/db/hao): a lock, and one folder per applied patch holding its
 record (every file's sha256 and attributes before and after, which files and folders were new) and a backup of
@@ -218,15 +218,22 @@ INSTALLER_PATHS = (
 CACHE_MAP_DIRS = ('System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld', 'System/Cryptexes/OS/System/Library/dyld',
                   'System/Library/dyld')
 CACHE_REASON = 'in the dyld shared cache (dyld maps the cache\'s copy; the installer rebuilds the cache)'
+CSR_ALLOW_APPLE_INTERNAL = 0x10
 
 
 class Classifier:
     """Why a path may not be written live (None when it may): INSTALLER_PATHS, and membership of the dyld shared
-    cache as the .map files beside the caches under BOOTED (the running system's root) list it."""
+    cache as the .map files beside the caches under BOOTED (the running system's root) list it.
 
-    def __init__(self, booted=None):
+    CACHE_ROOTS: dyld on this system loads a file at a cache image's path instead of the cache's copy (an on-disk
+    root). macOS dyld looks for such roots only when csr_check(CSR_ALLOW_APPLE_INTERNAL) succeeds, which hao's images
+    arrange (IntelCommpage's ic_csr_internal=1; it is how OCLP's Metal wrapper and MetalOld replace 27's Metal). Then
+    a cache image is written live like any other file: each process loads the new file when it next starts."""
+
+    def __init__(self, booted=None, cache_roots=False):
         self.cached = set()
         self.maps = []
+        self.cache_roots = bool(cache_roots)
         for d in CACHE_MAP_DIRS if booted is not None else ():
             folder = Path(booted) / d
             for m in sorted(folder.glob('*.map')) if folder.is_dir() else ():
@@ -239,7 +246,7 @@ class Classifier:
         for prefix, reason in INSTALLER_PATHS:
             if path == prefix.rstrip('/') or path.startswith(prefix):
                 return reason
-        if path in self.cached:
+        if path in self.cached and not self.cache_roots:
             return CACHE_REASON
         return None
 

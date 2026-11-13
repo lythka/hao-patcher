@@ -187,7 +187,7 @@ class GoldenRun(unittest.TestCase):
         import importlib.util
         spec=importlib.util.spec_from_file_location('patches_module',TOP/'pipeline/patches.py')
         patches=importlib.util.module_from_spec(spec);spec.loader.exec_module(patches)
-        for name in ('golden-gate-26B131','golden-gate','dev-bs-test','dev-golden-bootstrap'):
+        for name in ('golden-gate-26B131','golden-gate','dev-bs-test','dev-golden-bootstrap','dev-metal27'):
             rows=[(stage,patch) for stage,patch,_ in patches.plan(str(TOP/'pipeline/sets'/(name+'.txt')),
                                                                   str(TOP/'pipeline/targets/mbp92.json'),'25G342')]
             with self.subTest(set=name),tempfile.TemporaryDirectory() as folder:
@@ -210,6 +210,21 @@ class GoldenRun(unittest.TestCase):
         self.assertEqual('golden-gate-26B131',assembly.pop('patch_set'));developer.pop('patch_set')
         assembly.pop('repo',None);developer.pop('repo',None)   # each keeps its own image repository
         self.assertEqual(developer,assembly)
+
+    def test_metal27_set_is_the_dev_set_plus_its_one_recipe(self):
+        def names(name):
+            return [l.split('#',1)[0].strip() for l in (TOP/'pipeline/sets'/(name+'.txt')).read_text().splitlines()
+                    if l.split('#',1)[0].strip()]
+        dev=names('dev-bs-test');at=dev.index('golden-gate-live-text-shared')+1
+        self.assertEqual(dev[:at]+['golden-gate-metal27']+dev[at:],names('dev-metal27'))
+        self.assertEqual('golden-gate-native-identities',dev[at])
+        for name in ('dev-bs-test','golden-gate-26B131','golden-gate'):
+            self.assertNotIn('golden-gate-metal27',names(name))
+        variant=json.loads((TOP/'pipeline/assemblies/dev-26B131-metal27.json').read_text())
+        developer=json.loads((TOP/'pipeline/assemblies/dev-26B131.json').read_text())
+        self.assertEqual('dev-metal27',variant.pop('patch_set'));developer.pop('patch_set')
+        self.assertNotEqual(variant.pop('repo'),developer.pop('repo'))
+        self.assertEqual(developer,variant)
 
     def fixture_job(self, root, rc, workspace=None):
         share=root/'share';source=share/'assembly-source';source.mkdir(parents=True)

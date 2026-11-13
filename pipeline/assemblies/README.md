@@ -13,6 +13,7 @@ python3.14 -I pipeline/build NAME --dry-run          # print the command only
 |---|---|---|
 | `dev-26B131.json` | golden | 27.2.1 (26B131) for MacBookPro9,2, dev set (root SSH, hao statistics); the laptop images |
 | `mbp92-26B131.json` | golden | the same without dev recipes (not yet built) |
+| `dev-26B131-metal27.json` | golden | `dev-26B131` with set `dev-metal27`: every process on 27.2.1's own Metal ([golden-gate-metal27](../../patches/golden-gate-metal27/README.md)); dev trial, own image repository |
 | `tahoe-mbp92-25G342.json` | tahoe | Tahoe 25G342 for MacBookPro9,2 with stock OCLP and root SSH (set `tahoe-dev`), inputs `pipeline/inputs/25G342-tahoe` (full installer unpack) |
 
 `"runner": "golden"` (the default) runs `pipeline/golden-run`; `"runner": "tahoe"` runs the Tahoe-first

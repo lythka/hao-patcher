@@ -306,7 +306,8 @@ class MacOSLiveBackend(LP.DirectoryBackend):
         return LP.Attributes(self.host.fs('/'))
 
     def classifier(self, root):
-        return LP.Classifier(self.host.fs('/'))
+        csr = self.host.csr_config() or 0
+        return LP.Classifier(self.host.fs('/'), cache_roots=csr & LP.CSR_ALLOW_APPLE_INTERNAL)
 
     def volume(self, rel):
         """('data', path inside the Data volume) for a path under a firmlink, else ('system', REL)."""

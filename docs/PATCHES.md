@@ -7,7 +7,7 @@ A file is installed with the attributes its declaration gives (*installed*: mode
 without them gets root:wheel, 0755 for a Mach-O, 0644 otherwise, no flags (a tar member keeps its own mode and owner).
 A file made on the target lists what it is made *after* there.
 
-35 of 35 patches declare their files so far.
+36 of 36 patches declare their files so far.
 
 ## darwin27-kernel
 
@@ -151,6 +151,15 @@ Revision r19, status experiment. [Recipe](../patches/golden-gate-metal-libraries
 - 11 whole files from hao (row metallib_repairs_golden_gate), under `System/` (for example `Library/Frameworks/MetalPerformanceShaders.framework/Versions/A/Frameworks/MPSImage.framework/Versions/A/Resources/default.metallib`). The build's own library, already rewritten by cache/metallib (profiles/metallib-repairs-golden-gate.txt) so the HD 4000 compiler accepts it; installed whole, and only over the System library its SOURCES line names (or OCLP's copy on the same build). Listed by `patches.py explain golden-gate-metal-libraries`.
 - `System/Library/Extensions/AppleIntelGraphicsShared.bundle/Contents/Resources/runtime.igil64.split`: whole file from hao (row metal_quad_runtime_golden_gate). OCLP's Intel shader runtime extended with the SIMD and quad helpers MPS and MetalFX kernels call (cache/metallib make runtime-build); installed whole.
 - `System/Library/Extensions/AppleIntelHD4000GraphicsGLDriver.bundle/Contents/MacOS/iCBE.dylib`: whole file from hao (row metal_quad_runtime_golden_gate). OCLP's compiler with two 1-byte edits in Convert_ACTIVE_CHANNEL_MASK (cache/metallib/lib/compiler_mask.py), then ad-hoc signed; installed whole.
+
+## golden-gate-metal27
+
+Revision r1, status dev. [Recipe](../patches/golden-gate-metal27/README.md)
+
+- `System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/32023/MTLCompiler`: whole file from hao (row metal27_installed). New file over a dyld cache image (an on-disk root): tools/metal-adapter's stand-in, installed build; routes 27's in-process compiles to OCLP's 31001 and 3802. Installed mode 0755, owner root:wheel, flags restricted.
+- `System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/32024/MTLCompiler`: whole file from hao (row metal27_installed). New file over a dyld cache image: the same stand-in for 27's other compiler version. Installed mode 0755, owner root:wheel, flags restricted.
+- `System/Library/Frameworks/Metal.framework/Versions/A/libHaoMetalShim.dylib`: whole file from hao (row metal27_installed). New file: tools/metal-adapter's shim, installed build (ivar offsets, descriptor layouts for the HD 4000 driver, the in-process compiler switch). Installed mode 0755, owner root:wheel, flags restricted.
+- `System/Library/Frameworks/Metal.framework/Versions/A/Metal`: whole file from hao (row metal27_installed). 27.2.1's own x86_64 Metal cut from the 26B131 cache with LC_REEXPORT_DYLIB of the shim (the laptop bundle's file byte for byte); replaces OCLP's wrapper and golden-gate-hello's edits to it. Installed mode 0755, owner root:wheel, flags restricted.
 
 ## golden-gate-native-identities
 

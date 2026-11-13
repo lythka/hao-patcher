@@ -286,6 +286,18 @@ class Materialize(unittest.TestCase):
                        capture_output=True)
         self.assertTrue(signing.compare(reference.read_bytes(), unsigned.read_bytes())['problems'])   # the old gap
 
+    def test_a_whole_file_after_edits_replaces_them_unsigned_again(self):
+        # golden-gate-hello edits OCLP's wrapper and signs it; a later recipe installing a whole Metal (the
+        # metal27 trial) replaces it: its bytes as the row has them, not re-signed with the edit's signing spec
+        self.recipe('hello', [{'path': METAL, 'edits': 'edits/m.json'}],
+                    {'m.json': literal('x', 4, '6F', '4F', sign={'mode': 'adhoc', 'identifier': 'Metal'})})
+        self.recipe('metal27', [{'path': METAL, 'origin': {'kind': 'hao', 'row': 'one'}}])
+        report, out = self.run_all(packs={'hello': 'metal-3802', 'metal27': 'metal27-trial'})
+        self.assertEqual((out / 'metal27-trial/files' / METAL).read_bytes(), b'\xcf\xfa\xed\xfe one')
+        self.assertEqual(report[METAL]['writers'], ['hello', 'metal27'])
+        self.assertFalse(report[METAL]['base']['edited'])     # what it replaces: OCLP's wrapper as installed
+        self.assertFalse((out / 'metal-3802').exists())
+
     def test_last_writer_decides_the_pack(self):
         self.recipe('a', [{'path': 'usr/lib/one.dylib', 'origin': {'kind': 'hao', 'row': 'one'}}])
         report, out = self.run_all(packs={'a': 'metal-3802'})

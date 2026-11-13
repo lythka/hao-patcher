@@ -246,6 +246,8 @@ def compose(entry, root, sources, store, repo, facts=None):
             if w.get('tree'):
                 return sources.row_tree(o['row'], entry['path'], w.get('source'))
             data = sources.row_file(o['row'], entry['path'], w.get('source'))
+            original, signing = None, None     # a whole file replaces what earlier writers made, signature included
+            facts.pop('base', None)
             continue
         spec = SPEC.load(Path(root) / w['recipe'] / w['spec'])
         external = [e['op'] for e in spec['edits'] if e['kind'] == 'op' and e['op'] in SPEC.EXTERNAL_OPS]

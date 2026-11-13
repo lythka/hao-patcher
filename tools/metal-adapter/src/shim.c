@@ -10,6 +10,9 @@
 //     MTL_MONOLITHIC_COMPILER=1 selects the in-process compiler connection. A data write (the function's cached
 //     answer), located by instruction match in the loaded Metal27; any mismatch refuses (exit 70), nothing is guessed.
 // Also refuses (exit 70) unless the process's only Metal is the bundle's Metal27 (UUID) and MetalOld is not loaded.
+// Installed build (-DHAO_METAL27_INSTALLED, make.py installed; every process that loads Metal on the system): the flip is
+// on unless HAO_METAL27_INTERNAL=0, nothing is printed unless HAO_SHIM_LOG=1, and a refusal never ends the process: it
+// goes to the unified log (subsystem org.hao.metal27) and the shim does nothing more in that process.
 #include <CoreFoundation/CoreFoundation.h>
 #include <dlfcn.h>
 #include <objc/runtime.h>
@@ -22,6 +25,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdarg.h>
+#ifdef HAO_METAL27_INSTALLED
+#include <os/log.h>
+#endif
 
 #ifndef METAL27_UUID
 #error "build with -DMETAL27_UUID=\"<uuid of the bundle's Metal27>\""
@@ -41,10 +48,35 @@ __attribute__((visibility("default"))) void copyAndNullifyRefsInDescriptor(void)
   abort();
 }
 
-static void refuse(const char *why) {
-  fprintf(stderr, "[shim] REFUSE: %s\n", why);
+static int verbose(void) {
+#ifdef HAO_METAL27_INSTALLED
+  const char *e = getenv("HAO_SHIM_LOG");
+  return e && !strcmp(e, "1");
+#else
+  return 1;
+#endif
+}
+__attribute__((format(printf, 1, 2))) static void say(const char *fmt, ...) {
+  if (!verbose()) return;
+  va_list a; va_start(a, fmt); vfprintf(stderr, fmt, a); va_end(a);
+}
+#ifdef HAO_METAL27_INSTALLED
+static os_log_t olog(void) {
+  static os_log_t l;
+  if (!l) l = os_log_create("org.hao.metal27", "shim");
+  return l;
+}
+#endif
+// Returns -1 (installed build: logged, and the caller stops) or ends the process with 70 (test bundle).
+static int refuse(const char *why) {
+  say("[shim] REFUSE: %s\n", why);
+#ifdef HAO_METAL27_INSTALLED
+  os_log_error(olog(), "refused in %{public}s (pid %d): %{public}s", getprogname(), getpid(), why);
+  return -1;
+#else
   fflush(stderr);
   _exit(70);
+#endif
 }
 
 static void uuid_of(const struct mach_header_64 *h, char out[37]) {
@@ -64,41 +96,43 @@ static void uuid_of(const struct mach_header_64 *h, char out[37]) {
 
 static const struct mach_header_64 *gMetal;
 
-static void check_metal(void) {
+static int check_metal(void) {
   int metals = 0, old = 0;
   for (uint32_t i = 0; i < _dyld_image_count(); i++) {
     const char *n = _dyld_get_image_name(i);
     if (!n) continue;
-    if (strstr(n, "MetalOld")) { old++; fprintf(stderr, "[shim] loaded: %s\n", n); }
+    if (strstr(n, "MetalOld")) { old++; say("[shim] loaded: %s\n", n); }
     size_t l = strlen(n), k = strlen("/Metal.framework/Versions/A/Metal");
     if (l >= k && !strcmp(n + l - k, "/Metal.framework/Versions/A/Metal")) {
       char u[37]; uuid_of((const struct mach_header_64 *)_dyld_get_image_header(i), u);
-      fprintf(stderr, "[shim] Metal image: %s uuid %s\n", n, u);
+      say("[shim] Metal image: %s uuid %s\n", n, u);
       metals++;
       if (!strcmp(u, METAL27_UUID)) gMetal = (const struct mach_header_64 *)_dyld_get_image_header(i);
     }
   }
-  if (!gMetal) refuse("the loaded Metal is not the bundle's Metal27 (uuid " METAL27_UUID ")");
-  if (metals != 1) refuse("more than one Metal image is loaded");
-  if (old) refuse("MetalOld is loaded next to Metal27");
+  if (!gMetal) return refuse("the loaded Metal is not the bundle's Metal27 (uuid " METAL27_UUID ")");
+  if (metals != 1) return refuse("more than one Metal image is loaded");
+  if (old) return refuse("MetalOld is loaded next to Metal27");
+  return 0;
 }
 
-static void fill_ivars(void) {
+static int fill_ivars(void) {
   int bad_driver = 0, bad_extra = 0;
   for (size_t i = 0; i < sizeof table / sizeof *table; i++) {
     Class c = objc_getClass(table[i].cls);
     Ivar v = c ? class_getInstanceVariable(c, table[i].ivar) : NULL;
     if (!v) {
-      fprintf(stderr, "[shim] MISSING ivar %s.%s (%s)\n", table[i].cls, table[i].ivar, table[i].driver ? "driver" : "31001");
+      say("[shim] MISSING ivar %s.%s (%s)\n", table[i].cls, table[i].ivar, table[i].driver ? "driver" : "31001");
       if (table[i].driver) bad_driver++; else bad_extra++;
       continue;
     }
     *table[i].slot = ivar_getOffset(v);
-    if (getenv("HAO_SHIM_LOG")) fprintf(stderr, "[shim] %s.%s = %td\n", table[i].cls, table[i].ivar, *table[i].slot);
+    if (getenv("HAO_SHIM_LOG")) say("[shim] %s.%s = %td\n", table[i].cls, table[i].ivar, *table[i].slot);
   }
-  fprintf(stderr, "[shim] %zu ivar offsets filled (driver missing %d, 31001 missing %d)\n",
-          sizeof table / sizeof *table, bad_driver, bad_extra);
-  if (bad_driver) refuse("an ivar the HD 4000 driver needs is missing in this Metal");
+  say("[shim] %zu ivar offsets filled (driver missing %d, 31001 missing %d)\n",
+      sizeof table / sizeof *table, bad_driver, bad_extra);
+  if (bad_driver) return refuse("an ivar the HD 4000 driver needs is missing in this Metal");
+  return 0;
 }
 
 // MTLEnvVarAggregator::isInternalBuild(bool), 27.2 / 27.2.1 x86_64 (Metal 383.1, the same code in 26B123 and 26B131):
@@ -115,30 +149,31 @@ static int matches(const uint8_t *f) {
          f[0x17] == 0x05;
 }
 
-static void flip_internal(void) {
+static int flip_internal(void) {
   unsigned long tsize = 0, dsize = 0;
   const uint8_t *text = getsectiondata(gMetal, "__TEXT", "__text", &tsize);
   const uint8_t *dirty = getsegmentdata(gMetal, "__DATA_DIRTY", &dsize);
-  if (!text || !dirty) refuse("Metal27 has no __TEXT,__text or __DATA_DIRTY");
+  if (!text || !dirty) return refuse("Metal27 has no __TEXT,__text or __DATA_DIRTY");
   const uint8_t *hit = NULL; int count = 0;
   for (unsigned long i = 0; i + 0x1c <= tsize; i++)
     if (text[i] == 0x55 && matches(text + i)) { hit = text + i; count++; }
-  fprintf(stderr, "[shim] isInternalBuild pattern: %d match(es) in Metal27 __text\n", count);
-  if (count != 1) refuse("isInternalBuild instruction pattern not found exactly once");
+  say("[shim] isInternalBuild pattern: %d match(es) in Metal27 __text\n", count);
+  if (count != 1) return refuse("isInternalBuild instruction pattern not found exactly once");
   long off = (long)(hit - (const uint8_t *)gMetal);
   if (off != EXPECTED_OFFSET) {
-    fprintf(stderr, "[shim] match at +%#lx, expected +%#x\n", off, EXPECTED_OFFSET);
-    refuse("isInternalBuild match is not at the 26B131 offset");
+    say("[shim] match at +%#lx, expected +%#x\n", off, EXPECTED_OFFSET);
+    return refuse("isInternalBuild match is not at the 26B131 offset");
   }
   int32_t dg, dv; memcpy(&dg, hit + 0x0e, 4); memcpy(&dv, hit + 0x18, 4);
   volatile uint8_t *guard = (uint8_t *)(hit + 0x12 + dg), *value = (uint8_t *)(hit + 0x1c + dv);
   if ((const uint8_t *)guard < dirty || (const uint8_t *)guard >= dirty + dsize ||
       (const uint8_t *)value < dirty || (const uint8_t *)value >= dirty + dsize)
-    refuse("isInternalBuild static is not in Metal27 __DATA_DIRTY");
-  fprintf(stderr, "[shim] isInternalBuild fn=+%#lx guard=%p (was %u) value=%p (was %u)\n", off, guard, *guard, value, *value);
+    return refuse("isInternalBuild static is not in Metal27 __DATA_DIRTY");
+  say("[shim] isInternalBuild fn=+%#lx guard=%p (was %u) value=%p (was %u)\n", off, guard, *guard, value, *value);
   *value = 1; *guard = 1;
   setenv("MTL_MONOLITHIC_COMPILER", "1", 0);
-  fprintf(stderr, "[shim] isInternalBuild forced to true; MTL_MONOLITHIC_COMPILER=%s\n", getenv("MTL_MONOLITHIC_COMPILER"));
+  say("[shim] isInternalBuild forced to true; MTL_MONOLITHIC_COMPILER=%s\n", getenv("MTL_MONOLITHIC_COMPILER"));
+  return 0;
 }
 
 // ---- private descriptor structs (render). OCLP's driver asks a descriptor for its private struct
@@ -223,7 +258,7 @@ _Static_assert(NLAYOUTS <= sizeof tramps / sizeof *tramps, "more layouts than tr
 
 static void install_layouts(void) {
   const char *off = getenv("HAO_METAL27_LAYOUTS");
-  if (off && !strcmp(off, "0")) { fprintf(stderr, "[shim] layouts: off (HAO_METAL27_LAYOUTS=0)\n"); return; }
+  if (off && !strcmp(off, "0")) { say("[shim] layouts: off (HAO_METAL27_LAYOUTS=0)\n"); return; }
   for (size_t k = 0; k < NLAYOUTS; k++) {
     hao_layout *L = &layouts[k];
     Class c = objc_getClass(L->cls);
@@ -231,22 +266,32 @@ static void install_layouts(void) {
     Method m = c ? class_getInstanceMethod(c, sel_registerName(L->sel)) : NULL;
     const char *enc = v ? ivar_getTypeEncoding(v) : NULL;
     if (!m || !enc || strcmp(enc, L->nenc)) {
-      fprintf(stderr, "[shim] layouts: %s.%s not as expected (%s); left untranslated\n", L->cls, L->sel,
-              !m ? "no method" : !enc ? "no _private" : "encoding differs");
+      say("[shim] layouts: %s.%s not as expected (%s); left untranslated\n", L->cls, L->sel,
+          !m ? "no method" : !enc ? "no _private" : "encoding differs");
       continue;
     }
     L->orig = method_setImplementation(m, (IMP)tramps[k]);
     L->active = 1;
-    fprintf(stderr, "[shim] layouts: -[%s %s] -> %s in MetalOld layout for the driver (%zu -> %zu B, %zu fields)\n",
-            L->cls, L->sel, L->sname, L->nsize, L->osize, L->n);
+    say("[shim] layouts: -[%s %s] -> %s in MetalOld layout for the driver (%zu -> %zu B, %zu fields)\n",
+        L->cls, L->sel, L->sname, L->nsize, L->osize, L->n);
   }
 }
 
+// The in-process compiler: the test bundle asks for it (HAO_METAL27_INTERNAL=1); the installed build has it unless
+// HAO_METAL27_INTERNAL=0 (the image's MTLCompilerService is OCLP's 13.2.1 build, which cannot serve 27's Metal).
+static int want_internal(void) {
+  const char *e = getenv("HAO_METAL27_INTERNAL");
+#ifdef HAO_METAL27_INSTALLED
+  return !(e && !strcmp(e, "0"));
+#else
+  return e && !strcmp(e, "1");
+#endif
+}
+
 __attribute__((constructor)) static void shim_init(void) {
-  fprintf(stderr, "[shim] libHaoMetalShim loaded (pid %d)\n", getpid());
-  check_metal();
-  fill_ivars();
+  say("[shim] libHaoMetalShim loaded (pid %d)\n", getpid());
+  if (check_metal() || fill_ivars()) return;
   install_layouts();
-  if (getenv("HAO_METAL27_INTERNAL") && !strcmp(getenv("HAO_METAL27_INTERNAL"), "1")) flip_internal();
-  else fprintf(stderr, "[shim] isInternalBuild left alone (HAO_METAL27_INTERNAL unset): XPC compiler path\n");
+  if (want_internal()) flip_internal();
+  else say("[shim] isInternalBuild left alone (HAO_METAL27_INTERNAL): XPC compiler path\n");
 }

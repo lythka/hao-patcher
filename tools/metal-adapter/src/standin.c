@@ -6,13 +6,16 @@
 //   plugin-bound type 1 (backend): 27's AIR module -> OCLP 31001 downgrade (type 7, 13.2.1 framing, built from a
 //     captured MetalOld template with 27's name and module spliced in) -> 27's own request with the downgraded module
 //     -> OCLP 3802 + the Intel plugin;
-//   plugin-less requests (13 frontend, 15 specialization, ...): to OCLP 31001 as they are (13: 3 options translated).
+//   plugin-less requests (13 frontend, 15 specialization, ...): to OCLP 31001 as they are (13: options translated).
+// Two builds (make.py): the test bundle's, and the installed one (-DHAO_STANDIN_INSTALLED -DHAO_TEMPLATE_INC=...), which
+// is silent by default and carries the template; the routing is the same code.
 // Paths (defaults are the OCLP files on a Golden Gate image; env overrides for the host test):
 //   HAO_MTLCOMPILER_3802  /System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/3802/MTLCompiler
 //   HAO_MTLCOMPILER_31001 /System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/31001/MTLCompiler
 //   HAO_LLVM_HELPER_31001 /System/Library/PrivateFrameworks/GPUCompiler.framework/Versions/31001/Libraries/libLLVM_helper.dylib
 //   HAO_31001_CWD         /  (directory for the fallback retry, see open_31001)
-//   HAO_DOWNGRADE_TEMPLATE  (required) the captured type-7 request
+//   HAO_DOWNGRADE_TEMPLATE  the type-7 template (required by the test bundle; the installed build carries its own)
+//   HAO_STANDIN_LOG=1       installed build only: log to stderr (the test bundle always does)
 //   HAO_STANDIN_DUMP        optional directory: every request/reply is written there
 //   HAO_FE_MODULE_CACHE     optional (test harness): directory for the 31001 frontend's module cache (see modcache)
 //   HAO_STANDIN_ROUTE=3802  capture only (see passthrough)
@@ -28,6 +31,43 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <stdarg.h>
+#ifdef HAO_STANDIN_INSTALLED
+#include <os/log.h>
+#endif
+
+// Logging. The test bundle (default build) logs every step to stderr. The installed build (-DHAO_STANDIN_INSTALLED,
+// make.py installed: every Metal client on the system compiles through it, WindowServer included) is silent unless
+// HAO_STANDIN_LOG=1, and sends a fatal error to the unified log too (subsystem org.hao.metal27).
+static int verbose(void) {
+#ifdef HAO_STANDIN_INSTALLED
+  static int v = -1;
+  if (v < 0) { const char *e = getenv("HAO_STANDIN_LOG"); v = e && !strcmp(e, "1"); }
+  return v;
+#else
+  return 1;
+#endif
+}
+__attribute__((format(printf, 1, 2))) static void say(const char *fmt, ...) {
+  if (!verbose()) return;
+  va_list a; va_start(a, fmt); vfprintf(stderr, fmt, a); va_end(a);
+}
+__attribute__((format(printf, 1, 2), noreturn)) static void fatal(const char *fmt, ...) {
+  char m[512]; va_list a; va_start(a, fmt); vsnprintf(m, sizeof m, fmt, a); va_end(a);
+  fprintf(stderr, "[standin] FATAL %s\n", m); fflush(stderr);
+#ifdef HAO_STANDIN_INSTALLED
+  os_log_fault(os_log_create("org.hao.metal27", "standin"), "FATAL %{public}s", m);
+#endif
+  abort();
+}
+
+// The installed build carries its type-7 template (make.py writes HAO_TEMPLATE_INC from the framing in inputs.json:
+// static const unsigned char kTemplate[] = {...};); HAO_DOWNGRADE_TEMPLATE still overrides it. The test bundle reads
+// it from HAO_DOWNGRADE_TEMPLATE only.
+#ifdef HAO_TEMPLATE_INC
+#include HAO_TEMPLATE_INC
+#endif
 
 typedef void (^reply_t)(unsigned, const void *, size_t, const char *);
 typedef void *(*create_t)(void);
@@ -51,17 +91,17 @@ static const char *env(const char *k, const char *d) { const char *v = getenv(k)
 static void *open_31001(const char *path) {
   const char *hp = env("HAO_LLVM_HELPER_31001", PHELPER31001);
   void *hh = dlopen(hp, RTLD_NOW | RTLD_LOCAL);
-  fprintf(stderr, "[standin] preload 31001 helper %s -> %p %s\n", hp, hh, hh ? "" : dlerror());
+  say("[standin] preload 31001 helper %s -> %p %s\n", hp, hh, hh ? "" : dlerror());
   void *h = dlopen(path, RTLD_NOW | RTLD_LOCAL);
-  fprintf(stderr, "[standin] dlopen 31001 %s -> %p %s\n", path, h, h ? "" : dlerror());
+  say("[standin] dlopen 31001 %s -> %p %s\n", path, h, h ? "" : dlerror());
   if (!h) {
     const char *root = env("HAO_31001_CWD", "/");
     int fd = open(".", O_RDONLY | O_CLOEXEC);
     if (fd >= 0 && chdir(root) == 0) {
       h = dlopen(path, RTLD_NOW | RTLD_LOCAL);
-      fprintf(stderr, "[standin] dlopen 31001 retry with cwd %s -> %p %s\n", root, h, h ? "" : dlerror());
-      if (fchdir(fd) != 0) fprintf(stderr, "[standin] WARNING could not restore the cwd\n");
-    } else fprintf(stderr, "[standin] fallback: cannot chdir to %s\n", root);
+      say("[standin] dlopen 31001 retry with cwd %s -> %p %s\n", root, h, h ? "" : dlerror());
+      if (fchdir(fd) != 0) say("[standin] WARNING could not restore the cwd\n");
+    } else say("[standin] fallback: cannot chdir to %s\n", root);
     if (fd >= 0) close(fd);
   }
   return h;
@@ -71,16 +111,16 @@ static void *open_or_die(const char *what, const char *path) {
   if (!strcmp(what, "31001")) h = open_31001(path);
   else {
     h = dlopen(path, RTLD_NOW | RTLD_LOCAL);
-    fprintf(stderr, "[standin] dlopen %s %s -> %p %s\n", what, path, h, h ? "" : dlerror());
+    say("[standin] dlopen %s %s -> %p %s\n", what, path, h, h ? "" : dlerror());
   }
-  if (!h) { fprintf(stderr, "[standin] FATAL cannot load %s\n", what); fflush(stderr); abort(); }
+  if (!h) fatal("cannot load %s", what);
   return h;
 }
 static void *g3802, *g31001, *gsvc31001;
 static void *sym(void **h, const char *what, const char *path, const char *s) {
   if (!*h) *h = open_or_die(what, path);
   void *f = dlsym(*h, s);
-  if (!f) { fprintf(stderr, "[standin] FATAL %s lacks %s\n", what, s); fflush(stderr); abort(); }
+  if (!f) fatal("%s lacks %s", what, s);
   return f;
 }
 #define S3802(s) sym(&g3802, "3802", env("HAO_MTLCOMPILER_3802", P3802), s)
@@ -96,31 +136,32 @@ static void dump(const char *tag, int i, const void *p, size_t sz) {
   FILE *f = fopen(fn, "wb"); if (f) { fwrite(p, 1, sz, f); fclose(f); }
 }
 static void bt(void) {
+  if (!verbose()) return;
   void *a[32]; int k = backtrace(a, 32); char **s = backtrace_symbols(a, k);
-  for (int i = 0; i < k; i++) fprintf(stderr, "[standin]   %s\n", s[i]);
+  for (int i = 0; i < k; i++) say("[standin]   %s\n", s[i]);
   free(s);
 }
 static void *svc31001(void) {
   if (!gsvc31001) { gsvc31001 = ((create_t)S31001("MTLCodeGenServiceCreate"))();
-    fprintf(stderr, "[standin] 31001 service %p\n", gsvc31001); }
+    say("[standin] 31001 service %p\n", gsvc31001); }
   return gsvc31001;
 }
 
 __attribute__((visibility("default"))) void *MTLCodeGenServiceCreate(void *processName) {
-  fprintf(stderr, "[standin] MTLCodeGenServiceCreate(%p) from:\n", processName); bt();
+  say("[standin] MTLCodeGenServiceCreate(%p) from:\n", processName); bt();
   void *r = ((create_t)S3802("MTLCodeGenServiceCreate"))();  // 3802's Create takes no argument
-  fprintf(stderr, "[standin] -> 3802 service %p\n", r);
+  say("[standin] -> 3802 service %p\n", r);
   return r;
 }
 __attribute__((visibility("default"))) void MTLCodeGenServiceDestroy(void *s) {
-  fprintf(stderr, "[standin] MTLCodeGenServiceDestroy(%p)\n", s);
+  say("[standin] MTLCodeGenServiceDestroy(%p)\n", s);
   ((void (*)(void *))S3802("MTLCodeGenServiceDestroy"))(s);
 }
 __attribute__((visibility("default"))) int MTLCodeGenServiceSetPluginPath(void *s, const char *p, const void *td, size_t tds) {
-  fprintf(stderr, "[standin] SetPluginPath(%p, %s, targetData %zu B)\n", s, p ? p : "-", tds);
+  say("[standin] SetPluginPath(%p, %s, targetData %zu B)\n", s, p ? p : "-", tds);
   dump("targetdata", 0, td, tds);
   int r = ((setpath_t)S3802("MTLCodeGenServiceSetPluginPath"))(s, p, td, tds);
-  fprintf(stderr, "[standin] SetPluginPath -> %d\n", r);
+  say("[standin] SetPluginPath -> %d\n", r);
   return r;
 }
 
@@ -136,7 +177,7 @@ static uint8_t *resplice(const uint8_t *r, size_t rsz, const uint8_t *nm, uint32
   const uint32_t *w = (const uint32_t *)r; uint32_t no = w[22], ol = w[23], mo = w[24], oms = w[25];
   if (!nm) { nm = r + no; nl = ol; }
   if (rsz < 0x68 || mo != ((no + ol + 7) & ~7u) || (size_t)mo + oms > rsz) {
-    fprintf(stderr, "[standin] unexpected layout: name %u+%u module %u+%u size %zu\n", no, ol, mo, oms, rsz); return NULL; }
+    say("[standin] unexpected layout: name %u+%u module %u+%u size %zu\n", no, ol, mo, oms, rsz); return NULL; }
   uint32_t nmo = (no + nl + 7) & ~7u, tail = (uint32_t)(rsz - mo - oms);
   *osz = nmo + ms + tail; uint8_t *o = calloc(1, *osz);
   memcpy(o, r, no); memcpy(o + no, nm, nl); memcpy(o + nmo, mod, ms); memcpy(o + nmo + ms, r + mo + oms, tail);
@@ -162,17 +203,21 @@ static uint8_t *reply7_module(const void *r, size_t rs, uint32_t *mn) {
 }
 static int downgrade(int i, const void *d, size_t sz, uint8_t **mod, uint32_t *ms) {
   const char *tp = getenv("HAO_DOWNGRADE_TEMPLATE");
+  if (tp && !*tp) tp = NULL;
   size_t tn; uint8_t *t = tp ? readfile(tp, &tn) : NULL;
-  if (!t) { fprintf(stderr, "[standin] no downgrade template (HAO_DOWNGRADE_TEMPLATE=%s)\n", tp ? tp : "unset"); return -1; }
+#ifdef HAO_TEMPLATE_INC
+  if (!t && !tp) { tn = sizeof kTemplate; t = malloc(tn); memcpy(t, kTemplate, tn); }
+#endif
+  if (!t) { say("[standin] no downgrade template (HAO_DOWNGRADE_TEMPLATE=%s)\n", tp ? tp : "unset"); return -1; }
   const uint32_t *w = d; size_t qn;
   uint8_t *q = req7_for(t, tn, d, &qn);
   free(t); if (!q) return -1;
   dump("req7", i, q, qn);
-  fprintf(stderr, "[standin] #%d downgrade: type 7 to 31001, %zu B, module %u B, name %.*s\n", i, qn, w[25], (int)w[23], (const char *)d + w[22]);
+  say("[standin] #%d downgrade: type 7 to 31001, %zu B, module %u B, name %.*s\n", i, qn, w[25], (int)w[23], (const char *)d + w[22]);
   __block int ok = -1; __block uint8_t *m = NULL; __block uint32_t mn = 0;
   ((build_t)S31001("MTLCodeGenServiceBuildRequest"))(svc31001(), 0xffffffffu, 7, q, qn,
     ^(unsigned st, const void *r, size_t rs, const char *err) {
-      fprintf(stderr, "[standin] #%d downgrade reply status=%u size=%zu err=%s\n", i, st, rs, err ? err : "-");
+      say("[standin] #%d downgrade reply status=%u size=%zu err=%s\n", i, st, rs, err ? err : "-");
       dump("reply7", i, r, rs);
       if (st == 0 && (m = reply7_module(r, rs, &mn))) ok = 0; });
   *mod = m; *ms = mn; return ok;  // q is not freed: the compiler may keep it (replies were synchronous on the host)
@@ -188,7 +233,7 @@ static uint8_t *modcache(int i, const uint8_t *r, size_t rsz, size_t *osz) {
   uint64_t sl, ol; memcpy(&sl, r, 8); memcpy(&ol, r + 8, 8);
   size_t oo = (16 + sl + 7) & ~(size_t)7;
   if (sl > rsz || ol > rsz || oo + ol != rsz || !ol || r[rsz - 1]) {
-    fprintf(stderr, "[standin] #%d type 13 layout not recognized (%llu/%llu/%zu): module cache left as is\n", i,
+    say("[standin] #%d type 13 layout not recognized (%llu/%llu/%zu): module cache left as is\n", i,
             (unsigned long long)sl, (unsigned long long)ol, rsz); return NULL; }
   static const char key[] = "-fmodules-cache-path=\"";
   const char *o = (const char *)r + oo, *k = strstr(o, key);
@@ -198,19 +243,35 @@ static uint8_t *modcache(int i, const uint8_t *r, size_t rsz, size_t *osz) {
   size_t nol = pre + dl + post; *osz = oo + nol;
   uint8_t *n = calloc(1, *osz); memcpy(n, r, oo); memcpy(n + 8, &(uint64_t){nol}, 8);
   memcpy(n + oo, o, pre); memcpy(n + oo + pre, dir, dl); memcpy(n + oo + pre + dl, q, post);
-  fprintf(stderr, "[standin] #%d module cache %.*s -> %s (%zu -> %zu B)\n", i, (int)(q - v), v, dir, rsz, *osz);
+  say("[standin] #%d module cache %.*s -> %s (%zu -> %zu B)\n", i, (int)(q - v), v, dir, rsz, *osz);
   return n;
 }
 
 // Type 13 (frontend) for OCLP's 31001: 27's options the 13.x frontend rejects, rewritten in place (same length, space
 // padded), then the module cache moved (modcache). Returns a new buffer; *osz is its size, *moved whether the module
 // cache path was rewritten.
+// The language standard: 27 sends the client's version (-std=metal4.1 for its own default; an app may ask for 3.1,
+// 3.2, 4.0 ...), and the 13.x frontend knows none above 3.0, so any -std=metalM.N above 3.0 becomes -std=metal3.0
+// (same length). Older versions and macos-metal* are left alone.
+static void std30(int i, uint8_t *b, size_t sz) {
+  static const char key[] = "-std=metal";
+  size_t kl = sizeof key - 1;
+  for (uint8_t *p = b; (p = memmem(p, sz - (size_t)(p - b), key, kl)); p += kl) {
+    uint8_t *v = p + kl;
+    if ((size_t)(v - b) + 3 > sz || v[0] < '0' || v[0] > '9' || v[1] != '.' || v[2] < '0' || v[2] > '9') continue;
+    if ((size_t)(v - b) + 3 < sz && v[3] >= '0' && v[3] <= '9') continue;    /* not M.N */
+    if (v[0] < '3' || (v[0] == '3' && v[2] == '0')) continue;
+    say("[standin] #%d option -std=metal%c.%c -> '-std=metal3.0'\n", i, v[0], v[2]);
+    v[0] = '3'; v[2] = '0';
+  }
+}
 static uint8_t *translate13(int i, const void *d, size_t sz, size_t *osz, int *moved) {
   static const char *pairs[][2] = {{"-fmetal-math-mode=fast", "-ffast-math           "},
-    {"-fmetal-math-fp32-functions=fast", "                                "}, {"-std=metal4.1", "-std=metal3.0"}};
+    {"-fmetal-math-fp32-functions=fast", "                                "}};
   uint8_t *copy = malloc(sz); memcpy(copy, d, sz);
-  for (int k = 0; k < 3; k++) { uint8_t *hit = memmem(copy, sz, pairs[k][0], strlen(pairs[k][0]));
-    if (hit) { memcpy(hit, pairs[k][1], strlen(pairs[k][1])); fprintf(stderr, "[standin] #%d option %s -> '%s'\n", i, pairs[k][0], pairs[k][1]); } }
+  for (int k = 0; k < 2; k++) { uint8_t *hit = memmem(copy, sz, pairs[k][0], strlen(pairs[k][0]));
+    if (hit) { memcpy(hit, pairs[k][1], strlen(pairs[k][1])); say("[standin] #%d option %s -> '%s'\n", i, pairs[k][0], pairs[k][1]); } }
+  std30(i, copy, sz);
   size_t nsz; uint8_t *m = modcache(i, copy, sz, &nsz);
   *moved = m != NULL;
   if (m) { free(copy); *osz = nsz; return m; }
@@ -268,7 +329,7 @@ static uint8_t *reflection27(int i, const uint8_t *r, size_t rs, size_t *os) {
   memcpy(o + cut_at, r + cut_at + cut, sec + 16 + size - cut_at - cut);
   memcpy(o + sec + 8, &nsize, 8);
   memcpy(o + new_end, r + old_end, rs - old_end);
-  fprintf(stderr, "[standin] #%d reflection: input-stage table at %zu (%zu B) cut for 27's reader, reply %zu -> %zu B\n",
+  say("[standin] #%d reflection: input-stage table at %zu (%zu B) cut for 27's reader, reply %zu -> %zu B\n",
           i, cut_at - sec - 16, cut, rs, *os);
   return o;
 }
@@ -292,41 +353,41 @@ __attribute__((visibility("default"))) void MTLCodeGenServiceBuildRequest(void *
 }
 static void build(void *s, unsigned plugin, unsigned type, const void *d, size_t sz, reply_t cb) {
   int i = ++n;
-  fprintf(stderr, "[standin] #%d BuildRequest service=%p plugin=%d type=%u size=%zu\n", i, s, (int)plugin, type, sz);
+  say("[standin] #%d BuildRequest service=%p plugin=%d type=%u size=%zu\n", i, s, (int)plugin, type, sz);
   char tag[32]; snprintf(tag, sizeof tag, "req%u", type); dump(tag, i, d, sz);
-  if (i == 1) { fprintf(stderr, "[standin] first BuildRequest from:\n"); bt(); }
+  if (i == 1) { say("[standin] first BuildRequest from:\n"); bt(); }
   if (passthrough()) {  // capture only: MetalOld's own requests (host control), to 3802 unchanged
     ((build_t)S3802("MTLCodeGenServiceBuildRequest"))(s, plugin, type, d, sz,
       ^(unsigned st, const void *r, size_t rs, const char *err) {
-        fprintf(stderr, "[standin] #%d 3802 reply status=%u size=%zu err=%s (passthrough)\n", i, st, rs, err ? err : "-");
+        say("[standin] #%d 3802 reply status=%u size=%zu err=%s (passthrough)\n", i, st, rs, err ? err : "-");
         dump("reply", i, r, rs); cb(st, r, rs, err); });
     return;
   }
   if (plugin == 0xffffffffu) {  // plugin-less: frontend 13, specialization 15, ... -> 31001 as MetalOld does
     if (type == 13) { size_t nsz; int mv; d = translate13(i, d, sz, &nsz, &mv); sz = nsz; if (mv) dump("sent", i, d, sz); }
-    fprintf(stderr, "[standin] #%d type %u to 31001 as is\n", i, type);
+    say("[standin] #%d type %u to 31001 as is\n", i, type);
     ((build_t)S31001("MTLCodeGenServiceBuildRequest"))(svc31001(), plugin, type, d, sz,
       ^(unsigned st, const void *r, size_t rs, const char *err) {
-        fprintf(stderr, "[standin] #%d 31001 reply status=%u size=%zu err=%s\n", i, st, rs, err ? err : "-");
+        say("[standin] #%d 31001 reply status=%u size=%zu err=%s\n", i, st, rs, err ? err : "-");
         dump("reply", i, r, rs); cb(st, r, rs, err); });
     return;
   }
   uint8_t *sent = NULL;
   if (type == 1) {
     uint8_t *m; uint32_t mn;
-    if (downgrade(i, d, sz, &m, &mn)) fprintf(stderr, "[standin] #%d downgrade FAILED, sending 27's module as is\n", i);
+    if (downgrade(i, d, sz, &m, &mn)) say("[standin] #%d downgrade FAILED, sending 27's module as is\n", i);
     else { size_t on; sent = resplice(d, sz, NULL, 0, m, mn, &on); free(m);
-      if (sent) { fprintf(stderr, "[standin] #%d 27 request %zu -> %zu B with the downgraded module (%u B)\n", i, sz, on, mn);
+      if (sent) { say("[standin] #%d 27 request %zu -> %zu B with the downgraded module (%u B)\n", i, sz, on, mn);
         d = sent; sz = on; dump("sent", i, d, sz); } }
   }
   ((build_t)S3802("MTLCodeGenServiceBuildRequest"))(s, plugin, type, d, sz,
     ^(unsigned st, const void *r, size_t rs, const char *err) {
-      fprintf(stderr, "[standin] #%d 3802 reply status=%u size=%zu err=%s\n", i, st, rs, err ? err : "-");
+      say("[standin] #%d 3802 reply status=%u size=%zu err=%s\n", i, st, rs, err ? err : "-");
       dump("reply", i, r, rs);
       size_t ns; uint8_t *fixed = st == 0 && type == 1 && reflection_fix() ? reflection27(i, r, rs, &ns) : NULL;
       if (!fixed) { cb(st, r, rs, err); return; }
       dump("reply27", i, fixed, ns);
       cb(st, fixed, ns, err);
       free(fixed); });  // like 3802's own buffer, valid only during the reply: 27 copies what it keeps
-  fprintf(stderr, "[standin] #%d BuildRequest returned\n", i);
+  say("[standin] #%d BuildRequest returned\n", i);
 }
