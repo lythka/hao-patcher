@@ -1,5 +1,5 @@
 {
-  "revision": 47,
+  "revision": 48,
   "stage": "post",
   "applies": {
     "models": [
@@ -30,7 +30,7 @@
         "kind": "hao",
         "row": "kernel_repair_efi",
         "name": "IntelCommpage.kext",
-        "note": "EFI/OC/Kexts/IntelCommpage.kext of the row, copied with ditto; src/kc_bind.py refuses unless its files are the ones the kernel_repair_binding profile lists, and unless the commpage_abi.hpp it was compiled with (row intel_commpage_abi) holds for this image's BootKC"
+        "note": "EFI/OC/Kexts/IntelCommpage.kext of the row, copied with ditto; src/kc_bind.py refuses unless its files are the ones the kernel_repair_binding profile lists; its __DATA,__ic_table (r42) must equal the table for this image's BootKC, or in binder-only mode is written for it (a kext without the table: every collection-dependent line of row intel_commpage_abi must hold)"
       }
     },
     {

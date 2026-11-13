@@ -1,2 +1,3 @@
 # Derived for Golden Gate 26B131 with Tahoe 25G342; see the artifact build.json.
-- store/artifacts/kernel-repairs-26B131-r41
+# r42: IntelCommpage reads its collection addresses from its table; config.plist identical to r41.
+- store/artifacts/kernel-repairs-26B131-r42

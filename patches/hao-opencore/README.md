@@ -23,11 +23,17 @@ display and Ethernet drivers, OpenCore DEBUG file logging and the boot arguments
   - `src/kc_bind.py` runs [tools/kc-binder](../../tools/kc-binder/README.md) (staged into `build/` by `make.sh`),
     which computes the repairs from the BootKC itself. It refuses unless its `config.plist` is byte-identical to the
     recorded repairs bound above, every patch field and the capture match, and the profile's patch sites and
-    IntelCommpage bindings hold (mode `binder`, every image today). When `repair_binding.py` refused, it uses its own
-    repairs only if every collection-dependent line of the `commpage_abi.hpp` IntelCommpage.kext was compiled with
-    (`intel_commpage_abi`) still holds for this BootKC (mode `binder-only`); otherwise it says which lines need a
-    rebuilt IntelCommpage. A kernel no binder recipe covers (26A428) keeps the recorded repairs (mode `row`). Its
-    record is kept as `kc-binder.json`.
+    IntelCommpage bindings hold, and the IntelCommpage address table kc-binder computes for this BootKC equals the
+    one the kext holds (mode `binder`, every image today: the installed files are the row's). When
+    `repair_binding.py` refused, it uses its own repairs and writes this BootKC's table into IntelCommpage's
+    `__DATA,__ic_table` (mode `binder-only`; IntelCommpage reads its collection addresses from that table at load,
+    see [tools/kernel-foundation](../../tools/kernel-foundation/README.md#intelcommpages-address-table)). It does
+    this only if the header lines that are code facts rather than table entries (prologues, boot-args offsets,
+    UUIDs) still hold. A kext from before the table (the 26A428 rows) still needs every collection-dependent line of
+    `commpage_abi.hpp` to hold; otherwise it names the lines. A kernel no binder recipe covers (26A428) keeps the
+    recorded repairs (mode `row`). Its record is kept as `kc-binder.json`; its `commpage_table.restamped` says
+    whether the installed IntelCommpage binary differs from the row's. Like the HaoExec stamp, a restamped table is
+    not re-signed.
 - `src/repairs.py` installs exactly the repairs of `kc_bind.py`'s artifact and the `IntelCommpage.kext` Kernel.Add
   entry, and refuses any BootKC whose full SHA-256 differs from the bound artifact. Startup-trace patches are dropped
   (VM only).
@@ -104,7 +110,8 @@ the candidates, so the helper start and collection loads would likely remain, an
   `make vm-esp` ([tools/kernel-foundation](../../tools/kernel-foundation/README.md)): the reference kc-binder must
   equal, and the IntelCommpage.kext installed.
 - `intel_commpage_abi`: the `commpage_abi.hpp` that IntelCommpage.kext was compiled with (the binding profile pins its
-  SHA-256), from the same `tools/kernel-foundation` build.
+  SHA-256), from the same `tools/kernel-foundation` build. On 26B131 it is r42's: every r41 line is kept, plus the
+  table definitions.
 
 `make.sh` (on the host, when the build stages this patch) copies tools/kc-binder's run-time files, its recipes and
 their pins, and `tools/kernel-foundation/commpage_build.py` into `build/`, with `build/stage.json`, which `kc_bind.py`
@@ -118,7 +125,12 @@ in `tests/test_edits.py` and `tests/test_kc_bind.py` add the real-input checks. 
 `kernel_repair_efi`, `kernel_repair_binding` and `intel_commpage_abi` rows, runs both binders as apply.sh does and
 requires the same config.plist bytes; `HAO_OPENCORE_GUEST_PYTHON` runs them with the builder VM's Python.
 
-In the build log, `kc-binder.json` (next to `kernel-repair-binding.json`) has `"mode": "binder"`.
+In the build log, `kc-binder.json` (next to `kernel-repair-binding.json`) has `"mode": "binder"` and
+`"restamped": false`.
+
+After a boot with the r42 IntelCommpage (26B131), the kernel log has "IntelCommpage: macOS 26.5 source restoration
+installed". It must not have "address table is not version", "address table is for another kernel" or "target
+entry differs from the trampoline".
 
 On the built ESP, `plutil -lint` passes and Kernel.Add has `IntelCommpage.kext` and `HaoExec.kext`. After a boot,
 the ESP's OpenCore log shows each repair and both kexts applied once. On the running system:
@@ -151,7 +163,9 @@ must still die with VM guard flavor 13 (status 137), which shows the fix leaves 
 has a 15-second alarm. Finally load a website in Safari and scroll, navigate and reload.
 
 ## Validation
-NEEDS VALIDATION: r45 binds the repairs with tools/kc-binder (host tests: byte-identical config.plist on the 26B131
+NEEDS VALIDATION: r48 installs the r42 IntelCommpage on 26B131. It reads its collection addresses from its own table
+at load, so the kext's bytes are new. The table equals r41's compiled values on all 12 recorded 26B131 KCs (host
+tests), but the kext has not been booted (QEMU, then the laptop). config.plist is byte-identical to r47's. r45 binds the repairs with tools/kc-binder (host tests: byte-identical config.plist on the 26B131
 bootstrap KC and nine recorded image KCs; no VM build yet). r44 adds `auxKCAtBoot=false` (not booted yet; see Verify). the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r40 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
 
 Laptop 2026-11-12, image d131d5b (26B131, dev build): boots with r40 (hao d9ea9bd's HaoExec and stamp_identity.py); image 7d0b612 booted with r39 on 2026-11-11.
@@ -164,6 +178,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
+- r48 2026-11-12 Input rows `kernel_repair_efi`, `kernel_repair_binding` and `intel_commpage_abi` (26B131) now name r42: IntelCommpage reads its collection addresses from `__DATA,__ic_table` at load. kc_bind.py writes this BootKC's table into it in `binder-only` mode instead of refusing a moved layout, and in `binder` mode requires the table to equal the kext's own. config.plist is unchanged. The IntelCommpage binary is new.
 - r47 2026-11-12 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 0a2c2aa (hao-runtime-26B131-20261112-0a2c2aad4755). No recipe change.
 - r46 2026-11-12 Dev builds add `hao_diag_time=1` (hao-runtime 0a2c2aa): mach-clock stamps and phase lines on hao's console lines, and PID 1's lines from before the Data volume mounts, so a bench boot shows launchd's own startup on the Gantt's clock.
 - r45 2026-11-12 Bind the kernel repairs to the freshly linked BootKC with tools/kc-binder (src/kc_bind.py, staged by make.sh): refuses unless they equal the recorded repairs repair_binding.py binds, and binds a collection those refuse when IntelCommpage's compiled addresses still hold for it. New input row `intel_commpage_abi`; the repairs are declared as `kc.bind` in edits/config.json. Same config.plist bytes on every recorded 26B131 KC.
