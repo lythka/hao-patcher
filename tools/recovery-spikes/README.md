@@ -9,7 +9,7 @@ volume read-only to copy the installed driver tree.
 Run by the holder of the laptop lock, with the laptop in the NetBoot Recovery:
 
 ```sh
-LAPTOP=root@192.168.68.58 tools/recovery-spikes/run.sh survey    # then python, cryptex, group, kmutil
+LAPTOP=root@ADDR tools/recovery-spikes/run.sh survey          # then python, cryptex, group, kmutil
 tools/recovery-spikes/run.sh all      # the five in order; stops after python if python fails
 tools/recovery-spikes/run.sh clean    # undo every RAM disk, image and mount the spikes left
 ```

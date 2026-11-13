@@ -174,7 +174,7 @@ Revision r19, status experiment. [Recipe](../patches/golden-gate-metal-libraries
 
 ## golden-gate-metal27
 
-Revision r1, status dev. [Recipe](../patches/golden-gate-metal27/README.md)
+Revision r2, status dev. [Recipe](../patches/golden-gate-metal27/README.md)
 
 - `System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/32023/MTLCompiler`: whole file from hao (row metal27_installed). New file over a dyld cache image (an on-disk root): tools/metal-adapter's stand-in, installed build; routes 27's in-process compiles to OCLP's 31001 and 3802. Installed mode 0755, owner root:wheel, flags restricted.
 - `System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/32024/MTLCompiler`: whole file from hao (row metal27_installed). New file over a dyld cache image: the same stand-in for 27's other compiler version. Installed mode 0755, owner root:wheel, flags restricted.

@@ -220,9 +220,9 @@ python3.14 -I tools/metal-adapter/make.py installed OUT --cache ROSETTA_CRYPTEX/
 | `PrivateFrameworks/MTLCompiler.framework/Versions/{32023,32024}/MTLCompiler` | the stand-in, installed build (`-DHAO_STANDIN_INSTALLED`) |
 
 Metal and both MTLCompiler paths are images of the x86_64 dyld cache. On the image dyld loads the file at such a
-path instead of the cache's copy (an on-disk root) because `ic_csr_internal=1` makes the kernel report
-`CSR_ALLOW_APPLE_INTERNAL` ([hao-opencore](../../patches/hao-opencore/README.md)); that is how OCLP's wrapper replaces
-27's Metal today. No cache image links MTLCompiler 32023 or 32024 (`ipsw dyld imports`); 27's Metal `dlopen`s them.
+path instead of the cache's copy (an on-disk root) because dyld counts as an internal install
+([golden-gate-dyld-internal](../../patches/golden-gate-dyld-internal/README.md); earlier images used the
+`ic_csr_internal=1` boot argument); that is how OCLP's wrapper replaces 27's Metal today. No cache image links MTLCompiler 32023 or 32024 (`ipsw dyld imports`); 27's Metal `dlopen`s them.
 
 What the installed builds change (the routing, the flip, the layouts and the reflection cut are the same code):
 

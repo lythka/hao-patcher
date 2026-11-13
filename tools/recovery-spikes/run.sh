@@ -17,7 +17,7 @@
 # verdict PASS / PARTIAL / FAIL (lib/spikes.py; README.md says what each means).
 #
 # Environment: LAPTOP_SSH (default $HOME/hao-tools/tools/laptop-ssh, with its LAPTOP=root@ADDR and LAPTOP_KEY; on the
-# home LAN set LAPTOP=root@192.168.68.58), RECOVERY_BUILD (default 25G241), RESULTS (default
+# laptop's own address set LAPTOP=root@ADDR), RECOVERY_BUILD (default 25G241), RESULTS (default
 # REPO/store/runs/recovery-spikes-YYYYMMDD), FILL_MB (cryptex filler, default 256), KC_SCOPE (kmutil: auto|full|boot,
 # default auto), HOST_PYTHON (default python3.14), LOCK (default $HOME/mac-image/store/tmp/laptop.lock).
 set -euo pipefail

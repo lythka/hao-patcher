@@ -23,7 +23,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-metal-argbuf | r1 | oclp-hook | product |  | x |  |  |  | **needs** | r1 2026-11-12 Initial recipe. |
 | golden-gate-metal-framebuffer | r6 | oclp-hook | experiment |  | x | x |  |  | **needs** | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the driver |
 | golden-gate-metal-libraries | r19 | oclp-hook | experiment |  | x | x |  |  | **needs** | r19 2026-11-12 Declare the installed files in patch.json `files` (whole-file origins) and test them in tests/t |
-| golden-gate-metal27 | r1 | oclp-hook | dev |  |  |  |  |  | **needs** | r1 2026-11-13 New dev-only trial: 27.2.1's own Metal for every process (Metal27, the installed shim and stand- |
+| golden-gate-metal27 | r2 | oclp-hook | dev |  |  |  |  |  | **needs** | r2 2026-11-13 README: dyld loads cache roots because golden-gate-dyld-internal makes it an internal install (n |
 | golden-gate-native-identities | r4 | oclp-hook | experiment |  | x | x |  |  | **needs** | r4 2026-11-13 `native_identities.py` reads each executable's headers and code signature only, and a slice's by |
 | golden-gate-root-launchservices | r1 | post | experiment | boot-seeds |  |  |  |  | **needs** | r1 2026-11-12 New: install root's LaunchServices store and auth.db from a builder boot of the same image (row  |
 | golden-gate-shader-caches | r13 | post | experiment | caches | x |  |  |  | **needs** | r13 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) f |

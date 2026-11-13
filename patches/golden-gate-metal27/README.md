@@ -18,9 +18,9 @@ All four come from row `metal27_installed`, a `tools/metal-adapter/make.py insta
 names every file's hash, the commit and the inputs. All are root:wheel 0755 `restricted`, as Apple's.
 
 **How a cache image gets replaced.** Metal and both MTLCompiler paths are images of the x86_64 dyld cache.
-dyld loads the file at such a path instead of the cache's copy because `ic_csr_internal=1`
-([hao-opencore](../hao-opencore/README.md)) makes the kernel report `CSR_ALLOW_APPLE_INTERNAL`; OCLP's wrapper is
-loaded the same way today. Metal27 exports what the cache's Metal exports (it is that image), so every cache image
+dyld loads the file at such a path instead of the cache's copy because it counts as an internal install
+([golden-gate-dyld-internal](../golden-gate-dyld-internal/README.md); before hao-opencore r52 the `ic_csr_internal=1`
+boot argument did this for every process); OCLP's wrapper is loaded the same way today. Metal27 exports what the cache's Metal exports (it is that image), so every cache image
 bound to Metal binds to it; nothing in the cache links MTLCompiler 32023/32024 (27's Metal `dlopen`s them).
 
 **The compiler, for every process.** 27's Metal compiles through `MTLCompilerService` unless
@@ -119,4 +119,5 @@ NEEDS VALIDATION: never installed. The pieces passed on the laptop in one test p
 the installed builds passed the host replay (same requests as r4, silent). Not yet booted as the system's Metal.
 
 ## Revisions
+- r2 2026-11-13 README: dyld loads cache roots because golden-gate-dyld-internal makes it an internal install (no ic_csr_internal boot argument since hao-opencore r52). No file change.
 - r1 2026-11-13 New dev-only trial: 27.2.1's own Metal for every process (Metal27, the installed shim and stand-in from tools/metal-adapter d399c6f3), pack metal27-trial, set dev-metal27.
