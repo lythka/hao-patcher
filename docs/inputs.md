@@ -17,7 +17,7 @@ The current build is macOS 27.2.1 (26B131) with Tahoe 26.7.3 (25G342) as the don
 | Tahoe Kernel Debug Kit | **26.7.3 build 25G342**, [Kernel_Debug_Kit_26.7.3_build_25G342.dmg](https://github.com/dortania/KdkSupportPkg/releases/download/25G342/Kernel_Debug_Kit_26.7.3_build_25G342.dmg) from Dortania's [KdkSupportPkg](https://github.com/dortania/KdkSupportPkg) mirror, or from [Apple Developer downloads](https://developer.apple.com/download/all/?q=Kernel%20Debug%20Kit) (Apple Account required) | `219f27c7e039b6ab3426496e0d5852d55a31d00b3d3984d855cba04377c5dba0` |
 | OCLP support files | [PatcherSupportPkg **2.0.5** Universal-Binaries.dmg](https://github.com/dortania/PatcherSupportPkg/releases/download/2.0.5/Universal-Binaries.dmg), matching [OCLP **3.0.0-rc.5**](https://github.com/dortania/OpenCore-Legacy-Patcher/releases/tag/3.0.0-rc.5) | `1c290781bc726759ff37a110ffcb7182a6c6fd3d8ebce112d134d482c8de52a3` |
 | OpenCore | [OpenCore **1.0.5** DEBUG](https://github.com/acidanthera/OpenCorePkg/releases/tag/1.0.5), `OpenCore-1.0.5-DEBUG.zip` | `db0720000455502b34ad5a0fc53114f7cd6d388bc6af7636e8a530276a6bf0a1` |
-| hao-runtime payload | Built from [hao-runtime](https://github.com/lythka/hao-runtime) 790720d; see [hao-runtime payload](#hao-runtime-payload) | directory row, no hash |
+| hao-runtime payload | Built from [hao-runtime](https://github.com/lythka/hao-runtime) 273ba98; see [hao-runtime payload](#hao-runtime-payload) | directory row; payloads with `payload-manifest.json` are checked file by file |
 
 Check each download with `shasum -a 256 FILE`. Use these exact versions: other
 builds can have the same file names but different contents. The builder extracts
@@ -33,12 +33,12 @@ their rows are in `pipeline/inputs/25G332/`.
 
 The `hao_runtime` row (`pipeline/inputs/golden/26B131/hao_runtime`) names a payload
 directory under `store/artifacts/`. A release download of the payload is planned; until
-then, build it from [hao-runtime](https://github.com/lythka/hao-runtime) at commit
-`790720d` (the commit the 26B131 image was tested with) on the same Apple silicon host:
+then, build it from [hao-runtime](https://github.com/lythka/hao-runtime) at the commit the
+row's comment names (`273ba98` today) on the same Apple silicon host:
 
 ```sh
 git clone https://github.com/lythka/hao-runtime.git && cd hao-runtime
-git checkout 790720d
+git checkout 273ba98
 make
 tools/hao-image-payload [OPTIONS] OUT ROOT
 ```
@@ -122,7 +122,10 @@ overlays.
 
 Each file under `pipeline/inputs/` (`golden/26B131/`, `25G342/`, `common/`, ...) is one
 input row: optional `#` comment lines, then `SHA256 PATH` (or `- PATH` for a
-directory). A row is looked up first in `pipeline/inputs/golden/<golden_build>/`
+directory). A directory row may add `# check: payload os_build=B layout_version=N
+[manifest_sha256=H]`: the folder is then a hao-runtime payload, and every read checks its
+`payload-manifest.json` with the vendored [hao-assets](https://github.com/lythka/hao-assets) checker
+(clean build, OS build, install-layout version, every file's sha256). A row is looked up first in `pipeline/inputs/golden/<golden_build>/`
 (rows made from that Golden Gate build: its IPSW, kernel, userspace and the fixes
 derived from them), then in the donor build's folder (`25G342`, named by the
 assembly's `donor_build`), then in `common/`. Rows not yet moved to a

@@ -43,6 +43,46 @@ class Lock(unittest.TestCase):
         (d / 'bad').write_text('only-one-field\n')
         self.assertNotEqual(lock('path', d, 'kdk').returncode, 0)
 
+    def payload(self, **over):
+        d = self.d / 'pl'; d.mkdir(exist_ok=True)
+        (d / 'libhao.dylib').write_bytes(b'hao')
+        m = {'version': '26B131-abc', 'commit': 'a' * 40, 'clean': True, 'os_build': '26B131', 'cache_uuid': 'U',
+             'units_version': 'u', 'units_sha256': 'b' * 64, 'layout_version': 1,
+             'files': {'libhao.dylib': hashlib.sha256(b'hao').hexdigest()}}
+        m.update(over)
+        (d / 'payload-manifest.json').write_text(json.dumps(m))
+        return d
+
+    def row(self, text):
+        d = self.d / 'lockdir'; d.mkdir(exist_ok=True)
+        (d / 'hao_runtime').write_text(text)
+        return d
+
+    def test_payload_row_checked_by_its_manifest(self):
+        pl = self.payload()
+        msha = hashlib.sha256((pl / 'payload-manifest.json').read_bytes()).hexdigest()
+        d = self.row('# check: payload os_build=26B131 layout_version=1 manifest_sha256=%s\n- %s\n' % (msha, pl))
+        r = lock('path', d, 'hao_runtime'); self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), str(pl))
+        for text, why in (('# check: payload os_build=26A428 layout_version=1\n', 'OS build'),
+                          ('# check: payload os_build=26B131 layout_version=2\n', 'install-layout'),
+                          ('# check: payload os_build=26B131 layout_version=1 manifest_sha256=%s\n' % ('0' * 64), 'is not'),
+                          ('# check: payload layout_version=1\n', 'needs os_build'),
+                          ('# check: nonsense\n', 'unknown check'),
+                          ('# check: payload os_build\n', 'bad check line')):
+            r = lock('path', self.row(text + '- %s\n' % pl), 'hao_runtime')
+            self.assertNotEqual(r.returncode, 0, text); self.assertIn(why, r.stderr)
+        (pl / 'libhao.dylib').write_bytes(b'changed')
+        r = lock('path', self.row('# check: payload os_build=26B131 layout_version=1\n- %s\n' % pl), 'hao_runtime')
+        self.assertNotEqual(r.returncode, 0); self.assertIn('does not match', r.stderr)
+
+    def test_payload_row_dirty_or_unchecked(self):
+        pl = self.payload(clean=False)
+        r = lock('path', self.row('# check: payload os_build=26B131 layout_version=1\n- %s\n' % pl), 'hao_runtime')
+        self.assertNotEqual(r.returncode, 0); self.assertIn('dirty', r.stderr)
+        r = lock('path', self.row('# a plain comment mentioning check\n- %s\n' % pl), 'hao_runtime')
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_duplicate_row_stops(self):
         r = lock('path', self.write('kdk - /a\nkdk - /b\n'), 'kdk')
         self.assertNotEqual(r.returncode, 0); self.assertIn('twice', r.stderr)

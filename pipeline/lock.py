@@ -20,7 +20,8 @@ what the inputs are, never of where the store is or of a row's comments: a row c
 the store or editing a comment keeps cache hits and any hashed content change misses.
 
 A lock is a folder with one file per row (pipeline/inputs/<build>/<NAME>, pipeline/inputs/common/<NAME>), so rows
-can be added independently. The file holds `SHA256-or-- PATH [# comment]`; lines starting with # are comments. A
+can be added independently. The file holds `SHA256-or-- PATH [# comment]`; lines starting with # are comments,
+except `# check: KIND key=value ...` (see checks: a folder row checked by its own manifest). A
 single file of `NAME SHA256-or-- PATH` rows is also read (tests, one-off locks). PATH may start with ~; a relative
 PATH (`store/...`, `patches/...`) is relative to the repository root.
 """
@@ -66,6 +67,48 @@ def sha256(path):
     return h.hexdigest()
 
 
+CHECK = re.compile(r'^#\s*check:\s*(\S+)((?:\s+[a-z_0-9]+=\S+)*)\s*$')
+
+
+def checks(lock, name):
+    """A folder row's `# check: KIND key=value ...` lines (a lock folder's row file only), as [(KIND, {key: value})].
+    `# check: payload os_build=B layout_version=N [manifest_sha256=H]` makes the row a hao-runtime payload checked by
+    the vendored hao-assets checker (payload-manifest.json: clean, OS build, install layout, every file's sha256)."""
+    f = os.path.join(lock, name)
+    if not os.path.isdir(lock) or not os.path.isfile(f):
+        return []
+    out = []
+    for line in open(f):
+        if re.match(r'^#\s*check:', line):
+            m = CHECK.match(line.rstrip('\n'))
+            if not m:
+                sys.exit('%s: bad check line %r (want # check: KIND key=value ...)' % (f, line.strip()))
+            out.append((m.group(1), dict(kv.split('=', 1) for kv in m.group(2).split())))
+    return out
+
+
+def check_row(lock, name, p):
+    """Problems with row NAME at P by its check lines ([] when it has none or all pass)."""
+    bad = []
+    for kind, kv in checks(lock, name):
+        if kind != 'payload':
+            bad.append('%s: unknown check %s' % (name, kind))
+            continue
+        missing = {'os_build', 'layout_version'} - set(kv)
+        if missing:
+            bad.append('%s: check payload needs %s' % (name, ', '.join(sorted(missing))))
+            continue
+        manifest = os.path.join(p, 'payload-manifest.json')
+        if 'manifest_sha256' in kv and os.path.isfile(manifest) and sha256(manifest) != kv['manifest_sha256']:
+            bad.append('%s: %s is not %s' % (name, manifest, kv['manifest_sha256']))
+            continue
+        import runpy   # the vendored checker, as pipeline/tests/test_contract.py loads it
+        contract = runpy.run_path(os.path.join(TOP, 'tools', 'hao-contract', 'hao_contract.py'))
+        bad += ['%s: %s' % (name, b) for b in contract['check_payload'](
+            TOP, {'manifest': manifest, 'os_build': kv['os_build'], 'layout_version': int(kv['layout_version'])})]
+    return bad
+
+
 def path(lock, name):
     r = rows(lock) if not lock.endswith('.json') else \
         {k: (v['sha256'], resolve(v['path'])) for k, v in json.load(open(lock)).items() if isinstance(v, dict) and 'path' in v}
@@ -74,6 +117,9 @@ def path(lock, name):
     want, p = r[name]
     if want != '-' and sha256(p) != want:
         sys.exit('%s: %s is not %s (%s)' % (lock, p, want, name))
+    bad = check_row(lock, name, p)
+    if bad:
+        sys.exit('\n'.join('%s: %s' % (lock, b) for b in bad))
     return p
 
 
