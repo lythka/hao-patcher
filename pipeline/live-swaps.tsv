@@ -2,3 +2,4 @@
 # SHA256<TAB>/LAPTOP/PATH<TAB>row NAME | recipe NAME | dropped: WHY
 # "row"/"recipe": the fix now ships in images that way. "dropped": the swap was an experiment not to keep.
 # hao-runtime files under /usr/lib/hao/ need no line when the hao_runtime row's payload has the same bytes.
+f74e17a02eabf305cb080df84a5412a402a57897fdbad1bced702fab75725bce	/usr/lib/hao/libhao.dylib	dropped: ControlCenter bisect step (hao-runtime 7c68d7f = c6657a0~1), superseded by the dev-26B131 push
