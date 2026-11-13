@@ -7,7 +7,7 @@ A file is installed with the attributes its declaration gives (*installed*: mode
 without them gets root:wheel, 0755 for a Mach-O, 0644 otherwise, no flags (a tar member keeps its own mode and owner).
 A file made on the target lists what it is made *after* there.
 
-37 of 39 patches declare their files so far.
+38 of 40 patches declare their files so far.
 
 ## darwin27-kernel
 
@@ -64,6 +64,14 @@ Revision r6, status experiment. [Recipe](../patches/golden-gate-corespotlight-co
   1. `load-corespotlight-compat`: macho.add-dylib LC_LOAD_DYLIB /usr/lib/corespotlight_compat.dylib.
      Spotlight queries stop crashing the daemon: the compat library adds the CoreSpotlight getter 27.x's SpotlightDaemon calls and x86_64 CoreSpotlight lacks. Required (not weak) load; the x86_64 slice only.
 - `usr/lib/corespotlight_compat.dylib`: whole file from hao (row corespotlight_compat_shim). New file: adds -[CSSearchQueryContext compiledRankingFactsConfiguration] (src/corespotlight_compat.m, built by make). Installed mode 0755, owner root:wheel, flags restricted.
+
+## golden-gate-dyld-internal
+
+Revision r1, status experiment. [Recipe](../patches/golden-gate-dyld-internal/README.md)
+
+- `usr/lib/dyld`: from hao · hao-runtime's x86_64 dyld (payload replace/dyld: 26B131's dyld with the libignition stage count fixed) (row hao_runtime); 1 edit, applied by the installer, then signed: ad hoc, once, identifier com.apple.darwin.ignition. Installed mode 0755, owner root:wheel, flags restricted.
+  1. `internal-install-in-dyld-only`: literal near __ZNK5dyld415SyscallDelegate15internalInstallEv (within 32 bytes), 21 bytes, `55 48 89 E5 BF 10 00 00 00 E8 00 00 00 00 85 C0 0F 94 C0 5D C3` → `55 48 89 E5 BF 10 00 00 00 31 C0 0F 1F 00 85 C0 0F 94 C0 5D C3` (`call _csr_check(CSR_ALLOW_APPLE_INTERNAL); test eax,eax; sete al` → `xor eax,eax; nop dword [rax]; test eax,eax; sete al`).
+     Dyld honours on-disk roots of shared-cache images (OCLP's Metal wrapper and MetalOld) only on an internal install. This makes dyld alone count as one, so the ic_csr_internal boot-arg, which made every process see an Apple-internal build (mobileassetd then used Apple's internal asset server: no Spotlight, Siri or language assets), is no longer needed.
 
 ## golden-gate-font-registry
 

@@ -10,6 +10,7 @@
 darwin27-kernel                   # Boot/System kernel collections around the 27 x86_64 kernel and the Intel kexts. First: everything after edits on top of them
 golden-gate-userspace             # combined OS cryptex (x86_64 dyld cache, Tahoe DriverKit, cache repairs, code identity carrier in Security), IO80211/WiFiPeerToPeer/CoreWiFi compat, display shim. Second, same reason
 hao-runtime                       # hao, plus an x86_64 launch slice in every arm64-only 27 program so it runs on Intel
+golden-gate-dyld-internal         # dyld alone counts as an internal install (internalInstall() edit), so OCLP's Metal roots load without ic_csr_internal; after hao-runtime (its dyld)
 golden-gate-launchd-warm          # launchd starts kernelmanager_helper (RunAtLoad) for the OpenCore kexts' load reports and, until Setup is done, mbsystemadministration for loginwindow, both Interactive; after golden-gate-userspace (same launchd job cache)
 golden-gate-metal-libraries       # the build's own RenderBox/Tungsten/MPS/MetalFX/CoreRE metallibs repaired for the HD 4000 compiler; deliberately supersedes OCLP's Tahoe RenderBox/Tungsten copies
 golden-gate-hello                 # first-boot hello and Welcome to Mac: repaired hello shader, un-skip in OCLP's Metal wrapper

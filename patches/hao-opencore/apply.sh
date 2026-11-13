@@ -41,12 +41,12 @@ ditto "$P/inputs/hao_runtime/HaoExec.kext" "$ESP/EFI/OC/Kexts/HaoExec.kext"
     "$SYS/System/Library/KernelCollections/BootKernelExtensions.kc"
 /private/var/ssdshare/py/bin/python3.12 -I "$P/src/early_kexts.py" \
     "$SYS" "$ESP" "$P/src/early-kexts.txt"
-# The image's dyld counts as an internal install by itself (hao-runtime's replace/dyld: internalInstall() answers true),
+# The image's dyld counts as an internal install by itself (golden-gate-dyld-internal: internalInstall() answers true),
 # so it loads OCLP's on-disk Metal roots without the ic_csr_internal boot-arg, which made every process see an
 # Apple-internal build (mobileassetd then asked Apple's internal asset server: no Spotlight, Siri or language assets).
 # Without that dyld, dropping the boot-arg would leave 27's Metal in place of OCLP's: refuse.
 /private/var/ssdshare/py/bin/python3.12 -I -c 'import sys; sys.exit(0 if bytes.fromhex("554889e5bf1000000031c00f1f0085c00f94c05dc3") in open(sys.argv[1], "rb").read() else 1)' "$SYS/usr/lib/dyld" || {
-    echo "hao-opencore: $SYS/usr/lib/dyld lacks the internalInstall edit (hao_runtime payload too old): OCLP's Metal roots would not load without ic_csr_internal" >&2; exit 1; }
+    echo "hao-opencore: $SYS/usr/lib/dyld lacks the internalInstall edit (golden-gate-dyld-internal missing from the set): OCLP's Metal roots would not load without ic_csr_internal" >&2; exit 1; }
 /private/var/ssdshare/py/bin/python3.12 - "$ESP/EFI/OC/config.plist" <<'PYCONFIG'
 import os,plistlib,sys
 p=sys.argv[1]

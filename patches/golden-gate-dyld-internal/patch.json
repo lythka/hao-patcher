@@ -1,0 +1,11 @@
+{
+ "revision": 1,
+ "stage": "oclp-hook",
+ "applies": {"models": ["MacBookPro9,2"], "builds": ["25G342"]},
+ "inputs": [],
+ "status": "experiment",
+ "validated": false,
+ "files": [
+  {"path": "usr/lib/dyld", "edits": "edits/dyld.json", "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}}
+ ]
+}

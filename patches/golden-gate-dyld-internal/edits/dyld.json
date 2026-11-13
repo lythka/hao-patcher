@@ -1,0 +1,33 @@
+{
+ "format": 1,
+ "path": "usr/lib/dyld",
+ "arch": "x86_64",
+ "origin": {
+  "kind": "hao",
+  "row": "hao_runtime",
+  "name": "hao-runtime's x86_64 dyld (payload replace/dyld: 26B131's dyld with the libignition stage count fixed)",
+  "note": "written after hao-runtime installs it (set order); the arm64e slices are not touched"
+ },
+ "applied_by": "installer",
+ "sign": {
+  "mode": "adhoc",
+  "identifier": "com.apple.darwin.ignition"
+ },
+ "edits": [
+  {
+   "id": "internal-install-in-dyld-only",
+   "kind": "literal",
+   "base": "__ZNK5dyld415SyscallDelegate15internalInstallEv",
+   "limit": 32,
+   "find": "55 48 89 E5 BF 10 00 00 00 E8 00 00 00 00 85 C0 0F 94 C0 5D C3",
+   "mask": "FF FF FF FF FF FF FF FF FF FF 00 00 00 00 FF FF FF FF FF FF FF",
+   "replace": "55 48 89 E5 BF 10 00 00 00 31 C0 0F 1F 00 85 C0 0F 94 C0 5D C3",
+   "asm": {
+    "before": "call _csr_check(CSR_ALLOW_APPLE_INTERNAL); test eax,eax; sete al",
+    "after": "xor eax,eax; nop dword [rax]; test eax,eax; sete al"
+   },
+   "reason": "dyld honours on-disk roots of shared-cache images (OCLP's Metal wrapper and MetalOld) only on an internal install. This makes dyld alone count as one, so the ic_csr_internal boot-arg, which made every process see an Apple-internal build (mobileassetd then used Apple's internal asset server: no Spotlight, Siri or language assets), is no longer needed",
+   "evidence": "hao-opencore r52 refuses an image whose dyld lacks this edit; tests/test_edits.py proves the script and this spec write the same bytes on the hao_runtime row's dyld"
+  }
+ ]
+}

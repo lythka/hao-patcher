@@ -67,6 +67,14 @@
     "golden-gate-windowserver-filter"
    ]
   },
+  "usr/lib/dyld": {
+   "chain": "chain",
+   "writers": [
+    "apple",
+    "hao-runtime",
+    "golden-gate-dyld-internal"
+   ]
+  },
   "usr/lib/libhelloblur.dylib": {
    "chain": "chain",
    "writers": [

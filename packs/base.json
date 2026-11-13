@@ -13,6 +13,7 @@
   "darwin27-kernel",
   "darwin27-sandbox-disk-space",
   "hao-runtime",
+  "golden-gate-dyld-internal",
   "golden-gate-userspace",
   "golden-gate-launchd-warm",
   "golden-gate-corespotlight-compat",

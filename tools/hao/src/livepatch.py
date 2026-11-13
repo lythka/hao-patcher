@@ -220,7 +220,7 @@ CACHE_MAP_DIRS = ('System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld', 'Sy
 CACHE_REASON = 'in the dyld shared cache (dyld maps the cache\'s copy; the installer rebuilds the cache)'
 CSR_ALLOW_APPLE_INTERNAL = 0x10
 # dyld4::SyscallDelegate::internalInstall() with its csr_check(CSR_ALLOW_APPLE_INTERNAL) call replaced by xor eax,eax
-# (hao-runtime's replace/dyld): dyld alone counts as internal and honours on-disk roots, without the ic_csr_internal
+# (golden-gate-dyld-internal): dyld alone counts as internal and honours on-disk roots, without the ic_csr_internal
 # boot-arg that made every process see an Apple-internal build.
 DYLD_INTERNAL_EDITED = bytes.fromhex('554889e5bf1000000031c00f1f0085c00f94c05dc3')
 

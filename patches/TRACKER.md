@@ -13,6 +13,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
 | dev-diagnostics | r2 | post | dev |  |  |  |  |  | **needs** | r2 2026-11-13 The declared boot-args follow hao-opencore r52 (no ic_csr_internal=1); script unchanged. |
 | golden-gate-corespotlight-compat | r6 | oclp-hook | experiment |  | x | x |  |  | ok (r4) | r6 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both daemo |
+| golden-gate-dyld-internal | r1 | oclp-hook | experiment |  | x |  |  |  | **needs** | r1 2026-11-13 internalInstall() answers true in dyld only (owner chose this over the boot-arg, 2026-11-13). |
 | golden-gate-font-registry | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
 | golden-gate-hello | r6 | oclp-hook | experiment |  | x | x |  |  | **needs** | r6 2026-11-12 The `libhelloblur` source and builder are in `build/` (from the hello-render recipe); the row an |
 | golden-gate-icon-caches | r5 | post | experiment | caches | x |  |  |  | ok (r3) | r5 2026-11-12 Declare where each installed file is inside its row ("source"; tar members as ARCHIVE!MEMBER) fo |
@@ -30,7 +31,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-user-template | r3 | post | experiment |  | x |  |  |  | **needs** | r3 2026-11-13 26B131 input row user_template_golden_gate (harvest of benchtest's first login on image 3b2291a: |
 | golden-gate-userspace | r65 | oclp-hook | experiment |  | x | x |  |  | **needs** | r65 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 43af852 (hao-runt |
 | golden-gate-windowserver-filter | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on both libra |
-| hao-opencore | r52 | post | experiment |  | x | x |  |  | **needs** | r52 2026-11-13 No `ic_csr_internal=1` (removed if present): the image's dyld counts as internal itself (hao-ru |
+| hao-opencore | r52 | post | experiment |  | x | x |  |  | **needs** | r52 2026-11-13 No `ic_csr_internal=1` (removed if present): the image's dyld counts as internal itself (golden |
 | hao-runtime | r71 | oclp-hook | experiment |  | x | x |  |  | **needs** | r71 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 43af852 (hao-runt |
 | metal-compiler-compat | r4 | oclp-hook | experiment |  | x |  |  |  | **needs** | r4 2026-11-12 Declare install attributes in patch.json `files` (root:wheel 0755 and `restricted` on the servic |
 | metal-metalold | r1 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r1 2026-11-12 Our own MetalOld from Apple's 13.2.1 cut (hao-tools cache-dylib r5) plus the declared je->nop ed |

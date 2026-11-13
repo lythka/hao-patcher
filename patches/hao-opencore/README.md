@@ -75,8 +75,8 @@ and no measurement switches. Bench images add those with `dev-diagnostics` (pack
 `ic_csr_internal=1` is no longer written, and removed if present: 27's x86_64 dyld scans the disk for shared-cache
 overrides (OCLP's on-disk Metal and MetalOld) only when it counts as an internal install. It used to make IntelCommpage
 report `CSR_ALLOW_APPLE_INTERNAL` to every process, so os_variant made the whole system an Apple-internal build
-(mobileassetd asked Apple's internal asset server: no Spotlight, Siri or language assets). Now hao-runtime's dyld
-answers internalInstall() itself, and `apply.sh` refuses an image whose dyld lacks that edit.
+(mobileassetd asked Apple's internal asset server: no Spotlight, Siri or language assets). Now golden-gate-dyld-internal makes dyld
+answer internalInstall() itself, and `apply.sh` refuses an image whose dyld lacks that edit.
 
 `hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1` (hao's measurement switches) are never written here: only
 `dev-diagnostics` adds them, in bench images.
@@ -189,7 +189,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the MacBookPro9,2 is not yet proven.
 
 ## Revisions
-- r52 2026-11-13 No `ic_csr_internal=1` (removed if present): the image's dyld counts as internal itself (hao-runtime's replace/dyld, internalInstall() edit), so only dyld sees an internal install and mobileassetd uses the public asset server; `apply.sh` refuses an image whose dyld lacks the edit.
+- r52 2026-11-13 No `ic_csr_internal=1` (removed if present): the image's dyld counts as internal itself (golden-gate-dyld-internal's internalInstall() edit), so only dyld sees an internal install and mobileassetd uses the public asset server; `apply.sh` refuses an image whose dyld lacks the edit.
 - r51 2026-11-13 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 43af852 (hao-runtime-26B131-20261113-43af85296aa9). No recipe change.
 - r50 2026-11-13 End-user configuration only: `Misc.Debug.Target` 0 (no OpenCore log, no file writes at boot) and no measurement switches in any build; `IMAGE_DEV_BUILD` is gone. Bench images get `hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1` and the ESP file log from the new `dev-diagnostics` recipe (pack `dev`). Edits `debug-log-to-file` (65) and `debug-log-info-lines` replaced by `no-opencore-log` (0).
 - r49 2026-11-13 A normal boot shows only the Apple logo: `Misc.Debug.AppleDebug` false, and images use the OpenCore 1.0.5 RELEASE archive (row `opencore_release`; golden-run picks it unless the assembly says `"opencore": "debug"`). The DEBUG build printed its early lines and apfs.efi's on screen.
