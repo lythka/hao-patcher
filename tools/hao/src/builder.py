@@ -379,19 +379,9 @@ def build_disk(a, c, host, run=subprocess.call):
 
 
 def create_installer(a, c, host):
-    profile, path, asm, groups = resolve(a, c, 'create-installer')
-    info = gate(c, host, a, 'external', a.minimum_bytes)
-    show_steps(c, 'create-installer', groups)
-    c.item('partition 1  OpenCore (%s) + Recovery + launcher' % profile['model'], 'files')
-    c.item('partition 2  kit: images, packs, Python, tools, release.json', 'files')
-    c.print('')
-    c.print('disk  %s  everything on it will be erased' % DISKS.label(info))
-    if a.dry_run:
-        c.done('dry run: the stick passed every check; nothing was written')
-        return 0
-    if not c.confirm('Erase %s to make the installer?' % DISKS.label(info), 'ERASE', a.confirm):
-        raise Stopped('not confirmed', untouched='nothing was written')
-    raise Stopped('create-installer cannot write yet', why=NOT_WIRED, untouched='nothing was written to the stick')
+    """The USB stick: asks its questions and runs its steps in installer.py (the user's one command)."""
+    import installer
+    return installer.create_installer(a, c, host)
 
 
 def install(a, c, host, run=subprocess.call):

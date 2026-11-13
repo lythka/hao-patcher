@@ -40,8 +40,12 @@
         Both need root, SIP's filesystem protection off and AMFI relaxed, as the installer's Recovery starts; on a
         Mac's everyday macOS they stop before writing. LOCAL (default WORK/local) holds the assembly's copies and
         logs and must not be on the disk being erased.
-  hao create-installer /dev/diskN (--model M | --profile F) [--dry-run] [--confirm ERASE]  (sudo; USB stick)
-        checks the stick and shows its plan; writing the stick is not built yet.
+  hao create-installer [/dev/diskN] [--model M | --profile F] [--dry-run] [--confirm diskN]  (sudo; USB stick)
+        asks which Mac (a proven model by default, this Mac, or a profile file) and which external disk is the stick,
+        and for the disk's name typed; then downloads what release.json (beside hao) pins and prepares the packs.
+        Writing the stick is not built yet: it stops there. --dry-run asks and shows the plan, nothing more.
+  hao report [--output FILE]                                  one text file for a GitHub issue: hao's version, this Mac,
+        its hao detect profile, the last command's log and the install record, without serial, user or Wi-Fi names
 
 Detail levels for every command: --quiet, default, --show (files), --show-edits (edits), --log json.
 
@@ -65,6 +69,8 @@ import detect as DETECT  # noqa: E402
 import verify as VERIFY  # noqa: E402
 import builder as BUILD  # noqa: E402
 import assets as ASSETS  # noqa: E402
+import installer as INST  # noqa: E402
+import report as REP     # noqa: E402
 
 ACQUIRE = REPO / 'tools' / 'acquire'
 CACHE = Path.home() / 'Library' / 'Caches' / 'hao'
@@ -235,18 +241,31 @@ def cmd_patch(a):
         return 1
 
 
-def guarded(fn):
-    """Run FN(a, console); a Stopped check prints its report and exits 1."""
+def guarded(fn, log=None):
+    """Run FN(a, console); a Stopped check prints its report and exits 1. With LOG (a command name) the console's
+    events are kept as that command's log (src/report.py), which hao report attaches."""
     def run(a):
         c = CON.Console(CON.level_of(a))
         try:
             return fn(a, c)
         except CON.Stopped as x:
+            if log and INST.REPORT not in x.options and x.what != 'not confirmed':
+                x.options.append(INST.REPORT)
             c.stopped(x)
             return 1
         except (LP.PatchError, DETECT.DetectError) as x:
-            c.stopped(CON.Stopped(str(x)))
+            c.stopped(CON.Stopped(str(x), options=[INST.REPORT] if log else ()))
             return 1
+        except KeyboardInterrupt:
+            c.event('interrupted')
+            print('\nstopped: Control-C pressed', file=sys.stderr)
+            return 130
+        except BaseException as x:
+            c.event('crash', error='%s: %s' % (type(x).__name__, x))
+            raise
+        finally:
+            if log:
+                REP.save_log(log, sys.argv[1:], c.events)
     return run
 
 
@@ -413,12 +432,18 @@ def main():
     builder_args(q, disk=False)
     q.set_defaults(fn=guarded(cmd_assets))
     q = sub.add_parser('build-disk'); builder_args(q); kit_args(q)
-    q.set_defaults(fn=guarded(lambda a, c: BUILD.build_disk(a, c, MAC.SystemHost())))
+    q.set_defaults(fn=guarded(lambda a, c: BUILD.build_disk(a, c, MAC.SystemHost()), log='build-disk'))
     q = sub.add_parser('create-installer'); builder_args(q)
-    q.add_argument('--minimum-bytes', type=int, default=32 * 10 ** 9)
-    q.set_defaults(fn=guarded(lambda a, c: BUILD.create_installer(a, c, MAC.SystemHost())))
+    q.add_argument('--minimum-bytes', type=int, help='smallest stick accepted (default %d)' % INST.MINIMUM_BYTES)
+    q.add_argument('--release', help='the release.json to download from (default: beside hao)')
+    q.add_argument('--cache', type=Path, default=CACHE)
+    q.set_defaults(fn=guarded(lambda a, c: INST.create_installer(a, c, MAC.SystemHost()), log='create-installer'))
     q = sub.add_parser('install'); builder_args(q); kit_args(q)
-    q.set_defaults(fn=guarded(lambda a, c: BUILD.install(a, c, MAC.SystemHost())))
+    q.set_defaults(fn=guarded(lambda a, c: BUILD.install(a, c, MAC.SystemHost()), log='install'))
+    q = sub.add_parser('report', help='one file with what a developer needs, for a GitHub issue')
+    q.add_argument('--output', help='the file to write (default hao-report-DATE.txt in this folder)')
+    CON.add_level_flags(q)
+    q.set_defaults(fn=guarded(lambda a, c: REP.report(a, c, MAC.SystemHost())))
     a = p.parse_args()
     return a.fn(a)
 

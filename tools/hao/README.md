@@ -1,15 +1,37 @@
 # hao
 
+## For users
+
+1. Download the release archive from the project's GitHub Releases page and unpack it.
+2. In Terminal, in the unpacked folder, run `sudo ./hao create-installer`. It asks which Mac the installer is for
+   and which disk is the USB stick, asks you to type the stick's name, then downloads and checks everything and
+   writes the stick.
+3. Plug the stick into the Intel Mac, hold Option while it starts, and choose **hao Installer**.
+4. If something fails, run `./hao report` and attach the file it writes to a GitHub issue. It holds no serial
+   number, user names or Wi-Fi names.
+
+| You need | |
+|---|---|
+| An Intel Mac | proven: MacBookPro9,2 (MacBook Pro 13-inch, Mid 2012) |
+| A USB stick | at least 64 GB; everything on it is erased |
+| An internet connection | for Apple's and the project's files, each checked by size and sha256 |
+| A Mac to make the stick on | any Mac; it can be the Intel Mac itself |
+
+Not built yet: writing the stick. `create-installer` asks its questions, downloads and checks the files, then
+stops before it touches the stick and says so.
+
+## For developers
+
 The user commands of the hao builder (workflow plan, step 9a on): `hao patch` (live updates and revert), `hao explain`,
-`hao inspect`, and the builder and installer commands below (`detect`, `fetch`, `verify`, `build-image`, `build-disk`,
-`create-installer`, `install`).
+`hao inspect`, `hao report`, and the builder and installer commands below (`detect`, `fetch`, `verify`,
+`build-image`, `build-disk`, `create-installer`, `install`).
 
 Every command has the five detail levels of the console mockups (`src/console.py`): `--quiet` (progress and the one
 question), default (one line per step with its check), `--show` (one line per file or repair), `--show-edits` (origin
 and reason of each change), `--log json` (every event as a JSON line). A failed check stops the command with what
 happened, why it matters, what was left untouched and what to do next (exit 1).
 
-## The builder and installer commands
+### The builder and installer commands
 
 ```sh
 hao detect [--out mac.json]                     # on the target: model, board id, GPU/Wi-Fi/audio, patch sets, packs
@@ -17,8 +39,9 @@ hao fetch RELEASE.json [--cache DIR] [--verify] [--host-check] [--assets-from DI
 hao verify [ROOT] [--manifests OVERLAY_DIR|MANIFEST]...
 hao build-image REPO --model MacBookPro9,2 [--overlay-system ROOT] [--dry-run]
 sudo hao build-disk /dev/diskN --model MacBookPro9,2 [--dry-run]     # output (b): an external SSD
-sudo hao create-installer /dev/diskN --model MacBookPro9,2 [--dry-run]  # output (a): the USB stick
+sudo hao create-installer [/dev/diskN] [--model M | --profile F] [--dry-run]  # output (a): the USB stick
 hao install /dev/diskN [--dry-run]              # on the target, from the stick's Recovery
+hao report [--output FILE]                      # one text file for a GitHub issue
 ```
 
 - **detect** (`src/detect.py`, read-only) reads `sysctl`, `ioreg` (board id, PCI devices). Patch sets come from the
@@ -49,10 +72,27 @@ hao install /dev/diskN [--dry-run]              # on the target, from the stick'
   `amfi=0x80`), because the build makes firmlinks with an ad hoc entitled tool. The installer's Recovery starts that
   way; on a Mac's everyday macOS they stop before writing and say so. Our dev host never runs them against its own
   disks: they run in the builder VM or on the laptop.
-- **create-installer** checks the stick and shows its plan; writing the stick (Recovery, launcher, kit partition)
-  is not built yet, so it stops after the checks.
+- **create-installer** (`src/installer.py`) is the user's one command. It asks, one question at a time with
+  numbered choices: which Mac (the release's proven models, the first by default; this Mac through `hao detect`,
+  offered on an Intel Mac; or a profile file), which disk is the stick (`diskutil list external physical`, each
+  checked by `src/disks.py`: internal disks, the running system's and disk images are never listed; a stick under
+  60 * 10^9 bytes, what one sold as 64 GB holds at least, or one holding hao's folder or its cache is listed with
+  the reason and cannot be chosen), and the disk's name typed. The disk argument, `--model`/`--profile` and
+  `--confirm diskN` answer ahead; `--dry-run` asks and shows the plan. Then: Download (everything `release.json`
+  beside `hao`, or `--release FILE`, pins, through `tools/acquire` into `--cache`), Prepare packs (the profile's
+  packs and recipes), Write the USB stick. Writing the stick (Recovery, launcher, kit partition) and making the kit
+  from the downloads are not built yet: it stops there, before touching the stick. Its console events are kept as
+  a log (below).
+- **report** (`src/report.py`) writes one text file (default `hao-report-DATE.txt` in the current folder; under
+  sudo it belongs to the user who ran sudo): hao's release and commit, `sw_vers`, model, CPU, memory, SIP and boot
+  arguments, the `hao detect` profile, the last command log, the install record
+  (`/private/var/db/hao/install-record.json`) and the live patch records. Removed first: the serial number and
+  hardware UUID, computer and host names, login and full names (home folders become `USER`), Wi-Fi names, e-mail
+  and hardware addresses. create-installer, build-disk and install keep their console events, and any crash, as
+  `COMMAND-DATE.json` in `/Library/Logs/hao` (as root) or `~/Library/Logs/hao` (`HAO_LOGS` overrides; the newest 30
+  are kept); a stop of theirs points to `./hao report`.
 
-## hao patch
+### hao patch
 
 Applies pack overlays (one pack's final files + `manifest.json` with each file's sha256, mode, owner and flags) to
 a folder root, or to the running Mac (`--live`):
@@ -94,7 +134,7 @@ python3.14 -I tools/hao/hao patch --revert --root ROOT [--id hao-YYYYMMDD-HHMMSS
 
 State (records and backups) defaults to `ROOT/private/var/db/hao`.
 
-### The running Mac (`--live`)
+#### The running Mac (`--live`)
 
 For an Intel Mac booted through OpenCore with SIP's filesystem protection and authenticated root off (csr
 `0x2` and `0x800`). Every system command goes through `src/macos.py`'s `Host`; the tests answer them from

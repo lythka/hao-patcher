@@ -76,7 +76,8 @@ and reused between builds, keyed on their inputs and on the builder's tools.
 |---|---|---|
 | `hao detect` | the Mac, its devices and packs | works |
 | `hao fetch` / `hao verify` | a release's pinned downloads and assets; checks an installed system against its manifests | works |
-| `hao create-installer` | on any Mac: download, unpack, prepare packs, write the USB stick | checks and plan only; writing the stick is not built |
+| `hao create-installer` | the user's one command, on any Mac: asks which Mac and which stick, downloads, prepares packs, writes the USB stick | asks, checks the stick, downloads and checks the release's files; making the kit from them and writing the stick are not built |
+| `hao report` | one text file for a GitHub issue, without serial, user or Wi-Fi names | works |
 | `hao install` | on the target, from the stick: lay out the disk, copy macOS, add Intel support, apply packs, link the kernel, seal, make it bootable | builds from the stick's kit in a Recovery that relaxes SIP and AMFI; host tests only, not yet run onto a real disk |
 | `hao build-disk` | the same assembly onto an external SSD | stages the kit and builds onto the SSD, under the same conditions as `install`; host tests only |
 | `hao build-image` | an image file, for development | works, in the builder VM |
