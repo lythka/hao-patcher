@@ -11,7 +11,7 @@ A file made on the target lists what it is made *after* there.
 
 ## darwin27-kernel
 
-Revision r7, status experiment. [Recipe](../patches/darwin27-kernel/README.md)
+Revision r8, status experiment. [Recipe](../patches/darwin27-kernel/README.md)
 
 - `System/Library/Kernels/kernel`: whole file from Apple (row darwin27_kernel). Golden Gate's own x86_64 kernel from the IPSW, unchanged; installed once by the base layer (golden-pristine.sh finalize) and only checked by the kc-hook. Installed mode 0644, owner root:wheel.
 - `System/Library/KernelCollections/BootKernelExtensions.kc`: from hao · no earlier file; 1 edit, applied by the installer. Installed mode 0644, owner root:wheel.

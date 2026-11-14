@@ -8,7 +8,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 
 | Patch | Rev | Stage | Status | Optional | golden-gate-26B131 | golden-gate | recovery | stock | Validation | Newest revision |
 |---|---|---|---|---|---|---|---|---|---|---|
-| darwin27-kernel | r7 | oclp-hook | experiment |  | x | x |  |  | ok (r5) | r7 2026-11-12 Declare the kernel's install mode, 0644 (golden-pristine.sh installs it `-m 644`); the hook is u |
+| darwin27-kernel | r8 | oclp-hook | experiment |  | x | x |  |  | **needs** | r8 2026-11-13 On an Intel host (`uname -m` x86_64: a hao image, Golden Gate's Recovery) kmutil links in the ru |
 | darwin27-sandbox-disk-space | r3 | oclp-hook | experiment |  |  | x |  |  | **needs** | r3 2026-11-12 Declare the system.sb rule in `edits/system-sb.json` (edit-engine text.insert, unless already pr |
 | dev-access | r4 | post | dev |  |  |  |  |  | ok (r3) | r4 2026-11-12 Declare the four files it installs in patch.json `files`; the hook is unchanged. |
 | dev-diagnostics | r3 | post | dev |  |  |  |  |  | **needs** | r3 2026-11-13 `apply.sh` runs Python as `$OCLP_PYTHON` (the kit's CPython for the Mac the assembly runs on, ar |

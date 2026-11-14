@@ -1,0 +1,5 @@
+# Tahoe 26.7.3 (25G342) /usr/lib/libKernelCollectionBuilder.dylib (x86_64h), cut out of its OS cryptex shared cache
+# (row tahoe_os_cache_x86_64h) by pipeline/unpack/kc-builder at 93a3b5bc with hao-tools cache-dylib r7 (9d554a3),
+# signed ad hoc, check.py 0 errors; build.json and extraction.json beside it. darwin27-kernel's kmutil loads it on an
+# Intel host, where the running system's builder (Golden Gate's) refuses x86_64.
+a8653d9b46c5fb90bca8625565558406549f3097d171c566ccb23ff0ba3c69ef store/artifacts/tahoe-kc-builder-25G342-93a3b5bc/libKernelCollectionBuilder.dylib

@@ -1,5 +1,5 @@
 {
-  "revision": 7,
+  "revision": 8,
   "stage": "oclp-hook",
   "applies": {
     "models": [
@@ -12,12 +12,11 @@
   },
   "inputs": [
     "darwin27_kernel",
-    "tahoe_kmutil"
+    "tahoe_kmutil",
+    "tahoe_kc_builder"
   ],
   "status": "experiment",
-  "validated": true,
-  "validated_revision": 5,
-  "validated_digest": "b51d0041ccbfb6fa56747f0be5f80054d8608c83c580fdbf3c166969efbaf29b",
+  "validated": false,
   "files": [
     {
       "path": "System/Library/Kernels/kernel",

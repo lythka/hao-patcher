@@ -13,7 +13,14 @@ cmp -s "$K" "$SYS/System/Library/Kernels/kernel" ||
 # Paths inside the target must differ from the live builder's paths for kmutil.
 KC=System/Library/KernelCollections; B=/.darwin27-kc-build   # the build path is linked into the BootKC: changing it changes the bytes the repairs are bound to
 W=$(mktemp -d)
-cp "$H/inputs/tahoe_kmutil" "$W/kmutil"; chmod 755 "$W/kmutil"; codesign -s - -f "$W/kmutil"
+cp "$H/inputs/tahoe_kmutil" "$W/kmutil"; chmod 755 "$W/kmutil"
+if [ "$(uname -m)" = x86_64 ]; then
+    # An Intel host (a hao image, Golden Gate's Recovery): kmutil links in the running system's
+    # libKernelCollectionBuilder, Golden Gate's, which refuses x86_64 there. Load Tahoe's instead.
+    install -m 644 "$H/inputs/tahoe_kc_builder" "$W/kcbuilder.dylib"; codesign -s - -f "$W/kcbuilder.dylib"
+    "$OCLP_PYTHON" -I "$H/kmutil_builder.py" "$W/kmutil" @executable_path/kcbuilder.dylib
+fi
+codesign -s - -f "$W/kmutil"
 mkdir "$SYS$B"
 set -- -a x86_64 --allow-missing-kdk -R "$SYS" -k "$SYS/System/Library/Kernels/kernel" -V release -B "$B/BootKernelExtensions.kc"
 "$W/kmutil" create -n boot "$@"

@@ -294,6 +294,22 @@
    ],
    "reason": "Apple's Tahoe kmutil binary extracted from the installer (release-cut's store path calls it a download; it is not one)"
   },
+  "tahoe_kc_builder": {
+   "class": "made-on-mac",
+   "producer": "pipeline/unpack/kc-builder",
+   "inputs": [
+    "tahoe_os_cache_x86_64h"
+   ],
+   "reason": "Tahoe's x86_64 libKernelCollectionBuilder cut out of Apple's Tahoe OS cache by hao-tools cache-dylib; kmutil loads it on an Intel host, where Golden Gate's own builder refuses x86_64"
+  },
+  "tahoe_os_cache_x86_64h": {
+   "class": "made-on-mac",
+   "producer": "pipeline/unpack/unpack-installer",
+   "inputs": [
+    "installer"
+   ],
+   "reason": "Tahoe's x86_64h OS cryptex shared cache, rebuilt by pipeline/unpack's ripatch from Apple's installer; read only by the producers that cut libraries out of it (kc-builder)"
+  },
   "ipsw_27_0": {
    "class": "download",
    "name": "UniversalMac_27.2.1_26B131_Restore.ipsw",

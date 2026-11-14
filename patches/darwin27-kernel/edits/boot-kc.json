@@ -16,6 +16,8 @@
     "tool": "kmutil",
     "tool_row": "tahoe_kmutil",
     "tool_note": "copied to builder scratch and re-signed ad hoc; it runs only while linking",
+    "builder_row": "tahoe_kc_builder",
+    "builder_note": "on an Intel host only (uname -m x86_64: a hao image, Golden Gate's Recovery): kmutil links in the running system's libKernelCollectionBuilder, which there is Golden Gate's and refuses x86_64, so src/kmutil_builder.py makes the copy a thin x86_64 kmutil that loads Tahoe's from the row; in the builder VM (arm64) it loads the running system's, as before",
     "subcommand": "create",
     "arch": "x86_64",
     "allow_missing_kdk": true,
