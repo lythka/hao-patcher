@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Cut Tahoe's x86_64 kernel-collection builder out of its OS shared cache (row tahoe_kc_builder), with its record.
+
+  kc-builder OUTPUT [--inputs pipeline/inputs/25G342]
+
+Tahoe's kmutil links the kernel collections (darwin27-kernel), and does it in /usr/lib/libKernelCollectionBuilder.dylib
+of the Mac it runs on. In the builder VM that is Golden Gate's arm64e copy, which builds x86_64 collections. On an
+Intel Mac running a hao image or Golden Gate's Recovery it is Golden Gate's copy too, and there it refuses x86_64
+("unsupported arch: x86_64", "Unexpected __HIB segment"). Tahoe's own x86_64 copy builds them: Intel Macs running Tahoe
+link their collections with it. Tahoe ships it only inside its OS cryptex shared cache (row tahoe_os_cache_x86_64h), so
+hao-tools' cache-dylib cuts it out as a file (a hao-tools checkout next to this repository, or CACHE_DYLIB=DIR; r7 or
+later, which makes the header room this image needs), signs it ad hoc and verifies it with check.py.
+
+OUTPUT/libKernelCollectionBuilder.dylib keeps its install name. OUTPUT/build.json: the commit, the input row and its
+sha256, cache-dylib's commit, the commands (repository-relative paths), the extraction's stats and the output's
+sha256. OUTPUT/extraction.json: cache-dylib's report (every symbol bound per dependency).
+"""
+import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
+IMAGE = '/usr/lib/libKernelCollectionBuilder.dylib'
+ROW = 'tahoe_os_cache_x86_64h'
+CACHE_DYLIB = Path(os.environ.get('CACHE_DYLIB', REPO.parent/'hao-tools'/'tools'/'cache-dylib'))
+
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def run(*args, cwd=None):
+    return subprocess.run(list(map(str, args)), check=True, capture_output=True, text=True, cwd=cwd)
+
+
+def build(output, inputs):
+    output = Path(output).resolve()
+    if not (CACHE_DYLIB/'cache_dylib.py').is_file():
+        sys.exit('cache-dylib not found at %s: check out hao-tools next to this repository or set CACHE_DYLIB'
+                 % CACHE_DYLIB)
+    main = Path(run(sys.executable, '-I', REPO/'pipeline'/'lock.py', 'path', inputs, ROW).stdout.strip())
+    output.mkdir(parents=True, exist_ok=False)
+    dylib, report = output/'libKernelCollectionBuilder.dylib', output/'extraction.json'
+    sys.path.insert(0, str(CACHE_DYLIB))
+    import cache_dylib
+    import check
+    record = cache_dylib.extract(main.parent, 'x86_64h', IMAGE, dylib)
+    run('codesign', '-f', '-s', '-', dylib)
+    verified = check.check(str(dylib), record)
+    if verified['errors']:
+        sys.exit('the extracted builder fails verification:\n' + '\n'.join(verified['errors']))
+    report.write_text(json.dumps(record, indent=1, default=str) + '\n')
+    git = lambda d, *a: run('git', '-C', d, *a).stdout.strip()
+    rel = lambda p: os.path.relpath(p, REPO)
+    build = dict(unit='pipeline/unpack', operation='kc-builder', commit=git(REPO, 'rev-parse', 'HEAD'),
+                 dirty=bool(git(REPO, 'status', '--porcelain', '--', rel(HERE/'kc-builder'))),
+                 date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                 inputs={ROW: dict(row=rel(Path(inputs)/ROW), path=rel(main), sha256=sha(main))},
+                 cache_dylib=dict(commit=git(CACHE_DYLIB, 'rev-parse', 'HEAD'),
+                                  dirty=bool(git(CACHE_DYLIB, 'status', '--porcelain', '--', '.'))),
+                 commands=['cache_dylib.extract(%s, x86_64h, %s)' % (rel(main.parent), IMAGE),
+                           'codesign -f -s - libKernelCollectionBuilder.dylib', 'check.check'],
+                 stats={k: v for k, v in record.get('stats', {}).items() if not isinstance(v, dict)},
+                 verification={k: v for k, v in verified.items() if k != 'errors' and not isinstance(v, (list, dict))},
+                 files={dylib.name: sha(dylib), report.name: sha(report)})
+    (output/'build.json').write_text(json.dumps(build, indent=2) + '\n')
+    return build
+
+
+if __name__ == '__main__':
+    args = sys.argv[1:]
+    inputs = REPO/'pipeline'/'inputs'/'25G342'
+    if '--inputs' in args:
+        i = args.index('--inputs')
+        inputs = Path(args[i + 1]).resolve()
+        del args[i:i + 2]
+    if len(args) != 1 or args[0].startswith('-'):
+        sys.exit(__doc__)
+    print(json.dumps(build(args[0], inputs), indent=2))
