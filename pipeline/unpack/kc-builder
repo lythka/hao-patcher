@@ -54,9 +54,12 @@ def build(output, inputs):
     verified = check.check(str(dylib), record)
     if verified['errors']:
         sys.exit('the extracted builder fails verification:\n' + '\n'.join(verified['errors']))
-    report.write_text(json.dumps(record, indent=1, default=str) + '\n')
     git = lambda d, *a: run('git', '-C', d, *a).stdout.strip()
     rel = lambda p: os.path.relpath(p, REPO)
+    text = json.dumps(record, indent=1, default=str)
+    for folder in {str(main.parent), str(main.parent.resolve())}:   # the cache folder by its repository path only
+        text = text.replace(json.dumps(folder)[1:-1], rel(main.parent))
+    report.write_text(text + '\n')
     build = dict(unit='pipeline/unpack', operation='kc-builder', commit=git(REPO, 'rev-parse', 'HEAD'),
                  dirty=bool(git(REPO, 'status', '--porcelain', '--', rel(HERE/'kc-builder'))),
                  date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
