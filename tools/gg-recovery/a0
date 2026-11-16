@@ -50,8 +50,8 @@ def sh(*args, **kw):
     return subprocess.run(args, check=True, **kw)
 
 
-def job_script(stamp):
-    name = 'gga0-' + stamp
+def job_script(stamp, stage='a0', stock_template=False):
+    name = 'gg%s-%s' % (stage, stamp)
     return '''set -u
 umask 022
 G=%s
@@ -60,11 +60,25 @@ exec >"$G/out/a0.log" 2>&1
 rc=0
 "$G/py/bin/python3.12" -I "$G/golden-workspace.py" --size-bytes %d --mount /Volumes/%s --name %s \
     --record "$G/out/workspace.json" --source-sha256 %s || rc=$?
-[ "$rc" != 0 ] || GROW="$(cat "$G/grow")" "$G/py/bin/python3.12" -I "$G/guest_a0.py" "$G" /Volumes/%s || rc=$?
+[ "$rc" != 0 ] || STAGE=%s STOCK_TEMPLATE=%d GROW="$(cat "$G/grow")" "$G/py/bin/python3.12" -I "$G/guest_a0.py" "$G" /Volumes/%s || rc=$?
 sync
 printf '%%s\\n' "$rc" > "$G/out/result.new"
 mv "$G/out/result.new" "$G/out/result"
-''' % (GUEST, WORKSPACE_BYTES, name, name, digest(P / 'stages/golden-workspace.py'), name)
+''' % (GUEST, WORKSPACE_BYTES, name, name, digest(P / 'stages/golden-workspace.py'), stage, int(stock_template), name)
+
+
+A1_ROWS = (('tahoe_kmutil', (DONOR,)), ('hao_runtime_basesystem', (GOLDEN,)))
+REC_KEXTS = ('rec-audio', 'rec-bluetooth-input', 'rec-display-ethernet')
+
+
+def rec_kexts():
+    """The kexts.txt entries of the Recovery hardware recipes, in order: A1 links them into the BaseSystem KC."""
+    out = []
+    for n in REC_KEXTS:
+        for l in (TOP / 'patches' / n / 'kexts.txt').read_text().splitlines():
+            if l.strip() and not l.startswith('#') and l.strip() not in out:
+                out.append(l.strip())
+    return ''.join(i + '\n' for i in out)
 
 
 def image_record(image):
@@ -84,9 +98,9 @@ def image_record(image):
 def build(a):
     gr = runpy.run_path(str(P / 'golden-run'))
     stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6]
-    job = 'gg-recovery-a0-' + stamp
+    job = 'gg-recovery-%s-%s' % (a.stage, stamp)
     work, record = STORE / 'tmp' / job, STORE / 'runs' / job
-    out = Path(a.out).resolve() if a.out else STORE / 'recovery' / ('gg-a0-' + stamp)
+    out = Path(a.out).resolve() if a.out else STORE / 'recovery' / ('gg-%s-%s' % (a.stage, stamp))
     image = Path(a.system_image).resolve()
     if not image.is_file():
         sys.exit('a0: no system image %s' % image)
@@ -94,13 +108,13 @@ def build(a):
         sys.exit('a0: %s exists' % out)
     rows = {}
     for name, locks in (('golden_gate_basesystem', (GOLDEN,)), ('unpack', (DONOR,)), ('python_arm64', (COMMON,)),
-                        ('test_host_key', (COMMON,)), ('test_authorized_key', (COMMON,))):
+                        ('test_host_key', (COMMON,)), ('test_authorized_key', (COMMON,))) + A1_ROWS * (a.stage == 'a1'):
         d, p = row(name, *locks)
         rows[name] = dict(lock=str(d.relative_to(TOP)), path=str(p), row=(d / name).read_text())
     tahoe = Path(rows['unpack']['path']) / 'out/BaseSystem-x86_64.dmg'
     work.mkdir(parents=True); record.mkdir(parents=True)
     share = work / 'share'; share.mkdir()
-    state = dict(unit='tools/gg-recovery', operation='a0', date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    state = dict(unit='tools/gg-recovery', operation=a.stage, stock_template=a.stock_template, date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                  commit=subprocess.check_output(['git', '-C', str(TOP), 'rev-parse', 'HEAD'], text=True).strip(),
                  dirty=bool(subprocess.check_output(['git', '-C', str(TOP), 'status', '--porcelain'], text=True).strip()),
                  inputs=rows, tahoe_basesystem=dict(path=str(tahoe), sha256=digest(tahoe)),
@@ -124,6 +138,13 @@ def build(a):
             shutil.copyfile(rows['test_host_key']['path'], share / 'access/ssh_host_ed25519_key')
             shutil.copyfile(rows['test_authorized_key']['path'], share / 'access/authorized_keys')
             shutil.copyfile(HERE / 'src/guest_a0.py', share / 'guest_a0.py')
+            if a.stage == 'a1':
+                shutil.copyfile(HERE / 'src/dsc.py', share / 'dsc.py')
+                shutil.copyfile(HERE / 'src/keep-extra.txt', share / 'keep-extra.txt')
+                shutil.copyfile(P / 'stages/chunklist.py', share / 'chunklist.py')
+                (share / 'rec-kexts.txt').write_text(rec_kexts())
+                shutil.copyfile(rows['tahoe_kmutil']['path'], share / 'in/kmutil')
+                sh('ditto', rows['hao_runtime_basesystem']['path'], share / 'in/hao-basesystem')
             shutil.copyfile(P / 'stages/golden-workspace.py', share / 'golden-workspace.py')
             (share / 'grow').write_text(a.grow + '\n')
             state['source_files'] = {str(p.relative_to(HERE)): digest(p) for p in sorted(HERE.rglob('*'))
@@ -137,7 +158,7 @@ def build(a):
             started = True
             sh(sys.executable, '-I', P / 'vm/clones.py', 'start', vm, share, '--usb', str(work / 'system.img') + ':ro',
                '--usb', work / 'workspace.img', env=env)
-            script = job_script(stamp)
+            script = job_script(stamp, a.stage, a.stock_template)
             (record / 'guest-job.sh').write_text(script)
             reply = sh(P / 'vm/vmctl', vm, 'exec', '(\n' + script + '\n) >/dev/null 2>&1 </dev/null & echo started',
                        capture_output=True, text=True, env=env)
@@ -176,7 +197,7 @@ def build(a):
                     sh('zsh', P / 'vm/stop.sh', vm, env=env)
                 except Exception as e:
                     state['stop_error'] = str(e)
-            for f in ('a0.log', 'a0.json', 'machos.json', 'workspace.json'):   # before the work folder goes
+            for f in ('a0.log', 'a0.json', 'machos.json', 'workspace.json', 'keep.txt', 'unresolved.txt', 'kmutil.log'):   # before the work folder goes
                 for d in (share / 'out', out):
                     if (d / f).is_file():
                         shutil.copy2(d / f, record / f)
@@ -188,7 +209,7 @@ def build(a):
                 shutil.rmtree(work, ignore_errors=True)
             (record / 'build.json').write_text(json.dumps(state, indent=2) + '\n')
             (out / 'build.json').write_text(json.dumps(state, indent=2) + '\n') if out.is_dir() else None
-    print('A0 BaseSystem: %s\nRecord: %s' % (out, record))
+    print('%s BaseSystem: %s\nRecord: %s' % (a.stage.upper(), out, record))
 
 
 def esp(a):
@@ -224,6 +245,8 @@ def main():
     b.add_argument('--grow', default='20g')
     b.add_argument('--timeout', type=int, default=7200)
     b.add_argument('--keep-vm', action='store_true')
+    b.add_argument('--stage', choices=('a0', 'a1'), default='a0')
+    b.add_argument('--stock-template', action='store_true')
     e = s.add_parser('esp')
     e.add_argument('out_dir')
     a = ap.parse_args()

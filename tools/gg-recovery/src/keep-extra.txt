@@ -1,0 +1,2 @@
+# x86_64 cache images A1 keeps beyond the closure keep_roots() computes (guest_a0.py): install names, one per line.
+# Add an image here when a BaseSystem process is seen to load it (a crash in a zeroed page) and no root names it.
