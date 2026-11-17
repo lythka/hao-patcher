@@ -1,0 +1,240 @@
+{
+  "source_commit": "fd83bda09bdebc6d128287f5c599b5e0d679b8de",
+  "patchset_order": [
+    "Monterey GVA",
+    "Monterey OpenCL",
+    "Tahoe Graphics",
+    "Tahoe Camera",
+    "Intel Broadwell",
+    "Modern Wireless Common",
+    "Modern Audio",
+    "PCIe FaceTime Camera"
+  ],
+  "patches": {
+    "Monterey GVA": {
+      "Merge System Volume": {
+        "/System/Library/PrivateFrameworks": {
+          "AppleGVA.framework": "12.5",
+          "AppleGVACore.framework": "12.5"
+        }
+      }
+    },
+    "Monterey OpenCL": {
+      "Merge System Volume": {
+        "/System/Library/Frameworks": {
+          "OpenCL.framework": "12.5"
+        }
+      }
+    },
+    "Tahoe Graphics": {
+      "Overwrite System Volume": {
+        "/System/Library/PrivateFrameworks/RenderBox.framework/Versions/A/Resources": {
+          "default.metallib": "26.0-3802"
+        }
+      }
+    },
+    "Tahoe Camera": {
+      "Overwrite System Volume": {
+        "/System/Library/LaunchDaemons": {
+          "com.apple.cmio.AppleCameraAssistant.plist": "14.0 Beta 1"
+        }
+      },
+      "Merge System Volume": {
+        "/System/Library/Frameworks": {
+          "CoreMediaIO.framework": "14.0 Beta 1"
+        }
+      }
+    },
+    "Intel Broadwell": {
+      "Overwrite System Volume": {
+        "/System/Library/Extensions": {
+          "AppleIntelBDWGraphics.kext": "12.5-23.4",
+          "AppleIntelBDWGraphicsFramebuffer.kext": "12.5-23.4",
+          "AppleIntelBDWGraphicsGLDriver.bundle": "12.5",
+          "AppleIntelBDWGraphicsMTLDriver.bundle": "12.5-25",
+          "AppleIntelBDWGraphicsVADriver.bundle": "12.5",
+          "AppleIntelBDWGraphicsVAME.bundle": "12.5",
+          "AppleIntelGraphicsShared.bundle": "12.5"
+        }
+      }
+    },
+    "Modern Wireless Common": {
+      "Overwrite System Volume": {
+        "/usr/libexec": {
+          "wifip2pd": "13.7.2-25"
+        }
+      },
+      "Merge System Volume": {
+        "/System/Library/PrivateFrameworks": {
+          "IO80211.framework": "13.7.2-25",
+          "WiFiPeerToPeer.framework": "13.7.2-25"
+        }
+      }
+    },
+    "Modern Audio": {
+      "Overwrite System Volume": {
+        "/System/Library/Extensions": {
+          "AppleHDA.kext": "26.0 Beta 1"
+        }
+      }
+    },
+    "PCIe FaceTime Camera": {
+      "Overwrite System Volume": {
+        "/System/Library/Frameworks/CoreMediaIO.framework/Versions/A/Resources": {
+          "AppleCamera.plugin": "14.0 Beta 1"
+        },
+        "/System/Library/LaunchDaemons": {
+          "com.apple.cmio.AppleCameraAssistant.plist": "14.0 Beta 1"
+        }
+      }
+    }
+  },
+  "entries": [
+    {
+      "patch": "Monterey GVA",
+      "operation": "Merge System Volume",
+      "destination": "/System/Library/PrivateFrameworks/AppleGVA.framework",
+      "source_version": "12.5",
+      "support_package_relative_path": "12.5/System/Library/PrivateFrameworks/AppleGVA.framework"
+    },
+    {
+      "patch": "Monterey GVA",
+      "operation": "Merge System Volume",
+      "destination": "/System/Library/PrivateFrameworks/AppleGVACore.framework",
+      "source_version": "12.5",
+      "support_package_relative_path": "12.5/System/Library/PrivateFrameworks/AppleGVACore.framework"
+    },
+    {
+      "patch": "Monterey OpenCL",
+      "operation": "Merge System Volume",
+      "destination": "/System/Library/Frameworks/OpenCL.framework",
+      "source_version": "12.5",
+      "support_package_relative_path": "12.5/System/Library/Frameworks/OpenCL.framework"
+    },
+    {
+      "patch": "Tahoe Graphics",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/PrivateFrameworks/RenderBox.framework/Versions/A/Resources/default.metallib",
+      "source_version": "26.0-3802",
+      "support_package_relative_path": "26.0-3802/System/Library/PrivateFrameworks/RenderBox.framework/Versions/A/Resources/default.metallib"
+    },
+    {
+      "patch": "Tahoe Camera",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/LaunchDaemons/com.apple.cmio.AppleCameraAssistant.plist",
+      "source_version": "14.0 Beta 1",
+      "support_package_relative_path": "14.0 Beta 1/System/Library/LaunchDaemons/com.apple.cmio.AppleCameraAssistant.plist"
+    },
+    {
+      "patch": "Tahoe Camera",
+      "operation": "Merge System Volume",
+      "destination": "/System/Library/Frameworks/CoreMediaIO.framework",
+      "source_version": "14.0 Beta 1",
+      "support_package_relative_path": "14.0 Beta 1/System/Library/Frameworks/CoreMediaIO.framework"
+    },
+    {
+      "patch": "Intel Broadwell",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/Extensions/AppleIntelBDWGraphics.kext",
+      "source_version": "12.5-23.4",
+      "support_package_relative_path": "12.5-23.4/System/Library/Extensions/AppleIntelBDWGraphics.kext"
+    },
+    {
+      "patch": "Intel Broadwell",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/Extensions/AppleIntelBDWGraphicsFramebuffer.kext",
+      "source_version": "12.5-23.4",
+      "support_package_relative_path": "12.5-23.4/System/Library/Extensions/AppleIntelBDWGraphicsFramebuffer.kext"
+    },
+    {
+      "patch": "Intel Broadwell",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/Extensions/AppleIntelBDWGraphicsGLDriver.bundle",
+      "source_version": "12.5",
+      "support_package_relative_path": "12.5/System/Library/Extensions/AppleIntelBDWGraphicsGLDriver.bundle"
+    },
+    {
+      "patch": "Intel Broadwell",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/Extensions/AppleIntelBDWGraphicsMTLDriver.bundle",
+      "source_version": "12.5-25",
+      "support_package_relative_path": "12.5-25/System/Library/Extensions/AppleIntelBDWGraphicsMTLDriver.bundle"
+    },
+    {
+      "patch": "Intel Broadwell",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/Extensions/AppleIntelBDWGraphicsVADriver.bundle",
+      "source_version": "12.5",
+      "support_package_relative_path": "12.5/System/Library/Extensions/AppleIntelBDWGraphicsVADriver.bundle"
+    },
+    {
+      "patch": "Intel Broadwell",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/Extensions/AppleIntelBDWGraphicsVAME.bundle",
+      "source_version": "12.5",
+      "support_package_relative_path": "12.5/System/Library/Extensions/AppleIntelBDWGraphicsVAME.bundle"
+    },
+    {
+      "patch": "Intel Broadwell",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/Extensions/AppleIntelGraphicsShared.bundle",
+      "source_version": "12.5",
+      "support_package_relative_path": "12.5/System/Library/Extensions/AppleIntelGraphicsShared.bundle"
+    },
+    {
+      "patch": "Modern Wireless Common",
+      "operation": "Overwrite System Volume",
+      "destination": "/usr/libexec/wifip2pd",
+      "source_version": "13.7.2-25",
+      "support_package_relative_path": "13.7.2-25/usr/libexec/wifip2pd"
+    },
+    {
+      "patch": "Modern Wireless Common",
+      "operation": "Merge System Volume",
+      "destination": "/System/Library/PrivateFrameworks/IO80211.framework",
+      "source_version": "13.7.2-25",
+      "support_package_relative_path": "13.7.2-25/System/Library/PrivateFrameworks/IO80211.framework"
+    },
+    {
+      "patch": "Modern Wireless Common",
+      "operation": "Merge System Volume",
+      "destination": "/System/Library/PrivateFrameworks/WiFiPeerToPeer.framework",
+      "source_version": "13.7.2-25",
+      "support_package_relative_path": "13.7.2-25/System/Library/PrivateFrameworks/WiFiPeerToPeer.framework"
+    },
+    {
+      "patch": "Modern Audio",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/Extensions/AppleHDA.kext",
+      "source_version": "26.0 Beta 1",
+      "support_package_relative_path": "26.0 Beta 1/System/Library/Extensions/AppleHDA.kext"
+    },
+    {
+      "patch": "PCIe FaceTime Camera",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/Frameworks/CoreMediaIO.framework/Versions/A/Resources/AppleCamera.plugin",
+      "source_version": "14.0 Beta 1",
+      "support_package_relative_path": "14.0 Beta 1/System/Library/Frameworks/CoreMediaIO.framework/Versions/A/Resources/AppleCamera.plugin"
+    },
+    {
+      "patch": "PCIe FaceTime Camera",
+      "operation": "Overwrite System Volume",
+      "destination": "/System/Library/LaunchDaemons/com.apple.cmio.AppleCameraAssistant.plist",
+      "source_version": "14.0 Beta 1",
+      "support_package_relative_path": "14.0 Beta 1/System/Library/LaunchDaemons/com.apple.cmio.AppleCameraAssistant.plist"
+    }
+  ],
+  "schema": 1,
+  "name": "mbp121-legacy-hardware-darwin25",
+  "model": "MacBookPro12,1",
+  "donor_policy": {
+    "darwin_major": 25,
+    "darwin_minor": 6,
+    "build": "25G332",
+    "role": "legacy Intel hardware ABI selection; never the target OS identity"
+  },
+  "target_darwin_major": 27,
+  "psp_version": "2.0.5",
+  "oclp_version": "3.0.0-rc.5",
+  "psp_sha256": "1c290781bc726759ff37a110ffcb7182a6c6fd3d8ebce112d134d482c8de52a3"
+}

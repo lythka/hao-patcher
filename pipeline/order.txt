@@ -32,6 +32,7 @@ golden-gate-shared-cache-install   # build on the target, then fold the verified
 golden-gate-metal27                # dev only: 27.2.1's own Metal for every process (Metal27 + shim over OCLP's wrapper, the MTLCompiler 32023/32024 stand-in); after golden-gate-hello, whose wrapper edits it replaces
 golden-gate-native-identities      # Apple originals of the native programs the image re-signed ad hoc + /usr/lib/hao/native-identities, for golden-gate-userspace's code identity carrier. Last oclp-hook: after every recipe that re-signs
 opencore-mbp92                     # MacBookPro9,2 early Tahoe display/Ethernet kexts in OpenCore's Kernel.Add (none on recorded builds); split out of hao-opencore, right before it (the model's config first; with no kext to add the config is the same)
+opencore-mbp121                    # MacBookPro12,1: CryptexFixup, which OCLP leaves out on AVX2 CPUs; right before hao-opencore (the model's config first, as opencore-mbp92)
 opencore-generic                   # generic model (VMs, non-Apple PCs): SMBIOS iMac20,1, VirtualSMC, the QEMU reference's firmware quirks; right before hao-opencore
 hao-opencore                       # OpenCore: kernel repairs bound to this image's BootKC, IntelCommpage, HaoExec, boot-args
 golden-gate-live-text-service      # Live Text 3/3: drop RestrictEvents' revblock=media so mediaanalysisd (Photos' Live Text service) starts; after hao-opencore; needs the runtime

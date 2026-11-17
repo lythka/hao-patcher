@@ -1,0 +1,16 @@
+{
+ "format": 1,
+ "description": "The installer's Recovery: the MacBookPro12,1's drivers (pipeline/recovery). No recipe yet: its internal keyboard and trackpad need the SPI top-case kexts in the Recovery's kernel collection, its display the Broadwell framebuffer (the Broadwell GPU pack provides the kexts).",
+ "detect": {
+  "board_ids": [
+   "Mac-E43C1C25D4880AD6"
+  ]
+ },
+ "opt_in": true,
+ "phase": "installer",
+ "proven_on": [],
+ "oclp_patchsets": [],
+ "layer": "platform",
+ "kind": "recovery",
+ "platform": "apple-intel"
+}

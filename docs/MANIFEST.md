@@ -7,9 +7,9 @@ when it is stale. `patches.py manifest --record RUN` adds a build, `--laptop NAM
 
 ## 1. Installable
 
-64 patches: 60 installable, 2 undeclared (files not declared), 2 with a row missing.
+65 patches: 60 installable, 3 undeclared (files not declared), 2 with a row missing.
 
-Undeclared: opencore-generic, opencore-mbp92.
+Undeclared: opencore-generic, opencore-mbp121, opencore-mbp92.
 
 | Patch | Rev | Status | Stage | Installable | Sets | Rows (sha256, artifact, source commit) |
 |---|---|---|---|---|---|---|
@@ -64,6 +64,7 @@ Undeclared: opencore-generic, opencore-mbp92.
 | metal-metalold | r4 | unfinished | oclp-hook | yes | - | metalold_22d68 dd1ad676 MetalOld.dylib |
 | metalold-selectors | r10 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131, golden-gate | metalold_selectors 7075829d metalold-selectors-20261105-03d169d7ddae (hao-patcher 789a8c7d) |
 | opencore-generic | r6 | experiment | post | undeclared | generic | qemu_reference_efi 57e3f1c3 qemu-reference-efi-20261117; oclp_source ff509df0 oclp-source.tar |
+| opencore-mbp121 | r1 | experiment | post | undeclared | - | oclp_source ff509df0 oclp-source.tar |
 | opencore-mbp92 | r6 | product | post | undeclared | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131, golden-gate | - |
 | rec-audio | r5 | product | recovery | yes | recovery | - |
 | rec-bluetooth-input | r5 | product | recovery | yes | recovery | - |
