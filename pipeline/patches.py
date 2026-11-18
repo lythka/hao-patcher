@@ -637,7 +637,10 @@ def check(root=os.path.join(TOP, 'patches'), sets_dir=os.path.join(TOP, 'pipelin
             bad.append('%s: needs_any without optional (a patch that can be skipped must be optional)' % name)
         unknown = set(p) - {'revision', 'stage', 'applies', 'inputs', 'status', 'validated', 'optional', 'needs_any',
                             'files', 'validated_revision', 'validated_digest', 'pack', 'variant', 'replaces',
-                            'requires', 'proven_on'}
+                            'requires', 'proven_on', 'input_reads'}
+        if 'input_reads' in p:
+            # the only parts of a folder row the recipe reads (pipeline/incremental.py fingerprints those alone)
+            bad += ['%s: %s' % (name, x) for x in incremental()['reads_problems'](p)]
         if 'requires' in p:
             bad += ['%s: %s' % (name, x) for x in requires_problems(p['requires'])]
             if 'applies' in p:
@@ -908,6 +911,12 @@ def dev_problems(packs, root=os.path.join(TOP, 'patches'), sets_dir=os.path.join
     return bad
 
 DIGEST_SKIP = {'README.md', 'patch.json', 'edits', 'tests'}
+
+
+def incremental():
+    """pipeline/incremental.py as a module dict."""
+    import runpy
+    return runpy.run_path(os.path.join(TOP, 'pipeline', 'incremental.py'))
 
 
 def recipe_digest(name, root=os.path.join(TOP, 'patches'), inputs=os.path.join(TOP, 'pipeline', 'inputs')):
