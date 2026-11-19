@@ -1,10 +1,12 @@
 {
- "revision": 4,
+ "revision": 5,
  "pack": "base",
  "stage": "oclp-hook",
  "inputs": [],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 4,
+ "validated_digest": "175798e4649cd01dc04f5487185bbf73419929f02b0b9ed2a24634221d643713",
  "files": [
   {"path": "usr/lib/dyld", "edits": "edits/dyld.json", "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}}
  ],

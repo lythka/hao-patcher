@@ -24,7 +24,7 @@ Undeclared: opencore-generic, opencore-mbp92.
 | golden-gate-av1-encoder-x86 | r4 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, golden-gate-26B131 | - |
 | golden-gate-corespotlight-compat | r9 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, generic, golden-gate-26B131, golden-gate | corespotlight_compat_shim 7f7f5fcc corespotlight_compat.dylib (hao-patcher 177dc8a1) |
 | golden-gate-deep-sleep-off | r2 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, generic, golden-gate-26B131 | - |
-| golden-gate-dyld-internal | r4 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, generic, golden-gate-26B131 | - |
+| golden-gate-dyld-internal | r5 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, generic, golden-gate-26B131 | - |
 | golden-gate-font-registry | r10 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, generic, golden-gate-26B131 | font_registry_golden_gate 5bf6a3d3 font-registry-26B131-20261115-e09b952363a1 |
 | golden-gate-hd4000-planes | r8 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, golden-gate-26B131 | hd4000_planes bae5502e hd4000-planes-20261114-3030c66cd852 (hao-patcher 789a8c7d) |
 | golden-gate-hello | r12 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, golden-gate-26B131, golden-gate | hello_metallib_golden_gate 0ff25dac hello-metallib-26B131-20261111-b4c0156d117e; libhelloblur 9c273f39 libhelloblur.dylib (hao-patcher f479d6c7) |
@@ -121,7 +121,7 @@ Undeclared: opencore-generic, opencore-mbp92.
   - `usr/lib/corespotlight_compat.dylib`: from hao (row corespotlight_compat_shim)
 - **golden-gate-deep-sleep-off** r2
   - `Library/LaunchDaemons/local.hao.deep-sleep-off.plist`: from hao
-- **golden-gate-dyld-internal** r4
+- **golden-gate-dyld-internal** r5
   - `usr/lib/dyld`: edited (1 edit) from hao · hao-runtime's x86_64 dyld (payload replace/dyld: 26B131's dyld with the libignition stage count fixed) (row hao_runtime)
 - **golden-gate-font-registry** r10
   - `private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user`: from hao (row font_registry_golden_gate)
@@ -407,7 +407,7 @@ hashes it has. A cell marked * differs from the current one (section 1).
 | golden-gate-appstore-slices | - | r1* | r1* | r1* | r1* | r2* | r2* | r2* | - | r2* | - | - | - | - |
 | golden-gate-av1-encoder-x86 | - | - | - | - | - | - | - | - | - | - | - | r4 | r4 | r4 |
 | golden-gate-corespotlight-compat | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r9 | r9 | r9 |
-| golden-gate-dyld-internal | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r4 | r4 | r4 |
+| golden-gate-dyld-internal | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r1* | r4* | r4* | r4* |
 | golden-gate-font-registry | r6* | r6* | r6* | r7* | r7* | r7* | r7* | r7* | r7* | r7* | r7* | r10 | r10 | r10 |
 | golden-gate-hd4000-planes | r2* | r2* | r2* | r2* | r2* | r4* | r4* | r4* | r4* | r4* | r4* | r7* | r7* | r7* |
 | golden-gate-hello | r8* | r8* | r8* | r8* | r8* | r8* | r8* | r8* | r8* | r9* | r9* | r11* | r11* | r11* |
@@ -529,6 +529,7 @@ Image 8fb92d5, pushed 2026-11-14 10:11:23 (built 2026-11-14 09:13 from d970c5b3,
 - darwin27-kernel r16 is newer than every image built with it (newest r14).
 - dev-diagnostics r10 is newer than every image built with it (newest r4).
 - golden-gate-appstore-slices r6 is newer than every image built with it (newest r2).
+- golden-gate-dyld-internal r5 is newer than every image built with it (newest r4).
 - golden-gate-hd4000-planes r8 is newer than every image built with it (newest r7).
 - golden-gate-hello r12 is newer than every image built with it (newest r11).
 - golden-gate-ids r3 is newer than every image built with it (newest r1).
