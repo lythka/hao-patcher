@@ -44,7 +44,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-update-policy | r3 | post | product |  | x |  |  |  | ok (r2) | r3 2026-11-18 Validated r2 on hardware (Validation); nothing it installs changes. |
 | golden-gate-user-seed | r15 | post | product | caches | x |  |  |  | **needs** | r15 2026-11-18 seed.zsh takes the LaunchServices store's name from the payload instead of Tahoe's hard-coded ` |
 | golden-gate-user-template | r11 | post | product | caches | x |  |  |  | **needs** | r11 2026-11-17 Leaves out Mail's containers (8 of 336), fixes #47: a schema-0 Mail container was migrated unde |
-| golden-gate-userspace | r94 | oclp-hook | product |  | x | x |  |  | **needs** | r94 2026-11-19 The cryptex images go to Preboot fully allocated (#90). The boot's APFS graft cannot map a hole |
+| golden-gate-userspace | r95 | oclp-hook | product |  | x | x |  |  | **needs** | r95 2026-11-19 The OS cryptex image is sized to what it holds (`compact_image`): built as before at its files' |
 | golden-gate-wallpaper-export | r2 | post | product | caches |  |  |  |  | **needs** | r2 2026-11-19 Pack os-extras: dev profiles name it, release profiles leave it out (Apple-derived; returns when |
 | golden-gate-wifi-compat | r3 | oclp-hook | product |  | x | x |  |  | **needs** | r3 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-windowserver-filter | r10 | oclp-hook | product |  | x | x |  |  | ok (r5) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |

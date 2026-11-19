@@ -335,9 +335,45 @@ def build_os_image(work, golden_os, rosetta, workspace, driverkit_artifact, dono
         caches = mount/'System/Library/dyld'
         counts['cache_architectures'] = [name for name in ('arm64e', 'x86_64')
                                         if (caches/f'dyld_shared_cache_{name}').is_file()]
+    counts['image_size'] = compact_image(work, workspace, golden_os.stat())
     counts['seal'] = seal_image(work)
     counts['container'] = 'Fresh raw APFS container; Golden Gate SystemOS and RosettaOS files; sealed'
     return counts
+
+
+def used_bytes(mount):
+    st = os.statvfs(mount)
+    return (st.f_blocks - st.f_bfree) * st.f_frsize
+
+
+def fitted_size(used):
+    """The image size for a volume whose files and metadata use USED bytes: room for the seal's integrity data and
+    APFS's own reserve, rounded up to 1 MiB."""
+    size = used + max(1 << 30, used * 3 // 100)
+    return (size + (1 << 20) - 1) // (1 << 20) * (1 << 20)
+
+
+def compact_image(work, workspace, metadata):
+    """Copy the unsealed volume of WORK into a new image sized to what it holds (fitted_size) and put it at WORK.
+    WORK was made at the files' logical size, but most of them are stored compressed (26B131: 26.2 GB made, 12.9 GB
+    used), and install.py allocates the whole image (#90: the boot's graft maps no hole), so the unused half would
+    take Preboot space for nothing. golden-gate-shared-cache's fold calls it too, before sealing its own image.
+    Returns dict(built, used, size)."""
+    work = Path(work)
+    built = work.with_name(work.name + '.built')
+    os.replace(work, built)
+    built_size = built.stat().st_size
+    tag = work.name.lstrip('.')
+    with image_mount(built, Path(workspace)/f'{tag}-compact-source') as source:
+        used = used_bytes(source)
+        size = fitted_size(used)
+        new_image(work, size, source)
+        with image_mount(work, Path(workspace)/f'{tag}-compact-target', writable=True) as target:
+            replace_tree(source, target, CRYPTEX_KEEP)
+            os.chmod(target, stat.S_IMODE(metadata.st_mode))
+            os.chflags(target, metadata.st_flags)
+    remove(built)
+    return dict(built=built_size, used=used, size=size)
 
 
 APPLE_APP = "Apple's app.dmg"
