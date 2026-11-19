@@ -353,6 +353,14 @@ def fitted_size(used):
     return (size + (1 << 20) - 1) // (1 << 20) * (1 << 20)
 
 
+def built_path(work):
+    """Where compact_image keeps WORK's first image while it copies: beside it, still named .dmg, because hdiutil
+    recognises a raw image by that extension ("attach failed - image not recognized" for .dmg.built, VM build
+    2026-11-19). A caller removes it before starting when an earlier run stopped half way."""
+    work = Path(work)
+    return work.with_name(work.stem + '.built' + work.suffix)
+
+
 def compact_image(work, workspace, metadata):
     """Copy the unsealed volume of WORK into a new image sized to what it holds (fitted_size) and put it at WORK.
     WORK was made at the files' logical size, but most of them are stored compressed (26B131: 26.2 GB made, 12.9 GB
@@ -360,7 +368,7 @@ def compact_image(work, workspace, metadata):
     take Preboot space for nothing. golden-gate-shared-cache's fold calls it too, before sealing its own image.
     Returns dict(built, used, size)."""
     work = Path(work)
-    built = work.with_name(work.name + '.built')
+    built = built_path(work)
     os.replace(work, built)
     built_size = built.stat().st_size
     tag = work.name.lstrip('.')

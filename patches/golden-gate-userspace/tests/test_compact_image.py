@@ -45,6 +45,8 @@ class Compact(unittest.TestCase):
 
             @contextlib.contextmanager
             def image_mount(image, folder, writable=False):
+                if Path(image).suffix != '.dmg':        # hdiutil: "attach failed - image not recognized"
+                    raise RuntimeError('hdiutil attach: image not recognized: %s' % Path(image).name)
                 folder.mkdir()
                 mounts[folder.name] = (Path(image).name, writable)
                 calls.append(('mount', Path(image).name, writable))
@@ -61,12 +63,18 @@ class Compact(unittest.TestCase):
                 for n, f in saved.items():
                     setattr(cryptex, n, f)
             self.assertEqual(record, dict(built=26180845568, used=13 * GB, size=cryptex.fitted_size(13 * GB)))
-            self.assertEqual(calls, [('mount', 'os.dmg.built', False),
+            self.assertEqual(calls, [('mount', 'os.built.dmg', False),
                                      ('new', 'os.dmg', cryptex.fitted_size(13 * GB)),
                                      ('mount', 'os.dmg', True),
                                      ('copy', 'os.dmg-compact-source', 'os.dmg-compact-target', sorted(cryptex.CRYPTEX_KEEP))])
             self.assertTrue(work.is_file())
-            self.assertFalse((tmp/'os.dmg.built').exists())
+            self.assertFalse((tmp/'os.built.dmg').exists())
+            self.assertEqual(cryptex.built_path(tmp/'.golden-gate-os.dmg').name, '.golden-gate-os.built.dmg')
+
+    def test_install_removes_a_stale_first_image(self):
+        text = (SRC/'install.py').read_text()
+        body = text[text.index('def install_cryptex'):text.index('def arguments')]
+        self.assertLess(body.index('remove(built_path(os_work))'), body.index('build_os_image('))
 
     def test_build_compacts_before_sealing(self):
         text = (SRC/'cryptex.py').read_text()

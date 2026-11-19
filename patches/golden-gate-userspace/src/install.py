@@ -24,7 +24,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from macho import add_load_dylib, section_ranges, set_install_name
 # install.py's own steps use run, disk_info, image_mount and remove; the rest is named here for the tests.
-from cryptex import (build_app_image, build_os_image, disk_info, image_mount, remove, run,  # noqa: F401
+from cryptex import (build_app_image, build_os_image, built_path, disk_info, image_mount, remove, run,  # noqa: F401
                      matrix_plan, audio_plan, replace_tree, restore_special_modes)
 import cryptex_cache
 import prespecialization
@@ -207,6 +207,7 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
     sha256; a new build is stored for the next one."""
     current = preboot/group/'cryptex1/current'
     os_work, app_work = current/'.golden-gate-os.dmg', current/'.golden-gate-app.dmg'
+    remove(built_path(os_work))     # compact_image's first image, if an earlier run stopped half way
     reused = cache.restore(os_work, app_work, payload) if cache else None
     if reused:
         counts, app = reused
