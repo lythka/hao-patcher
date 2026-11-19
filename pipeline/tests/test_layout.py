@@ -28,6 +28,10 @@ class RealTree(unittest.TestCase):
         self.assertIn('golden-gate-userspace', packs['base']['recipes'])
         self.assertTrue(all('recipes' not in json.loads(f.read_text()) for f in (TOP / 'packs').glob('*.json')))
 
+    def test_real_waivers_are_well_formed(self):
+        # here, not in Fixture: Fixture's setUp makes every Mac detect only the base pack
+        self.assertEqual(P['waiver_problems'](), [])
+
 
 class Fixture(unittest.TestCase):
     """A small tree: two OS recipes (one with a variant), one GPU recipe, one opt-in dev recipe."""
@@ -162,9 +166,6 @@ class Fixture(unittest.TestCase):
         for name in ('alpha-v0.1.0', 'alpha-v0.1.0-fold', 'golden-gate-26B131'):
             self.assertEqual(P['release_problems'](name, gate=False), [], name)
         self.assertTrue(P['release_problems']('dev-bs-test'))
-
-    def test_real_waivers_are_well_formed(self):
-        self.assertEqual(P['waiver_problems'](), [])
 
 
 if __name__ == '__main__':
