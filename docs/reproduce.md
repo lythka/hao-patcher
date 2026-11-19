@@ -2,6 +2,9 @@
 
 For anyone checking a release's source: rebuild its files from the public tag and compare them byte for byte.
 
+> **v0.0.1 preview: release pending.** The `v0.0.1` tag and its release files are not published yet, so the commands below don't
+> work until [v0.0.1](https://github.com/lythka/hao-patcher/releases) appears under Releases.
+
 ## You need
 
 - The build Mac from [Install](install.md#requirements): any Mac on its normal macOS, Xcode with its Metal toolchain,
