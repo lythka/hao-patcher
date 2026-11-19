@@ -1,5 +1,7 @@
 # Commands
 
+For anyone installing or running hao: what each `hao` command does, where it runs, and its options.
+
 `hao` is the one command you type, on every Mac involved: the Mac that makes the USB installer, the USB installer's
 Recovery, and the Mac running macOS 27 with hao. `hao` on its own lists the commands for where it runs, with the hao
 and macOS versions; `hao help --all` adds the developer commands; `hao COMMAND --help` gives a command's options.
@@ -9,13 +11,13 @@ and macOS versions; `hao help --all` adds the developer commands; `hao COMMAND -
 | [`verify-release`](#hao-verify-release) | anywhere | checks a release is the one the project signed: run it before `create-installer` |
 | [`create-installer`](#hao-create-installer) | any Mac on its own macOS | makes the USB installer (asks for your password to write the drive) |
 | [`install`](#hao-install) | the USB installer's Recovery | installs macOS 27 on this Mac |
-| [`doctor`](#hao-doctor) | any Mac on its own macOS | checks this Mac is ready to make the USB installer (new in v0.0.2) |
-| [`status`](#hao-status) | anywhere | one screen about hao on this Mac (new in v0.0.2) |
+| [`doctor`](#hao-doctor) | any Mac on its own macOS | checks this Mac is ready to make the USB installer |
+| [`status`](#hao-status) | anywhere | one screen about hao on this Mac |
 | [`report`](#hao-report) | anywhere | one file with what a developer needs, for a GitHub issue |
 | [`verify`](#hao-verify) | a Mac with hao | checks every installed pack file against its manifest |
 | [`explain`](#hao-explain) | a Mac with hao, or the Mac that made the installer | where a file comes from and every edit to it |
-| [`run`](#hao-run) | a Mac with hao | runs an ARM program with the runtime's diagnostics (new in v0.0.2) |
-| [`aot`](#hao-aot) | a Mac with hao | the runtime's ahead-of-time caches (new in v0.0.2) |
+| [`run`](#hao-run) | a Mac with hao | runs an ARM program with the runtime's diagnostics |
+| [`aot`](#hao-aot) | a Mac with hao | the runtime's ahead-of-time caches |
 
 A command started where it doesn't belong stops and says where it runs (exit code 5).
 
@@ -40,15 +42,15 @@ PASS, FAIL, or SKIP with the reason (SKIP means not checked). Any FAIL exits 4: 
 ## hao create-installer
 
 ```sh
-sudo ./hao create-installer [/dev/diskN] [--model MODEL | --profile FILE] [--dry-run]
+sudo ./hao create-installer [/dev/diskN] [--model MODEL | --profile FILE] [--unproven] [--dry-run]
 ```
 
 Run `./hao verify-release` right before it, as yourself: `sudo` runs hao's files as root, so check them first.
 `sudo ./hao` runs only python.org's Python 3.14, and only while it is root's alone (`./hao doctor` checks this and
 prints the fix). It refuses a release whose signature does not hold (exit 4).
 
-**v0.0.1 is unsigned** (the project's decision for this first release; signing returns in v0.0.2). Download
-`SHA256SUMS` with `release.json` and put both beside hao: hao checks every file against them, says UNSIGNED on
+**v0.0.1 is unsigned** (the project's decision for this first release). Download `SHA256SUMS` with
+`release.json` and put both beside hao: hao checks every file against them, says UNSIGNED on
 every command that reads the release, and refuses any file that does not match (exit 4). An unsigned release
 proves its files are unchanged, not who made them.
 
@@ -62,11 +64,13 @@ kit on `HAO`. It ends with what to do on the Intel Mac.
 | `/dev/diskN` | the USB drive (asked when left out) |
 | `--model MODEL` | the Mac to build for, for example `MacBookPro9,2` |
 | `--profile FILE` | a profile from `hao detect`, for a Mac that is not a proven model |
+| `--unproven` | go on with a Mac hao has not proven (without it, exit 5); kept in the install record |
 | `--dry-run` | ask the questions and show the plan; write nothing |
 | `--confirm DISK` | the typed confirmation, given ahead (scripts) |
 | `--release FILE` | the release.json to download from (default: the one beside hao) |
 | `--cache DIR` | where downloads are kept |
 | `--minimum-bytes N` | the smallest USB drive accepted |
+| `--keep-kit` | keep the staged kit on this Mac (default: removed once the USB installer is written and checked) |
 
 ## hao doctor
 
@@ -77,12 +81,19 @@ hao doctor [--for create-installer | ci | release] [--offline]
 Read only. Checks the Python running hao (python.org's 3.14 on the Mac that makes the installer; `sudo ./hao` runs only that Python, and only while it is root's alone), Xcode and its Metal
 toolchain, the macOS version, the free disk against the release's peak, that each download URL answers, and that each
 download has a mirror. A failing check names its fix; any failure exits 5. `--for release` also requires the exact Xcode
-version and a mirror for every download; `--offline` skips the network checks.
+version and a mirror for every download.
+
+| Option | |
+|---|---|
+| `--for create-installer \| ci \| release` | the checks for that use (default `create-installer`) |
+| `--offline` | skip the network checks |
+| `--release FILE` | the release.json to check against (default: the one beside hao) |
+| `--cache DIR` | where downloads go (default `~/Library/Caches/hao`) |
 
 ## hao install
 
 ```sh
-/Volumes/HAO/install [/dev/diskN] [--dry-run] [--resume FOLDER]
+/Volumes/HAO/install [/dev/diskN] [--dry-run] [--resume FOLDER] [--no-restart]
 ```
 
 Run in Terminal in the USB installer's Recovery. Checks this Mac against the release, asks which disk, and needs
@@ -95,6 +106,8 @@ brought, the kernel repairs, and the log.
 | `/dev/diskN` | the internal disk (asked when left out) |
 | `--dry-run` | check the Mac and the disk and show the steps; write nothing |
 | `--resume FOLDER` | continue a failed install at the step it stopped in (`/Volumes/HAO/hao-install-DATE`), when that step can run again |
+| `--no-restart` | stay in the Recovery when the install is done (default: restart after a 10 s countdown) |
+| `--model MODEL`, `--profile FILE`, `--unproven` | as for `create-installer` |
 | `--confirm WORD` | the typed confirmation, given ahead (scripts) |
 
 ## hao status
