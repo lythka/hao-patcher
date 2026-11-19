@@ -501,3 +501,43 @@ class ManifestTests(unittest.TestCase):
                              ('seed', 'Metal appends to it'))
             self.assertEqual(len(files['Library/c/functions.data']['sha256']), 64)
             self.assertNotIn('content', files['Library/c/plain'])
+
+
+class CryptexAllocationTests(unittest.TestCase):
+    """#90: after the last writer, Preboot's cryptex images have no holes (the boot's APFS graft maps none)."""
+
+    def holey(self, path, mib=1 << 20):
+        with open(path, 'wb') as f:
+            f.write(os.urandom(mib)); f.seek(64 * mib); f.write(b'\0' * mib); f.seek(128 * mib); f.write(os.urandom(mib))
+            f.truncate(200 * mib)
+        if not golden.hole_map(path):
+            self.skipTest('this file system reports no holes (SEEK_HOLE)')
+
+    def test_fills_holes_reclones_and_keeps_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            current = Path(tmp)
+            self.holey(current/'os.dmg'); self.holey(current/'app.dmg')
+            subprocess.run(['cp', '-c', str(current/'os.dmg'), str(current/'os.clone.dmg')], check=True)
+            before = {n: (current/n).read_bytes() for n in ('os.dmg', 'app.dmg')}
+            filled = golden.allocate_cryptex_images(current, run=lambda c: subprocess.run(c, check=True))
+            self.assertEqual(set(filled), {'os.dmg', 'app.dmg'})
+            for name in ('os.dmg', 'app.dmg', 'os.clone.dmg'):
+                self.assertEqual(golden.hole_map(current/name), [], name)
+            self.assertEqual({n: (current/n).read_bytes() for n in before}, before)
+            self.assertEqual((current/'os.clone.dmg').read_bytes(), before['os.dmg'])
+            self.assertEqual(golden.allocate_cryptex_images(current), {'os.dmg': 0, 'app.dmg': 0})
+
+    def test_refuses_without_space_and_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            current = Path(tmp)
+            self.holey(current/'os.dmg')
+            holes = golden.hole_map(current/'os.dmg')
+            with self.assertRaisesRegex(RuntimeError, 'nothing was written'):
+                golden.allocate_cryptex_images(current, free=1 << 20)
+            self.assertEqual(golden.hole_map(current/'os.dmg'), holes)
+
+    def test_posts_run_it_after_the_last_post(self):
+        text = SCRIPT.read_text()
+        posts = text[text.index('    def posts(self):'):text.index('    def write_manifests(self):')]
+        self.assertGreater(posts.index('allocate_cryptex_images'), posts.index("for post in self.config['posts']"))
+        self.assertLess(posts.index('allocate_cryptex_images'), posts.index('self.write_manifests()'))

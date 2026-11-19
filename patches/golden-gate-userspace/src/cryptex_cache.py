@@ -161,9 +161,68 @@ def _hole_at(fd, at, size):
         return size
 
 
+def hole_map(path):
+    """[(start, end)] of PATH's holes (SEEK_HOLE/SEEK_DATA), in order; [] when the file system cannot report them."""
+    holes = []
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        size, at = os.fstat(fd).st_size, 0
+        while at < size:
+            start = _hole_at(fd, at, size)
+            if start >= size:
+                break
+            end = _data_at(fd, start, size)
+            if end == start:                      # holes cannot be found
+                return []
+            holes.append((start, end))
+            at = end
+    finally:
+        os.close(fd)
+    return holes
+
+
+def _write(fd, data, offset):
+    view = memoryview(data)
+    while view:
+        written = os.pwrite(fd, view, offset)
+        view, offset = view[written:], offset + written
+
+
+def allocate(path):
+    """Write zeros over every hole of PATH, so the file is fully allocated, and return the bytes filled. The boot
+    grafts the cryptex images (os.dmg, app.dmg) from Preboot, and the APFS graft cannot map a hole (#90:
+    "_graft_dev_read: blockmap lut lookup failed", ENOENT, then SIGBUS in the x86_64 shared cache), although a hole
+    reads back as zeros everywhere else, so the sha256 and a sealed volume's root hash are unchanged. Raises when
+    holes are left (hole_map), and before writing anything when the volume has less free space than the holes."""
+    holes = hole_map(path)
+    need = sum(end - start for start, end in holes)
+    if need:
+        st = os.statvfs(path)
+        if st.f_bavail * st.f_frsize < need + (1 << 30):
+            raise RuntimeError(f'{path}: {need} bytes of holes to fill (#90), {st.f_bavail * st.f_frsize} bytes free; '
+                               'nothing was written')
+    filled = 0
+    fd = os.open(path, os.O_WRONLY)
+    try:
+        for start, end in holes:
+            at = start
+            while at < end:
+                n = min(CHUNK, end - at)
+                _write(fd, ZERO[:n], at)
+                at += n
+            filled += end - start
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    left = hole_map(path)
+    if left:
+        raise RuntimeError(f'{path}: {len(left)} holes left after allocating ({left[:3]})')
+    return filled
+
+
 def copy_file(source, target):
-    """Copy SOURCE to the new file TARGET, keeping holes (the images are sparse raw images), and return
-    dict(sha256, size) of the bytes read: SOURCE's full logical content, holes hashed as zeros."""
+    """Copy SOURCE to the new file TARGET, fully allocated (SOURCE's holes are written as zeros: see allocate()), and
+    return dict(sha256, size) of the bytes read: SOURCE's full logical content, holes hashed as zeros."""
     h = hashlib.sha256()
     src = os.open(source, os.O_RDONLY)
     try:
@@ -172,9 +231,10 @@ def copy_file(source, target):
             size, at = os.fstat(src).st_size, 0
             while at < size:
                 data = _data_at(src, at, size)
-                while at < data:                                  # a hole: zeros, nothing written
+                while at < data:                                  # a hole of the source: written as zeros
                     n = min(CHUNK, data - at)
                     h.update(ZERO[:n])
+                    _write(dst, ZERO[:n], at)
                     at += n
                 if at >= size:
                     break
@@ -184,11 +244,7 @@ def copy_file(source, target):
                     if not chunk:
                         raise OSError(f'{source}: short read at {at} of {size}')
                     h.update(chunk)
-                    if chunk != ZERO[:len(chunk)]:
-                        view, offset = memoryview(chunk), at
-                        while view:
-                            written = os.pwrite(dst, view, offset)
-                            view, offset = view[written:], offset + written
+                    _write(dst, chunk, at)                        # zeros included
                     at += len(chunk)
             os.ftruncate(dst, size)
         finally:

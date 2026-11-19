@@ -3,8 +3,8 @@
 Always: the key's source files are exactly the code cryptex.py runs (its local imports, found by importing it) plus
 build/, and leave out install.py's other work; any covered input changes the key; a stored image comes back byte for
 byte with the same sha256; a damaged or mismatched entry is not used.
-With CRYPTEX_CACHE_IMAGE=PATH (a real sealed os.dmg, e.g. from an exported image's Preboot, read only): the sparse
-copy of it is byte-identical, has the file's own sha256 and keeps its holes.
+With CRYPTEX_CACHE_IMAGE=PATH (a real sealed os.dmg, e.g. from an exported image's Preboot, read only): the
+copy of it is byte-identical, has the file's own sha256 and is fully allocated (no holes: #90).
 python3.14 -I -B -m unittest discover -s patches/golden-gate-userspace/tests -k cryptex_cache"""
 import hashlib
 import json
@@ -142,18 +142,51 @@ class TargetLines(unittest.TestCase):
 
 
 class Copy(unittest.TestCase):
-    def test_sparse_copy_is_byte_identical_and_keeps_holes(self):
+    def holey(self, path):
+        """Data, a real hole (APFS leaves small gaps allocated), written zeros aligned and unaligned to the copy's
+        1 MiB pieces, another real hole, data, a trailing hole; skips where the file system reports no holes."""
+        mib = 1 << 20
+        sparse(path, [(0, os.urandom(mib)), (64 * mib, b'\0' * (4 * mib)), (69 * mib + 4096, b'\0' * (mib + 8192)),
+                      (128 * mib, os.urandom(mib + 5)), (200 * mib, b'')])
+        with open(path, 'r+b') as stream:
+            stream.truncate(260 * mib)
+        if not cc.hole_map(path):
+            self.skipTest('this file system reports no holes (SEEK_HOLE)')
+        return cc.hole_map(path)
+
+    def test_copy_is_byte_identical_and_fully_allocated(self):
+        """#90: the boot's APFS graft cannot map a hole of os.dmg (ENOENT, then SIGBUS in the x86_64 shared cache),
+        whether the copy made it or the source had it: the copy has none."""
         with tempfile.TemporaryDirectory() as tmp:
             source, target = Path(tmp)/'source.img', Path(tmp)/'target.img'
-            mib = 1 << 20
-            sparse(source, [(0, b'head' * 1000), (64 * mib + 5, os.urandom(3 * mib + 7)), (200 * mib, b'\0' * mib),
-                            (300 * mib - 3, b'end')])
+            holes = self.holey(source)
+            written = ((64 << 20, 68 << 20), ((69 << 20) + 4096, (70 << 20) + 12288))      # the zeros: data, not holes
+            self.assertFalse([h for h in holes for w in written if h[0] < w[1] and h[1] > w[0]], holes)
             got = cc.copy_file(source, target)
             self.assertEqual(got, dict(sha256=sha(source), size=source.stat().st_size))
             self.assertEqual(target.read_bytes(), source.read_bytes())
-            self.assertLess(target.stat().st_blocks * 512, 16 * mib)
+            self.assertEqual(cc.hole_map(target), [])
+            self.assertGreaterEqual(target.stat().st_blocks * 512, source.stat().st_size)
             with self.assertRaises(FileExistsError):
                 cc.copy_file(source, target)
+
+    def test_allocate_fills_every_hole_and_keeps_the_bytes(self):
+        """install_cryptex allocates the built (sparse: new_image truncates) or reused images before they go to Preboot."""
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp)/'os.dmg'
+            holes = self.holey(image)
+            before = sha(image)
+            self.assertEqual(cc.allocate(image), sum(e - s for s, e in holes))
+            self.assertEqual(cc.hole_map(image), [])
+            self.assertEqual(sha(image), before)
+            self.assertEqual(cc.allocate(image), 0)
+
+    def test_install_allocates_both_images_built_or_reused(self):
+        text = (SRC/'install.py').read_text()
+        body = text[text.index('def install_cryptex'):text.index('def arguments')]
+        self.assertIn("cryptex_cache.allocate(path)", body)
+        self.assertIn("(('os.dmg', os_work), ('app.dmg', app_work))", body)
+        self.assertLess(body.index('cryptex_cache.allocate'), body.index("os.replace(os_work"))   # before Preboot
 
     def test_empty_and_unaligned_files(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -173,8 +206,7 @@ class Copy(unittest.TestCase):
             self.assertEqual(cc.sha256(target), got['sha256'])
             self.assertEqual(target.stat().st_size, image.stat().st_size)
             subprocess.run(['cmp', str(image), str(target)], check=True)
-            # holes kept: within 1% of the source's allocation (1 MiB copy pieces vs. the source's own extents)
-            self.assertLessEqual(target.stat().st_blocks, image.stat().st_blocks * 101 // 100)
+            self.assertEqual(cc.hole_map(target), [])                      # fully allocated (#90)
 
 
 class StoreRestore(unittest.TestCase):

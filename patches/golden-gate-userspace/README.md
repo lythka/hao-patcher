@@ -362,10 +362,12 @@ creation logs in automatically (authd accepts loginwindow's `FUSAutologinDataKey
 unlisted ad hoc one.
 
 ## Validation
+NEEDS VALIDATION: r94 (#90, fully allocated cryptex images) has host tests (copy and allocate leave no hole and keep the bytes; the copy test fails on r93); an image built with it (os.dmg hole map empty) and the graft read of the x86_64 caches on a booted image are open. r92 was proven on hardware:
 
 Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r92): automatic login to the desktop; Spotlight finds apps, Safari reaches the network, Bluetooth, sound and the camera are up, and 40 of 48 apps open and run 20 s. Open on that image and tracked on their own: Weather and News crash (#9, #62), Books (#15), gamed (#18).
 
 ## Revisions
+- r94 2026-11-19 The cryptex images go to Preboot fully allocated (#90). The boot's APFS graft cannot map a hole of os.dmg ("_graft_dev_read: blockmap lut lookup failed", ENOENT; Books, Stocks, News and Podcasts SIGBUS in the x86_64 shared cache on dev 8305fdd and release c1eb676), and os.dmg had holes from two places: the sparse build (new_image truncates) and the cache copy, which also skipped all-zero 1 MiB pieces. install_cryptex now writes zeros over every hole of os.dmg and app.dmg, built or reused, and stops if one is left (`cryptex_cache.allocate`); the cache copy writes every byte. After the last post, the pipeline (pipeline/stages/golden-image.py) fills any hole a later writer left (golden-gate-shared-cache's fold makes a new sparse os.dmg), clones os.clone.dmg again and refuses a remaining hole; both check the free space first. Contents, sha256 and root hash are unchanged; Preboot holds about 13 GB more. The cache key changes (cryptex_cache.py is a key source).
 - r93 2026-11-19 Validated r92 on hardware (Validation). Nothing it installs changes.
 - r92 2026-11-18 The 26 cryptex embed specs carry the stub and result hashes of hao-runtime 256dd30 (row hao_runtime: C5 plus the MenuBarAgent, sandboxd and Control Center fixes).
 - r91 2026-11-18 The cryptex cache key takes the target's model and its `model_gates`, not its whole `platform_data`: the model's OpenCore reasons there do not change the images, so they no longer rebuild them. Nothing it installs changes.

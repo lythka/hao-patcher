@@ -670,6 +670,10 @@ class Assembler:
                       env=dict(environment,P=p['folder'],PATCH_OUTPUT_DIR=str(o))))
         self.run('rm','-rf',self.mounts['data']/'.Spotlight-V100')
         self.fix_owners('posts',('data','preboot','recovery'))
+        current = self.mounts['preboot']/self.group/'cryptex1/current'
+        if current.is_dir():        # after the last writer of the cryptex images (#90: the boot's graft maps no hole)
+            print('golden-image: cryptex holes filled',
+                  json.dumps(allocate_cryptex_images(current,run=lambda c:self.run(*c))),flush=True)
         self.write_manifests()
         self.run('sync')
 
@@ -774,8 +778,85 @@ def check_set_id(expected, system):
     return bad
 
 
+def hole_map(path):
+    """[(start, end)] of PATH's holes (SEEK_HOLE/SEEK_DATA); [] when the file system cannot report them."""
+    holes = []
+    fd = os.open(str(path), os.O_RDONLY)
+    try:
+        size, at = os.fstat(fd).st_size, 0
+        while at < size:
+            try:
+                start = min(os.lseek(fd, at, os.SEEK_HOLE), size)
+            except OSError:
+                return []
+            if start >= size:
+                break
+            try:
+                end = os.lseek(fd, start, os.SEEK_DATA)
+            except OSError as error:
+                if getattr(error, 'errno', None) != 6:      # ENXIO: only a hole is left
+                    return []
+                end = size
+            if end <= start:
+                return []
+            holes.append((start, end))
+            at = end
+    finally:
+        os.close(fd)
+    return holes
+
+
+CRYPTEX_IMAGES = ('os.dmg', 'app.dmg')
+ZERO = bytes(1 << 20)
+
+
+def allocate_cryptex_images(current, free=None, run=subprocess.check_call):
+    """Leave Preboot's cryptex images (CURRENT = Preboot/GROUP/cryptex1/current) with no holes, after the last recipe
+    that writes them (golden-gate-userspace, golden-gate-shared-cache's fold, posts with PRE). The boot grafts them,
+    and the APFS graft cannot map a hole (#90: "_graft_dev_read: blockmap lut lookup failed", ENOENT, then SIGBUS in
+    the x86_64 shared cache), although a hole reads as zeros, so contents and seal are unchanged. Zeros go over every
+    hole, os.clone.dmg is cloned again from a filled os.dmg, and it refuses before writing when Preboot's container
+    has less free space than the holes (FREE: bytes free, measured when not given), or when a hole is left.
+    Returns {name: bytes filled}."""
+    current = Path(current)
+    holes = {name: hole_map(current/name) for name in CRYPTEX_IMAGES if (current/name).is_file()}
+    need = sum(e - s for h in holes.values() for s, e in h)
+    clone = current/'os.clone.dmg'
+    reclone = clone.is_file() and (bool(holes.get('os.dmg')) or bool(hole_map(clone)))
+    if need:
+        if free is None:
+            st = os.statvfs(str(current))
+            free = st.f_bavail * st.f_frsize
+        if free < need + (1 << 30):
+            raise RuntimeError('%s: the cryptex images have %d bytes of holes to fill (#90) and Preboot has %d bytes '
+                               'free; nothing was written' % (current, need, free))
+    filled = {}
+    for name, ranges in holes.items():
+        fd = os.open(str(current/name), os.O_WRONLY)
+        try:
+            for start, end in ranges:
+                at = start
+                while at < end:
+                    view = memoryview(ZERO)[:min(len(ZERO), end - at)]
+                    while view:
+                        n = os.pwrite(fd, view, at)
+                        view, at = view[n:], at + n
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        filled[name] = sum(e - s for s, e in ranges)
+    if reclone:
+        clone.unlink()
+        run(['cp', '-c', str(current/'os.dmg'), str(clone)])
+    left = {name: hole_map(current/name) for name in CRYPTEX_IMAGES + ('os.clone.dmg',) if (current/name).is_file()}
+    left = {name: h for name, h in left.items() if h}
+    if left:
+        raise RuntimeError('%s: holes left in %s (#90)' % (current, ', '.join(sorted(left))))
+    return filled
+
+
 MANIFESTS = 'private/var/db/hao/manifests'
-FLAG_NAMES = {0x80000: 'restricted', 0x20000: 'schg', 0x100000: 'sunlnk', 0x2: 'uchg', 0x8000: 'hidden', 0x1: 'nodump'}
+FLAG_NAMES ={0x80000: 'restricted', 0x20000: 'schg', 0x100000: 'sunlnk', 0x2: 'uchg', 0x8000: 'hidden', 0x1: 'nodump'}
 
 
 def manifest_entry(roots, rel):

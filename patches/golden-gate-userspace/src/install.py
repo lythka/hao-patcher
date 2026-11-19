@@ -218,6 +218,9 @@ def install_cryptex(payload, preboot, group, golden_os, rosetta, workspace, driv
         print(f'cryptex images built in {time.monotonic() - started:.1f} s', flush=True)
         if cache:
             cache.store(os_work, app_work, counts, app)
+    # the boot's APFS graft cannot map a hole (#90): both images go to Preboot fully allocated, built or reused
+    counts['allocated_bytes'] = {name: cryptex_cache.allocate(path) for name, path in
+                                 (('os.dmg', os_work), ('app.dmg', app_work))}
     print('Combined cryptex:', json.dumps(counts), flush=True)
     remove(current/'os.clone.dmg')
     remove(current/'os.dmg')
