@@ -124,5 +124,23 @@ class Planted(unittest.TestCase):
         self.assertIn('hao runs on Python 3.9', j['checks']['doctor']['tail'])
 
 
+    def exported_here(self):
+        """main() runs on this test's tree; returns the list unexport() is called with."""
+        g = CI['main'].__globals__
+        saved, calls = (g['export'], g['unexport']), []
+        g['export'], g['unexport'] = (lambda sha, where: self.tree), calls.append
+        self.addCleanup(g.update, export=saved[0], unexport=saved[1])
+        return calls
+
+    def test_an_only_selector_that_matches_nothing_fails(self):
+        calls = self.exported_here()
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(CI['main'](['HEAD', '--only', 'suite:tools/hao/test', '--only', 'layuot']), 2)
+        self.assertIn('layuot', err.getvalue())
+        self.assertNotIn('suite:tools/hao/test,', err.getvalue())   # a prefix that matches is fine
+        self.assertNotIn('PASS', out.getvalue())
+        self.assertEqual(len(calls), 1)                               # its worktree is removed
+
+
 if __name__ == '__main__':
     unittest.main()

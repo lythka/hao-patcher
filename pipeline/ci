@@ -195,6 +195,14 @@ def main(argv=None):
     todo = [(n, (lambda f: lambda: f(tree, {'message': message}))(f)) for n, f in CHECKS]
     todo += [('suite:' + d, (lambda d: lambda: run_suite(tree, d))(d)) for d in suites(tree)]
     if a.only:
+        # a selector that matches no check is a mistake (a typo would otherwise run nothing and pass)
+        unmatched = [o for o in a.only if not any(n == o or n.startswith(o) for n, _ in todo)]
+        if unmatched:
+            if work:
+                unexport(work)
+            print('ci: --only %s matches no check (pipeline/ci --list shows them)' % ', '.join(unmatched),
+                  file=sys.stderr)
+            return 2
         todo = [t for t in todo if any(t[0] == o or t[0].startswith(o) for o in a.only)]
     if a.list:
         print('\n'.join(n for n, _ in todo))
