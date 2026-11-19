@@ -49,12 +49,18 @@ order:
 - `## Revisions`: the last section, newest line first, `- rN DATE change`, where N equals `revision`.
 
 `python3.14 -I pipeline/patches.py check` enforces these rules, and the pipeline tests fail when
-[TRACKER.md](TRACKER.md) is stale. After changing a patch:
+[TRACKER.md](TRACKER.md), [docs/PATCHES.md](../docs/PATCHES.md) or [docs/MANIFEST.md](../docs/MANIFEST.md) is stale.
+After changing a patch:
 
 ```sh
 python3.14 -I pipeline/patches.py tracker
+python3.14 -I pipeline/patches.py catalog
+python3.14 -I pipeline/patches.py manifest
 python3.14 -I pipeline/patches.py check
 ```
+
+[CONTRIBUTING.md](../CONTRIBUTING.md#worked-example-one-recipe-change-clone-to-pull-request) walks one change from
+clone to pull request.
 
 ## Sets
 

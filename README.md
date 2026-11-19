@@ -86,7 +86,8 @@ Developer preview. Installing erases the MacBook Pro's internal disk.
 
 For developers: [Building an image](docs/building.md) covers the inputs, what the build does and testing in QEMU;
 [architecture](docs/architecture.md) explains how the pieces fit, and [CONTRIBUTING.md](CONTRIBUTING.md) the tests
-and conventions.
+and conventions. To change a fix, follow its
+[worked example](CONTRIBUTING.md#worked-example-one-recipe-change-clone-to-pull-request), which goes from a clean clone to a pull request.
 
 | Path | Contents |
 |---|---|
