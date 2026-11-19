@@ -307,11 +307,15 @@ class RichSurface:
     def __init__(self, c, modules, record=False):
         RichConsole, self.Live, self.Text = modules
         self.c = c
+        # Rich reads TERM, NO_COLOR and the rest from os.environ unless told otherwise; it gets the console's own
+        # environment, so a Console given an environment draws as that environment says (TERM=dumb or NO_COLOR
+        # inherited by the process no longer turns the live region or the colours off behind the console's back).
         self.rc = RichConsole(file=c.out, force_terminal=True, color_system='truecolor', highlight=False, markup=False,
-                              emoji=False, soft_wrap=True)
+                              emoji=False, soft_wrap=True, _environ=c.env)
         import io
         self.rec = RichConsole(file=io.StringIO(), force_terminal=True, color_system='256', highlight=False,
-                               markup=False, emoji=False, soft_wrap=True, record=True, width=c.width()) if record else None
+                               markup=False, emoji=False, soft_wrap=True, record=True, width=c.width(),
+                               _environ=c.env) if record else None
         self.live = None
 
     # -- finished output
@@ -435,6 +439,7 @@ class Console:
         self.paint = Style(level != 'json' and (colour_for(self.out, env) if colour is None else colour), env)
         enc = (getattr(self.out, 'encoding', None) or 'utf-8').lower()
         e = os.environ if env is None else env
+        self.env = e              # the environment every decision here reads, Rich's included
         self.utf = 'utf' in enc and not e.get('HAO_ASCII')
         self.ok = self.paint('ok', '✓' if self.utf else 'ok')
         self.bad = self.paint('bad', '✗' if self.utf else 'FAILED')
@@ -730,7 +735,7 @@ class Console:
         panel = Panel(Group(*parts), title=Text(' STOPPED ', style=bad), title_align='left', border_style=bad,
                       padding=(1, 2))
         RichConsole(file=self.err, force_terminal=True, color_system='truecolor', highlight=False, markup=False,
-                    emoji=False).print(panel)
+                    emoji=False, _environ=self.env).print(panel)
         if self.rich and self.rich.rec is not None:
             self.rich.rec.print(panel)
 

@@ -172,6 +172,16 @@ class Steps(unittest.TestCase):
         self.assertIn('\033[1m[1/7] Lay out the disk\033[0m', out)
         self.assertIn('\033[38;5;78m✓\033[0m', out)
 
+    def test_the_given_environment_wins_over_the_process(self):
+        # Rich used to read os.environ: a runner started from TERM=dumb or with NO_COLOR set drew nothing live and
+        # no colour although the console had been given a colour terminal (the v0.0.1 pre-release CI run).
+        from unittest import mock
+        with mock.patch.dict(os.environ, {'TERM': 'dumb', 'NO_COLOR': '1'}):
+            _, out, _, _, c = render(out=Tty())
+        self.assertIsInstance(c.surface, CON.RichSurface)
+        self.assertIn('\033[?25l', out)
+        self.assertIn('\033[38;5;78m✓\033[0m', out)
+
     def test_without_rich_the_console_redraws_itself(self):
         _, out, _, _, c = render(out=Tty(), env={'TERM': 'xterm-256color', 'HAO_THEME': 'dark', 'HAO_NO_RICH': '1'})
         self.assertIsInstance(c.surface, CON.PlainSurface)
