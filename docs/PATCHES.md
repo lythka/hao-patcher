@@ -137,7 +137,7 @@ Revision r2, status product. [Recipe](../patches/golden-gate-deep-sleep-off/READ
 
 ## golden-gate-dyld-internal
 
-Revision r5, status product. [Recipe](../patches/golden-gate-dyld-internal/README.md)
+Revision r4, status product. [Recipe](../patches/golden-gate-dyld-internal/README.md)
 
 - `usr/lib/dyld`: from hao · hao-runtime's x86_64 dyld (payload replace/dyld: 26B131's dyld with the libignition stage count fixed) (row hao_runtime); 1 edit, applied by the installer, then signed: ad hoc, once, identifier com.apple.darwin.ignition. Installed mode 0755, owner root:wheel, flags restricted.
   1. `internal-install-in-dyld-only`: literal near __ZNK5dyld415SyscallDelegate15internalInstallEv (within 32 bytes), 21 bytes, `55 48 89 E5 BF 10 00 00 00 E8 00 00 00 00 85 C0 0F 94 C0 5D C3` → `55 48 89 E5 BF 10 00 00 00 31 C0 0F 1F 00 85 C0 0F 94 C0 5D C3` (`call _csr_check(CSR_ALLOW_APPLE_INTERNAL); test eax,eax; sete al` → `xor eax,eax; nop dword [rax]; test eax,eax; sete al`).
@@ -190,7 +190,7 @@ Revision r3, status product. [Recipe](../patches/golden-gate-ids/README.md)
 
 ## golden-gate-launchd-warm
 
-Revision r7, status product. [Recipe](../patches/golden-gate-launchd-warm/README.md)
+Revision r6, status product. [Recipe](../patches/golden-gate-launchd-warm/README.md)
 
 - `System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist`: from Apple · Golden Gate System volume; 2 edits, applied by the installer. Installed mode 0644, owner root:wheel, flags restricted.
   1. `helper-run-at-load`: plist.set RunAtLoad = true.

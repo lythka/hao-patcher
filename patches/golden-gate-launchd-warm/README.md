@@ -98,10 +98,10 @@ script's bytes and that the hook installs every file the script writes. No input
 
 ## Validation
 
-The fb6542df image builds print the three hashes under Verify. Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r6): launchd starts kernelmanager_helper speculatively (pid 77) before kernelmanagerd (pid 106), and after Setup mbsystemadministration starts only on an IPC request. The Setup-time checks did not run (the test account skips Setup).
+NEEDS VALIDATION: not built or booted. Host tests pass with the real 26B131 files (read-only System volume of the
+26B131 IPSW).
 
 ## Revisions
-- r7 2026-11-19 Validated r6 on hardware (Validation). Nothing it installs changes.
 - r6 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.
 - r5 2026-11-17 Declares its scope (`requires`, docs/requires.md): launchd job edits used on both builds. Nothing it installs changes.
 - r4 2026-11-16 Declares its pack (base): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

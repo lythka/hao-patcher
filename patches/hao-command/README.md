@@ -20,7 +20,7 @@ On the installed Mac: `hao`, `hao status`, `hao --help`.
 
 ## Validation
 
-Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r12): `/usr/local/bin/hao verify` runs and reports against 38 pack manifests, and /private/var/log/hao is root:wheel 755.
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r12): `/usr/local/bin/hao verify` runs and reports against 38 pack manifests, and the listing of /private/var/log/hao collected from that boot shows `drwxr-xr-x root wheel`.
 
 ## Revisions
 - r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes.

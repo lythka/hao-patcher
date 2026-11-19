@@ -19,13 +19,13 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-av1-encoder-x86 | r4 | oclp-hook | product |  | x |  |  |  | **needs** | r4 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-corespotlight-compat | r9 | oclp-hook | product |  | x | x |  |  | ok (r4) | r9 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-deep-sleep-off | r2 | post | product |  | x |  |  |  | ok (r1) | r2 2026-11-18 Validated r1 on hardware (Validation); nothing it installs changes. |
-| golden-gate-dyld-internal | r5 | oclp-hook | product |  | x |  |  |  | ok (r4) | r5 2026-11-19 Validated r4 on hardware (Validation). Nothing it installs changes. |
+| golden-gate-dyld-internal | r4 | oclp-hook | product |  | x |  |  |  | **needs** | r4 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-font-registry | r10 | post | product | caches | x |  |  |  | ok (r3) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
 | golden-gate-hd4000-planes | r7 | oclp-hook | product |  | x |  |  |  | **needs** | r7 2026-11-17 The mode argument in src/kc-hook.sh is quoted, like its paths, so no expansion in an install-tim |
 | golden-gate-hello | r11 | oclp-hook | product |  | x | x |  |  | **needs** | r11 2026-11-17 `requires`: os 26A428/26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmwar |
 | golden-gate-icon-caches | r9 | post | product | caches | x |  |  |  | ok (r3) | r9 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-ids | r3 | oclp-hook | product |  |  |  |  |  | **needs** | r3 2026-11-17 Declares its scope (`requires`, docs/requires.md): its row is for 26B131. Nothing it installs ch |
-| golden-gate-launchd-warm | r7 | oclp-hook | product |  | x |  |  |  | ok (r6) | r7 2026-11-19 Validated r6 on hardware (Validation). Nothing it installs changes. |
+| golden-gate-launchd-warm | r6 | oclp-hook | product |  | x |  |  |  | **needs** | r6 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-live-text-service | r7 | post | product |  | x |  |  |  | **needs** | r7 2026-11-17 `requires`: os 26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; r |
 | golden-gate-live-text-shared | r13 | oclp-hook | product |  | x |  |  |  | **needs** | r13 2026-11-17 Row `live_text_framework` (26B131) is the ec5fe76b build: before the first TextRecognition comp |
 | golden-gate-metal-argbuf | r10 | oclp-hook | product |  | x |  |  |  | **needs** | r10 2026-11-17 Row `metal_argbuf` is a full make at the stack commit (tools/metal-argbuf as d977ced2). libargb |
