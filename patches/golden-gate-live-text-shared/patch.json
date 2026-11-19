@@ -1,12 +1,14 @@
 {
- "revision": 13,
+ "revision": 14,
  "pack": "metal-3802",
  "stage": "oclp-hook",
  "inputs": [
   "live_text_framework"
  ],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 13,
+ "validated_digest": "40fed833d2c2622e1eecc90c873ef9a3ed4d19abed3e9d8bbc9e23d6c7ed385e",
  "files": [
   {
    "path": "usr/lib/libhelloblur.dylib",

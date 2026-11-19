@@ -68,12 +68,10 @@ On the laptop (with `golden-gate-live-text-service` in the image):
 
 ## Validation
 
-NEEDS VALIDATION. Host tests pass, including Vision OCR through Rosetta with this runtime (the policy and the
-detector rewrite on x86_64 Espresso of macOS 27.2). The 26A428 build of the same sources recognized the two-line
-fixture on the laptop's HD 4000 on 2026-11-09 and Photos loaded the helpers, but mediaanalysisd was blocked, so
-Photos' Live Text was never seen working. Not yet built into an image or booted with 26B131.
+Laptop 2026-11-19, a MacBookPro9,2. On the release-EFI image 8acc07f (26B131, built from fb6542df with r13), mediaanalysisd maps `LiveText.dylib` and its two libraries, and the boot log has no `Code=11`. On the acceptance image 5e30343 (26B131, same recipe revision), Photos showed the Live Text button on a photo of two lines of text; a drag-select and Copy put the first line on the pasteboard (`pbpaste`). No mediaanalysisd, MTLCompilerService or Photos crash report on image 8305fdd over a 48-app sweep. Background load over the first 30 minutes was not sampled.
 
 ## Revisions
+- r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes.
 - r13 2026-11-17 Row `live_text_framework` (26B131) is the ec5fe76b build: before the first TextRecognition compile in a process, `libLiveTextPolicy` removes deny-delete ACEs below e5rt's own cache folder, and it compiles once more if a compile failed and something was removed (diag#0017). Reason (S18): mediaanalysisd's e5 cache held empty entries whose folders deny delete; e5rt's remove_all() failed with EACCES and every TextRecognition compile returned Code 11. Moving those entries aside by hand made Live Text work on the MacBookPro9,2 (2026-11-14); the host test recreates the state and fails without the change. Installed bytes that change: `runtime/libLiveTextPolicy.dylib` and `runtime/build.json` only.
 - r12 2026-11-17 `requires`: os 26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces `applies`. status product: it ships in the release profiles (what it installs is unchanged; `validated` stays false until the re-cut's laptop boots prove it).
 - r11 2026-11-16 Declares its pack (metal-3802): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.
