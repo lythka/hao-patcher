@@ -41,10 +41,12 @@ boot the image in [QEMU](../../tools/qemu-vm/README.md) before installing it on 
 hao-runtime and do not replace image boot and application checks.
 
 ## Validation
+NEEDS VALIDATION: r92 (row hao-runtime 5a7d3fc, the JIT arena): its libhao was shown working on a MacBookPro9,2 running image 5e30343; the validation record waits for the acceptance run with this payload (its libhao, AOT made by it).
 
 Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r90): hao runs the image's ARM programs to a logged-in desktop; 965 AOT files are in place; fma64 equals native arm64; Control Center, Notification Center, Font Book, Stocks and Tips run with no refusal. Open and tracked on their own: Weather (#9, #62), gamed (#18), the AOT job's done marker (#78).
 
 ## Revisions
+- r92 2026-11-19 Row hao_runtime (26B131, A family) is hao-runtime 5a7d3fc: the RC runtime 1691020 with the JIT arena (Maps refusal, #84), libhao 582796eb, shown working on a MacBookPro9,2 running image 5e30343 with that libhao in place. The payload changes: libhao and the AOT files the Mac makes from it.
 - r91 2026-11-19 Validated r90 on hardware (Validation). Nothing it installs changes.
 - r90 2026-11-17 Row hao_runtime (26B131, A family) is hao-runtime af5aa59, release/v0.0.1's security batch: AOT format 8 (older caches refused, baseline CPU), hardened stubs for library-validated programs, libhao by absolute path, launch constraints carried; hao-install installs exactly the manifest and stages about 3.5 GB in TMPDIR first.
 - r89 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.

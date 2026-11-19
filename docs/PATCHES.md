@@ -616,7 +616,7 @@ Revision r85, status product. [Recipe](../patches/hao-opencore/README.md)
 
 ## hao-runtime
 
-Revision r91, status product. [Recipe](../patches/hao-runtime/README.md)
+Revision r92, status product. [Recipe](../patches/hao-runtime/README.md)
 
 - `usr/libexec/hao`: whole file from hao (row hao_runtime). The hao launcher that runs ARM64 programs on Intel (payload root/usr/libexec/hao, copied by hao-install.py). Installed mode 0755, owner root:wheel, flags restricted.
 - `usr/lib/hao/libhao.dylib`: whole file from hao (row hao_runtime). Hao runtime library (payload root). Installed mode 0755, owner root:wheel.

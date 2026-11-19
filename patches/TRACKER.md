@@ -50,7 +50,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-windowserver-filter | r10 | oclp-hook | product |  | x | x |  |  | ok (r5) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
 | hao-command | r13 | post | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
 | hao-opencore | r85 | post | product |  | x | x |  |  | **needs** | r85 2026-11-18 Names no model (S15): the reasons and provenance of the mbp92 target's OCLP-generated kexts (US |
-| hao-runtime | r91 | oclp-hook | product |  | x | x |  |  | ok (r90) | r91 2026-11-19 Validated r90 on hardware (Validation). Nothing it installs changes. |
+| hao-runtime | r92 | oclp-hook | product |  | x | x |  |  | **needs** | r92 2026-11-19 Row hao_runtime (26B131, A family) is hao-runtime 5a7d3fc: the RC runtime 1691020 with the JIT  |
 | hao-runtime-fold | r10 | oclp-hook | product |  |  |  |  |  | **needs** | r10 2026-11-18 Row `hao_runtime_fold` -> hao-runtime cabc1d5 payload for fold family B 31C0215A (manifest 8e45 |
 | hao-runtime-fold-catalog | r1 | oclp-hook | experiment |  |  |  |  |  | **needs** | r1 2026-11-18 New: the B+catalog set's runtime payload (row `hao_runtime_fold_catalog`, hao-runtime 3a6a5d9 fo |
 | metal-compiler-compat | r13 | oclp-hook | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
