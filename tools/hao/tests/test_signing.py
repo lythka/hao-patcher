@@ -290,19 +290,17 @@ class Commands(unittest.TestCase):
             self.assertIn('not signed by hao', r.stdout + r.stderr)
             self.assertFalse((Path(d) / 'cache').exists())
 
-    def test_fetch_takes_the_owner_waived_v001_unsigned_and_says_so(self):
+    def test_fetch_refuses_an_unsigned_v001(self):
+        # v0.0.1 is signed: with SHA256SUMS but no signatures, fetch stops before any download
         with tempfile.TemporaryDirectory() as d:
             rel = Path(d) / 'release.json'
             rel.write_text(json.dumps({'version': 'v0.0.1', 'downloads': [
                 {'name': 'a.bin', 'url': 'file:///nonexistent', 'size': 1, 'sha256': '0' * 64}]}))
-            r = self.hao('fetch', str(rel), '--cache', d + '/cache', env={'HAO_LOGS': d})
-            self.assertEqual(r.returncode, 4, r.stdout + r.stderr)            # no SHA256SUMS beside it: refused
             (Path(d) / 'SHA256SUMS').write_text('%s  release.json\n' % hashlib.sha256(rel.read_bytes()).hexdigest())
             r = self.hao('fetch', str(rel), '--cache', d + '/cache', env={'HAO_LOGS': d})
-            self.assertNotEqual(r.returncode, 4, r.stdout + r.stderr)        # past the signature; the fake URL fails
-            self.assertIn('UNSIGNED release', r.stdout + r.stderr)
-            rel.write_text(rel.read_text().replace('v0.0.1', 'v0.0.2'))       # not waived: refused
-            self.assertEqual(self.hao('fetch', str(rel), '--cache', d + '/cache', env={'HAO_LOGS': d}).returncode, 4)
+            self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+            self.assertNotIn('UNSIGNED release', r.stdout + r.stderr)
+            self.assertFalse((Path(d) / 'cache').exists())
 
     def test_fetch_refuses_a_release_signed_by_another_key(self):
         with tempfile.TemporaryDirectory() as d:
@@ -358,6 +356,17 @@ class Commands(unittest.TestCase):
                 hao['signed_release'](argparse.Namespace(unsigned=True), c, rel)
             self.assertEqual(x.exception.code, 5)
 
+
+
+class ShippedKeys(unittest.TestCase):
+    """The tree carries the owner's release key (DECISIONS 2026-11-17) and no waiver for a signed release."""
+    def test_the_release_key_is_the_owners(self):
+        keys = SIGN.parse_keys((TOOL / 'data' / 'release-keys.pub').read_text())
+        self.assertEqual(sorted(keys.values()), ['SHA256:HPvLz28RozOa/bJ+7bJ0ha4s27LBEjQ/B3TxSqQCdek'])
+
+    def test_v001_has_no_unsigned_waiver(self):
+        waivers = json.loads((TOOL / 'data' / 'unsigned-releases.json').read_text())['releases']
+        self.assertNotIn('v0.0.1', waivers)
 
 if __name__ == '__main__':
     unittest.main()

@@ -383,16 +383,14 @@ class Unsigned(unittest.TestCase):
         bad = RC.check_folder(self._tampered(), KEYS, offline=True)
         self.assertIn(('files', 'FAIL'), states(bad))
 
-    def test_the_real_command_with_no_keys_accepts_v001_and_refuses_a_change(self):
+    def test_the_real_command_refuses_an_unsigned_v001(self):
+        # the tree carries the release key and no v0.0.1 waiver: an unsigned v0.0.1 stops, signed or tampered
         import subprocess
-        good = self.folder()
-        r = subprocess.run([sys.executable, '-I', '-B', str(TOOL / 'hao'), 'verify-release', str(good), '--offline'],
-                           capture_output=True, text=True, env=dict(os.environ, HAO_LOGS=self.d.name))
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn('UNSIGNED release', r.stdout + r.stderr)
-        r = subprocess.run([sys.executable, '-I', '-B', str(TOOL / 'hao'), 'verify-release', str(self._tampered()),
-                            '--offline'], capture_output=True, text=True, env=dict(os.environ, HAO_LOGS=self.d.name))
-        self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+        for folder in (self.folder(), self._tampered()):
+            r = subprocess.run([sys.executable, '-I', '-B', str(TOOL / 'hao'), 'verify-release', str(folder),
+                                '--offline'], capture_output=True, text=True, env=dict(os.environ, HAO_LOGS=self.d.name))
+            self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+            self.assertNotIn('UNSIGNED release', r.stdout + r.stderr)
 
     def _tampered(self):
         f = Path(self.d.name) / 'tampered'
