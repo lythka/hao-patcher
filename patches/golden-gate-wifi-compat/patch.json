@@ -1,9 +1,11 @@
 {
- "revision": 3,
+ "revision": 4,
  "pack": "wifi-broadcom-modern",
  "stage": "oclp-hook",
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 3,
+ "validated_digest": "2dcfe27990c24aaebfc852f1641acae75f394c7027f390b2786ad4640cbf6ca0",
  "inputs": [
   "io80211_compat",
   "wifip2p_compat"

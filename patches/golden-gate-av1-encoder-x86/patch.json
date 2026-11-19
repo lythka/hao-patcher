@@ -1,9 +1,11 @@
 {
- "revision": 4,
+ "revision": 5,
  "pack": "intel-hd4000",
  "stage": "oclp-hook",
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 4,
+ "validated_digest": "e94a44a4d6c0ac599834f2ec93b552e0ae084af409ae4b6480187037c630d061",
  "files": [
   {
    "path": "System/Library/Video/Plug-Ins/AV1EncoderSW.bundle/Contents/Info.plist",

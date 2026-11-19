@@ -111,7 +111,7 @@ Revision r6, status diagnostic. [Recipe](../patches/golden-gate-appstore-slices/
 
 ## golden-gate-av1-encoder-x86
 
-Revision r4, status product. [Recipe](../patches/golden-gate-av1-encoder-x86/README.md)
+Revision r5, status product. [Recipe](../patches/golden-gate-av1-encoder-x86/README.md)
 
 - `System/Library/Video/Plug-Ins/AV1EncoderSW.bundle/Contents/Info.plist`: from Apple · Golden Gate System volume; 1 edit, applied by the installer. Installed mode 0644, owner root:wheel, flags restricted.
   1. `av1-encoder-arm64-only`: plist.set CMClassImplementations:0:CMExecutableArchitectures = ["arm64"].
@@ -378,7 +378,7 @@ Revision r3, status product. [Recipe](../patches/golden-gate-update-policy/READM
 
 ## golden-gate-user-seed
 
-Revision r15, status product. [Recipe](../patches/golden-gate-user-seed/README.md)
+Revision r16, status product. [Recipe](../patches/golden-gate-user-seed/README.md)
 
 - `Library/LaunchDaemons/local.peruser-seed.plist`: whole file from hao. Launchd daemon made at install by src/plist.sh, which escapes src/seed.zsh into the plist (root 644): places the seeded caches into each new account.
 - `Library/Application Support/PerUserSeed/build`: whole file from hao. The System's ProductBuildVersion written at install (root 644): seed.zsh places nothing on another build.
@@ -556,7 +556,7 @@ Revision r2, status product. [Recipe](../patches/golden-gate-wallpaper-export/RE
 
 ## golden-gate-wifi-compat
 
-Revision r3, status product. [Recipe](../patches/golden-gate-wifi-compat/README.md)
+Revision r4, status product. [Recipe](../patches/golden-gate-wifi-compat/README.md)
 
 - `System/Library/PrivateFrameworks/IO80211.framework/Versions/A/IO80211`: whole file from hao (row io80211_compat). The IO80211 compatibility library (golden-gate-userspace src/io80211), installed under the framework's own name over OCLP's Modern Wireless wrapper; it re-exports the wrapper, kept as IO80211OCLP.dylib. Installed mode 0755, owner root:wheel, flags restricted.
 - `System/Library/PrivateFrameworks/WiFiPeerToPeer.framework/Versions/A/WiFiPeerToPeer`: whole file from hao (row wifip2p_compat). The WiFiPeerToPeer compatibility library (golden-gate-userspace src/wifip2p), installed under the framework's own name over OCLP's wrapper; it re-exports the wrapper, kept as WiFiPeerToPeerOCLP.dylib. Installed mode 0755, owner root:wheel, flags restricted.

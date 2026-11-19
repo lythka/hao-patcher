@@ -65,21 +65,11 @@ account: `/private/var/log/peruser-seed.log` shows the icon index, the Metal tre
 the new uid before its desktop started.
 
 ## Validation
-NEEDS VALIDATION (r15): with a LaunchServices payload, a new account's first login logs "LS store placed" in
-/private/var/log/peruser-seed.log, and the account's lsd does not log "Seeding database". Without one it logs "no LS
-store in the payload".
-NEEDS VALIDATION (r11): on an image with r11, a new account's first login shows these in /private/var/log/peruser-seed.log:
-"icon index placed", the font registry, "metal: N bundle trees placed" and "seeded". The placed folders are the
-account's (`ls -ln` in its `getconf DARWIN_USER_CACHE_DIR`), and the times are within the r5 laptop run's (account seen 2.3 s after
-creation, all placed before the first login). Host: `tests/test_as_account.py`.
-NEEDS VALIDATION (r6): a new account on an image with r6 has no `com.apple.metalfe` in its cache folder, and SceneKit
-in Preview draws a shaded scene. Host: the `place_chunk` test (fails on r5). r5 on the laptop:
-Laptop 2026-11-11, image 4d1c48c (26B131): seed.zsh saw the new account 2.3 s after creation and placed the icon index, font registry and 17 Metal trees before its first login.
-Earlier: r4 is built only on the host fixture; no image with it has booted. On 26A428 images r2/r3's runtime
-placed trees (owner sessions 2026-11-06), not re-checked on 26B131.
-r5 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r4's, so the result above stands.
+
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r15): for the new account, /private/var/log/peruser-seed.log shows the icon index, the font registry and 16 Metal bundle trees placed and "seeded", and "no LS store in the payload" (no LaunchServices store ships yet).
 
 ## Revisions
+- r16 2026-11-19 Validated r15 on hardware (Validation). Nothing it installs changes.
 - r15 2026-11-18 seed.zsh takes the LaunchServices store's name from the payload instead of Tahoe's hard-coded `com.apple.LaunchServices-20971545-v2.csstore`, so a 26B131 store (`-35651614-`) is placed. No store ships yet, so a new account gets the same files as with r14. `tests/test_as_account.py` checks the name.
 - r14 2026-11-17 Declares its scope (`requires`, docs/requires.md): the seed runtime and the payload layout of 26B131's caches. Nothing it installs changes.
 - r13 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.

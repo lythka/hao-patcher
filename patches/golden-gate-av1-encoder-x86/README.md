@@ -38,11 +38,10 @@ is put back root:wheel 0644 `restricted`, like Apple's.
 
 ## Validation
 
-NEEDS VALIDATION: not built or booted. Laptop test 2026-11-16 (26B131, this file's bytes bd656487 in place of
-Apple's): with a PNG on the clipboard, `clipboard info` exited 0 5 of 5 times; with Apple's file it died with SIGILL
-(rc 132), and with this one it exited 0 again.
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r4): AV1EncoderSW's Info.plist lists CMExecutableArchitectures ["arm64"]; with a PNG on the clipboard, `osascript -e "clipboard info"` as the logged-in user exits 0 and lists the types, and no osascript crash report appears.
 
 ## Revisions
+- r5 2026-11-19 Validated r4 on hardware (Validation). Nothing it installs changes.
 - r4 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.
 - r3 2026-11-17 Declares its scope (`requires`, docs/requires.md): only a CPU without AVX2 needs the arm64-only encoder entry. Nothing it installs changes.
 - r2 2026-11-16 Declares its pack (intel-hd4000): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

@@ -16,7 +16,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | dev-keepawake | r3 | post | dev |  |  |  |  |  | **needs** | r3 2026-11-17 Declares its scope (`requires`, docs/requires.md): power settings and a launchd job: no build or |
 | dev-session | r2 | post | dev |  |  |  |  |  | **needs** | r2 2026-11-18 The test account's Setup Assistant record is complete, so the per-user Setup Assistant does not  |
 | golden-gate-appstore-slices | r6 | post | diagnostic |  |  | x |  |  | **needs** | r6 2026-11-17 Every path in apply.sh is quoted: an install runs recipe scripts from the installer volume, whos |
-| golden-gate-av1-encoder-x86 | r4 | oclp-hook | product |  | x |  |  |  | **needs** | r4 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
+| golden-gate-av1-encoder-x86 | r5 | oclp-hook | product |  | x |  |  |  | ok (r4) | r5 2026-11-19 Validated r4 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-corespotlight-compat | r9 | oclp-hook | product |  | x | x |  |  | ok (r4) | r9 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-deep-sleep-off | r2 | post | product |  | x |  |  |  | ok (r1) | r2 2026-11-18 Validated r1 on hardware (Validation); nothing it installs changes. |
 | golden-gate-dyld-internal | r5 | oclp-hook | product |  | x |  |  |  | ok (r4) | r5 2026-11-19 Validated r4 on hardware (Validation). Nothing it installs changes. |
@@ -42,11 +42,11 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-store | r7 | oclp-hook | product |  |  |  |  |  | **needs** | r7 2026-11-18 The policy library is installed as usr/lib/hao/hao-appstore-policy.dylib, and the three specs lo |
 | golden-gate-unsupported-daemons | r4 | post | product |  | x |  |  |  | ok (r3) | r4 2026-11-19 Validated r3 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-update-policy | r3 | post | product |  | x |  |  |  | ok (r2) | r3 2026-11-18 Validated r2 on hardware (Validation); nothing it installs changes. |
-| golden-gate-user-seed | r15 | post | product | caches | x |  |  |  | **needs** | r15 2026-11-18 seed.zsh takes the LaunchServices store's name from the payload instead of Tahoe's hard-coded ` |
+| golden-gate-user-seed | r16 | post | product | caches | x |  |  |  | ok (r15) | r16 2026-11-19 Validated r15 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-user-template | r11 | post | product | caches | x |  |  |  | **needs** | r11 2026-11-17 Leaves out Mail's containers (8 of 336), fixes #47: a schema-0 Mail container was migrated unde |
 | golden-gate-userspace | r96 | oclp-hook | product |  | x | x |  |  | **needs** | r96 2026-11-19 compact_image keeps its first image under a .dmg name (`built_path`: .golden-gate-os.built.dmg) |
 | golden-gate-wallpaper-export | r2 | post | product | caches |  |  |  |  | **needs** | r2 2026-11-19 Pack os-extras: dev profiles name it, release profiles leave it out (Apple-derived; returns when |
-| golden-gate-wifi-compat | r3 | oclp-hook | product |  | x | x |  |  | **needs** | r3 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
+| golden-gate-wifi-compat | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-19 Validated r3 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-windowserver-filter | r10 | oclp-hook | product |  | x | x |  |  | ok (r5) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
 | hao-command | r13 | post | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
 | hao-opencore | r85 | post | product |  | x | x |  |  | **needs** | r85 2026-11-18 Names no model (S15): the reasons and provenance of the mbp92 target's OCLP-generated kexts (US |

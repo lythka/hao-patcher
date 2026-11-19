@@ -1,10 +1,12 @@
 {
- "revision": 15,
+ "revision": 16,
  "pack": "base",
  "stage": "post",
  "inputs": [],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 15,
+ "validated_digest": "6a44ddfd4fcf57167fddf19acdf796873cd0bfe88e54d376c690027f766019e3",
  "optional": "caches",
  "needs_any": "caches",
  "files": [

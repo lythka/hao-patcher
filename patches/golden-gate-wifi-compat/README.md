@@ -40,9 +40,10 @@ files); the compat libraries are whole files from their rows.
 
 ## Validation
 
-NEEDS VALIDATION: the split itself is not built yet. The same steps were in golden-gate-userspace until r83.
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r3): the build log prints the IO80211 compat line; Wi-Fi joins a 5 GHz network (join rc 0, an address on en1 after 12 s, https 200), and airportd, sharingd and coreaudiod keep the same processes afterwards. OCLP's IO80211OCLP.dylib and WiFiPeerToPeerOCLP.dylib sit behind the compat libraries.
 
 ## Revisions
+- r4 2026-11-19 Validated r3 on hardware (Validation). Nothing it installs changes.
 - r3 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.
 - r2 2026-11-17 Declares its scope (`requires`, docs/requires.md): compat rows for both builds. Nothing it installs changes.
 - r1 2026-11-16 New: golden-gate-userspace's IO80211 and WiFiPeerToPeer steps, files and edit specs, unchanged, in pack wifi-broadcom-modern.

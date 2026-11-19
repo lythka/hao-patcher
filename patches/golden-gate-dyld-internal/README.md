@@ -32,7 +32,7 @@ Terminal as its top hit.
 
 ## Validation
 
-Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r4): the boot-args have no `ic_csr_internal`; OCLP's Metal loads (GPU text recognition and the argument-buffer probes pass); mobileassetd used only Apple's public asset hosts (gdmf.apple.com, mesu.apple.com, updates.cdn-apple.com); Spotlight finds Terminal first. On a release-EFI image of the same day (csr-active-config 0x803) a csr_check of CSR_ALLOW_APPLE_INTERNAL from a normal process is refused, as user and as root, so only dyld counts as internal. The "InternalBuild" : "true" that mobileassetd sends on auto-asset requests is Apple's own: it marks every request that allows the same version, and stock macOS 27.2 sends it on the same requests.
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r4): the boot-args have no `ic_csr_internal`; OCLP's Metal loads (GPU text recognition and the argument-buffer probes pass); mobileassetd used only Apple's public asset hosts (gdmf.apple.com, mesu.apple.com, updates.cdn-apple.com); Spotlight finds Terminal first. On a release-EFI image of the same day (csr-active-config 0x803) a csr_check of CSR_ALLOW_APPLE_INTERNAL from a normal process is refused, as user and as root, so only dyld counts as internal. The "InternalBuild" : "true" that mobileassetd sends on auto-asset requests is Apple's own: it marks every request that allows the same version, and stock macOS 27.2 (26B123) sends it on the same requests (evidence patcher-20261119-stock-26B123-mobileasset-internalbuild: 44 of 44 auto-asset requests that allow the same version, and no other).
 
 ## Revisions
 - r5 2026-11-19 Validated r4 on hardware (Validation). Nothing it installs changes.
