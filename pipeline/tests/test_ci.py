@@ -142,5 +142,13 @@ class Planted(unittest.TestCase):
         self.assertEqual(len(calls), 1)                               # its worktree is removed
 
 
+    def test_list_removes_its_worktree(self):
+        calls = self.exported_here()
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(CI['main'](['HEAD', '--list']), 0)
+        self.assertIn('suite:pipeline/tests', out.getvalue().splitlines())
+        self.assertEqual(len(calls), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

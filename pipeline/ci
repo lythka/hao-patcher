@@ -206,6 +206,8 @@ def main(argv=None):
         todo = [t for t in todo if any(t[0] == o or t[0].startswith(o) for o in a.only)]
     if a.list:
         print('\n'.join(n for n, _ in todo))
+        if work:
+            unexport(work)          # --list exports COMMIT too: leave no worktree behind
         return 0
     print('ci: %s %s (%d checks%s)' % ('working tree at' if a.here else 'commit', sha[:12], len(todo),
                                        ', uncommitted changes' if dirty else ''), flush=True)
