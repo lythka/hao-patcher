@@ -1,7 +1,9 @@
 # Architecture
 
-hao-patcher builds one disk image from several sources. Golden Gate is the installed
-system. Tahoe, OCLP and this repository's fixes add what an Intel Mac needs.
+For contributors: how one macOS 27 image is put together from several sources. Golden Gate is the installed
+system. Tahoe, OCLP and this repository's fixes add what an Intel Mac needs. Development images are assembled in
+the builder VM as below; a release is assembled the same way on the user's Mac by `hao create-installer` and
+`hao install` ([builder path](builder-path.md)).
 
 ```mermaid
 flowchart TD

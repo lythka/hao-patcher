@@ -1,5 +1,9 @@
 # Build inputs
 
+For developers building images in the builder VM: which archives to download and how each input row is made.
+Users don't need this page: `hao create-installer` downloads a release's pinned files and makes the rest on their
+Mac ([builder path](builder-path.md)).
+
 This repository contains no Apple software or generated binaries. You download the
 Apple and third-party archives yourself, build the prepared inputs from them, and
 record each file's SHA256 in an input row.
