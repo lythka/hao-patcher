@@ -16,6 +16,8 @@ import report as REP       # noqa: E402
 import verify as VERIFY    # noqa: E402
 
 
+OTHER_PYTHON = '/opt/homebrew/bin/python3.14'   # not ROOT_PYTHON, whatever runs the tests
+
 class Files(unittest.TestCase):
     def test_create_refuses_a_planted_symlink_and_an_existing_file(self):
         with tempfile.TemporaryDirectory() as d:
@@ -189,7 +191,7 @@ class Environment(unittest.TestCase):
     def test_sudo_drops_developer_variables(self):
         env = {'HAO_LAUNCHER': '/tmp/x', 'HAO_LOGS': '/tmp/l', 'HAO_STICK': '/tmp/s', 'TMPDIR': '/tmp/t',
                'PATH': '/opt/evil/bin:/usr/bin', 'HAO_THEME': 'dark', 'SUDO_USER': 'u', 'SUDO_UID': '501'}
-        gone = SAFE.harden_env(env, euid=0)
+        gone = SAFE.harden_env(env, euid=0, executable=OTHER_PYTHON)
         self.assertEqual(sorted(gone), ['HAO_LAUNCHER', 'HAO_LOGS', 'HAO_STICK', 'TMPDIR'])
         self.assertEqual(env['PATH'], SAFE.SYSTEM_PATH)
         self.assertEqual(env['HAO_THEME'], 'dark')
@@ -220,7 +222,8 @@ class Environment(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             here = Path(d) / 'hao' / 'tools' / 'hao' / 'src' / 'safety.py'
             env = {'HAO_STICK': d, 'HAO_LAUNCHER': '/tmp/x', 'HAO_LOGS': '/tmp/l', 'PATH': '/x'}
-            self.assertEqual(sorted(SAFE.harden_env(env, euid=0, here=here)), ['HAO_LAUNCHER', 'HAO_LOGS'])
+            self.assertEqual(sorted(SAFE.harden_env(env, euid=0, here=here, executable=OTHER_PYTHON)),
+                             ['HAO_LAUNCHER', 'HAO_LOGS'])
             self.assertEqual(env['HAO_STICK'], d)             # this hao runs from that drive: the launcher's
             self.assertEqual(env['PATH'], SAFE.SYSTEM_PATH)
             env = {'HAO_STICK': d}                             # a hao elsewhere: HAO_STICK is not the launcher's

@@ -10,13 +10,17 @@ SRC = Path(__file__).resolve().parents[1] / 'src'
 
 class CheckTrace(unittest.TestCase):
     def test_a_crash_leaves_the_last_file_and_a_traceback(self):
+        # A real fault would leave a crash report on the Mac running the tests. The child ignores SIGBUS before the
+        # fault handler is installed: the handler writes its traceback, re-raises into SIG_IGN, and the child exits.
         with tempfile.TemporaryDirectory() as d:
             code = ('import sys; sys.path.insert(0, %r)\n'
-                    'import builder, pathlib, ctypes\n'
+                    'import builder, os, pathlib, signal\n'
+                    'signal.signal(signal.SIGBUS, signal.SIG_IGN)\n'
                     'f = builder.check_trace(pathlib.Path(%r)); f.write("4 kit/x\\n"); f.flush()\n'
-                    'ctypes.string_at(0)\n') % (str(SRC), d)
+                    'os.kill(os.getpid(), signal.SIGBUS)\n'
+                    'os._exit(3)\n') % (str(SRC), d)
             r = subprocess.run([sys.executable, '-I', '-B', '-c', code], capture_output=True)
-            self.assertNotEqual(r.returncode, 0)
+            self.assertEqual(r.returncode, 3, r.stderr)
             logs = list((Path(d) / 'logs').glob('manifest-check-*.txt'))
             self.assertEqual(len(logs), 1)
             text = logs[0].read_text()
