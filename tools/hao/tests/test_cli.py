@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import stat
 import subprocess
 import sys
 import tempfile
@@ -321,16 +322,23 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual([(x['path'], x['changed'], x['reason']) for x in r['changed']],
                          [('usr/lib/a.dylib', 'seed', 'Metal compiles append to it on first GPU use')])
 
-    def test_a_seed_still_fails_missing_or_with_the_wrong_mode(self):
+    def test_a_seed_rewritten_with_another_mode_is_ok(self):
+        # root's Metal cache comes back 0600 at first boot with the same bytes (v0.0.1, laptop 1): the mode is macOS's
         self.seeds()
-        (self.root / 'usr/lib/a.dylib').write_bytes(b'grown')
-        os.chmod(self.root / 'usr/lib/a.dylib', 0o644)
-        (self.root / 'usr/lib/b.dylib').unlink()
-        (self.root / 'usr/lib/c.dylib').write_bytes(b'not a seed')
+        os.chmod(self.root / 'usr/lib/a.dylib', 0o600)
         r = VERIFY.verify(self.root, VERIFY.manifests([self.ovl], self.root))
-        got = {p['path']: p['problem'] for p in r['problems']}
-        self.assertEqual(got, {'usr/lib/a.dylib': 'attributes', 'usr/lib/b.dylib': 'missing',
-                               'usr/lib/c.dylib': 'content'})
+        self.assertEqual((r['ok'], r['problems']), (3, []))
+
+    def test_a_seed_still_fails_missing_or_with_other_flags_and_a_file_with_another_mode_fails(self):
+        self.seeds()
+        os.chmod(self.root / 'usr/lib/a.dylib', 0o600)
+        os.chflags(self.root / 'usr/lib/a.dylib', stat.UF_NODUMP)
+        (self.root / 'usr/lib/b.dylib').unlink()
+        os.chmod(self.root / 'usr/lib/c.dylib', 0o600)      # not a seed: its mode is still checked
+        r = VERIFY.verify(self.root, VERIFY.manifests([self.ovl], self.root))
+        got = {p['path']: (p['problem'], p.get('keys')) for p in r['problems']}
+        self.assertEqual(got, {'usr/lib/a.dylib': ('attributes', ['flags']), 'usr/lib/b.dylib': ('missing', None),
+                               'usr/lib/c.dylib': ('attributes', ['mode'])})
 
     def test_hao_verify_prints_seeds_and_exits_0(self):
         self.seeds()
