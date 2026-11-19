@@ -6,6 +6,13 @@
       "revision": 1,
       "reason": "owner 2026-11-19: skip for v0.0.1; proving it moves to v0.0.2. The image matches the one built before the split, but Sidecar, AirPlay to Mac and Continuity Camera offering this Mac have not been checked. Known issue: Sidecar, AirPlay to Mac and Continuity Camera are not checked.",
       "decided": "2026-11-19"
+    },
+    {
+      "profile": "alpha-v0.1.0",
+      "recipe": "golden-gate-user-template",
+      "revision": 11,
+      "reason": "owner 2026-11-19: approved for v0.0.1; prove it in v0.0.2. iCloud part (#47) not shown; non-iCloud part K4 PASS (no Mail container before Mail's first launch, Mail's link and first launch without an abort). Known issue: #47, Mail after iCloud sign-in.",
+      "decided": "2026-11-19"
     }
   ]
 }
