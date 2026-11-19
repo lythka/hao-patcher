@@ -1,7 +1,8 @@
 # hao-patcher
 
-hao-patcher builds disk images of **macOS 27 (Golden Gate) for Intel x86_64 Macs**. The current build is
-macOS 27.2.1 (26B131).
+For owners of a 2012 13-inch MacBook Pro: run **macOS 27 (Golden Gate)** on it, installed from a USB installer you make on any Mac.
+
+macOS 27.2.1 (26B131). Developer preview, for a test Mac only.
 
 macOS 27 does not support Intel Macs, so the image is built in layers: Golden Gate's own System and Data, the Intel
 kernel extensions, drivers and boot files macOS 26 (Tahoe) still ships, legacy hardware support from OpenCore Legacy
@@ -40,17 +41,13 @@ Intel Macs are untested. Tested with macOS 27.2.1 (26B131).
 | Connectivity | Wi-Fi (joins from Setup Assistant and System Settings, remembered networks at startup), Ethernet, Bluetooth, AirDrop, AirPlay display discovery, sound on AirPlay speakers |
 | Audio and input | Speakers, camera and microphone, brightness keys, keyboard backlight, built-in keyboard and trackpad; external USB keyboard and mouse |
 | Power and ports | Sleep and wake (including the lid), battery level and charging, USB 3 at USB 3 speed, SD card slot |
-| Apps | Safari (YouTube, WebGPU), Maps (3D globe, satellite, 3D buildings), Weather (forecasts; temperature, air-quality and wind maps), Photos, Music, TV, Podcasts, Calendar, Preview, App Store, Books, News, Stocks, Terminal, System Settings |
+| Apps | Safari (YouTube, WebGPU), Maps (3D globe, satellite, 3D buildings), Weather (forecasts; temperature, air-quality and wind maps), Photos, TV, Podcasts, Calendar, Preview, App Store, Books, News, Stocks, Terminal, System Settings |
 | 3D | SceneKit scenes with materials, shadows and reflections; Quick Look and Preview open SceneKit scenes |
-| Accounts | iMessage; App Store sign-in and installs |
-| ARM-only programs | macOS 27's ARM-only programs and apps built only for Apple silicon run on the Intel CPU through hao-runtime |
+| Accounts | Apple Account sign-in in Setup Assistant |
+| ARM-only programs | macOS 27's ARM-only programs run on the Intel CPU through hao-runtime |
 
-**Releases:** none yet. The next is v0.0.1; planned versions are the
-[milestones](https://github.com/lythka/hao-patcher/milestones).
-
-**Installing:** being validated; see [Install](#install).
-
-[Progress](docs/progress.md) has the detailed lists, what's new and every fix.
+**Releases:** [Releases](https://github.com/lythka/hao-patcher/releases) (each lists its known issues); planned versions are the
+[milestones](https://github.com/lythka/hao-patcher/milestones). [Progress](docs/progress.md) has the detailed lists and every fix.
 
 ## Risks
 
@@ -59,10 +56,7 @@ Intel Macs are untested. Tested with macOS 27.2.1 (26B131).
 Use hao-patcher only on a **dedicated test Mac** whose contents you can lose.
 
 - Installing an image overwrites the whole target disk.
-- The image weakens macOS security on purpose: AMFI is off, SIP is lowered and authenticated root is off
-  (`csr-active-config` 0x803), Secure Boot is disabled, System programs are re-signed ad hoc, and OpenCore loads
-  third-party kexts. [docs/security.md](docs/security.md) lists each change; report a vulnerability privately
-  ([SECURITY.md](SECURITY.md)).
+- [docs/security.md](docs/security.md) lists each security change; report a vulnerability privately ([SECURITY.md](SECURITY.md)).
 - hao-runtime changes System files in place and has no uninstaller; see its
   [Read first](https://github.com/lythka/hao-runtime#read-first). Its binary translation is experimental and can
   crash programs or damage their data.
@@ -71,13 +65,14 @@ Use hao-patcher only on a **dedicated test Mac** whose contents you can lose.
 
 ## Install
 
-Developer preview, and this path is still being validated. Installing erases the MacBook Pro's internal disk.
+Developer preview. Installing erases the MacBook Pro's internal disk.
 
 1. Get hao and the release's file list: `git clone --branch v0.0.1 https://github.com/lythka/hao-patcher`,
-   `cd hao-patcher/tools/hao`, then `curl -LO https://github.com/lythka/hao-assets/releases/download/27.2.1-26B131.0/release.json`.
-2. Run `sudo ./hao create-installer --link-on-target`, choose the USB drive and confirm (the drive is erased).
-   Keep the USB installer with you between making it and installing: anyone who can change it can change what it
-   installs. hao install checks it against its manifest first, which catches damage and casual edits.
+   `cd hao-patcher/tools/hao`, then download `release.json` and `SHA256SUMS` from
+   [hao-assets 27.2.1-26B131.0](https://github.com/lythka/hao-assets/releases/tag/27.2.1-26B131.0) and run
+   `./hao verify-release` ([Verify](docs/verify.md)). Any `FAIL`: stop.
+2. Run `sudo ./hao create-installer --link-on-target`, choose the USB drive and confirm (the drive is erased). Keep the
+   USB installer with you until you install: anyone who can change it can change what it installs.
 3. On the MacBook Pro, hold Option at startup, choose **EFI Boot** (a silent pause of several minutes follows)
    and run `/Volumes/HAO/install` from the Recovery's Terminal.
 4. After the first start-up, run `sudo /usr/libexec/hao --aot` once.

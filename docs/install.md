@@ -1,7 +1,10 @@
 # Install
 
+For anyone installing hao on a MacBook Pro (13-inch, Mid 2012): what you need, the four steps, and what to send if something
+breaks.
+
 > [!WARNING]
-> Developer preview, and this path is still being validated. Installing erases the MacBook Pro's internal disk.
+> Developer preview. Installing erases the MacBook Pro's internal disk.
 
 Making the USB installer yourself is in progress: parts made on another macOS version may differ in signature; the
 graphics parts need Xcode's Metal toolchain.
@@ -29,7 +32,12 @@ MacBook Pro.
    ```sh
    git clone --branch v0.0.1 https://github.com/lythka/hao-patcher && cd hao-patcher/tools/hao
    curl -LO https://github.com/lythka/hao-assets/releases/download/27.2.1-26B131.0/release.json
+   curl -LO https://github.com/lythka/hao-assets/releases/download/27.2.1-26B131.0/SHA256SUMS
+   ./hao verify-release
    ```
+
+   `verify-release` checks the file list against the release and the clone against its tag. Any `FAIL`: stop and don't
+   run `sudo`. v0.0.1 is unsigned, so it also prints `UNSIGNED` ([Verify this release](verify.md)).
 
 2. Plug in the USB drive and run:
 
