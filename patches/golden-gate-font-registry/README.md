@@ -37,6 +37,7 @@ the earlier Tahoe image project): that fontd adopts a seeded registry without a 
 r2 changes only whether the patch is planned (patch.json "optional"); apply.sh and inputs are r1's, so the result above stands.
 
 ## Revisions
+- r11 2026-11-19 The Setup account's fontregistry.user is declared `"content": "seed"`: fontd rewrites it at runtime, so `hao verify` checks its presence, type, owner and flags, not its bytes (the release image's verify stopped on it). The PerUserSeed copy stays a checked source. Declaration only; nothing installed changes.
 - r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.
 - r9 2026-11-17 Declares its scope (`requires`, docs/requires.md): registries harvested from 26B131. `proven_on` records the laptop boot of 2026-11-11. Nothing it installs changes.
 - r8 2026-11-16 Declares its pack (base): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

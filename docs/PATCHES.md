@@ -145,9 +145,9 @@ Revision r5, status product. [Recipe](../patches/golden-gate-dyld-internal/READM
 
 ## golden-gate-font-registry
 
-Revision r10, status product. [Recipe](../patches/golden-gate-font-registry/README.md)
+Revision r11, status product. [Recipe](../patches/golden-gate-font-registry/README.md)
 
-- `private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user`: whole file from hao (row font_registry_golden_gate). Setup account's fontd registry, from setup.tar (owner 248).
+- `private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user`: whole file from hao (row font_registry_golden_gate). Setup account's fontd registry, from setup.tar (owner 248). Seed (macOS changes it after install): Fontd rewrites this registry at runtime as fonts are activated and caches are checked, so its bytes after first boot are not the shipped ones.
 - `Library/Application Support/PerUserSeed/fonts/fontregistry.user`: whole file from hao (row font_registry_golden_gate). Account-neutral user registry from user/; golden-gate-user-seed's seed.zsh places it into each new account.
 
 ## golden-gate-hd4000-planes
@@ -175,9 +175,11 @@ Revision r12, status product. [Recipe](../patches/golden-gate-hello/README.md)
 
 ## golden-gate-icon-caches
 
-Revision r9, status product. [Recipe](../patches/golden-gate-icon-caches/README.md)
+Revision r10, status product. [Recipe](../patches/golden-gate-icon-caches/README.md)
 
-- 673 whole files from hao (row icon_caches_golden_gate), in several folders (for example `Library/Caches/com.apple.iconservices.store/007F36FE-7D6C-3B42-BF6A-5D1CC54204B0.isdata`). IconServices store or system-account index, from icon-caches.tar. Listed by `patches.py explain golden-gate-icon-caches`.
+- 671 whole files from hao (row icon_caches_golden_gate), in several folders (for example `Library/Caches/com.apple.iconservices.store/007F36FE-7D6C-3B42-BF6A-5D1CC54204B0.isdata`). IconServices store or system-account index, from icon-caches.tar. Listed by `patches.py explain golden-gate-icon-caches`.
+- `private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservices/store.index`: whole file from hao (row icon_caches_golden_gate). IconServices store or system-account index, from icon-caches.tar. Seed (macOS changes it after install): Iconservicesd rewrites this index at runtime as it adds icons to the store, so its bytes after first boot are not the shipped ones.
+- `private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservices/store.index`: whole file from hao (row icon_caches_golden_gate). IconServices store or system-account index, from icon-caches.tar. Seed (macOS changes it after install): Iconservicesd rewrites the Setup account's index at runtime as that account draws icons, so its bytes after Setup are not the shipped ones.
 - `Library/Application Support/PerUserSeed/is/__cache_info__`: whole file from hao (row icon_caches_golden_gate). User's index from user/; golden-gate-user-seed copies it into each new account.
 - `Library/Application Support/PerUserSeed/is/store.index`: whole file from hao (row icon_caches_golden_gate). User's index from user/; golden-gate-user-seed copies it into each new account.
 

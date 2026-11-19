@@ -1,5 +1,5 @@
 {
- "revision": 9,
+ "revision": 10,
  "pack": "base",
  "stage": "post",
  "inputs": [
@@ -6048,7 +6048,9 @@
     "row": "icon_caches_golden_gate",
     "note": "IconServices store or system-account index, from icon-caches.tar"
    },
-   "source": "icon-caches.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservices/store.index"
+   "source": "icon-caches.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/C/com.apple.iconservices/store.index",
+   "content": "seed",
+   "reason": "iconservicesd rewrites this index at runtime as it adds icons to the store, so its bytes after first boot are not the shipped ones"
   },
   {
    "path": "private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservices/__cache_info__",
@@ -6066,7 +6068,9 @@
     "row": "icon_caches_golden_gate",
     "note": "IconServices store or system-account index, from icon-caches.tar"
    },
-   "source": "icon-caches.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservices/store.index"
+   "source": "icon-caches.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.iconservices/store.index",
+   "content": "seed",
+   "reason": "iconservicesd rewrites the Setup account's index at runtime as that account draws icons, so its bytes after Setup are not the shipped ones"
   },
   {
    "path": "Library/Application Support/PerUserSeed/is/__cache_info__",

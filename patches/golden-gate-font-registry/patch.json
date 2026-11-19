@@ -1,5 +1,5 @@
 {
- "revision": 10,
+ "revision": 11,
  "pack": "base",
  "stage": "post",
  "inputs": [
@@ -18,7 +18,9 @@
     "row": "font_registry_golden_gate",
     "note": "Setup account's fontd registry, from setup.tar (owner 248)"
    },
-   "source": "setup.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user"
+   "source": "setup.tar!private/var/folders/zz/zyxvpxvq6csfxvn_n00000z000007r/C/com.apple.FontRegistry/fontregistry.user",
+   "content": "seed",
+   "reason": "fontd rewrites this registry at runtime as fonts are activated and caches are checked, so its bytes after first boot are not the shipped ones"
   },
   {
    "path": "Library/Application Support/PerUserSeed/fonts/fontregistry.user",
