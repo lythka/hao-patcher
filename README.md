@@ -65,9 +65,6 @@ Use hao-patcher only on a **dedicated test Mac** whose contents you can lose.
 
 ## Install
 
-> **v0.0.1 preview: release pending.** The `v0.0.1` tag and its release files are not published yet, so these steps don't
-> work until [v0.0.1](https://github.com/lythka/hao-patcher/releases) appears under Releases.
-
 Developer preview. Installing erases the MacBook Pro's internal disk.
 
 1. Get hao and the release's file list: `git clone --branch v0.0.1 https://github.com/lythka/hao-patcher`,

@@ -3,9 +3,6 @@
 For anyone who downloaded a hao release: check that your files are the ones the release published, unchanged, before you
 run anything with `sudo`.
 
-> **v0.0.1 preview: release pending.** The `v0.0.1` tag and its release files are not published yet, so the commands below don't
-> work until [v0.0.1](https://github.com/lythka/hao-patcher/releases) appears under Releases.
-
 **v0.0.1 is unsigned, this once** (owner's decision). Each release lists the sha256 of its files in `SHA256SUMS`.
 Checking it shows that your files match the release's list. It doesn't prove who made the list, because the list comes
 from the same GitHub page as the files. Signed releases come in a later release.

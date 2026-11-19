@@ -3,9 +3,6 @@
 For anyone installing hao on a MacBook Pro (13-inch, Mid 2012): what you need, the four steps, and what to send if something
 breaks.
 
-> **v0.0.1 preview: release pending.** The `v0.0.1` tag and its release files are not published yet, so the steps below don't
-> work until [v0.0.1](https://github.com/lythka/hao-patcher/releases) appears under Releases.
-
 > [!WARNING]
 > Developer preview. Installing erases the MacBook Pro's internal disk.
 
