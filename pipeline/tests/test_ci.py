@@ -75,6 +75,16 @@ class Planted(unittest.TestCase):
             self.assertIn(d, found)
         self.assertFalse([d for d in found if d.startswith('store')])
 
+    def test_every_tracked_test_file_is_in_a_suite(self):
+        # a test folder no pattern finds would never run while CI passes (tools/*/*/tests were missed)
+        found = CI['suites'](self.tree)
+        files = subprocess.run(['git', 'ls-files'], cwd=TOP, capture_output=True, text=True, check=True).stdout.split()
+        folders = {str(Path(f).parent) for f in files if Path(f).name.startswith('test') and f.endswith('.py')}
+        missed = sorted(d for d in folders if not any(d == s or d.startswith(s + '/') for s in found))
+        self.assertEqual(missed, [])
+        for d in ('tools/metal-wrapper/spec/tests', 'tools/tahoe-donors/cache-dylib/tests'):
+            self.assertIn(d, found)
+
     def test_network_is_closed_but_local_servers_are_not(self):
         e = CI['env']()
         self.assertEqual(e['https_proxy'], CI['CLOSED'])

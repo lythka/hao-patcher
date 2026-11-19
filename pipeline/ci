@@ -19,8 +19,8 @@ Checks (each prints one line, ok or FAIL, and the run exits 1 if any failed):
               and its assemblies' build pairs)
   hygiene     tools/hao-contract check (contract.json: home folders and private names in tracked files) and
               the commit message of COMMIT
-  suite:DIR   every unittest suite: pipeline/tests, tools/*/tests, patches/*/tests, patches/*/build/tests,
-              cache/*/tests, cache/metallib/lib
+  suite:DIR   every unittest suite: pipeline/tests, tools/*/tests, tools/*/*/tests, patches/*/tests,
+              patches/*/build/tests, cache/*/tests, cache/metallib/lib
 A later check registers itself by adding a function to CHECKS (requires, boundary, validated gating).
 --log FILE writes the run as JSON (commit, each check's result and output tail): what the push gate records.
 """
@@ -114,8 +114,8 @@ def check_hygiene(tree, ctx):
 
 
 def suites(tree):
-    pats = ['pipeline/tests', 'tools/*/tests', 'patches/*/tests', 'patches/*/build/tests', 'cache/*/tests',
-            'cache/metallib/lib']
+    pats = ['pipeline/tests', 'tools/*/tests', 'tools/*/*/tests', 'patches/*/tests', 'patches/*/build/tests',
+            'cache/*/tests', 'cache/metallib/lib']
     found = []
     for p in pats:
         found += sorted(d for d in tree.glob(p) if d.is_dir() and any(d.glob('test*.py')))
