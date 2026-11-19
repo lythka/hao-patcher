@@ -31,9 +31,11 @@ On the laptop: `sysctl kern.bootargs` has no `ic_csr_internal`; OCLP's Metal sti
 Terminal as its top hit.
 
 ## Validation
-NEEDS VALIDATION: host tests (script and spec agree on hao-runtime's dyld); not built into an image or booted.
+
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r4): the boot-args have no `ic_csr_internal`; OCLP's Metal loads (GPU text recognition and the argument-buffer probes pass); Spotlight lists Calculator, Safari and Notes as apps. mobileassetd's asset server was not looked at.
 
 ## Revisions
+- r5 2026-11-19 Validated r4 on hardware (Validation). Nothing it installs changes.
 - r4 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.
 - r3 2026-11-17 Declares its scope (`requires`, docs/requires.md): edits the 26B131 runtime's dyld. Nothing it installs changes.
 - r2 2026-11-16 Declares its pack (base): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

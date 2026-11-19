@@ -1,9 +1,11 @@
 {
- "revision": 6,
+ "revision": 7,
  "pack": "base",
  "stage": "oclp-hook",
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 6,
+ "validated_digest": "c2402f8848b7e3fe02c7cbcde83ee28e6bc73e85cae68129aba940b95bafc646",
  "files": [
   {
    "path": "System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist",

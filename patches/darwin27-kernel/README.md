@@ -45,14 +45,11 @@ the Mac, `uname -v` reports the build's Darwin 27 version and `kmutil showloaded
 display drivers.
 
 ## Validation
-NEEDS VALIDATION: r8's Intel-host path (Tahoe's builder) linked this image's BootKC on the MBP9,2 running a hao image (029c216f..., 67 MB; it differs from the VM's, so hao-opencore binds its repairs from it), but no image built that way has booted. The builder VM path is unchanged.
 
-Laptop 2026-11-11, image 4d1c48c (26B131): boots to Setup, the desktop and apps over three boots.
-Earlier: the collection recipe reproduces BootKC 6494d8e3 (26A428) and c8ae8b05 (26B131 bootstrap), and the
-26A428 kernel has booted Tahoe userspace on a MacBookPro9,2 and Golden Gate userspace to launchd in QEMU; r5
-(kernel file no longer copied by the hook) has not been built.
+Laptop 2026-11-19, image 8305fdd (26B131, built from fb6542df with r15): boots to the desktop with automatic login, no panic. The same day a hands-free install of the fb6542df release kit on a second laptop booted its kernel and brought the network up.
 
 ## Revisions
+- r16 2026-11-19 Validated r15 on hardware (Validation). Nothing it installs changes.
 - r15 2026-11-18 README names no model or GPU (S15). Nothing it installs changes.
 - r14 2026-11-17 boot-kc.json's reason names no GPU (GEN1, S15). Declaration only.
 - r13 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.

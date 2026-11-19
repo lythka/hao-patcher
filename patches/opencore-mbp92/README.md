@@ -34,11 +34,11 @@ interface 0) give both to the kernel's `IOUSBHostHIDDevice`, which the Boot coll
   EHC1 powered off and on through its `UsbForcePower` property, and a sleep and wake, both complete.
 
 ## Validation
-NEEDS VALIDATION (r4): HIDProxyKernelMatch.kext. Proof is one boot (no inactive 05ac:820a/820b devices, EHC1 not busy) and sleep/wake runs without the panic.
 
-NEEDS VALIDATION: the split itself is not built yet. The same step was in hao-opencore until r66.
+The fb6542df image builds print `Tahoe driver already supplied by collection or EFI:` for the framebuffer, HD 4000 and Ethernet drivers. Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r5): boots to the desktop; a hands-free install of the fb6542df release kit on a second MacBookPro9,2 boots with the network up. The sleep/wake panic (#79) stays open.
 
 ## Revisions
+- r6 2026-11-19 Validated r5 on hardware (Validation). Nothing it installs changes.
 - r5 2026-11-17 HIDProxyKernelMatch.kext removed (r4): on hardware the Bluetooth HID-proxy devices stay stuck terminating under the kernel HID driver too, so the kext changed nothing. Five sleep/wake cycles woke without a panic with or without it (#79 stays open: the panic needs EHC1 to go to Off).
 - r4 2026-11-17 Adds HIDProxyKernelMatch.kext (codeless) to Kernel.Add: the Bluetooth HID-proxy devices go to the kernel HID driver, so EHCI can power off on wake (fixes #79).
 - r3 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.

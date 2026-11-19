@@ -8,7 +8,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 
 | Patch | Rev | Stage | Status | Optional | golden-gate-26B131 | golden-gate | recovery | stock | Validation | Newest revision |
 |---|---|---|---|---|---|---|---|---|---|---|
-| darwin27-kernel | r15 | oclp-hook | product |  | x | x |  |  | **needs** | r15 2026-11-18 README names no model or GPU (S15). Nothing it installs changes. |
+| darwin27-kernel | r16 | oclp-hook | product |  | x | x |  |  | ok (r15) | r16 2026-11-19 Validated r15 on hardware (Validation). Nothing it installs changes. |
 | darwin27-sandbox-disk-space | r5 | oclp-hook | experiment |  |  | x |  |  | **needs** | r5 2026-11-17 Declares its scope (`requires`, docs/requires.md): only 26A428 lacks the rule; 27.2 ships it. No |
 | dev-access | r8 | post | dev |  |  |  |  |  | **needs** | r8 2026-11-17 Every path in apply.sh is quoted: the user's install runs posts from the installer volume ("/Vol |
 | dev-capture | r4 | post | dev |  |  |  |  |  | **needs** | r4 2026-11-18 hao_crash=1 and SIP 0x4 in every dev image: dev-lite has no dev-diagnostics, so its images had n |
@@ -19,13 +19,13 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-av1-encoder-x86 | r4 | oclp-hook | product |  | x |  |  |  | **needs** | r4 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-corespotlight-compat | r9 | oclp-hook | product |  | x | x |  |  | ok (r4) | r9 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-deep-sleep-off | r2 | post | product |  | x |  |  |  | ok (r1) | r2 2026-11-18 Validated r1 on hardware (Validation); nothing it installs changes. |
-| golden-gate-dyld-internal | r4 | oclp-hook | product |  | x |  |  |  | **needs** | r4 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
+| golden-gate-dyld-internal | r5 | oclp-hook | product |  | x |  |  |  | ok (r4) | r5 2026-11-19 Validated r4 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-font-registry | r10 | post | product | caches | x |  |  |  | ok (r3) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
 | golden-gate-hd4000-planes | r7 | oclp-hook | product |  | x |  |  |  | **needs** | r7 2026-11-17 The mode argument in src/kc-hook.sh is quoted, like its paths, so no expansion in an install-tim |
 | golden-gate-hello | r11 | oclp-hook | product |  | x | x |  |  | **needs** | r11 2026-11-17 `requires`: os 26A428/26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmwar |
 | golden-gate-icon-caches | r9 | post | product | caches | x |  |  |  | ok (r3) | r9 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-ids | r3 | oclp-hook | product |  |  |  |  |  | **needs** | r3 2026-11-17 Declares its scope (`requires`, docs/requires.md): its row is for 26B131. Nothing it installs ch |
-| golden-gate-launchd-warm | r6 | oclp-hook | product |  | x |  |  |  | **needs** | r6 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
+| golden-gate-launchd-warm | r7 | oclp-hook | product |  | x |  |  |  | ok (r6) | r7 2026-11-19 Validated r6 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-live-text-service | r7 | post | product |  | x |  |  |  | **needs** | r7 2026-11-17 `requires`: os 26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; r |
 | golden-gate-live-text-shared | r13 | oclp-hook | product |  | x |  |  |  | **needs** | r13 2026-11-17 Row `live_text_framework` (26B131) is the ec5fe76b build: before the first TextRecognition comp |
 | golden-gate-metal-argbuf | r10 | oclp-hook | product |  | x |  |  |  | **needs** | r10 2026-11-17 Row `metal_argbuf` is a full make at the stack commit (tools/metal-argbuf as d977ced2). libargb |
@@ -34,30 +34,30 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-metal27 | r6 | oclp-hook | dev |  |  |  |  |  | **needs** | r6 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces |
 | golden-gate-mobile-assets | r3 | post | product | caches |  |  |  |  | **needs** | r3 2026-11-19 Pack os-extras: dev profiles name it, release profiles leave it out (Apple-derived; returns when |
 | golden-gate-model-gates-mbp92 | r1 | oclp-hook | product |  | x |  |  |  | **needs** | r1 2026-11-17 New (GEN1): golden-gate-userspace's model-gates edit, declared for pack mbp92; the 9,2 and its n |
-| golden-gate-native-identities | r13 | oclp-hook | product |  | x | x |  |  | **needs** | r13 2026-11-19 A programs.txt line whose inserted libraries are not installed (its recipe is not in the set, e |
+| golden-gate-native-identities | r14 | oclp-hook | product |  | x | x |  |  | ok (r13) | r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-root-launchservices | r5 | post | experiment | boot-seeds |  |  |  |  | **needs** | r5 2026-11-17 A comment names the test laptop by role, not by model (GEN1, S15). Nothing it installs changes. |
 | golden-gate-shader-caches | r17 | post | product | caches | x |  |  |  | **needs** | r17 2026-11-17 The system accounts' Metal cache files (46, under private/var/folders) are declared `"content": |
 | golden-gate-shared-cache | r10 | oclp-hook | product |  |  |  |  |  | **needs** | r10 2026-11-18 Row `rebuilt_cache`: rebuilt-cache-fold-in-26B131-20261118-5aacad92 (cache UUID 31C0215A), from |
 | golden-gate-shared-cache-catalog | r5 | oclp-hook | experiment |  |  |  |  |  | **needs** | r5 2026-11-18 Row `rebuilt_cache_catalog`: rebuilt-cache-fold-in-catalog-26B131-20261118-5aacad92 (cache UUID |
 | golden-gate-store | r7 | oclp-hook | product |  |  |  |  |  | **needs** | r7 2026-11-18 The policy library is installed as usr/lib/hao/hao-appstore-policy.dylib, and the three specs lo |
-| golden-gate-unsupported-daemons | r3 | post | product |  | x |  |  |  | **needs** | r3 2026-11-18 com.apple.prngseedd disabled: it needs a Secure Enclave and respawned every ~10 s (CB1). |
+| golden-gate-unsupported-daemons | r4 | post | product |  | x |  |  |  | ok (r3) | r4 2026-11-19 Validated r3 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-update-policy | r3 | post | product |  | x |  |  |  | ok (r2) | r3 2026-11-18 Validated r2 on hardware (Validation); nothing it installs changes. |
 | golden-gate-user-seed | r15 | post | product | caches | x |  |  |  | **needs** | r15 2026-11-18 seed.zsh takes the LaunchServices store's name from the payload instead of Tahoe's hard-coded ` |
 | golden-gate-user-template | r11 | post | product | caches | x |  |  |  | **needs** | r11 2026-11-17 Leaves out Mail's containers (8 of 336), fixes #47: a schema-0 Mail container was migrated unde |
-| golden-gate-userspace | r92 | oclp-hook | product |  | x | x |  |  | **needs** | r92 2026-11-18 The 26 cryptex embed specs carry the stub and result hashes of hao-runtime 256dd30 (row hao_run |
+| golden-gate-userspace | r93 | oclp-hook | product |  | x | x |  |  | ok (r92) | r93 2026-11-19 Validated r92 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-wallpaper-export | r2 | post | product | caches |  |  |  |  | **needs** | r2 2026-11-19 Pack os-extras: dev profiles name it, release profiles leave it out (Apple-derived; returns when |
 | golden-gate-wifi-compat | r3 | oclp-hook | product |  | x | x |  |  | **needs** | r3 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-windowserver-filter | r10 | oclp-hook | product |  | x | x |  |  | ok (r5) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
-| hao-command | r12 | post | product |  | x |  |  |  | **needs** | r12 2026-11-18 Makes hao's log folder /private/var/log/hao root:wheel 755 on Data. launchd created it 744 for  |
+| hao-command | r13 | post | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
 | hao-opencore | r85 | post | product |  | x | x |  |  | **needs** | r85 2026-11-18 Names no model (S15): the reasons and provenance of the mbp92 target's OCLP-generated kexts (US |
-| hao-runtime | r90 | oclp-hook | product |  | x | x |  |  | **needs** | r90 2026-11-17 Row hao_runtime (26B131, A family) is hao-runtime af5aa59, release/v0.0.1's security batch: AOT |
+| hao-runtime | r91 | oclp-hook | product |  | x | x |  |  | ok (r90) | r91 2026-11-19 Validated r90 on hardware (Validation). Nothing it installs changes. |
 | hao-runtime-fold | r10 | oclp-hook | product |  |  |  |  |  | **needs** | r10 2026-11-18 Row `hao_runtime_fold` -> hao-runtime cabc1d5 payload for fold family B 31C0215A (manifest 8e45 |
 | hao-runtime-fold-catalog | r1 | oclp-hook | experiment |  |  |  |  |  | **needs** | r1 2026-11-18 New: the B+catalog set's runtime payload (row `hao_runtime_fold_catalog`, hao-runtime 3a6a5d9 fo |
 | metal-compiler-compat | r12 | oclp-hook | product |  | x |  |  |  | **needs** | r12 2026-11-18 Row metal_compiler_compat is the same tools/live-text build at 46289f6d: build.json records com |
 | metal-metalold | r4 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r4 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces |
 | metalold-selectors | r10 | oclp-hook | product |  | x | x |  |  | ok | r10 2026-11-18 Row metalold_selectors hashes and publishes only libmetalold-selectors.dylib (`# hash: release- |
 | opencore-generic | r6 | post | experiment |  |  |  |  |  | **needs** | r6 2026-11-18 Test only: hao-opencore knows the generic config from the generic target's `platform_data` (`ope |
-| opencore-mbp92 | r5 | post | product |  | x | x |  |  | **needs** | r5 2026-11-17 HIDProxyKernelMatch.kext removed (r4): on hardware the Bluetooth HID-proxy devices stay stuck te |
+| opencore-mbp92 | r6 | post | product |  | x | x |  |  | ok (r5) | r6 2026-11-19 Validated r5 on hardware (Validation). Nothing it installs changes. |
 | rec-audio | r5 | recovery | product |  |  |  | x |  | **needs** | r5 2026-11-17 Every path in apply.sh is quoted: an install runs recipe scripts from the installer volume, whos |
 | rec-bluetooth-input | r5 | recovery | product |  |  |  | x |  | **needs** | r5 2026-11-17 Every path in apply.sh is quoted: an install runs recipe scripts from the installer volume, whos |
 | rec-brightness-keys | r5 | recovery | product |  |  |  | x |  | **needs** | r5 2026-11-17 Every path in apply.sh is quoted: an install runs recipe scripts from the installer volume, whos |

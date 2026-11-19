@@ -33,14 +33,10 @@ A label is added here only with evidence that the service is inert or failing on
 
 ## Validation
 
-NEEDS VALIDATION (r3: prngseedd). r1's labels:
-
-Laptop 2026-11-18, a MacBookPro9,2 with a fresh install of the v0.0.1 candidate C4 (26B131): both labels disabled; no
-modelmanagerd or modelcatalogd instance and 0 spawns in 10 minutes; their callers (runningboardd, gamepolicyd) quiet,
-only generativeexperiencesd logged 14 failed lookups; first login settled (load under 4) in 885 s, against 928 s on
-stock and 992 s on the interim image with the daemons running (389 modelmanagerd spawns).
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r3): `launchctl print-disabled system` lists modelmanagerd, modelcatalogd and prngseedd as disabled, and launchd started none of them after boot. r1, 2026-11-18, on a fresh install of a v0.0.1 candidate: first login settled in 885 s, against 928 s on stock.
 
 ## Revisions
+- r4 2026-11-19 Validated r3 on hardware (Validation). Nothing it installs changes.
 - r3 2026-11-18 com.apple.prngseedd disabled: it needs a Secure Enclave and respawned every ~10 s (CB1).
 - r2 2026-11-18 Validated r1 on hardware (Validation); nothing it installs changes.
 - r1 2026-11-18 New: modelmanagerd and modelcatalogd disabled (diag#19; owner: disable what this hardware cannot run).

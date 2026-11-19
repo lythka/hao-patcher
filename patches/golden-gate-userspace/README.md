@@ -362,38 +362,11 @@ creation logs in automatically (authd accepts loginwindow's `FUSAutologinDataKey
 unlisted ad hoc one.
 
 ## Validation
-NEEDS VALIDATION: r77 (model gates) has only host tests: on the pristine 26B131 x86_64 cache the declared sites equal the planner's and the engine applies them; no image has been built with it, and whether Sidecar, AirPlay Receiver and Continuity Camera then appear is not shown. r75 (Swift prespecialization edits and gate) has only host tests: on the pristine 26B131 caches the declared sites equal the planner and the engine applies them; no image has been built with it. Before that, r64 moves the image code into `src/cryptex.py` and adds the cryptex cache; the images it builds are
-made by the same code as r63, and a reused one equals the stored one (host tests, including a 26 GB image from a
-built 26B131 image). VM build 2026-11-13 (dev-26B131, from-overlays, empty cache): a miss, built and stored in 18 s
-(guest copy) plus 9 s (host sha256 check); the hook took 318 s (340 s before). The hit path has run only in host
-tests; a second VM build (warm cache) and a boot of an image with reused cryptexes are the open checks. Before that,
-the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r58 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
 
-Laptop 2026-11-12, image d131d5b (26B131): r58 boots to a logged-in desktop (automatic login); Stocks, News, Photos and Podcasts run. Image 7d0b612 (r57) booted the same way on 2026-11-11.
-Laptop 2026-11-11, image 4d1c48c (26B131): r46 Setup's own Wi-Fi join, r47 Spotlight without the Swift SIGBUS, r48 automatic login, r49 Safari; r51's Tahoe CoreWiFi auto-joins live and at boot; r52's hao 790720d fixes rapportd and Control Center live. Not yet exercised: the u3 units' Weather/Photos cases, SearchHelper's own identity.
-Earlier: host tests cover the current recipe (r48's carrier runs against this Mac's x86_64 cache; no image
-with it has been built or booted), and a Golden Gate-first image assembled with it booted with its network services up;
-loading of HID and serial DriverKit extensions with the added DriverKit cache, and a full application pass, are open.
-The WiFiPeerToPeer library (r43) was tested on the laptop on a 26B131 image: AirPlayXPCHelper then
-started without the libobjc abort. An image built with r43, and coreaudiod starting on it, are not yet tested.
-Laptop, image 4d1c48c (26B131, built from adfd15a0 = r49), 2026-11-11:
-- r46: Setup's own Wi-Fi join shows WiFiAgent's password sheet; airportd receives `BEGIN REQ [ASSOC]` from WiFiAgent
-  and joins (bf10de4 hung at "Connecting..."). Confirmed.
-- r47: Cmd-Space opens the Spotlight panel in Siri AI.app without the SIGBUS (bf10de4 crashed every launch).
-  Confirmed. (Its local app results are missing for an unrelated reason: Spotlight's ranking assets never download
-  because ic_csr_internal makes the build look internal.)
-- r48: after Setup creates the account, authd authorizes `system.login.console` with the auto-login mechanism in 16 s
-  and Setup continues in the user session (bf10de4 hung: "client is not allowed to supply FUSAutologinDataKey").
-  Confirmed.
-- r49: Safari opens and loads pages; SearchHelper and the WebKit services' own identity not separately checked.
-r50 on the laptop crashed airportd at start-up (Tahoe CoreWiFi's categories not attached; fixed in r51).
-r51 (Tahoe CoreWiFi + compat) on the laptop (image 4d1c48c with r51's files installed):
-airportd starts and maps CoreWiFi + CoreWiFiTahoe.dylib; Wi-Fi off/on auto-joins the remembered network in 14-27 s
-with no airportd `.ips`; control on the same laptop with the cached 27.x CoreWiFi never auto-joins ("All scan results
-are filtered out ... Known network is found nearby but not joined"); after a reboot Wi-Fi
-auto-joined at boot (airportd runs = 1). Not yet: an image built with r51.
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r92): automatic login to the desktop; Spotlight finds apps, Safari reaches the network, Bluetooth, sound and the camera are up, and 40 of 48 apps open and run 20 s. Open on that image and tracked on their own: Weather and News crash (#9, #62), Books (#15), gamed (#18).
 
 ## Revisions
+- r93 2026-11-19 Validated r92 on hardware (Validation). Nothing it installs changes.
 - r92 2026-11-18 The 26 cryptex embed specs carry the stub and result hashes of hao-runtime 256dd30 (row hao_runtime: C5 plus the MenuBarAgent, sandboxd and Control Center fixes).
 - r91 2026-11-18 The cryptex cache key takes the target's model and its `model_gates`, not its whole `platform_data`: the model's OpenCore reasons there do not change the images, so they no longer rebuild them. Nothing it installs changes.
 - r90 2026-11-17 The prespecialization gate refuses only a Swift-bearing image the overridden set gains. One it loses (a generic image has no Wi-Fi pack, so WiFiPeerToPeer is not overridden) keeps its descriptor slots nulled while the cache copy loads: the ordinary path, correct and slower. It is recorded (`gone_null_slots`). The cache edits are unchanged, so the 9,2 image is byte-identical.

@@ -1,5 +1,5 @@
 {
-  "revision": 15,
+  "revision": 16,
   "pack": "base",
   "stage": "oclp-hook",
   "inputs": [
@@ -8,7 +8,9 @@
     "tahoe_kc_builder"
   ],
   "status": "product",
-  "validated": false,
+  "validated": true,
+  "validated_revision": 15,
+  "validated_digest": "ecc500fd36069963ba46901c204ae1b46f242086b0c8cb5a47ff0a639d51440e",
   "files": [
     {
       "path": "System/Library/Kernels/kernel",

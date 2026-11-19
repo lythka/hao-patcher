@@ -1,9 +1,11 @@
 {
- "revision": 92,
+ "revision": 93,
  "pack": "base",
  "stage": "oclp-hook",
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 92,
+ "validated_digest": "582a048cf1eb0f89618ca079d6943c3ce77be03191212ce58dfbce557e43ce7c",
  "inputs": [
   "golden_gate_userspace",
   "display_state_shim",

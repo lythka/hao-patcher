@@ -94,23 +94,11 @@ mounted read-only and its record's two sources), on a real System:
 `python3.14 -I -B -m unittest discover -s patches/golden-gate-native-identities/tests -k test_real_system`.
 
 ## Validation
-NEEDS VALIDATION (r13): the next image build's log shows one row for each program in `src/programs.txt` that its set
-re-signs (WindowServer, `corespotlightd`, `managedcorespotlightd`, and `appstoreagent` and `appstored` with
-golden-gate-store), with no refusal. Its `/usr/lib/hao/native-identities` equals r7's for the same inputs. A refusal
-names the digest the build saw. The content and entitlements pins came from edit-engine on the pinned 26B131 inputs,
-not from a built image. Host: the refusal tests and `tests/test_programs.py`.
-NEEDS VALIDATION: r4 reads headers and signatures instead of whole files. On the exported 26B131 image (System
-read-only, the record's two sources) its scan equals r3's byte for byte (rows and skips), the list it gives equals the
-image's `/usr/lib/hao/native-identities`, and all 11,517 Mach-O files of that System and the pristine 27.2.1 System
-give the same signature and slice bytes; the hook is otherwise unchanged. VM build 2026-11-13 (dev-26B131): same 3
-rows and 936 skips; the step took 220 s (232 s before), so in the builder reading the files was not the main cost
-(the walk of the System's ~340k entries is the likely one). The hook's log now gives the walk's seconds, entries and
-executables read, to confirm that on the next build.
-r1: laptop 2026-11-11, image 4d1c48c (26B131): Setup's automatic login after account creation is authorized in 16 s (system.login.console with the auto-login mechanism).
-Earlier: Host tests pass and a host simulation of the 26B131 WindowServer and `corespotlightd` edits gives
-their rows. No image has been built with this recipe.
+
+The fb6542df image builds (golden-gate-store not in the set) give 3 rows and no refusal. Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r13): automatic login to the desktop, and Spotlight searches with no mds report.
 
 ## Revisions
+- r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes.
 - r13 2026-11-19 A programs.txt line whose inserted libraries are not installed (its recipe is not in the set, e.g. golden-gate-store in release profiles) is skipped, not refused.
 - r12 2026-11-18 appstored and appstoreagent insert the store policy library under its new path (golden-gate-store). The pinned originals are unchanged.
 - r11 2026-11-17 Declares its scope (`requires`, docs/requires.md): programs.txt pins tuples measured on 26B131's originals and the 25G342 donors (a 26A428 build had no line and refused). Nothing it installs changes.

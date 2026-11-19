@@ -1,10 +1,12 @@
 {
- "revision": 3,
+ "revision": 4,
  "pack": "base",
  "stage": "post",
  "inputs": [],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 3,
+ "validated_digest": "860136c190e72e11c65e16a03fd26b53fd2582063724f0661071ca8cbce55724",
  "files": [
   {
    "path": "private/var/db/com.apple.xpc.launchd/disabled.plist",

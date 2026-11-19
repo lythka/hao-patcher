@@ -41,14 +41,11 @@ boot the image in [QEMU](../../tools/qemu-vm/README.md) before installing it on 
 hao-runtime and do not replace image boot and application checks.
 
 ## Validation
-NEEDS VALIDATION: the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r65 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
 
-Laptop 2026-11-12, image d131d5b (26B131): hao d9ea9bd runs the image's ARM programs to a logged-in desktop; the 1-byte Swift enum that aborted Weather.app on 7d0b612 (hao 4e68804) now passes.
-Laptop 2026-11-11, image 4d1c48c (26B131): the 7415a0b payload (r59) runs the image's ARM programs; hao 790720d (this revision's payload) fixes rapportd's and Control Center's crash loops, and its AOT caches load. Not yet exercised: the u3 units' Weather/Photos cases.
-Earlier: earlier payloads booted Golden Gate through translated launchd to the desktop, and a Golden
-Gate-first image booted with its network services up; the current profile needs a fresh image and application pass.
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r90): hao runs the image's ARM programs to a logged-in desktop; 965 AOT files are in place; fma64 equals native arm64; Control Center, Notification Center, Font Book, Stocks and Tips run with no refusal. Open and tracked on their own: Weather (#9, #62), gamed (#18), the AOT job's done marker (#78).
 
 ## Revisions
+- r91 2026-11-19 Validated r90 on hardware (Validation). Nothing it installs changes.
 - r90 2026-11-17 Row hao_runtime (26B131, A family) is hao-runtime af5aa59, release/v0.0.1's security batch: AOT format 8 (older caches refused, baseline CPU), hardened stubs for library-validated programs, libhao by absolute path, launch constraints carried; hao-install installs exactly the manifest and stages about 3.5 GB in TMPDIR first.
 - r89 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.
 - r88 2026-11-17 Declares its scope (`requires`, docs/requires.md): hao refuses a CPU below x86-64-v2 (hao-runtime's release notes). Nothing it installs changes.

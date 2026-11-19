@@ -1,8 +1,10 @@
 {
- "revision": 5,
+ "revision": 6,
  "pack": "mbp92",
  "stage": "post",
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 5,
+ "validated_digest": "80388fd6acebd8b4b94b26997165ff4d1941198e5b67edcf875e806e1ee5444e",
  "requires": {"os": ["26A428", "26B131"], "donor": ["25G332", "25G342"], "cpu": "any", "gpu": ["intel-ivb"], "firmware": ["none"]}
 }

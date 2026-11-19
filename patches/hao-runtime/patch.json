@@ -1,12 +1,14 @@
 {
- "revision": 90,
+ "revision": 91,
  "pack": "base",
  "stage": "oclp-hook",
  "inputs": [
   "hao_runtime"
  ],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 90,
+ "validated_digest": "05a9199c20054dda935a28603f11635638cc48dfd48f2cc4869951f9eb367670",
  "files": [
   {
    "path": "usr/libexec/hao",

@@ -20,9 +20,10 @@ On the installed Mac: `hao`, `hao status`, `hao --help`.
 
 ## Validation
 
-NEEDS VALIDATION: not yet run in an image build, a QEMU install or on a laptop.
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r12): `/usr/local/bin/hao verify` runs and reports against 38 pack manifests, and /private/var/log/hao is root:wheel 755.
 
 ## Revisions
+- r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes.
 - r12 2026-11-18 Makes hao's log folder /private/var/log/hao root:wheel 755 on Data. launchd created it 744 for the AOT job's log, so per-user hao logs were lost.
 - r11 2026-11-18 SHA256SUMS staged with release.json (an unsigned release, v0.0.1, is checked against it)
 - r10 2026-11-17 a candidate build's tools/hao/data/candidate-keys.pub is staged with hao (never tracked; release-cut --candidate writes it)
