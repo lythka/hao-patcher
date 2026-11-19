@@ -1,9 +1,11 @@
 {
- "revision": 7,
+ "revision": 8,
  "pack": "metal-3802",
  "stage": "post",
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 7,
+ "validated_digest": "db61c75c4d17cf959eb375d1cd524b22e36e8e7471af1f7fe2a3234f6c80b65c",
  "files": [
  {"path": "EFI/OC/config.plist", "edits": "edits/config.json"}
  ],

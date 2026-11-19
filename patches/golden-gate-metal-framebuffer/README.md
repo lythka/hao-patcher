@@ -48,12 +48,10 @@ Declared edit: `python3.14 -I -B -m unittest discover -s patches/golden-gate-met
 
 ## Validation
 
-NEEDS VALIDATION. The adapter passes the HD 4000 probe matrix and renders the real
-Wi-Fi symbol correctly, and Setup renders with it installed. The full desktop
-(Control Center, login window) and shader-pack records for the transformed requests
-remain open. Nothing has been checked on 26B131.
+Laptop 2026-11-19, a MacBookPro9,2: image 8305fdd (26B131, built from fb6542df with r13) reached the desktop with WindowServer, Dock and Control Center up, and none of them nor iconservicesagent wrote a crash report over a 48-app sweep. The release-EFI image 8acc07f (same recipes) drew Setup Assistant, the menu-bar and Control Center symbols and the desktop with 0 crash reports. On the release-EFI image 8acc07f: WindowServer and iconservicesagent map `libmetal-framebuffer.dylib` (4 regions each).
 
 ## Revisions
+- r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes.
 - r13 2026-11-17 Row `metal_framebuffer`: lowering always uses the stack's own libLLVM (no environment override). Same command at fe579412, same bytes.
 - r12 2026-11-17 `requires`: os 26A428/26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces `applies`. status product: it ships in the release profiles (what it installs is unchanged; `validated` stays false until the re-cut's laptop boots prove it).
 - r11 2026-11-16 Declares its pack (intel-hd4000): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

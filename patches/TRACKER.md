@@ -21,15 +21,15 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-deep-sleep-off | r2 | post | product |  | x |  |  |  | ok (r1) | r2 2026-11-18 Validated r1 on hardware (Validation); nothing it installs changes. |
 | golden-gate-dyld-internal | r4 | oclp-hook | product |  | x |  |  |  | **needs** | r4 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-font-registry | r10 | post | product | caches | x |  |  |  | ok (r3) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
-| golden-gate-hd4000-planes | r7 | oclp-hook | product |  | x |  |  |  | **needs** | r7 2026-11-17 The mode argument in src/kc-hook.sh is quoted, like its paths, so no expansion in an install-tim |
-| golden-gate-hello | r11 | oclp-hook | product |  | x | x |  |  | **needs** | r11 2026-11-17 `requires`: os 26A428/26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmwar |
+| golden-gate-hd4000-planes | r8 | oclp-hook | product |  | x |  |  |  | ok (r7) | r8 2026-11-19 Validated r7 on hardware (Validation). Nothing it installs changes. |
+| golden-gate-hello | r12 | oclp-hook | product |  | x | x |  |  | ok (r11) | r12 2026-11-19 Validated r11 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-icon-caches | r9 | post | product | caches | x |  |  |  | ok (r3) | r9 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-ids | r3 | oclp-hook | product |  |  |  |  |  | **needs** | r3 2026-11-17 Declares its scope (`requires`, docs/requires.md): its row is for 26B131. Nothing it installs ch |
 | golden-gate-launchd-warm | r6 | oclp-hook | product |  | x |  |  |  | **needs** | r6 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
-| golden-gate-live-text-service | r7 | post | product |  | x |  |  |  | **needs** | r7 2026-11-17 `requires`: os 26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; r |
+| golden-gate-live-text-service | r8 | post | product |  | x |  |  |  | ok (r7) | r8 2026-11-19 Validated r7 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-live-text-shared | r13 | oclp-hook | product |  | x |  |  |  | **needs** | r13 2026-11-17 Row `live_text_framework` (26B131) is the ec5fe76b build: before the first TextRecognition comp |
-| golden-gate-metal-argbuf | r10 | oclp-hook | product |  | x |  |  |  | **needs** | r10 2026-11-17 Row `metal_argbuf` is a full make at the stack commit (tools/metal-argbuf as d977ced2). libargb |
-| golden-gate-metal-framebuffer | r13 | oclp-hook | product |  | x | x |  |  | **needs** | r13 2026-11-17 Row `metal_framebuffer`: lowering always uses the stack's own libLLVM (no environment override) |
+| golden-gate-metal-argbuf | r11 | oclp-hook | product |  | x |  |  |  | ok (r10) | r11 2026-11-19 Validated r10 on hardware (Validation). Nothing it installs changes. |
+| golden-gate-metal-framebuffer | r14 | oclp-hook | product |  | x | x |  |  | ok (r13) | r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-metal-libraries | r23 | oclp-hook | product |  | x | x |  |  | **needs** | r23 2026-11-17 `requires`: os 26A428/26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmwar |
 | golden-gate-metal27 | r6 | oclp-hook | dev |  |  |  |  |  | **needs** | r6 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces |
 | golden-gate-mobile-assets | r3 | post | product | caches |  |  |  |  | **needs** | r3 2026-11-19 Pack os-extras: dev profiles name it, release profiles leave it out (Apple-derived; returns when |
@@ -53,7 +53,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | hao-runtime | r91 | oclp-hook | product |  | x | x |  |  | ok (r90) | r91 2026-11-19 Validated r90 on hardware (Validation). Nothing it installs changes. |
 | hao-runtime-fold | r10 | oclp-hook | product |  |  |  |  |  | **needs** | r10 2026-11-18 Row `hao_runtime_fold` -> hao-runtime cabc1d5 payload for fold family B 31C0215A (manifest 8e45 |
 | hao-runtime-fold-catalog | r1 | oclp-hook | experiment |  |  |  |  |  | **needs** | r1 2026-11-18 New: the B+catalog set's runtime payload (row `hao_runtime_fold_catalog`, hao-runtime 3a6a5d9 fo |
-| metal-compiler-compat | r12 | oclp-hook | product |  | x |  |  |  | **needs** | r12 2026-11-18 Row metal_compiler_compat is the same tools/live-text build at 46289f6d: build.json records com |
+| metal-compiler-compat | r13 | oclp-hook | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
 | metal-metalold | r4 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r4 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces |
 | metalold-selectors | r10 | oclp-hook | product |  | x | x |  |  | ok | r10 2026-11-18 Row metalold_selectors hashes and publishes only libmetalold-selectors.dylib (`# hash: release- |
 | opencore-generic | r6 | post | experiment |  |  |  |  |  | **needs** | r6 2026-11-18 Test only: hao-opencore knows the generic config from the generic target's `platform_data` (`ope |

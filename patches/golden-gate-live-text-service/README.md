@@ -60,10 +60,10 @@ after the first boot of the image: `nvram 4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102:r
 
 ## Validation
 
-NEEDS VALIDATION. Config tests pass on authored configs and on OCLP 3.0.0's MacBookPro9,2 values. Not yet built into
-an image or booted; background analysis load on the HD 4000 is unmeasured.
+Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r7): `nvram 4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102:revblock` prints `none`, and mediaanalysisd runs with no crash report. On the release-EFI image 8acc07f the boot log has no `Operation not permitted` for mediaanalysisd. Background analysis load on the HD 4000 is unmeasured.
 
 ## Revisions
+- r8 2026-11-19 Validated r7 on hardware (Validation). Nothing it installs changes.
 - r7 2026-11-17 `requires`: os 26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces `applies`. status product: it ships in the release profiles (what it installs is unchanged; `validated` stays false until the re-cut's laptop boots prove it).
 - r6 2026-11-16 Declares its pack (metal-3802): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.
 

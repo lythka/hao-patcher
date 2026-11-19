@@ -1,10 +1,12 @@
 {
- "revision": 11,
+ "revision": 12,
  "pack": "metal-3802",
  "stage": "oclp-hook",
  "inputs": ["hello_metallib_golden_gate", "libhelloblur"],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 11,
+ "validated_digest": "7da0265314429279b34378f315a0a190e37daf71c8c1f4304ad46f15a02c5dbd",
  "files": [
   {"path": "System/Library/Frameworks/Metal.framework/Versions/A/Metal", "edits": "edits/metal.json",
    "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}},

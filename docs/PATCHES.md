@@ -152,7 +152,7 @@ Revision r10, status product. [Recipe](../patches/golden-gate-font-registry/READ
 
 ## golden-gate-hd4000-planes
 
-Revision r7, status product. [Recipe](../patches/golden-gate-hd4000-planes/README.md)
+Revision r8, status product. [Recipe](../patches/golden-gate-hd4000-planes/README.md)
 
 - `usr/lib/libhd4000-planes.dylib`: whole file from hao (row hd4000_planes). X86_64 dylib built by build/make from build/hd4000_planes.m, ad hoc signed: plane textures of planar IOSurfaces with their own row pitch. Installed mode 0755, owner root:wheel, flags restricted.
 - `System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver`: from OCLP · AppleIntelHD4000GraphicsMTLDriver; 1 edit, applied by the installer, then signed: ad hoc, once, identifier AppleIntelHD4000GraphicsMTLDriver. Installed mode 0755, owner root:wheel, flags restricted.
@@ -161,7 +161,7 @@ Revision r7, status product. [Recipe](../patches/golden-gate-hd4000-planes/READM
 
 ## golden-gate-hello
 
-Revision r11, status product. [Recipe](../patches/golden-gate-hello/README.md)
+Revision r12, status product. [Recipe](../patches/golden-gate-hello/README.md)
 
 - `System/Library/Frameworks/Metal.framework/Versions/A/Metal`: from OCLP · Metal 3802 Common; 3 edits, applied by the installer, then signed: ad hoc, once, identifier Metal. Installed mode 0755, owner root:wheel, flags restricted.
   1. `hello-not-skipped`: literal near _fake_LCAUtilities_shouldSkipHello (within 64 bytes), 11 bytes, `B0 01 0F BE C0 48 83 C4 10 5D C3` → `B0 00 0F BE C0 48 83 C4 10 5D C3` (`mov al,1` → `mov al,0`).
@@ -214,7 +214,7 @@ Revision r6, status product. [Recipe](../patches/golden-gate-launchd-warm/README
 
 ## golden-gate-live-text-service
 
-Revision r7, status product. [Recipe](../patches/golden-gate-live-text-service/README.md)
+Revision r8, status product. [Recipe](../patches/golden-gate-live-text-service/README.md)
 
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, after hao-opencore; 1 edit, applied by the installer.
   1. `revblock-without-media`: plist.set NVRAM:Add:4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102:revblock = "none".
@@ -243,7 +243,7 @@ Revision r13, status product. [Recipe](../patches/golden-gate-live-text-shared/R
 
 ## golden-gate-metal-argbuf
 
-Revision r10, status product. [Recipe](../patches/golden-gate-metal-argbuf/README.md)
+Revision r11, status product. [Recipe](../patches/golden-gate-metal-argbuf/README.md)
 
 - `System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver`: from OCLP · AppleIntelHD4000GraphicsMTLDriver; 1 edit, applied by the installer, then signed: ad hoc, once, identifier AppleIntelHD4000GraphicsMTLDriver. Installed mode 0755, owner root:wheel, flags restricted.
   1. `weak-load-libargbuf`: macho.add-dylib LC_LOAD_WEAK_DYLIB /System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/libargbuf.dylib.
@@ -254,7 +254,7 @@ Revision r10, status product. [Recipe](../patches/golden-gate-metal-argbuf/READM
 
 ## golden-gate-metal-framebuffer
 
-Revision r13, status product. [Recipe](../patches/golden-gate-metal-framebuffer/README.md)
+Revision r14, status product. [Recipe](../patches/golden-gate-metal-framebuffer/README.md)
 
 - `System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver`: from OCLP · AppleIntelHD4000GraphicsMTLDriver; 1 edit, applied by the installer, then signed: ad hoc, once, identifier AppleIntelHD4000GraphicsMTLDriver. Installed mode 0755, owner root:wheel, flags restricted.
   1. `weak-load-metal-framebuffer`: macho.add-dylib LC_LOAD_WEAK_DYLIB /usr/lib/libmetal-framebuffer.dylib.
@@ -664,7 +664,7 @@ Revision r1, status experiment. [Recipe](../patches/hao-runtime-fold-catalog/REA
 
 ## metal-compiler-compat
 
-Revision r12, status product. [Recipe](../patches/metal-compiler-compat/README.md)
+Revision r13, status product. [Recipe](../patches/metal-compiler-compat/README.md)
 
 - `System/Library/Frameworks/Metal.framework/Versions/A/XPCServices/MTLCompilerService.xpc/Contents/MacOS/MTLCompilerService`: whole file from hao (row metal_compiler_compat). OCLP's legacy MTLCompilerService with a load command for libhaoMetalCompilerCompat.dylib added and re-signed ad hoc, made by tools/live-text compiler-service; installed whole, and only over the exact service it was made from. Installed mode 0755, owner root:wheel, flags restricted.
 - `System/Library/PrivateFrameworks/MTLCompiler.framework/Versions/3802/Libraries/libhaoMetalCompilerCompat.dylib`: whole file from hao (row metal_compiler_compat). New file: the shader repair library the service loads at startup. Installed mode 0755, owner root:wheel, flags restricted.

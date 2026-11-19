@@ -1,12 +1,14 @@
 {
- "revision": 13,
+ "revision": 14,
  "pack": "intel-hd4000",
  "stage": "oclp-hook",
  "inputs": [
   "metal_framebuffer"
  ],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 13,
+ "validated_digest": "99d9b49be71f0fff924ac2ba61487a7352cf79df8dc2a93273b3c18d557f75ff",
  "files": [
   {
    "path": "System/Library/Extensions/AppleIntelHD4000GraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelHD4000GraphicsMTLDriver",

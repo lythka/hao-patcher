@@ -71,12 +71,10 @@ give the same bytes: the r1 artifact (fee66603...) is the file that ran on lapto
 
 ## Validation
 
-NEEDS VALIDATION. The same two files ran on laptop 1 (26B131, f112087) as a persisted live swap. Research's
-phase D passed all five cases through the driver, and the `HD4000_PLANES=0` control failed as before
-(bench 20261114-0510 part A). The Photos zooms on the panel (part B) have not run yet. No image built with this
-recipe has booted.
+Laptop 2026-11-19, a MacBookPro9,2 with the release-EFI image 8acc07f (26B131, built from fb6542df with r7): the log has `hd4000-planes on` from WindowServer, which maps the library. Research's probe (3bbe01f9) with `YCBCR_PROBE_ONLY_D=1` passes all five cases; with `HD4000_PLANES=0` it fails 444f, 444f-cv and 420f-p1pad again. The Photos zoom was not run.
 
 ## Revisions
+- r8 2026-11-19 Validated r7 on hardware (Validation). Nothing it installs changes.
 - r7 2026-11-17 The mode argument in src/kc-hook.sh is quoted, like its paths, so no expansion in an install-time script can split at a space. No installed byte changes.
 - r6 2026-11-17 Declares its scope (`requires`, docs/requires.md): changes the HD 4000's Metal driver. Nothing it installs changes.
 - r5 2026-11-16 Declares its pack (intel-hd4000): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

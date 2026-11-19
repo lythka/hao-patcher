@@ -1,12 +1,14 @@
 {
- "revision": 7,
+ "revision": 8,
  "pack": "intel-hd4000",
  "stage": "oclp-hook",
  "inputs": [
   "hd4000_planes"
  ],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 7,
+ "validated_digest": "48e50b92431af2c69030632ff25ea8e50498293aee176a8aa2639c940af65d2c",
  "files": [
   {
    "path": "usr/lib/libhd4000-planes.dylib",

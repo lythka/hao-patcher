@@ -45,11 +45,10 @@ Dock's Apps grid draw.
 
 ## Validation
 
-NEEDS VALIDATION. Host tests pass. The same edit (from the 26A428 build of the same sources) ran on the laptop on
-2026-11-09: 132 backend requests, no error replies, the shared-compiler Vision fixture recognized both lines. Not
-yet built into an image or booted with 26B131.
+Laptop 2026-11-19, a MacBookPro9,2: image 8305fdd (26B131, built from fb6542df with r12): the shared-compiler Vision fixture recognized both lines, and no MTLCompilerService crash report was written over a 48-app sweep (Photos and Maps included). The release-EFI image 8acc07f (same recipes) drew Setup's shader effects with 0 crash reports (r11's fault gave 17+ per boot), and `hao verify` found MTLCompilerService, the 31001 `libLLVM.dylib` and the compat library as installed. On the release-EFI image 8acc07f: all 14 MTLCompilerService processes map `libhaoMetalCompilerCompat.dylib`, and the boot log has no `[compat] refused` line.
 
 ## Revisions
+- r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes.
 - r12 2026-11-18 Row metal_compiler_compat is the same tools/live-text build at 46289f6d: build.json records compat_revision 59 (was 58), the dylib is unchanged; `tools/asset-build` now reproduces the row from source.
 - r11 2026-11-17 OCLP's GPUCompiler 31001 `libLLVM.dylib` names `libLLVM_helper.dylib` by an absolute path (`edits/libllvm-31001.json`, `src/llvm_helper_path.py`, re-signed ad hoc as `libLLVM`). Reason (S18): MTLCompilerService runs hardened (code-signing flags 0x22010801), dyld refuses OCLP's relative helper path there ("relative path not allowed in hardened program"), so its dlopen of the 31001 MTLCompiler failed and the service called a null pointer on every 31001 request (Setup's shader effects vanished, 17+ crashes per boot). Evidence (2026-11-17, MacBookPro9,2 running these bytes): a restricted dlopen probe fails before and loads after, no crash after the swap, and the services hold the 31001 and 3802 compilers.
 - r10 2026-11-17 `requires`: os 26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces `applies`. status product: it ships in the release profiles (what it installs is unchanged; `validated` stays false until the re-cut's laptop boots prove it).

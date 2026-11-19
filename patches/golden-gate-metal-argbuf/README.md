@@ -40,14 +40,10 @@ Only built for 26B131.
 
 ## Validation
 
-NEEDS VALIDATION (r6 is not in a booted image). Image b124c40 (26B131, record golden-26B131-20261114-173106-35769e)
-with r5 booted on a MacBookPro9,2 on 2026-11-15: CLAIMS C004b (argument buffers), C004c (ASTC), C009c (Safari WebGPU) and
-C011a (Weather) proven; C011b (the precipitation map's rain colour) failed (diag#0055, open). Earlier tests with the
-recipe's files put in place by hand on image f112087 (26B131), 2026-11-14: r5's libargbuf ends the precipitation-map
-abort (3 of 3 selections); r4's wrapper reads WebGPU and WebGL back right with no GPU reset. r6's change (textures and
-pipelines freed) is shown on the host only: 100 of 100 freed in a lifecycle control, 11 tool tests pass.
+Laptop 2026-11-19, a MacBookPro9,2 with the release-EFI image 8acc07f (26B131, built from fb6542df with r10; the build log's libargbuf.dylib is d991fe8d): Quick Look of a `.usdz` started RAQLPreviewExtension with no `validateWithDevice` abort and no RAQL crash report (r10's need). On image 8305fdd (same recipes) the seven argument-buffer probes pass, and `probe18` prints `destroyed 200/200` for textures and render pipelines with a flat footprint. Open and tracked separately: the model draws black (#26); Weather crashes in a runtime fault, so its maps were not seen (#9/#62); WebGPU was not read on this image (#23).
 
 ## Revisions
+- r11 2026-11-19 Validated r10 on hardware (Validation). Nothing it installs changes.
 - r10 2026-11-17 Row `metal_argbuf` is a full make at the stack commit (tools/metal-argbuf as d977ced2). libargbuf emulates placement heaps and shared-storage heaps, which MetalOld refuses on the HD 4000. RealityKit asks for both at engine init (diag#0019). It also reports ASTC textures' ASTC format to the app. Need: on a MacBookPro9,2 running these bytes (d991fe8d), Quick Look of a `.usdz` no longer aborts (before, RAQLPreviewExtension and RAQLThumbnailExtension aborted in `validateWithDevice:`), and the placement and shared-heap probes pass there. The model still draws black (open). iCBE.dylib and iCBE-real are unchanged.
 - r9 2026-11-17 Row `metal_argbuf` is a full make at fe579412: the iCBE wrapper reads no path from the environment (its dump and replace switches exist only in a `make --diagnostics` build). libargbuf and iCBE-real are unchanged. Same command, same bytes.
 - r8 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces `applies`.
