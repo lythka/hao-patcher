@@ -62,6 +62,11 @@ FILES = [  # (relative path on the Data volume, why)
     ("Library/Preferences/com.apple.security.systemidentities.plist", "pointers to identities in the removed keychain"),
     # Directory service and this Mac's identities
     (f"{DSLOCAL}/config/KerberosKDC.plist", "this Mac's local Kerberos realm; recreated at boot"),
+    # The local Kerberos (LKDC) setup is three things: the realm above, its identities in the System keychain, and
+    # this done-marker. They go together. With the marker left behind and the identities gone, the state would say
+    # "configured" for a realm that no longer exists; with all three gone com.apple.configureLocalKDC (KeepAlive
+    # while the marker is absent) makes a new realm exactly once, at first boot.
+    ("private/var/db/.configureLocalKDC", "done-marker of the local Kerberos setup; it runs once at first boot"),
     (f"{DSLOCAL}/sqlindex", "directory-service index that still lists the deleted accounts; rebuilt at boot"),
     (f"{DSLOCAL}/sqlindex-wal", "journal of the directory-service index"),
     (f"{DSLOCAL}/sqlindex-shm", "journal of the directory-service index"),
