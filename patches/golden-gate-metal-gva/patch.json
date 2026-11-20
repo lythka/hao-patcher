@@ -1,0 +1,12 @@
+{
+ "revision": 2,
+ "pack": "metal-3802-extras",
+ "stage": "oclp-hook",
+ "status": "product",
+ "validated": false,
+ "files": [
+  {"path": "System/Library/PrivateFrameworks/AppleGVA.framework/Versions/A/AppleGVA", "edits": "edits/applegva.json",
+   "install": {"mode": "0755", "owner": "root:wheel", "flags": ["restricted"]}}
+ ],
+ "requires": {"os": ["26B131"], "donor": ["25G342"], "cpu": "any", "gpu": ["intel-ivb"], "firmware": "any"}
+}

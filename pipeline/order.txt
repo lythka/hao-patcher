@@ -21,6 +21,7 @@ metalold-selectors                 # Metal selectors OCLP's MetalOld does not an
 golden-gate-metal-framebuffer      # framebuffer reads for RenderBox symbols, a second weak dylib in the same driver; built for 26A428, not yet checked on 26B131
 golden-gate-metal-argbuf           # Metal argument buffers + ASTC textures (tools/metal-argbuf): iCBE wrapper and a third weak dylib in the HD 4000 Metal driver; after metal-libraries (its iCBE) and metal-framebuffer; 26B131 only
 golden-gate-hd4000-planes          # HD 4000 plane textures (diag#0025 Photos zoom, diag#0024 bands): a fourth weak dylib in the HD 4000 Metal driver gives planes whose pitch differs from plane 0's a shadow texture; after golden-gate-metal-argbuf (previous weak dylib); 25G342 donor (26B131) only
+golden-gate-metal-gva              # opt-in (metal-3802-extras), unfolded images only: OCLP's AppleGVA reports Intel hardware JPEG decode unavailable (diag#0025 strip); after the OCLP overlay, before golden-gate-shared-cache (which refuses a changed provider)
 metal-compiler-compat              # Live Text 1/3: OCLP's legacy MTLCompilerService loads cache/metallib's compat.dylib (runtime-generated shaders); OS-independent service, row in golden/26B131
 golden-gate-live-text-shared       # Live Text 2/3: Vision text recognition runtime in /usr/lib/hao-live-text via libhelloblur; after golden-gate-hello and metal-compiler-compat; 26B131 only (refuses another MPSNDArray library)
 golden-gate-ids                    #

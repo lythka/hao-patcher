@@ -9,7 +9,7 @@ A file made on the target lists what it is made *after* there. A *seed* file is 
 changes after install (`"content": "seed"` with a `"reason"`): `hao verify` checks it is there with its
 attributes, not its bytes.
 
-60 of 62 patches declare their files so far.
+61 of 63 patches declare their files so far.
 
 ## darwin27-kernel
 
@@ -262,6 +262,14 @@ Revision r14, status product. [Recipe](../patches/golden-gate-metal-framebuffer/
   1. `weak-load-metal-framebuffer`: macho.add-dylib LC_LOAD_WEAK_DYLIB /usr/lib/libmetal-framebuffer.dylib.
      The driver loads the framebuffer-read adapter, so RenderBox symbols (Wi-Fi, Control Center) draw on the HD 4000; weak, so the driver still loads without the library.
 - `usr/lib/libmetal-framebuffer.dylib`: whole file from hao (row metal_framebuffer). New file: framebuffer-read adapter built by build/metal-framebuffer. Installed mode 0755, owner root:wheel, flags restricted.
+
+## golden-gate-metal-gva
+
+Revision r2, status product. [Recipe](../patches/golden-gate-metal-gva/README.md)
+
+- `System/Library/PrivateFrameworks/AppleGVA.framework/Versions/A/AppleGVA`: from OCLP · Big Sur GVA; 1 edit, applied by the installer, then signed: ad hoc, once, keeping the file's identifier, entitlements. Installed mode 0755, owner root:wheel, flags restricted.
+  1. `jpeg-decode-unavailable`: literal near _AVFJPG_GetJPEGDecodeAvailability (within 16 bytes), 8 bytes, `55 48 89 E5 41 57 41 56` → `31 C0 C3 E5 41 57 41 56` (`push rbp; mov rbp,rsp` → `xor eax,eax; ret`).
+     Intel hardware JPEG decode reported unavailable (the function's own 'unsupported' answer), so JPEG decodes in software: on the HD 4000 GVA's JPEG path shows incomplete surfaces (Photos zoom strip).
 
 ## golden-gate-metal-libraries
 

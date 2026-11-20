@@ -1,0 +1,16 @@
+{
+ "format": 1,
+ "path": "System/Library/PrivateFrameworks/AppleGVA.framework/Versions/A/AppleGVA",
+ "arch": "x86_64",
+ "origin": {"kind": "oclp", "name": "Big Sur GVA", "note": "OCLP's AppleGVA from macOS 11.7.10 (PatcherSupportPkg 2.0.5)"},
+ "applied_by": "installer",
+ "edits": [
+  {"id": "jpeg-decode-unavailable", "kind": "literal",
+   "base": "_AVFJPG_GetJPEGDecodeAvailability", "limit": 16,
+   "find": "55 48 89 E5 41 57 41 56", "replace": "31 C0 C3 E5 41 57 41 56",
+   "asm": {"before": "push rbp; mov rbp,rsp", "after": "xor eax,eax; ret"},
+   "reason": "Intel hardware JPEG decode reported unavailable (the function's own 'unsupported' answer), so JPEG decodes in software: on the HD 4000 GVA's JPEG path shows incomplete surfaces (Photos zoom strip)"}
+ ],
+ "sign": {"mode": "adhoc", "preserve": ["identifier", "entitlements"]},
+ "expect": {"2a4fb1829b881c035bc416103a8f278fd5ffc46dfdd09c82eab7a242bf1b16c7": "064010304c1831fc7531831bf526efed2844629d03f78231442ed90eb15f8b6a"}
+}
