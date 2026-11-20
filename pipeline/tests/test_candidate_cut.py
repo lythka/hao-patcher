@@ -240,6 +240,22 @@ class Cut(unittest.TestCase):
         self.assertFalse(rec['passed'])
         self.assertEqual((rec['fresh_mac'], rec['qemu_boot']), ('FAIL', 'PASS'))
 
+    def test_every_stick_folder_has_the_cuts_candidate_json(self):
+        rc, rec, out = self.cut('--generic')
+        self.assertEqual([s['kind'] for s in rec['sticks']], ['release', 'generic', 'dev'])
+        for kind, folder in (('generic', out / 'generic'), ('dev', out / 'dev')):
+            got = json.loads((folder / 'candidate.json').read_text())
+            self.assertEqual(got['stick']['kind'], kind)
+            self.assertEqual(got['stick']['path'], str(folder / 'stick.img'))
+            for k in ('commit', 'fresh_mac', 'qemu_boot', 'passed', 'sticks'):
+                self.assertEqual(got[k], rec[k])
+        self.assertNotIn('stick', rec)
+
+    def test_stick_folders_carry_the_checks_verdicts(self):
+        rc, rec, out = self.checks(fresh=True, qemu='FAIL', extra=['--generic'])
+        got = json.loads((out / 'generic' / 'candidate.json').read_text())
+        self.assertEqual((got['fresh_mac'], got['qemu_boot'], got['passed']), ('PASS', 'FAIL', False))
+
     def test_without_qemu_boot_it_is_null(self):
         rc, rec, out = self.cut('--no-dev')
         self.assertIsNone(rec['qemu_boot'])

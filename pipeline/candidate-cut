@@ -22,7 +22,8 @@ committed tree); there:
      the changes REV made to DEV_FILES since its merge base with COMMIT are applied in the cut's worktree after the
      release stick, the dev set generated there again, and committed there (recorded in candidate.json
      "dev_overlay"). --only-dev makes only the dev stick.
-  6. OUT/stick.img.sha256, OUT/dev/stick.img.sha256 and OUT/candidate.json: commit, each stick (path, size, sha256),
+  6. OUT/stick.img.sha256, OUT/dev/stick.img.sha256 and OUT/candidate.json (also written, with "stick": that
+     stick's entry, into OUT/dev and OUT/generic, the other folders that hold a stick): commit, each stick (path, size, sha256),
      release.json sha256s, signed or not, each step's seconds and log, create-installer's phases (from its event log
      in OUT/logs and OUT/dev/logs), and "dev": the dev stick's own record. Exit 0 only when every step passed.
   --generic: the release is cut with the generic assembly too (release-cut ASSEMBLY GENERIC_ASSEMBLY, one release
@@ -448,6 +449,12 @@ def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkou
             record['dev']['phases'] = phases(out / 'dev' / 'logs')
         record['finished'] = datetime.datetime.now().astimezone().isoformat(timespec='seconds')
         (out / 'candidate.json').write_text(json.dumps(record, indent=1) + '\n')
+        # a bench's arm gate reads candidate.json in the folder of the stick it writes: each other stick folder
+        # gets the cut's whole record plus that stick's entry
+        for entry in record['sticks']:
+            folder = Path(entry['path']).parent
+            if folder != out and folder.is_dir():
+                (folder / 'candidate.json').write_text(json.dumps(dict(record, stick=entry), indent=1) + '\n')
         worktree[1](tree)
         shutil.rmtree(work, ignore_errors=True)
 
