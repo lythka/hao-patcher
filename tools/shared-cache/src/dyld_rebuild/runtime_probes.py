@@ -562,11 +562,11 @@ def prepare_main(argv):
     binder=a.output/'bind-runtime-probes'
     subprocess.run(['xcrun','clang','-arch','x86_64','-mmacosx-version-min=14.0',
                     '-O2','-Wall','-Wextra','-Werror',
-                    str(root/'cache/shared-cache/tools/bind-runtime-probes.c'),'-o',str(binder)],check=True)
+                    str(root/'tools/bind-runtime-probes.c'),'-o',str(binder)],check=True)
     subprocess.run(['codesign','-s','-',str(binder)],check=True)
     from .swift_metadata import provenance, write_json
     inputs=[Path(row['path']) for row in p['inputs']]+[Path(__file__),source,
-            root/'cache/shared-cache/tools/bind-runtime-probes.c']
+            root/'tools/bind-runtime-probes.c']
     write_json(a.output/'build.json',provenance(inputs,operation='runtime-probes',cache_uuid=p['cache_uuid']))
     print(a.output/'runtime.d')
 

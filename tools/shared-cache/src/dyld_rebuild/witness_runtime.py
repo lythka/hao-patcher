@@ -155,7 +155,10 @@ def recipe(family,toolchain,layout,output,*,metatypes=False,metadata_shapes=None
             'Swift runtime exceeds producer reservation')
     data=bytearray(data_size)
     for offset,value in scalar_fields:data[offset:offset+len(value)]=value
-    return dict(schema=1,profile=p,link_command=command,families=relocations,
+    result=dict(schema=1,profile=p,link_command=command,families=relocations,
         blobs=[dict(reservation='swift_runtime_code',address=code_address,data=blob.hex()),
                dict(reservation='swift_runtime_data',address=data_address,data=data.hex())],
         new_pointer_fields=pointers,byte_edits=patches,pointer_edits=[])
+    # make runtime-probes --runtime-recipe reads this to probe the redirected lookups (cache-use measurement).
+    write_json(output/'recipe.json',result)
+    return result

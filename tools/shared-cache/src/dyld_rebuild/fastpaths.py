@@ -127,7 +127,7 @@ def main(argv):
         subprocess.run(['codesign','-s','-',str(binary)],check=True)
     from .swift_metadata import provenance, write_json
     inputs=[Path(row['path']) for row in p['inputs']]+[Path(__file__)]+[
-        root/'cache/shared-cache/tools'/(name+'.c') for name in ('swift-conformance-probe','bind-runtime-probes')]
+        root/'tools'/(name+'.c') for name in ('swift-conformance-probe','bind-runtime-probes')]
     write_json(a.output/'build.json',provenance(inputs,operation='fastpaths',cache_uuid=p['cache_uuid']))
     print(a.output)
     return 0
