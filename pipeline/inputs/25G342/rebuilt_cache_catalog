@@ -1,5 +1,8 @@
-# Shared-cache fold-in, family B+catalog (golden-gate-shared-cache-catalog): the 66k-record Swift catalog family
-# 322743F4 (generator fe70eccb: ObjC method lists fixed), the cache image 3957131 booted (2026-11-18/19 on a MacBookPro9,2:
-# desktop, sharingd and WiFiAgent up, first login 718 s).
+# Shared-cache fold-in, family B+catalog (golden-gate-shared-cache-catalog): the witness family 31DA2287 (generator r90
+# with the inline witness hook and the indexed normalize, 2026-11-20). Its catalog was captured natively on a
+# MacBookPro9,2 (stock 262FA161) from the merged request graph (static run B, the 25G332 keymap, the 223,195-key metadata
+# library) and verified in an isolated replay with 0 failures: 99,062 metadata records and 25,671 protocol witness
+# tables (18 records whose initialization changes identity were left out). Prebuilt loaders, the regenerated
+# conformance tables and the 26 providers as in the 66k family.
 # hash: without build.json
-459848771b008654ae0c855b48aa1089eaf7fb425270cb9f96c9a3c3723cce80 store/artifacts/rebuilt-cache-fold-in-catalog-66k-26B131-20261118-851adc54-fe70eccb
+bdc9174458d82fe7c0ded47e52a7d3684cf62c1d5a048254213de6951c1ba00b store/artifacts/rebuilt-cache-fold-in-witness-26B131-20261120

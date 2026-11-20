@@ -26,12 +26,13 @@ A change to that recipe's code reaches this one at the next build without a revi
 
 ## Validation
 
-NEEDS VALIDATION: r6 (fold compaction) not built yet; r5 not built by golden-run. golden-gate-shared-cache's `fold.py install` ran on a copy of an aae0ab3
+NEEDS VALIDATION: r8 (the witness family 31DA2287) not built into an image yet; r5 not built by golden-run. golden-gate-shared-cache's `fold.py install` ran on a copy of an aae0ab3
 image with the D3BDB76E family and row `hao_runtime_fold_catalog`'s payload (recipe hao-runtime-fold-catalog: hao's
 records name the cache UUID, so this family needs its own payload). That image booted in QEMU to sshd in 559 s, with
 no panic and no launchd refusal.
 
 ## Revisions
+- r8 2026-11-20 Row rebuilt_cache_catalog is the witness family 31DA2287: 99,062 prespecialized metadata records and 25,671 protocol witness tables from a native capture, verified in isolation; prebuilt loaders and conformance tables as before.
 - r7 2026-11-20 Row `rebuilt_cache_catalog`: rebuilt-cache-fold-in-catalog-66k-26B131-20261118-851adc54-fe70eccb (cache 322743F4, the 66k-record Swift catalog family with the ObjC method lists fixed), the cache image 3957131 booted to the desktop with sharingd and WiFiAgent up.
 - r6 2026-11-19 Stages golden-gate-shared-cache r11's fold.py: the folded OS cryptex is compacted to what it holds
   before it is sealed (about 14.6 GB instead of 26 GB on 26B131).
