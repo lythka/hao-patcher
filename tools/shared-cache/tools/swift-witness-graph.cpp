@@ -2,6 +2,7 @@
 // The upstream ABI supplies sizes, conditional keys, and protocol slot kinds.
 #include "swift/ABI/Metadata.h"
 #include "witness-runtime.h"
+#include "inline-hook.h"
 #include <cstdio>
 #include <dlfcn.h>
 #include <map>
@@ -23,7 +24,7 @@ struct Observation {
 };
 static Witness *original;
 static gpointer implementation;
-static GumInterceptor *interceptor;
+static InlineHook witnessHook;
 static bool internal;
 static std::mutex observationsMutex;
 static std::map<std::tuple<const Descriptor *, const void *, const Word *>, Observation> observations;
@@ -127,20 +128,17 @@ static const Word *record(const Descriptor *descriptor, const void *type,
 }
 extern "C" int swift_witness_graph_start() {
   auto witness = dlsym(RTLD_DEFAULT, "swift_getWitnessTable");
-  if (!witness) return 1;
+  if (!witness) { std::fprintf(stderr, "witness graph: no swift_getWitnessTable\n"); return 1; }
   gum_init_embedded();
   auto module=gum_process_find_module_by_name("libswiftCore.dylib");
-  if (!module) return 2;
+  if (!module) { std::fprintf(stderr, "witness graph: libswiftCore not found\n"); return 2; }
   gum_module_enumerate_symbols(module,conformanceSymbol,nullptr);
   g_object_unref(module);
-  if (!conformingType) return 2;
+  if (!conformingType) { std::fprintf(stderr, "witness graph: no conforming-type symbol\n"); return 2; }
   implementation = witness_implementation(witness, &internal);
-  if (!implementation) return 2;
-  interceptor = gum_interceptor_obtain();
-  GumReplaceOptions options = {};
-  auto rc = gum_interceptor_replace(interceptor, implementation, (gpointer)record,
-                                     (gpointer *)&original, &options);
-  return rc == GUM_REPLACE_OK ? 0 : 3;
+  if (!implementation) { std::fprintf(stderr, "witness graph: implementation not found\n"); return 2; }
+  // inline-hook.h, not GumInterceptor: its unwind broker overflows the stack on 27 x86_64.
+  return inline_replace(witnessHook, implementation, (gpointer)record, (gpointer *)&original) ? 0 : 3;
 }
 static void words(const Word *begin, size_t count) {
   std::putchar('[');
@@ -216,7 +214,7 @@ extern "C" void swift_witness_graph_finish(int (*capture)(const Word *, unsigned
       }
     }
   }
-  gum_interceptor_revert(interceptor, implementation);
+  inline_revert(witnessHook);
   // Output is deferred so callbacks cannot interleave partial collector JSON rows.
   std::map<std::tuple<const Descriptor *, const void *, const Word *>, Observation> closed;
   {
@@ -258,7 +256,6 @@ extern "C" void swift_witness_graph_finish(int (*capture)(const Word *, unsigned
        (unsigned long long)table,(unsigned long long)descriptor,(unsigned long long)type,(unsigned long long)selected);
   }
   std::printf("{\"witness_graph\":true,\"internal_implementation\":%s,\"calls\":%lu,\"failed\":%lu,\"records\":%zu}\n",internal?"true":"false",calls,failed,closed.size());
-  g_object_unref(interceptor);
   // Other library threads may still exist; Gum's process resources live until exit.
 }
 

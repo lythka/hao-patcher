@@ -3,6 +3,7 @@
 // Frida Gum handles instruction relocation; no hand-built trampoline is used.
 #include "cache-address.h"
 #include "witness-runtime.h"
+#include "inline-hook.h"
 #include "swift/ABI/Metadata.h"
 #include <cstdio>
 #include <cstdlib>
@@ -245,18 +246,14 @@ int main(int argc, char **argv) {
   if (dependencies != 1)
     return 8;
   gum_init_embedded();
-  auto interceptor = gum_interceptor_obtain();
+  static InlineHook hook;  // inline-hook.h: no GumInterceptor on 27
   bool internal = false;
   implementation = witness_implementation((gpointer)witness, &internal);
   if (!implementation) return 18;
   if (exported) implementation = (gpointer)witness;
   if (enabled) {
-    GumReplaceOptions options = {};
-    auto rc = gum_interceptor_replace(interceptor, implementation,
-                                      (gpointer)replacement,
-                                      (gpointer *)&original, &options);
-    if (rc != GUM_REPLACE_OK) {
-      printf("{\"replace_error\":%d}\n", rc);
+    if (!inline_replace(hook, implementation, (gpointer)replacement, (gpointer *)&original)) {
+      printf("{\"replace_error\":1}\n");
       return 9;
     }
   }
@@ -286,7 +283,7 @@ int main(int argc, char **argv) {
   if (witness((const void *)roots[0][0], scalar, nullptr) != roots[0])
     return 12;
   if (enabled)
-    gum_interceptor_revert(interceptor, implementation);
+    inline_revert(hook);
   // Obtain the runtime comparison witnesses only after proving fresh
   // consumption.
   if (enabled)
@@ -307,7 +304,6 @@ int main(int argc, char **argv) {
          "\"dependencies\":%u,\"comparisons\":%u,\"hashes\":%u}\n",
          argv[1], uuid, internal ? "true" : "false", direct, ordinary, adopted,
          hits, misses, dependencies, comparisons, hashes);
-  g_object_unref(interceptor);
   gum_deinit_embedded();
   return 0;
 }

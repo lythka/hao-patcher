@@ -6,6 +6,7 @@ guessed from pointer-shaped words.
 """
 import hashlib
 from functools import lru_cache
+import itertools
 import json
 import re
 import struct
@@ -276,6 +277,16 @@ def normalize_graph(recipe, captured, family, base_catalog, *, witness_closures=
 
     outcomes = []
     included = set()
+    # ready only grows (each address is converted once), so the first row of each identity, in insertion order, is
+    # what a scan of ready.values() would find. Index it incrementally: a full scan per owned reference was
+    # quadratic and took hours on a 155k-constructor witness capture.
+    owned_rows, indexed = {}, [0]
+    def owned_row(identity):
+        if identity not in owned_rows and indexed[0] < len(ready):
+            for r in itertools.islice(ready.values(), indexed[0], None):
+                owned_rows.setdefault(record_id(r), r)
+            indexed[0] = len(ready)
+        return owned_rows[identity]
     def include(row):
         identity = record_id(row)
         if identity in included or identity in merged:
@@ -283,7 +294,7 @@ def normalize_graph(recipe, captured, family, base_catalog, *, witness_closures=
         included.add(identity)
         for ref in row['key']+[p['ref'] for p in row['pointers']]:
             if 'owned' in ref and ref['owned'] not in merged:
-                include(next(r for r in ready.values() if record_id(r) == ref['owned']))
+                include(owned_row(ref['owned']))
     for root in roots:
         try:
             require(not root.get('error'), root.get('error'))
