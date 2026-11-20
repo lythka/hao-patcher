@@ -50,6 +50,27 @@ def share_dir(vmdir):
     return Path(d) if d else Path(vmdir).resolve().parent / "share"
 
 
+def live_share(vmdir):
+    """The share of this VM's running ssdvm, from the vnc.json it writes once up. serve and exec must agree on the
+    queue folder: before that file exists share_dir guesses VM/../share, while a build runs the VM on its own workspace
+    share, so a serve started early (at once when another VM already holds the bridge) watched one folder and exec
+    queued in another, and the guest never got the job. Exits (start.sh tries again) until the VM's vnc.json is there."""
+    j = Path(vmdir) / "vnc.json"
+    try:
+        info = json.loads(j.read_text())
+        os.kill(int(info["pid"]), 0)
+        return Path(info["share"]) if info.get("share") else Path(vmdir).resolve().parent / "share"
+    except (OSError, ValueError, KeyError, TypeError):
+        sys.exit("vmctl: %s has no vnc.json from a running ssdvm yet; not guessing its share" % vmdir)
+
+
+def live_agent_dir(vmdir):
+    q = live_share(vmdir) / ".agent"
+    q.mkdir(parents=True, exist_ok=True)
+    (q / "agent.sh").write_text(AGENT)
+    return q
+
+
 def agent_dir(vmdir):
     q = share_dir(vmdir) / ".agent"
     q.mkdir(parents=True, exist_ok=True)
@@ -443,11 +464,17 @@ def endpoint(vmdir):
         serving = True
     except (OSError, ValueError):
         serving = False
+    # serve writes http-agent.sh into the queue it watches when it starts: one older than serve.pid means serve
+    # watches another folder than the one exec queues in
+    try:
+        watched = (q / "http-agent.sh").stat().st_mtime >= serve.stat().st_mtime - 5
+    except OSError:
+        watched = False
     bridges = vm_bridges()
     return dict(vm=str(Path(vmdir).resolve()), port=config["port"], identity=config["identity"][:8],
                 host_link_local=config.get("host_link_local"), guest_interface=config.get("guest_interface"),
                 bridge=bridge_if(config.get("host_link_local")) if bridges else None, vm_bridges=bridges,
-                share=str(share_dir(vmdir)), queue=counts, serving=serving,
+                share=str(share_dir(vmdir)), queue=counts, serving=serving, serve_watches_share=watched,
                 collisions=collisions(vmdir, running_vms()))
 
 
@@ -457,7 +484,7 @@ def agent_server(vmdir, bootstrap_port=None, interface=None):
     """
     import http.server
     config = agent_config(vmdir)
-    q = agent_dir(vmdir)
+    q = live_agent_dir(vmdir)
     (q / "http-agent.sh").write_text(guest_agent(config))
     bridge = bridge_if(config.get('host_link_local')) if interface is None else interface
     if config.get('host_link_local'):
@@ -538,7 +565,7 @@ def exec_cmd(vmdir, cmd, timeout=600, gui=False, q=None):
     """Queue CMD for the guest agent and wait for its rc. When no reply comes within TIMEOUT and the agent never took
     the command (still CID.cmd), it is withdrawn and EXEC_UNDELIVERED returned, so a caller may send it again without
     a second run; a command the agent took (CID.run) is never withdrawn."""
-    q = q or (agent_dir(vmdir) if not gui else share_dir(vmdir) / ".agent-gui")
+    q = q or (live_agent_dir(vmdir) if not gui else share_dir(vmdir) / ".agent-gui")
     cid = uuid.uuid4().hex[:12]
     tmp = q / (cid + ".tmp")
     tmp.write_text(cmd + "\n")

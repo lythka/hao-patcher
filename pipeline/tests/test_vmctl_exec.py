@@ -126,6 +126,49 @@ bridge101: flags=8a63<UP> mtu 1500
 '''
 
 
+class SharedQueue(unittest.TestCase):
+    """serve and exec must use the running VM's share: a serve started before ssdvm wrote vnc.json guessed VM/../share
+    while the build ran the VM on its workspace share, so the job was queued where nobody looked."""
+    def setUp(self):
+        import json, os, uuid
+        self.d = tempfile.TemporaryDirectory()
+        root = Path(self.d.name).resolve()
+        self.vm, self.share = root / 'clone' / 'vm', root / 'workspace-share'
+        self.vm.mkdir(parents=True)
+        self.share.mkdir()
+        (self.vm / 'agent.json').write_text(json.dumps(dict(schema=1, vm=str(self.vm), port=20001,
+                                                             identity=uuid.uuid4().hex)))
+        self.guess = root / 'clone' / 'share' / '.agent'
+        self.json, self.pid = json, os.getpid()
+
+    def tearDown(self):
+        self.d.cleanup()
+
+    def vnc(self, pid):
+        (self.vm / 'vnc.json').write_text(self.json.dumps(dict(pid=pid, share=str(self.share), port=5900)))
+
+    def test_serve_waits_for_the_running_vms_share_instead_of_guessing(self):
+        with self.assertRaises(SystemExit):
+            V['agent_server'](self.vm, interface='lo0')
+        self.assertFalse(self.guess.exists())
+
+    def test_a_vnc_json_from_an_earlier_run_does_not_count(self):
+        self.vnc(2 ** 22 + 12345)                      # no such process
+        with self.assertRaises(SystemExit):
+            V['live_share'](self.vm)
+
+    def test_exec_queues_where_serve_watches(self):
+        with self.assertRaises(SystemExit):
+            V['exec_cmd'](self.vm, 'true', timeout=0.1)
+        self.assertFalse(self.guess.exists())
+        self.vnc(self.pid)
+        self.assertEqual(V['live_share'](self.vm), self.share)
+        (self.share / '.agent').mkdir()
+        slow_agent(self.share / '.agent', 0)
+        self.assertEqual(V['exec_cmd'](self.vm, 'echo started', timeout=5), 0)
+        self.assertFalse(self.guess.exists())
+
+
 class Endpoint(unittest.TestCase):
     def test_vm_bridges(self):
         got = V['vm_bridges'](IFCONFIG)

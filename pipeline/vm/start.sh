@@ -11,6 +11,8 @@ VM=${1:A}; SHARE=${2:A}; shift 2; R=$VM.run; mkdir -p $R
 python3 -I ${0:A:h}/../diskguard.py check --need ${VM_DISK_NEED_GB:-20} --who ssdvm --what ${VM:t} --path ${VM:h} || exit 3
 # SSDVM_MAC: a base VM (no clone marker) being set up by clean-vm make-base.
 MAC=${SSDVM_MAC:-$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["mac"])' $VM/.ssdvm-clone.json)}
+# vmctl serve and exec read the VM's share from the vnc.json ssdvm writes once up; one from an earlier run must not count
+rm -f $VM/vnc.json
 nohup $VMBIN/ssdvm run $VM --mac $MAC --share $SHARE "$@" > $R/ssdvm.log 2>&1 &
 echo $! > $R/ssdvm.pid
 t0=$(date +%s); serve=""
