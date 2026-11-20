@@ -18,7 +18,7 @@ class FakeHost:
     def __init__(self, root, ssh_after=2, ps=PS, serial='', build_rc=0, slot=True):
         self.root, self.ssh_after, self.ps, self.serial, self.build_rc, self.slot = root, ssh_after, ps, serial, \
             build_rc, slot
-        self.calls, self.probes = [], 0
+        self.calls, self.probes, self.plan = [], 0, 'export'
 
     def disk(self, need_gb, what, path):
         self.calls.append(('disk', what))
@@ -54,8 +54,11 @@ class FakeHost:
     def newest_rev(self, repo):
         return 'abc1234'
 
-    def export(self, repo, rev, dest, log):
-        self.calls.append(('export', rev))
+    def export_plan(self, repo, rev):
+        return self.plan
+
+    def export(self, repo, rev, dest, log, plan='export'):
+        self.calls.append(('export', rev, plan))
         dest.write_bytes(b'raw')
         return 0
 
@@ -127,6 +130,15 @@ class FirstBoot(unittest.TestCase):
         self.assertIn(('stop',), host.calls)
         self.assertEqual([c[0] for c in host.calls][:4], ['slot', 'build', 'remove', 'disk'])
         self.assertEqual(rec['removed'], ['/store/tmp/golden-x'])
+        self.assertEqual(rec['export'], 'export')
+
+    def test_a_clean_working_image_is_cloned_without_a_disk_check(self):
+        host = FakeHost(self.root)
+        host.plan = 'clone'
+        rc, rec = self.boot(host)
+        self.assertEqual(rc, 0)
+        self.assertIn(('export', 'abc1234', 'clone'), host.calls)
+        self.assertNotIn('disk', [c[0] for c in host.calls])
 
     def test_the_esp_is_made_from_the_image_with_its_kernel_patches(self):
         host = FakeHost(self.root)

@@ -12,8 +12,10 @@ that must run, and how many macOS VMs this host may run at once.
      VM too. golden-run checks the disk itself. --no-build boots REPO as it is. golden-run leaves its work folder
      (the workspace image, over 100 GB) and its stopped VM clone behind; once its build record says the image is
      committed to REPO, both are removed, so the export below has room.
-  2. tools/bin/ssdimg export of REPO's newest revision to OUT/target.img (raw and sparse; diskguard checks its
-     logical size first).
+  2. OUT/target.img, the raw image of REPO's newest revision: when that revision is HEAD and `ssdimg status` says
+     the working image matches it, an APFS clone of the working image (cp -c: no space, no time); else tools/bin/ssdimg
+     export (raw and sparse; diskguard checks its logical size first). A copy costs about the image's used size,
+     which qemu-vm's own disk check (the logical size) would then count again.
   3. The QEMU ESP, OUT/esp: tools/kernel-foundation/make vm-esp with the reference row (pipeline/lock.py, for the
      assembly's donor build), the image's boot-efi.zip EFI as the donor ESP, its commpage kext and kexts, and the
      boot-args; then its Kernel.Patch is replaced by boot-efi's own, which are bound to the image's BootKC.
@@ -151,7 +153,24 @@ class Host:
         lines = p.stdout.split('\n')
         return lines[0].split()[0] if p.returncode == 0 and lines[0].strip() else None
 
-    def export(self, repo, rev, dest, log):
+    def ssdimg(self, repo, *args):
+        p = subprocess.run([str(TOP / 'tools/bin/ssdimg'), '-C', str(repo)] + list(args), cwd=TOP,
+                           capture_output=True, text=True)
+        return p.returncode, p.stdout
+
+    def export_plan(self, repo, rev):
+        """'clone' when REV is HEAD and the working image matches it, else 'export'."""
+        rc, log = self.ssdimg(repo, 'log')
+        first = log.split('\n')[0]
+        rc2, status = self.ssdimg(repo, 'status')
+        work = Path(repo) / 'work' / 'disk.img'
+        clean = rc2 == 0 and 'clean (matches HEAD)' in status and 'attached as' not in status
+        return 'clone' if rc == 0 and first.startswith(rev + ' ') and 'HEAD' in first and clean and work.is_file() \
+            else 'export'
+
+    def export(self, repo, rev, dest, log, plan='export'):
+        if plan == 'clone':
+            return self.call(['cp', '-c', Path(repo) / 'work' / 'disk.img', dest], log)
         return self.call([TOP / 'tools/bin/ssdimg', '-C', repo, 'export', '--rev', rev, dest], log)
 
     def row(self, build, name):
@@ -249,12 +268,13 @@ def first_boot(a, cfg, host, clock=time.monotonic, sleep=time.sleep):
             return record
         image_json = Path(repo) / 'image.json'
         size = json.loads(image_json.read_text()).get('size', 0) if image_json.is_file() else 0
-        refused = host.disk(size / 1e9, 'export ' + rev, out)
+        plan = record['export'] = host.export_plan(repo, rev)
+        refused = host.disk(size / 1e9, 'export ' + rev, out) if plan == 'export' else None
         if refused:
             record['reasons'].append('disk: %s' % refused)
             return record
         target = out / 'target.img'
-        if host.export(repo, rev, target, out / 'export.log'):
+        if host.export(repo, rev, target, out / 'export.log', plan):
             record['reasons'].append('ssdimg export failed (see %s)' % (out / 'export.log'))
             return record
         lap('export')
