@@ -1,0 +1,7 @@
+{
+ "comment": "dev-ssh-alpha-v0.1.0: alpha-v0.1.0 plus dev-access only (root SSH by the bench key, Screen Sharing), so bench can observe a release first boot (Setup Assistant and the first login run as a user's would). A dev profile: never released (release-cut --candidate --dev).",
+ "target": "mbp92",
+ "recipes": [
+  "dev-access"
+ ]
+}
