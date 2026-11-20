@@ -3,7 +3,8 @@
 
   pipeline/candidate-cut COMMIT [--out DIR] [--cache DIR] [--sign-key KEY] [--version vX.Y.Z] [--release NAME]
                          [--assembly NAME] [--dev-assembly NAME] [--no-dev | --only-dev] [--dev-overlay REV]
-                         [--generic [--generic-assembly NAME]] [--fresh-mac [--mirror URL] [--fresh-mac-vm VMDIR]]
+                         [--generic [--generic-assembly NAME]] [--fresh-mac [--mirror URL] [--fresh-mac-vm VMDIR]
+                         [--host-mirror URL] [--mirror-tool TOOL]] [--qemu-boot]
 
 For the hardware benches' acceptance runs. COMMIT is checked out detached in a new worktree (the cut sees only the
 committed tree); there:
@@ -33,6 +34,18 @@ committed tree); there:
      candidate.json "fresh_mac" is "PASS" or "FAIL" and "fresh_mac_result" its OUT/fresh-mac/fresh-mac.json (null
      without --fresh-mac); a FAIL makes candidate-cut exit 1, and such a candidate goes to no bench. It checks the
      MacBookPro9,2 stick only. candidate.json is written for every cut, a failed one too.
+     Before it, the mirror fill: every file the release needs (the commit's pipeline/mirror-list) that the mirror
+     lacks (asked of HOST_MIRROR, default http://127.0.0.1:8765) and that the cut's own OUT/release holds (same name,
+     size and sha256) is added with `TOOL add FILE --name NAME --origin URL --expect SHA256` (TOOL: --mirror-tool,
+     default $HAO_MIRROR_FILL, the mirror's tool), so a new release asset never fails the run as a mirror miss.
+     Recorded as candidate.json "mirror_fill" (added, not_in_release, failed); what is still missing fails
+     fresh-mac-run as before.
+  8. with --qemu-boot, after --fresh-mac (never at the same time: both use a macOS VM): pipeline/qemu-first-boot
+     --out OUT/qemu-boot builds the commit's dev-lite image (OUT/qemu-boot/image; pipeline/qemu-boot.json says
+     which), boots it once in QEMU to the first-boot marker (sshd up, the listed processes running, no panic) and
+     writes OUT/qemu-boot/qemu-boot.json. candidate.json "qemu_boot" is "PASS" or "FAIL" and "qemu_boot_record" that
+     record (null without --qemu-boot). Both checks run even when the other failed; either FAIL makes candidate-cut
+     exit 1.
 OUT defaults to store/artifacts/candidate-COMMIT8; CACHE to store/cache/candidate-fetch. Rows made on this Mac are
 reused by their pins (make-on-mac leaves a row whose sha256 checks), so the dev stick costs about one more kit write.
 """
@@ -42,6 +55,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import runpy
 import shutil
 import subprocess
 import sys
@@ -51,6 +65,7 @@ import time
 TOP = Path(__file__).resolve().parents[1]
 PY = sys.executable
 MODEL = 'MacBookPro9,2'
+FRESH = runpy.run_path(str(TOP / 'pipeline' / 'fresh-mac-run'))
 
 
 def sha256(p):
@@ -96,6 +111,54 @@ def fresh_mac_result(where):
         return json.loads((Path(where) / 'fresh-mac.json').read_text())
     except (OSError, ValueError):
         return None
+
+
+def qemu_boot_result(where):
+    """OUT/qemu-boot/qemu-boot.json, or None when qemu-first-boot wrote none."""
+    try:
+        return json.loads((Path(where) / 'qemu-boot.json').read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def release_file(release_dir, name, size, digest):
+    """The file called NAME, of SIZE bytes and sha256 DIGEST, in the cut's release folder (or below), or None."""
+    name = name.replace('%20', ' ')
+    for folder, _, files in sorted(os.walk(release_dir)):
+        p = Path(folder) / name
+        if name in files and p.is_file() and not p.is_symlink() and p.stat().st_size == size and sha256(p) == digest:
+            return p
+    return None
+
+
+def fill_mirror(release_dir, host_mirror, tool, needs, check, run=subprocess.run):
+    """Add to the mirror every file the release needs that it lacks and the cut's release folder holds, one
+    `TOOL add` each (the tool checks the sha256 again). Returns the record."""
+    rec = dict(host_mirror=host_mirror, tool=str(tool) if tool else None, added=[], not_in_release=[], failed=[])
+    try:
+        lines = needs(Path(release_dir) / 'release.json')
+    except SystemExit as x:
+        rec['error'] = str(x)
+        return rec
+    missing = FRESH['mirror_missing'](lines, host_mirror, check)
+    rec.update(needed=len(lines), missing=[l.split(' ', 3)[-1] for l in missing])
+    for line in missing:
+        digest, size, origin, name = line.split(' ', 3)
+        found = release_file(release_dir, name, int(size), digest)
+        if found is None:
+            rec['not_in_release'].append(name)
+            continue
+        if not tool:
+            rec['failed'].append(name)
+            continue
+        cmd = [str(tool), 'add', str(found), '--name', name, '--expect', digest]
+        if origin != '?':
+            cmd += ['--origin', origin]
+        p = run(cmd, capture_output=True, text=True)
+        (rec['added'] if p.returncode == 0 and check(host_mirror, digest) else rec['failed']).append(name)
+    if rec['failed'] and not tool:
+        rec['error'] = 'no mirror tool (--mirror-tool or $HAO_MIRROR_FILL): release assets not added'
+    return rec
 
 
 def run_step(cmd, cwd, log, env):
@@ -159,7 +222,7 @@ def dev_skip(tree, assembly):
     return None
 
 
-def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkout)):
+def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkout), mirror=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('commit')
     ap.add_argument('--out', type=Path)
@@ -178,6 +241,12 @@ def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkou
     ap.add_argument('--mirror', default='http://192.168.64.1:8765', help='--fresh-mac: the mirror, as the VM reaches it')
     ap.add_argument('--fresh-mac-vm', default=os.environ.get('HAO_FRESH_MAC_VM'), metavar='VMDIR',
                     help='--fresh-mac: the Tahoe builder clone (default $HAO_FRESH_MAC_VM)')
+    ap.add_argument('--host-mirror', default='http://127.0.0.1:8765', help='--fresh-mac: the mirror, as this Mac '
+                    'reaches it (the mirror fill asks it)')
+    ap.add_argument('--mirror-tool', default=os.environ.get('HAO_MIRROR_FILL'), metavar='TOOL',
+                    help='--fresh-mac: the mirror\'s tool, to add the release assets it lacks (default $HAO_MIRROR_FILL)')
+    ap.add_argument('--qemu-boot', action='store_true',
+                    help='last: the commit\'s dev-lite image built and booted once in QEMU to the first-boot marker')
     a = ap.parse_args(argv)
     if a.no_dev and (a.only_dev or a.dev_overlay):
         ap.error('--no-dev excludes --only-dev and --dev-overlay')
@@ -200,6 +269,7 @@ def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkou
     out.mkdir(parents=True)
     cache.mkdir(parents=True, exist_ok=True)
     record = dict(commit=sha, out=str(out), signed=bool(a.sign_key), steps=[], sticks=[], fresh_mac=None,
+                  qemu_boot=None,
                   started=datetime.datetime.now().astimezone().isoformat(timespec='seconds'))
     work = Path(tempfile.mkdtemp(prefix='candidate-cut-'))
     tree = work / 'tree'
@@ -321,15 +391,39 @@ def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkou
             dev.update(image=dev_entry['path'], image_size=dev_entry['size'], image_sha256=dev_entry['sha256'],
                        release_json_sha256=dev_entry['release_json_sha256'], passed=True)
             record['sticks'].append(dev_entry)
+        failed_checks = []
         if a.fresh_mac:
+            m = mirror or {}
+            fill = record['mirror_fill'] = fill_mirror(
+                out / 'release', a.host_mirror, a.mirror_tool,
+                m.get('needs') or (lambda rel: FRESH['mirror_list'](rel, top=tree)),
+                m.get('check') or FRESH['on_mirror'], m.get('run') or subprocess.run)
+            print('candidate-cut: mirror fill: %d needed, %d missing, %d added from the release%s' % (
+                fill.get('needed', 0), len(fill.get('missing', [])), len(fill['added']),
+                '; ' + fill['error'] if fill.get('error') else ''), flush=True)
             fresh = out / 'fresh-mac'
             try:
                 step('fresh-mac', [PY, '-I', 'pipeline/fresh-mac-run', out / 'release', sha, '--vm', a.fresh_mac_vm,
-                                   '--mirror', a.mirror, '--out', fresh], record, out)
+                                   '--mirror', a.mirror, '--host-mirror', a.host_mirror, '--out', fresh], record, out)
+            except SystemExit:
+                failed_checks.append('fresh-mac')
             finally:
                 result = fresh_mac_result(fresh)
                 record['fresh_mac'] = 'PASS' if result and result.get('passed') else 'FAIL'
                 record['fresh_mac_result'] = result
+        if a.qemu_boot:
+            where = out / 'qemu-boot'
+            try:
+                step('qemu-boot', [PY, '-I', 'pipeline/qemu-first-boot', '--out', where, '--commit', sha], record, out)
+            except SystemExit:
+                failed_checks.append('qemu-boot')
+            finally:
+                result = qemu_boot_result(where)
+                record['qemu_boot'] = 'PASS' if result and result.get('qemu_boot') == 'PASS' else 'FAIL'
+                record['qemu_boot_record'] = result
+        if failed_checks:
+            current.update(rec=record, out=out)
+            raise SystemExit(1)
         record['passed'] = True
         return 0
     except (RuntimeError, subprocess.CalledProcessError) as x:
@@ -343,8 +437,9 @@ def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkou
         rec = current['rec']
         if rec is not record:
             rec['passed'] = False
-        print('candidate-cut: %s FAILED at %s (see %s)' % (sha[:8], rec['steps'][-1]['name'],
-                                                         out / rec['steps'][-1]['log']), file=sys.stderr)
+        bad = [s for s in rec['steps'] if s['rc']] or rec['steps'][-1:]
+        print('candidate-cut: %s FAILED at %s (see %s)' % (sha[:8], ', '.join(s['name'] for s in bad),
+                                                         ', '.join(str(out / s['log']) for s in bad)), file=sys.stderr)
         return 1
     finally:
         if 'phases' not in record:

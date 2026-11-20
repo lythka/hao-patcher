@@ -1,5 +1,6 @@
 """pipeline/candidate-cut with fake steps: the release stick and the dev stick, and create-installer's phase times."""
 from pathlib import Path
+import hashlib
 import json
 import runpy
 import shutil
@@ -17,6 +18,7 @@ class Cut(unittest.TestCase):
         self.root = Path(self.d.name).resolve()
         (self.root / 'store').mkdir()
         self.calls = []
+        self.mirror = dict(needs=lambda rel: [], check=lambda url, h: True)
 
     def tearDown(self):
         self.d.cleanup()
@@ -46,7 +48,7 @@ class Cut(unittest.TestCase):
     def cut(self, *extra, dev=True):
         out = self.root / 'out'
         rc = C['main'](['HEAD', '--out', str(out)] + list(extra), store=self.root / 'store', run=self.fake_run,
-                       worktree=self.fake_checkout(dev))
+                       worktree=self.fake_checkout(dev), mirror=self.mirror)
         return rc, json.loads((out / 'candidate.json').read_text()), out
 
     def test_both_sticks_are_made_and_listed(self):
@@ -178,6 +180,127 @@ class Cut(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertEqual(rec['fresh_mac'], 'FAIL')
         self.assertIsNone(rec['fresh_mac_result'])
+
+    def checks(self, fresh=None, qemu=None, extra=()):
+        """A cut with fake fresh-mac-run (FRESH: passed or not) and qemu-first-boot (QEMU: 'PASS', 'FAIL' or
+        None for no record) steps."""
+        real = self.fake_run
+
+        def run(cmd, cwd, log, env):
+            cmd = [str(c) for c in cmd]
+            if 'pipeline/fresh-mac-run' in cmd:
+                self.calls.append((cmd, env['HAO_LOGS']))
+                log.write_text('ran\n')
+                where = Path(cmd[cmd.index('--out') + 1])
+                where.mkdir(parents=True)
+                (where / 'fresh-mac.json').write_text(json.dumps(dict(passed=fresh)))
+                return 0 if fresh else 1
+            if 'pipeline/qemu-first-boot' in cmd:
+                self.calls.append((cmd, env['HAO_LOGS']))
+                log.write_text('ran\n')
+                where = Path(cmd[cmd.index('--out') + 1])
+                where.mkdir(parents=True)
+                if qemu:
+                    (where / 'qemu-boot.json').write_text(json.dumps(dict(qemu_boot=qemu, rev='abc1234')))
+                return 0 if qemu == 'PASS' else 1
+            return real(cmd, cwd, log, env)
+        self.fake_run = run
+        args = ['--no-dev', '--qemu-boot'] + list(extra)
+        if fresh is not None:
+            args += ['--fresh-mac', '--fresh-mac-vm', str(self.root / 'vm')]
+        return self.cut(*args)
+
+    def test_qemu_boot_runs_last_and_is_recorded(self):
+        rc, rec, out = self.checks(fresh=True, qemu='PASS')
+        self.assertEqual(rc, 0)
+        self.assertTrue(rec['passed'])
+        self.assertEqual((rec['fresh_mac'], rec['qemu_boot']), ('PASS', 'PASS'))
+        self.assertEqual(rec['qemu_boot_record']['rev'], 'abc1234')
+        self.assertEqual([s['name'] for s in rec['steps']][-2:], ['fresh-mac', 'qemu-boot'])
+        cmd = self.calls[-1][0]
+        self.assertEqual(cmd[cmd.index('--out') + 1], str(out / 'qemu-boot'))
+        self.assertEqual(cmd[cmd.index('--commit') + 1], rec['commit'])
+
+    def test_a_qemu_boot_failure_fails_the_cut(self):
+        rc, rec, out = self.checks(qemu='FAIL')
+        self.assertEqual(rc, 1)
+        self.assertFalse(rec['passed'])
+        self.assertEqual(rec['qemu_boot'], 'FAIL')
+        self.assertIsNone(rec['fresh_mac'])
+
+    def test_qemu_boot_without_a_record_is_a_failure(self):
+        rc, rec, out = self.checks(qemu=None)
+        self.assertEqual(rc, 1)
+        self.assertEqual(rec['qemu_boot'], 'FAIL')
+        self.assertIsNone(rec['qemu_boot_record'])
+
+    def test_a_fresh_mac_failure_still_boots_in_qemu(self):
+        rc, rec, out = self.checks(fresh=False, qemu='PASS')
+        self.assertEqual(rc, 1)
+        self.assertFalse(rec['passed'])
+        self.assertEqual((rec['fresh_mac'], rec['qemu_boot']), ('FAIL', 'PASS'))
+
+    def test_without_qemu_boot_it_is_null(self):
+        rc, rec, out = self.cut('--no-dev')
+        self.assertIsNone(rec['qemu_boot'])
+        self.assertNotIn('qemu-boot', [s['name'] for s in rec['steps']])
+
+    def test_the_mirror_fill_adds_release_assets_the_mirror_lacks(self):
+        held, added = {'aa' * 32}, []
+        asset = b'a new release asset'
+        digest = hashlib.sha256(asset).hexdigest()
+        lines = ['aa' * 32 + ' 5 https://example.invalid/old old.tar',
+                 '%s %d https://example.invalid/new.tar new.tar' % (digest, len(asset)),
+                 'bb' * 32 + ' 9 https://example.invalid/w.whl not-a-release-file.whl']
+
+        def tool(cmd, **kw):
+            added.append(cmd)
+            held.add(cmd[cmd.index('--expect') + 1])
+            return subprocess.CompletedProcess(cmd, 0, '', '')
+        real = self.fake_run
+
+        def run(cmd, cwd, log, env):
+            rc = real(cmd, cwd, log, env)
+            if 'pipeline/release-cut' in [str(c) for c in cmd]:
+                (self.root / 'out/release/new.tar').write_bytes(asset)
+            return rc
+        self.fake_run = run
+        self.mirror = dict(needs=lambda rel: lines, check=lambda url, h: h in held, run=tool)
+        rc, rec, out = self.cut('--no-dev', '--fresh-mac', '--fresh-mac-vm', str(self.root / 'vm'),
+                                '--mirror-tool', '/x/apple-mirror')
+        fill = rec['mirror_fill']
+        self.assertEqual(fill['needed'], 3)
+        self.assertEqual(fill['missing'], ['new.tar', 'not-a-release-file.whl'])
+        self.assertEqual(fill['added'], ['new.tar'])
+        self.assertEqual(fill['not_in_release'], ['not-a-release-file.whl'])
+        self.assertEqual(added, [['/x/apple-mirror', 'add', str(out / 'release/new.tar'), '--name', 'new.tar',
+                                  '--expect', digest, '--origin', 'https://example.invalid/new.tar']])
+        names = [s['name'] for s in rec['steps']]
+        self.assertLess(0, names.index('fresh-mac'))
+
+    def test_a_release_file_with_another_sha256_is_not_added(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'x.tar').write_bytes(b'12345')
+            self.assertIsNone(C['release_file'](d, 'x.tar', 5, 'cd' * 32))
+            self.assertIsNone(C['release_file'](d, 'x.tar', 6, C['sha256'](Path(d) / 'x.tar')))
+            self.assertEqual(C['release_file'](d, 'x.tar', 5, C['sha256'](Path(d) / 'x.tar')), Path(d) / 'x.tar')
+
+    def test_without_a_mirror_tool_nothing_is_added_and_it_says_so(self):
+        asset = b'asset'
+        digest = hashlib.sha256(asset).hexdigest()
+        real = self.fake_run
+
+        def run(cmd, cwd, log, env):
+            rc = real(cmd, cwd, log, env)
+            if 'pipeline/release-cut' in [str(c) for c in cmd]:
+                (self.root / 'out/release/a.tar').write_bytes(asset)
+            return rc
+        self.fake_run = run
+        self.mirror = dict(needs=lambda rel: ['%s 5 ? a.tar' % digest], check=lambda url, h: False,
+                           run=lambda *x, **k: self.fail('no tool to run'))
+        rc, rec, out = self.cut('--no-dev', '--fresh-mac', '--fresh-mac-vm', str(self.root / 'vm'), '--mirror-tool', '')
+        self.assertEqual(rec['mirror_fill']['failed'], ['a.tar'])
+        self.assertIn('no mirror tool', rec['mirror_fill']['error'])
 
 
 def sh(cwd, *cmd):
