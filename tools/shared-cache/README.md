@@ -156,6 +156,8 @@ output alone is not a deployable artifact. Existing runtime override gates remai
 in force; host lookup checks do not establish boot success or a speedup.
 
 ## Revisions
+- r93 2026-11-20 toolchain/make applies source.patch with --forward --batch: a DYLD_SOURCE already patched in place
+  stops the build instead of being silently un-patched (patch took such hunks as reversed).
 - r92 2026-11-20 tools/prespecialization-adoption.py: on a running target, checks that the Swift runtime reads the
   family's generated prespecialization map and finds entries in it.
 - r91 2026-11-20 macOS 27: the witness workers (swift-witness-graph, swift-dependency-replay, swift-witness-consumer) hook through tools/inline-hook.h (frida-gum's x86 relocator and writer, a trampoline written RW then made RX) instead of GumInterceptor, whose unwind broker recursed until the stack overflowed before the first record. normalize_graph finds owned rows through an index, not a scan per reference (a 155k-constructor witness capture took hours, now minutes). dependency-replay REPLAY_CONTINUE=1 (diagnostic) lists every record whose initialization changes identity in one run; the verdict still fails on any.

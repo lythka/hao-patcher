@@ -45,7 +45,9 @@ def build(source, output, arch, availability=None):
     output = output.resolve()
     tree = output / 'source'
     shutil.copytree(source, tree, ignore=shutil.ignore_patterns('.git'))  # a git clone's metadata is not source
-    subprocess.run(['patch', '-p1', '-i', str(HERE / 'source.patch')], cwd=tree, check=True)
+    # --forward: source that already carries a hunk (a DYLD_SOURCE patched in place) fails here, instead of patch
+    # taking the hunk as reversed and silently undoing it
+    subprocess.run(['patch', '-p1', '--forward', '--batch', '-i', str(HERE / 'source.patch')], cwd=tree, check=True)
     shutil.copytree(HERE / 'added-source', tree, dirs_exist_ok=True)
     version_map(availability, output, tree / 'include/dyld/VersionMap.h')
     project = tree / 'dyld.xcodeproj/project.pbxproj'

@@ -29,5 +29,30 @@ class VersionMap(unittest.TestCase):
             self.assertFalse(destination.exists())
 
 
+class SourcePatch(unittest.TestCase):
+    """A DYLD_SOURCE that already carries source.patch must stop the build, not be silently un-patched."""
+    PATCH = ('--- a/f.h\n+++ b/f.h\n@@ -1,2 +1,3 @@\n a\n+ours\n b\n')
+
+    def apply(self, text):
+        import subprocess
+        with tempfile.TemporaryDirectory() as scratch:
+            (Path(scratch) / 'f.h').write_text(text)
+            (Path(scratch) / 'p').write_text(self.PATCH)
+            run = subprocess.run(['patch', '-p1', '--forward', '--batch', '-i', 'p'], cwd=scratch,
+                                 capture_output=True, text=True)
+            return run.returncode, (Path(scratch) / 'f.h').read_text()
+
+    def test_make_uses_forward_batch(self):
+        self.assertIn("'--forward', '--batch'", PATH.read_text())
+
+    def test_pristine_source_is_patched(self):
+        self.assertEqual(self.apply('a\nb\n'), (0, 'a\nours\nb\n'))
+
+    def test_patched_source_is_refused_unchanged(self):
+        rc, text = self.apply('a\nours\nb\n')
+        self.assertNotEqual(rc, 0)
+        self.assertEqual(text, 'a\nours\nb\n')
+
+
 if __name__ == '__main__':
     unittest.main()
