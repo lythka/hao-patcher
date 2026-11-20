@@ -14,6 +14,7 @@
   vmctl VMDIR init-agent [PORT]          persist this VM's port and identity (idempotent)
   vmctl VMDIR agent-port|agent-id        read validated per-VM configuration
   vmctl VMDIR pin-agent-route IP IFACE   pin host link-local endpoint; install generated guest agent afterward
+  vmctl VMDIR endpoint                  JSON: agent port, bridge, share, queue state, collisions with running VMs
   vmctl VMDIR agent-install             print the guest installer for delivery as text through exec
   vmctl VMDIR serve                      authenticated HTTP side for the full-macOS root agent
   vmctl VMDIR serve-bootstrap PORT       legacy migration only, with this VM isolated by start.sh
@@ -361,15 +362,93 @@ echo AGENT-INSTALLED
 """ % script
 
 
-def bridge_if():
-    out = subprocess.run(["ifconfig"], capture_output=True, text=True).stdout
-    cur = None
-    for line in out.splitlines():
+def vm_bridges(text=None):
+    """{bridge: {"members": [vmenetN...], "inet6": [addresses]}} for every bridge with a VM member, in ifconfig order."""
+    text = subprocess.run(["ifconfig"], capture_output=True, text=True).stdout if text is None else text
+    found, cur = {}, None
+    for line in text.splitlines():
         if line and not line[0].isspace():
             cur = line.split(":")[0]
-        elif cur and cur.startswith("bridge") and "member: vmenet" in line:
-            return cur
+            continue
+        if not cur or not cur.startswith("bridge"):
+            continue
+        words = line.split()
+        entry = found.setdefault(cur, dict(members=[], inet6=[]))
+        if words[:1] == ["member:"] and words[1].startswith("vmenet"):
+            entry["members"].append(words[1])
+        elif words[:1] == ["inet6"]:
+            entry["inet6"].append(words[1].split("%")[0])
+    return {b: e for b, e in found.items() if e["members"]}
+
+
+def bridge_if(pinned=None, text=None):
+    """The VM bridge to serve on: the one holding the pinned host link-local address when there is one (with
+    several VM bridges, the first one may belong to another VM), else the first."""
+    bridges = vm_bridges(text)
+    if pinned:
+        for name, entry in bridges.items():
+            if pinned in entry["inet6"]:
+                return name
+    if bridges:
+        return next(iter(bridges))
     sys.exit("vmctl: no VM bridge interface (is the VM running?)")
+
+
+def running_vms(text=None):
+    """[(vmdir, mac, share)] of every `ssdvm run` on this Mac."""
+    if text is None:
+        text = subprocess.run(["ps", "-axo", "command="], capture_output=True, text=True).stdout
+    out = []
+    for line in text.splitlines():
+        m = re.search(r"(?:^|/)ssdvm run (.*?)(?: --|$)", line)
+        if m:
+            mac = re.search(r"--mac (\S+)", line)
+            share = re.search(r"--share (.*?)(?: --|$)", line)
+            out.append((m[1], mac[1] if mac else None, share[1] if share else None))
+    return out
+
+
+def collisions(vmdir, running, config_of=None):
+    """What VMDIR shares with another running VM that must be its own: agent port or identity, MAC, share."""
+    config_of = config_of or (lambda d: json.loads((Path(d) / "agent.json").read_text()))
+    me = Path(vmdir).resolve()
+    mine = dict(config_of(me))
+    for d, mac, share in running:
+        if Path(d).resolve() == me:
+            mine.update(mac=mac, share=share)
+    found = []
+    for d, mac, share in running:
+        if Path(d).resolve() == me:
+            continue
+        try:
+            other = config_of(Path(d))
+        except (OSError, ValueError):
+            other = {}
+        for key, a, b in (("agent port", mine.get("port"), other.get("port")),
+                          ("agent identity", mine.get("identity"), other.get("identity")),
+                          ("MAC", mine.get("mac"), mac), ("share", mine.get("share"), share)):
+            if a is not None and a == b:
+                found.append("%s %s also used by %s" % (key, a, d))
+    return found
+
+
+def endpoint(vmdir):
+    """How exec reaches this VM's guest agent, for a failure report."""
+    config = agent_config(vmdir)
+    q = share_dir(vmdir) / ".agent"
+    counts = {k: len(list(q.glob("*." + k))) for k in ("cmd", "run", "rc", "withdrawn")} if q.is_dir() else None
+    serve = Path(str(Path(vmdir).resolve()) + ".run") / "serve.pid"
+    try:
+        os.kill(int(serve.read_text().strip()), 0)
+        serving = True
+    except (OSError, ValueError):
+        serving = False
+    bridges = vm_bridges()
+    return dict(vm=str(Path(vmdir).resolve()), port=config["port"], identity=config["identity"][:8],
+                host_link_local=config.get("host_link_local"), guest_interface=config.get("guest_interface"),
+                bridge=bridge_if(config.get("host_link_local")) if bridges else None, vm_bridges=bridges,
+                share=str(share_dir(vmdir)), queue=counts, serving=serving,
+                collisions=collisions(vmdir, running_vms()))
 
 
 def agent_server(vmdir, bootstrap_port=None, interface=None):
@@ -380,7 +459,7 @@ def agent_server(vmdir, bootstrap_port=None, interface=None):
     config = agent_config(vmdir)
     q = agent_dir(vmdir)
     (q / "http-agent.sh").write_text(guest_agent(config))
-    bridge = bridge_if() if interface is None else interface
+    bridge = bridge_if(config.get('host_link_local')) if interface is None else interface
     if config.get('host_link_local'):
         text = subprocess.check_output(['ifconfig', bridge], text=True)
         addresses = [line.split()[1].split('%')[0] for line in text.splitlines()
@@ -681,6 +760,9 @@ def main():
         return
     if op == "agent-id":
         print(agent_config(vmdir)["identity"])
+        return
+    if op == "endpoint":                      # how exec reaches the guest agent (port, bridge, queue, collisions)
+        print(json.dumps(endpoint(vmdir), indent=1))
         return
     if op == "agent-install":
         print(agent_install(vmdir), end="")

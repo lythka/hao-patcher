@@ -69,38 +69,86 @@ class Submit(unittest.TestCase):
     def reply(self, rc, out='', err=''):
         return subprocess.CompletedProcess([], rc, out, err)
 
+    def vmctl(self, exec_reply, calls=None):
+        """A fake `vmctl VM exec|endpoint`: EXEC_REPLY(argv) answers exec; endpoint prints a port."""
+        def run(a):
+            if a[2] == 'endpoint':
+                return self.reply(0, '{"port": 20001}')
+            if calls is not None:
+                calls.append(a)
+            return exec_reply(a)
+        return run
+
     def test_started_at_once(self):
         said = []
-        n = G['submit_job'](lambda a: self.reply(0, 'started\n'), 'vmctl', 'vm', 'job', '/no/such', say=lambda *a, **k: said.append(a))
+        n = G['submit_job'](self.vmctl(lambda a: self.reply(0, 'started\n')), 'vmctl', 'vm', 'job', '/no/such', say=lambda *a, **k: said.append(a))
         self.assertEqual((n, said), (1, []))
 
     def test_an_undelivered_job_is_sent_again_and_stderr_shown(self):
         replies = [self.reply(75, err='vmctl: no reply within 600s and the guest never took the command; withdrawn'),
                    self.reply(0, 'started\n')]
         said = []
-        n = G['submit_job'](lambda a: replies.pop(0), 'vmctl', 'vm', 'job', '/no/such',
+        n = G['submit_job'](self.vmctl(lambda a: replies.pop(0)), 'vmctl', 'vm', 'job', '/no/such',
                             say=lambda *a, **k: said.append(a[0]))
         self.assertEqual(n, 2)
         self.assertIn('never took the command', said[0])
+        self.assertEqual(said[1], 'golden-run: agent endpoint: {"port": 20001}')
 
     def test_a_job_that_started_is_never_sent_again(self):
         with tempfile.TemporaryDirectory() as d:
             calls = []
-            n = G['submit_job'](lambda a: calls.append(a) or self.reply(75, err='slow'), 'vmctl', 'vm', 'job', d,
+            n = G['submit_job'](self.vmctl(lambda a: self.reply(75, err='slow'), calls), 'vmctl', 'vm', 'job', d,
                                 say=lambda *a, **k: None)
             self.assertEqual((n, len(calls)), (1, 1))
 
     def test_a_job_that_may_have_been_delivered_is_not_resent(self):
         calls = []
         with self.assertRaises(RuntimeError) as e:
-            G['submit_job'](lambda a: calls.append(a) or self.reply(1, err='vmctl: no reply; the guest took the command'),
+            G['submit_job'](self.vmctl(lambda a: self.reply(1, err='vmctl: no reply; the guest took the command'), calls),
                             'vmctl', 'vm', 'job', '/no/such', say=lambda *a, **k: None)
         self.assertEqual(len(calls), 1)
         self.assertIn('not resent', str(e.exception))
 
     def test_attempts_run_out(self):
         with self.assertRaises(RuntimeError):
-            G['submit_job'](lambda a: self.reply(75), 'vmctl', 'vm', 'job', '/no/such', say=lambda *a, **k: None)
+            G['submit_job'](self.vmctl(lambda a: self.reply(75)), 'vmctl', 'vm', 'job', '/no/such', say=lambda *a, **k: None)
+
+
+IFCONFIG = '''lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384
+bridge0: flags=8863<UP> mtu 1500
+\tmember: en1 flags=3<LEARNING,DISCOVER>
+bridge100: flags=8a63<UP> mtu 1500
+\tinet6 fe80::aaaa:1%bridge100 prefixlen 64 scopeid 0x1b
+\tmember: vmenet0 flags=20803<LEARNING,DISCOVER,PRIVATE,VIRTIO>
+bridge101: flags=8a63<UP> mtu 1500
+\tinet6 fe80::bbbb:2%bridge101 prefixlen 64 scopeid 0x1c
+\tmember: vmenet1 flags=20803<LEARNING,DISCOVER,PRIVATE,VIRTIO>
+'''
+
+
+class Endpoint(unittest.TestCase):
+    def test_vm_bridges(self):
+        got = V['vm_bridges'](IFCONFIG)
+        self.assertEqual(list(got), ['bridge100', 'bridge101'])
+        self.assertEqual(got['bridge101'], dict(members=['vmenet1'], inet6=['fe80::bbbb:2']))
+
+    def test_the_bridge_holding_the_pinned_address_is_served_not_the_first(self):
+        self.assertEqual(V['bridge_if']('fe80::bbbb:2', IFCONFIG), 'bridge101')
+        self.assertEqual(V['bridge_if']('fe80::aaaa:1', IFCONFIG), 'bridge100')
+        self.assertEqual(V['bridge_if'](None, IFCONFIG), 'bridge100')
+
+    def test_collisions_with_another_running_vm(self):
+        ps = ('/s/vm/bin/ssdvm run /vms/a/vm --mac 02:00:00:00:00:01 --share /x/share-a\n'
+              '/s/vm/bin/ssdvm run /vms/b/vm --mac 02:00:00:00:00:02 --share /x/share-b\n'
+              '/s/vm/bin/ssdvm run /vms/c/vm --mac 02:00:00:00:00:01 --share /x/share-a\n')
+        running = V['running_vms'](ps)
+        self.assertEqual(running[1], ('/vms/b/vm', '02:00:00:00:00:02', '/x/share-b'))
+        configs = {'/vms/a/vm': dict(port=20001, identity='a' * 32), '/vms/b/vm': dict(port=20002, identity='b' * 32),
+                   '/vms/c/vm': dict(port=20001, identity='c' * 32)}
+        got = V['collisions']('/vms/a/vm', running, config_of=lambda d: configs[str(d)])
+        self.assertEqual(got, ['agent port 20001 also used by /vms/c/vm', 'MAC 02:00:00:00:00:01 also used by /vms/c/vm',
+                               'share /x/share-a also used by /vms/c/vm'])
+        self.assertEqual(V['collisions']('/vms/b/vm', running, config_of=lambda d: configs[str(d)]), [])
 
 
 class AgentScript(unittest.TestCase):

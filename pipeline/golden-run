@@ -407,6 +407,8 @@ def submit_job(run, vmctl, vm, submission, output, attempts=3, say=print):
             return attempt
         say('golden-run: vmctl exec failed (rc %d, attempt %d/%d): %s'%(reply.returncode,attempt,attempts,
             (reply.stderr or '').strip()[-2000:] or '(no stderr)'),flush=True)
+        where=run([str(vmctl),str(vm),'endpoint'])
+        say('golden-run: agent endpoint: %s'%((where.stdout or '').strip() or (where.stderr or '').strip()),flush=True)
         if Path(output).exists():
             say('golden-run: the guest job started (%s exists); waiting for it'%output,flush=True)
             return attempt
@@ -608,6 +610,7 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
             script=job_script(local,workspace=workspace,recovery_commands=recovery_commands)
             (record/'guest-job.sh').write_text(script)
             submission='(\n'+script+'\n) >/dev/null 2>&1 </dev/null & echo started'
+            subprocess.run([str(pipeline/'vm/vmctl'),str(vm),'endpoint'],env=env)   # logged: the agent's port and bridge
             print('+ '+shlex.join([str(pipeline/'vm/vmctl'),str(vm),'exec','<guest job>']),flush=True)
             submit_job(lambda a:subprocess.run(a,env=env,capture_output=True,text=True),pipeline/'vm/vmctl',vm,
                        submission,share/'out-golden')
