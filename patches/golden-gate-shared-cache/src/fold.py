@@ -11,7 +11,8 @@ retired-roots.txt as cache images. This recipe:
    (LATER_EDITS: the Swift prespecialization edits, which a cache without overridden images does not need, and the
    model gates, which step 4 applies again);
 4. builds a new sealed OS cryptex: the current one's files with the x86_64 family replaced by the artifact's, the
-   model gates renamed in it when the image had them, 4 KiB code pages, every Swift metadata reference checked;
+   model gates renamed in it when the image had them, 4 KiB code pages, every Swift metadata reference checked, then
+   copied into an image sized to what it holds (golden-gate-userspace's compact_image) before it is sealed;
 5. removes the roots from System and stops unless no image of the new family is left on disk (dyld itself aside, and
    the N patterns of src/providers.txt: images no process loads on this Mac, listed in the record).
 
@@ -279,7 +280,8 @@ def gate(system, image_paths, allowed=None):
 
 
 def install(system, artifact):   # pragma: no cover - builder VM only (APFS images, Preboot)
-    from cryptex import CRYPTEX_KEEP, image_mount, logical_size, new_image, remove, replace_tree, run, seal_image
+    from cryptex import (CRYPTEX_KEEP, built_path, compact_image, image_mount, logical_size, new_image, remove,
+                         replace_tree, run, seal_image)
     from cache_pages import resign_file
     from install import volume_mount
     system, artifact = Path(system), Path(artifact)
@@ -297,6 +299,7 @@ def install(system, artifact):   # pragma: no cover - builder VM only (APFS imag
         current = preboot/group/'cryptex1/current'
         work = current/'.golden-gate-shared-cache-os.dmg'
         remove(work)
+        remove(built_path(work))   # compact_image's first image, if an earlier run stopped
         with image_mount(current/'os.dmg', workspace/'built-os') as built:
             record['input'] = match_input(built/DYLD, art['inputs'], workspace, resign_file,
                                           later_edits(built/DYLD, artifact))
@@ -325,6 +328,9 @@ def install(system, artifact):   # pragma: no cover - builder VM only (APFS imag
                 record['images'] = len(image_paths)
                 os.chmod(mount, metadata.st_mode & 0o7777)
                 os.chflags(mount, metadata.st_flags)
+        # The image above is made at the files' logical size, but most are stored compressed, and the golden-image
+        # guard allocates the whole image (#90): copy the volume into one sized to what it holds, then seal that.
+        record['image_size'] = compact_image(work, workspace, metadata)
         record['seal'] = seal_image(work)
         remove(current/'os.clone.dmg')
         remove(current/'os.dmg')

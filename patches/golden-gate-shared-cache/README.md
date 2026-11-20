@@ -86,12 +86,16 @@ cryptex build that step 3 compares against. The compat libraries (`io80211_compa
 
 ## Validation
 
-NEEDS VALIDATION: r10 not built by golden-run. This recipe's `fold.py install` ran on a copy of an aae0ab3 image with
+NEEDS VALIDATION: r11 (the folded image compacted before the seal) not built yet; r10 not built by golden-run. This recipe's `fold.py install` ran on a copy of an aae0ab3 image with
 the 31C0215A family and row `hao_runtime_fold`'s payload, and that image booted in QEMU to sshd with loginwindow and
 WindowServer up. The fold sets take row `hao_runtime_fold` (recipe hao-runtime-fold), whose payload must name this
 family's cache UUID.
 
 ## Revisions
+- r11 2026-11-19 The folded OS cryptex is copied into an image sized to what it holds before it is sealed
+  (golden-gate-userspace's compact_image, r95): it was made at logical size + 2 GiB, about 26 GB on 26B131, and the
+  golden-image guard allocates the whole image, which brought back the 13 GB r95 removed. Host tests: tests/test_fold.py
+  Compact.
 - r10 2026-11-18 Row `rebuilt_cache`: rebuilt-cache-fold-in-26B131-20261118-5aacad92 (cache UUID 31C0215A), from
   tools/shared-cache r86 on the System of release/v0.0.1 aae0ab3: no prebuilt loaders, the dylibs set at the cache base.
 - r9 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.

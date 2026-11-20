@@ -332,5 +332,37 @@ class Recipe(unittest.TestCase):
             self.assertEqual([n for n in b if n != recipe and n not in extra.get(name, [])], expect, name)
 
 
+class Compact(unittest.TestCase):
+    """The folded OS cryptex is sized to what it holds, as golden-gate-userspace's own build is (r95): the golden-image
+    guard allocates the whole os.dmg (#90), so an image made at logical size + 2 GiB (26B131: about 26 GB) would bring
+    back the 13 GB the compaction removed. install() runs in the builder VM, so this checks its order and the helper."""
+
+    def body(self):
+        text = (PATCH/'src/fold.py').read_text()
+        return text[text.index('def install('):text.index('def main(')]
+
+    def test_compacts_the_folded_image_before_sealing(self):
+        body = self.body()
+        self.assertLess(body.index('replace_cache(mount/DYLD'), body.index('compact_image(work, workspace, metadata)'))
+        self.assertLess(body.index('compact_image(work, workspace, metadata)'), body.index('seal_image(work)'))
+        self.assertLess(body.index('seal_image(work)'), body.index("os.replace(work, current/'os.dmg')"))
+
+    def test_compaction_starts_after_the_folded_volume_is_unmounted(self):
+        """compact_image mounts WORK read-only; the writable mount of the folded image must be closed by then."""
+        lines = self.body().splitlines()
+        mount = next(i for i, l in enumerate(lines) if "image_mount(work, workspace/'folded-os', writable=True)" in l)
+        compact = next(i for i, l in enumerate(lines) if 'compact_image(work, workspace, metadata)' in l)
+        indent = lambda l: len(l) - len(l.lstrip())
+        self.assertLess(indent(lines[compact]), indent(lines[mount]))
+
+    def test_a_stopped_run_leaves_no_first_image(self):
+        self.assertIn('remove(built_path(work))', self.body())
+
+    def test_the_helper_is_the_userspace_one(self):
+        import cryptex
+        self.assertEqual(Path(cryptex.__file__).resolve().parent, fold.USERSPACE.resolve())
+        self.assertLess(cryptex.fitted_size(12937896 * 1024), 15 * 10 ** 9)
+
+
 if __name__ == '__main__':
     unittest.main()
