@@ -124,7 +124,7 @@ def assemble_onto(a, c, host, path, info, policy, run=subprocess.call):
         kit = work / 'stage' / 'share'
     if not (kit / 'kit.json').is_file():
         raise Stopped('%s is no kit (no kit.json)' % kit, untouched='nothing was written to the disk')
-    local = Path(getattr(a, 'local', None) or work / 'local').resolve()
+    local = assembly_local(a, work)
     prior = resumed_work(a)
     # A kit staged here is collected afterwards (golden-run --collect-kit keeps its sealed cryptex images); a kit
     # named with --kit (hao install from the stick) is not, so storing them would only fill the stick.
@@ -184,6 +184,13 @@ def failed_step(work):
         return None
     left = [row['name'] for row in steps if not row.get('complete')]
     return left[0] if left else None
+
+
+def assembly_local(a, work=None):
+    """The assembler's LOCAL folder (--local, else WORK/local), resolved as assemble_onto uses it."""
+    if getattr(a, 'local', None):
+        return Path(a.local).resolve()
+    return (Path(work if work is not None else a.work).resolve() / 'local').resolve()
 
 
 def resumed_work(a):
@@ -657,27 +664,59 @@ def check_trace(top):
     return f
 
 
-def kit_ownership(c, host, kit):
-    """Turn ownership on for the volume the kit is on, when it is off: a Recovery mounts the USB installer's HAO
-    "noowners", so every file there reads as owned by an unknown user, and the install's own checks of its private
-    copies (made under its work folder there, as root) refuse them. Root only; a failure is a warning (the install then
-    says which step refused)."""
+def new_file_owner(folder):
+    """The owner a file made now in FOLDER reads as (a volume mounted without ownership reports uid 99 for it)."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(dir=folder, prefix='.hao-owner-') as f:
+        return os.fstat(f.fileno()).st_uid
+
+
+def mount_point(path):
+    """The mount point of the volume PATH (an existing folder) is on."""
+    p = Path(os.path.abspath(path))
+    while not os.path.ismount(p) and p != p.parent:
+        p = p.parent
+    return str(p)
+
+
+def kit_ownership(c, host, place, owner=None, euid=os.geteuid):
+    """Make files the install creates under PLACE (its work folder, or the nearest folder of it that exists) read as
+    owned by this user. A Recovery mounts the USB installer's HAO "noowners", so every file there reads as owned by an
+    unknown user (99), and the install's own checks of its private copies (made under its work folder, as root) refuse
+    them after the shared cache is built (~3 h in). Decided by what a new file there reads as, not by `diskutil info`
+    (given a folder rather than a mount point it answers only {Error: Could not find disk}). When the owner is wrong:
+    `diskutil enableOwnership` on PLACE's volume, then the same test again; still wrong stops the install before
+    anything is erased, and so does a test that cannot run. Returns True when ownership was turned on, False when it was already right."""
+    place = Path(place).resolve()               # as assembly resolves it: a link to another volume is followed
+    while not place.is_dir() and place != place.parent:
+        place = place.parent
+    owner = owner or new_file_owner
+    want = euid()
     try:
-        info = plistlib.loads(host.run(['diskutil', 'info', '-plist', str(Path(kit).resolve())], check=False).stdout
-                              or b'{}')
-    except ValueError:
+        got = owner(place)
+    except OSError as x:
+        raise Stopped('could not test who owns files made in %s (%s)' % (place, x.strerror or x),
+                      why='the install checks who owns its working copies there and would refuse them hours in',
+                      options=['make that folder writable, or name another work folder'],
+                      untouched='nothing was written to any disk') from None
+    if got == want:
         return False
-    if info.get('GlobalPermissionsEnabled', True):
-        return False
-    mount = info.get('MountPoint')
-    r = host.run(['diskutil', 'enableOwnership', mount], check=False) if mount else None
-    ok = bool(r and r.returncode == 0)
-    c.event('kit.ownership', mount=mount, enabled=ok)
-    if ok:
-        c.item('ownership on for %s (the install checks who owns its working copies)' % mount, 'files', ok=True)
-    else:
-        c.warning('ownership could not be turned on for %s: the install may refuse its own working copies' % mount)
-    return ok
+    mount = mount_point(place)
+    r = host.run(['diskutil', 'enableOwnership', mount], check=False)
+    try:
+        after = owner(place)
+    except OSError:
+        after = None
+    ok = after == want
+    c.event('kit.ownership', mount=mount, before=got, after=after, enabled=ok, rc=r.returncode)
+    if not ok:
+        raise Stopped('files made in %s read as owned by uid %s, not %d, even after diskutil enableOwnership %s (rc %d)'
+                      % (place, after if after is not None else got, want, mount, r.returncode),
+                      why='the install checks who owns its working copies there and would refuse them hours in',
+                      options=['turn ownership on for that volume (diskutil enableOwnership %s) and run the command '
+                               'again' % mount], untouched='nothing was written to any disk')
+    c.item('ownership on for %s (the install checks who owns its working copies)' % mount, 'files', ok=True)
+    return True
 
 
 def check_drive(a, c):
@@ -794,7 +833,7 @@ def install(a, c, host, run=subprocess.call):
         raise Stopped('not confirmed', untouched='nothing was written')
     if not getattr(a, 'local', None) and not getattr(a, 'work', None):
         a.work = str(Path(a.kit).resolve().parent / ('hao-install-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S')))
-    kit_ownership(c, host, a.kit)
+    kit_ownership(c, host, assembly_local(a))
     work = assemble_onto(a, c, host, path, info, 'internal', run)
     write_install_record(c, host, DISKS.normalize(a.disk),
                          install_record(a, c, profile, path, asm, groups, DISKS.normalize(a.disk), a.kit))

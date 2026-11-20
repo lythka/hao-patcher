@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 TOOL = HERE.parent
@@ -745,22 +746,89 @@ class BuilderTest(unittest.TestCase):
             self.assertEqual((x.exception.code, ran), (4, []))
             self.assertIn('install (a different size)', x.exception.what)
 
-    def test_install_turns_ownership_on_for_the_kits_volume(self):
-        class Host:
-            def __init__(self, enabled):
-                self.enabled, self.calls = enabled, []
-            def run(self, argv, check=True, timeout=120):
-                argv = [str(x) for x in argv]
-                self.calls.append(argv)
-                out = plistlib.dumps({'MountPoint': '/Volumes/HAO', 'GlobalPermissionsEnabled': self.enabled}) \
-                    if argv[:2] == ['diskutil', 'info'] else b''
-                return subprocess.CompletedProcess(argv, 0, out, b'')
-        off, on = Host(False), Host(True)
-        c, _ = console('quiet')
-        self.assertTrue(BUILD.kit_ownership(c, off, '/Volumes/HAO/kit'))
-        self.assertIn(['diskutil', 'enableOwnership', '/Volumes/HAO'], off.calls)
-        self.assertFalse(BUILD.kit_ownership(c, on, '/Volumes/HAO/kit'))      # already on: nothing to do
-        self.assertFalse(any(x[:2] == ['diskutil', 'enableOwnership'] for x in on.calls))
+    # What `diskutil info -plist /Volumes/HAO/kit` answers in the USB installer's Recovery (byte for byte, QEMU
+    # 2026-11-19; the HAO volume itself reports GlobalPermissionsEnabled false and is mounted noowners): a folder is no
+    # disk, so there is no GlobalPermissionsEnabled, and 1bfb134b read that as "ownership on" and did nothing.
+    DISKUTIL_INFO_FOLDER = (b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+                            b'"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n'
+                            b'\t<key>Error</key>\n\t<true/>\n\t<key>ErrorMessage</key>\n'
+                            b'\t<string>Could not find disk: /Volumes/HAO/kit</string>\n\t<key>ExitCode</key>\n'
+                            b'\t<integer>1</integer>\n</dict>\n</plist>\n')
+
+    class OwnerHost:
+        """diskutil as a Recovery answers it; enableOwnership turns the owner of new files from 99 to root when FIXES."""
+        def __init__(self, owner, fixes=True):
+            self.owner, self.fixes, self.calls = owner, fixes, []
+        def run(self, argv, check=True, timeout=120):
+            argv = [str(x) for x in argv]
+            self.calls.append(argv)
+            if argv[:2] == ['diskutil', 'info']:
+                return subprocess.CompletedProcess(argv, 1, BuilderTest.DISKUTIL_INFO_FOLDER, b'')
+            if argv[:2] == ['diskutil', 'enableOwnership'] and self.fixes:
+                self.owner = 0
+            return subprocess.CompletedProcess(argv, 0, b'', b'')
+        def probe(self, folder):
+            return self.owner
+        def enabled(self):
+            return [x for x in self.calls if x[:2] == ['diskutil', 'enableOwnership']]
+
+    def test_install_turns_ownership_on_whatever_diskutil_info_says(self):
+        with tempfile.TemporaryDirectory() as d:
+            work = Path(d) / 'hao-install-20261119-200019'          # not made yet: tested in the folder above it
+            off = self.OwnerHost(99)
+            c, _ = console('quiet')
+            self.assertTrue(BUILD.kit_ownership(c, off, work, owner=off.probe, euid=lambda: 0))
+            self.assertEqual(off.enabled(), [['diskutil', 'enableOwnership', BUILD.mount_point(d)]])
+            on = self.OwnerHost(0)
+            self.assertFalse(BUILD.kit_ownership(c, on, work, owner=on.probe, euid=lambda: 0))   # already right
+            self.assertEqual(on.enabled(), [])
+
+    def test_install_stops_before_erasing_when_ownership_stays_off(self):
+        with tempfile.TemporaryDirectory() as d:
+            stuck = self.OwnerHost(99, fixes=False)
+            c, _ = console('quiet')
+            with self.assertRaises(CON.Stopped) as x:
+                BUILD.kit_ownership(c, stuck, d, owner=stuck.probe, euid=lambda: 0)
+            self.assertIn('uid 99', x.exception.what)
+            self.assertEqual(x.exception.untouched, 'nothing was written to any disk')
+
+    def test_install_stops_before_erasing_when_the_owner_test_cannot_run(self):
+        host = FakeMac(root_device='disk9s1', **self.RELAXED)
+        with tempfile.TemporaryDirectory() as d:
+            kit = Path(d) / 'kit'; kit.mkdir(); (kit / 'kit.json').write_text('{}')
+            ran, run = self.fake_run()
+            c, _ = console('quiet')
+            def fails(folder):
+                raise PermissionError(13, 'Permission denied')
+            with mock.patch.object(BUILD, 'new_file_owner', fails), self.assertRaises(CON.Stopped) as x:
+                BUILD.install(ns(disk='disk0', dry_run=False, confirm='ERASE', kit=str(kit), work=str(Path(d) / 'w')),
+                              c, host, run=run)
+            self.assertIn('could not test who owns', x.exception.what)
+            self.assertEqual(ran, [])                                    # nothing assembled, nothing erased
+
+    def test_install_tests_the_owner_where_assembly_works(self):
+        host = FakeMac(root_device='disk9s1', **self.RELAXED)
+        with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as other:
+            kit = Path(d) / 'kit'; kit.mkdir(); (kit / 'kit.json').write_text('{}')
+            (Path(d) / 'w').symlink_to(other)                           # the work folder is a link elsewhere
+            ran, run = self.fake_run()
+            seen = []
+            def probe(folder):
+                seen.append(Path(folder))
+                return os.geteuid()
+            c, _ = console('quiet')
+            with mock.patch.object(BUILD, 'new_file_owner', probe):
+                BUILD.install(ns(disk='disk0', dry_run=False, confirm='ERASE', kit=str(kit), work=str(Path(d) / 'w')),
+                              c, host, run=run)
+            self.assertEqual(len(ran), 1)
+            self.assertEqual(seen, [Path(other).resolve()])              # the link's target, where local/ will be made
+
+    def test_new_file_owner_reads_a_real_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(BUILD.new_file_owner(d), os.geteuid())
+            self.assertEqual(os.listdir(d), [])
+            self.assertEqual(BUILD.mount_point(d), BUILD.mount_point(BUILD.mount_point(d)))
+            self.assertTrue(os.path.ismount(BUILD.mount_point(d)))
 
     def test_install_resumes_a_failed_one(self):
         host = FakeMac(root_device='disk9s1', **self.RELAXED)
