@@ -1,4 +1,5 @@
-# hao runtime payload for the B+catalog fold-in image (family D3BDB76E, row rebuilt_cache_catalog), from hao-runtime
-# 3a6a5d9: libhao b739adbd, 965 of 969 AOT caches. Its records name D3BDB76E only.
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=c9829374532450df36b029ee59cb4bbf1a4b4154838c34c00cc92e3d2d2b7999
-2046947d35b90bbbd93248dff9bffb8c9d5544ca671550fa318e1ca6e092f715 store/artifacts/hao-runtime-26B131-20261118-3a6a5d9-catalog-d3bdb76e/payload
+# hao runtime payload for the B+catalog fold-in image (family 322743F4, row rebuilt_cache_catalog: the 66k-record Swift
+# catalog family), from hao-runtime aba5ce7 (the RC runtime with the JIT arena and the Weather fix): libhao db500576.
+# Its records name 322743F4 only.
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=42b429982eb76e4df605c2fc789fdf37b67e93350b141a84dfad5e2a49c58078
+ae6b32aa2c64b18909ea010ffca604b6765afefd89dc6bcb41e2ef3fd7fe3e54 store/artifacts/hao-runtime-26B131-20261119-aba5ce7-fold-66k-322743f4/payload

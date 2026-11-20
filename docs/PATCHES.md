@@ -650,7 +650,7 @@ Revision r10, status product. [Recipe](../patches/hao-runtime-fold/README.md)
 
 ## hao-runtime-fold-catalog
 
-Revision r1, status experiment. [Recipe](../patches/hao-runtime-fold-catalog/README.md)
+Revision r2, status experiment. [Recipe](../patches/hao-runtime-fold-catalog/README.md)
 
 - `usr/libexec/hao`: whole file from hao (row hao_runtime_fold_catalog). The hao launcher (B+catalog payload) that runs ARM64 programs on Intel (payload root/usr/libexec/hao, copied by hao-install.py). Installed mode 0755, owner root:wheel, flags restricted.
 - `usr/lib/hao/libhao.dylib`: whole file from hao (row hao_runtime_fold_catalog). Hao runtime library (payload root). Installed mode 0755, owner root:wheel.
