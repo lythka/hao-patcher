@@ -1,0 +1,13 @@
+{
+ "comment": "pipeline/qemu-first-boot: what a candidate's QEMU first boot builds and boots, and what it must show",
+ "assembly": "dev-lite-26B131-alpha-v0.1.0",
+ "reference_row": "qemu_reference_efi",
+ "darwin_major": 27,
+ "commpage_kext": "IntelCommpage.kext",
+ "kexts": ["HaoExec.kext"],
+ "boot_args": ["serial=3"],
+ "memory": "8G",
+ "boot_timeout_seconds": 1800,
+ "running": ["WindowServer", "loginwindow"],
+ "max_macos_vms": 2
+}

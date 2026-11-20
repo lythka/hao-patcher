@@ -1,0 +1,324 @@
+#!/usr/bin/env python3.14
+"""qemu-first-boot: a commit's dev-lite image built and booted once in QEMU to the first-boot marker.
+
+  pipeline/qemu-first-boot --out DIR [--image REPO] [--no-build] [--commit SHA] [--config FILE] [--ssh-key KEY]
+
+What is built, booted and checked is data: pipeline/qemu-boot.json (--config): the assembly, the reference EFI row,
+the Darwin major, the kexts and boot-args the QEMU ESP gets, the guest's memory, the boot timeout, the processes
+that must run, and how many macOS VMs this host may run at once.
+
+  1. pipeline/golden-run ASSEMBLY --repo REPO (default OUT/image), once fewer than max_macos_vms builder VMs
+     (`ssdvm run`) are running: every macOS guest on this Mac counts against Virtualization's limit, the fresh-Mac
+     VM too. golden-run checks the disk itself. --no-build boots REPO as it is.
+  2. tools/bin/ssdimg export of REPO's newest revision to OUT/target.img (raw and sparse; diskguard checks its
+     logical size first).
+  3. The QEMU ESP, OUT/esp: tools/kernel-foundation/make vm-esp with the reference row (pipeline/lock.py, for the
+     assembly's donor build), the image's boot-efi.zip EFI as the donor ESP, its commpage kext and kexts, and the
+     boot-args; then its Kernel.Patch is replaced by boot-efi's own, which are bound to the image's BootKC.
+  4. tools/qemu-vm start (run folder OUT/boot, a free localhost SSH port, key $SSDIMG_TEST_KEY or
+     ~/.ssh/mbp92_test), then wait for the first of: a panic in serial.log, sshd answering as root (the first-boot
+     marker), QEMU exiting, boot_timeout_seconds.
+  5. With sshd up, `ps` over SSH must show every process named in "running", and serial.log holds no "panic(".
+  6. QEMU is stopped; the raw export and the run's overlay are deleted (serial.log and the run's json are kept).
+  7. OUT/qemu-boot.json: qemu_boot PASS or FAIL, image, rev, commit, run, marker, esp, date, seconds per stage and
+     the reasons of a FAIL; REPO/candidate.json gets the same verdict (what a bench's arm gate reads for an image).
+Exit 0 only on PASS.
+"""
+import argparse
+import datetime
+import json
+import os
+from pathlib import Path
+import plistlib
+import re
+import runpy
+import shutil
+import socket
+import subprocess
+import sys
+import time
+
+TOP = Path(__file__).resolve().parents[1]
+PY = sys.executable
+PANIC = ('panic(cpu', 'Kernel panic', 'panicked task', 'exited -- exit reason')
+
+
+def now():
+    return datetime.datetime.now().astimezone().isoformat(timespec='seconds')
+
+
+def free_port():
+    with socket.socket() as s:
+        s.bind(('127.0.0.1', 0))
+        return s.getsockname()[1]
+
+
+def macos_vms(rows=None):
+    """How many builder VMs (`ssdvm run ...`) are running on this Mac."""
+    if rows is None:
+        ps = subprocess.run(['ps', '-axo', 'command='], capture_output=True, text=True)
+        rows = ps.stdout.splitlines()
+    return sum(1 for r in rows if re.search(r'(?:^|/)ssdvm run ', r))
+
+
+def wait_vm_slot(limit, count=macos_vms, clock=time.monotonic, sleep=time.sleep, timeout=6 * 3600):
+    """True once fewer than LIMIT macOS VMs run; False after TIMEOUT seconds."""
+    end, said = clock() + timeout, False
+    while count() >= limit:
+        if clock() > end:
+            return False
+        if not said:
+            print('qemu-first-boot: %d macOS VMs running (limit %d); waiting for a free slot' % (count(), limit),
+                  flush=True)
+            said = True
+        sleep(60)
+    return True
+
+
+def serial(run):
+    try:
+        return (Path(run) / 'serial.log').read_bytes().decode('latin1')
+    except OSError:
+        return ''
+
+
+def missing_processes(ps_text, names):
+    return [n for n in names if not re.search(r'(?:^|/|\s)%s\s*$' % re.escape(n), ps_text, re.M)]
+
+
+class Host:
+    """The real steps; tests replace them."""
+
+    def __init__(self, key):
+        self.key = key
+
+    def call(self, cmd, log, timeout=None):
+        with open(log, 'w') as f:
+            return subprocess.run([str(c) for c in cmd], cwd=TOP, stdout=f, stderr=subprocess.STDOUT,
+                                  stdin=subprocess.DEVNULL, timeout=timeout).returncode
+
+    def disk(self, need_gb, what, path):
+        """None when NEED_GB may be written (pipeline/diskguard.py), else the reason."""
+        disk = runpy.run_path(str(TOP / 'pipeline/diskguard.py'))
+        try:
+            disk['check'](need_gb, 'qemu-first-boot', what, str(path))
+        except disk['Refused'] as x:
+            return str(x)
+        return None
+
+    def vm_slot(self, limit):
+        return wait_vm_slot(limit)
+
+    def build(self, assembly, repo, log):
+        return self.call([PY, '-I', 'pipeline/golden-run', 'pipeline/assemblies/%s.json' % assembly, '--repo', repo],
+                         log)
+
+    def newest_rev(self, repo):
+        p = subprocess.run([str(TOP / 'tools/bin/ssdimg'), '-C', str(repo), 'log'], cwd=TOP, capture_output=True,
+                           text=True)
+        lines = p.stdout.split('\n')
+        return lines[0].split()[0] if p.returncode == 0 and lines[0].strip() else None
+
+    def export(self, repo, rev, dest, log):
+        return self.call([TOP / 'tools/bin/ssdimg', '-C', repo, 'export', '--rev', rev, dest], log)
+
+    def row(self, build, name):
+        p = subprocess.run([PY, '-I', 'pipeline/lock.py', 'path', 'pipeline/inputs/' + build, name], cwd=TOP,
+                           capture_output=True, text=True)
+        return p.stdout.strip() if p.returncode == 0 else None
+
+    def vm_esp(self, args, log):
+        return self.call([PY, '-I', 'tools/kernel-foundation/make', 'vm-esp'] + args, log)
+
+    def start(self, image, esp, run, name, port, memory, log):
+        return self.call([PY, '-I', 'tools/qemu-vm/qemu-vm', 'start', '--image', image, '--esp', esp, '--out', run,
+                          '--name', name, '--ssh-port', port, '--memory', memory], log)
+
+    def alive(self, run):
+        try:
+            os.kill(int((Path(run) / 'qemu.pid').read_text().strip()), 0)
+            return True
+        except (OSError, ValueError):
+            return False
+
+    def ssh(self, port, connect_timeout, command):
+        cmd = ['ssh', '-i', self.key, '-p', str(port), '-o', 'BatchMode=yes', '-o',
+               'ConnectTimeout=%d' % connect_timeout, '-o', 'StrictHostKeyChecking=no', '-o',
+               'UserKnownHostsFile=/dev/null', '-o', 'LogLevel=ERROR', 'root@127.0.0.1', command]
+        try:
+            p = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL,
+                               timeout=connect_timeout + 100)
+            return p.returncode, p.stdout + p.stderr
+        except subprocess.TimeoutExpired:
+            return 124, ''
+
+    def stop(self, run, log):
+        return self.call([PY, '-I', 'tools/qemu-vm/qemu-vm', 'stop', run], log)
+
+
+def make_esp(host, cfg, repo, out, donor_build):
+    """OUT/esp for QEMU from the image's boot-efi.zip; returns None or the reason it failed."""
+    src = out / 'esp-src'
+    (src / 'zip').mkdir(parents=True)
+    if subprocess.run(['unzip', '-q', str(Path(repo) / 'boot-efi.zip'), '-d', str(src / 'zip')]).returncode:
+        return 'the image has no readable boot-efi.zip'
+    payload = src / 'zip' / 'payload'
+    subprocess.run(['tar', '-C', str(payload), '-cf', str(src / 'donor-esp.tar'), 'EFI'], check=True)
+    reference = host.row(donor_build, cfg['reference_row'])
+    if not reference:
+        return 'no %s row for %s' % (cfg['reference_row'], donor_build)
+    kexts = payload / 'EFI/OC/Kexts'
+    args = ['--reference', reference, '--donor-esp', src / 'donor-esp.tar', '--darwin-major', cfg['darwin_major'],
+            '--commpage-kext', kexts / cfg['commpage_kext']]
+    for k in cfg['kexts']:
+        args += ['--kext', kexts / k]
+    for b in cfg['boot_args']:
+        args += ['--boot-arg', b]
+    args += ['--out', out / 'esp']
+    if host.vm_esp([str(x) for x in args], out / 'vm-esp.log'):
+        return 'make vm-esp failed (see %s)' % (out / 'vm-esp.log')
+    image_config = plistlib.loads((payload / 'EFI/OC/config.plist').read_bytes())
+    path = out / 'esp/EFI/OC/config.plist'
+    config = plistlib.loads(path.read_bytes())
+    config['Kernel']['Patch'] = list(image_config['Kernel']['Patch'])
+    path.write_bytes(plistlib.dumps(config))
+    return None
+
+
+def first_boot(a, cfg, host, clock=time.monotonic, sleep=time.sleep):
+    out, repo = a.out, a.image
+    record = dict(qemu_boot='FAIL', image=str(repo), rev=None, commit=a.commit, run=str(out / 'boot'), marker=None,
+                  esp=str(out / 'esp'), assembly=cfg['assembly'], started=now(), seconds={}, reasons=[])
+    t = [clock()]
+
+    def lap(name):
+        record['seconds'][name] = round(clock() - t[0])
+        t[0] = clock()
+
+    started = False
+    try:
+        if not a.no_build:
+            if not host.vm_slot(cfg['max_macos_vms']):
+                record['reasons'].append('no free macOS VM slot')
+                return record
+            t[0] = clock()
+            rc = host.build(cfg['assembly'], repo, out / 'golden-run.log')
+            lap('build')
+            if rc:
+                record['reasons'].append('golden-run failed (see %s)' % (out / 'golden-run.log'))
+                return record
+        rev = record['rev'] = host.newest_rev(repo)
+        if not rev:
+            record['reasons'].append('the image repository has no revision')
+            return record
+        image_json = Path(repo) / 'image.json'
+        size = json.loads(image_json.read_text()).get('size', 0) if image_json.is_file() else 0
+        refused = host.disk(size / 1e9, 'export ' + rev, out)
+        if refused:
+            record['reasons'].append('disk: %s' % refused)
+            return record
+        target = out / 'target.img'
+        if host.export(repo, rev, target, out / 'export.log'):
+            record['reasons'].append('ssdimg export failed (see %s)' % (out / 'export.log'))
+            return record
+        lap('export')
+        assembly = json.loads((TOP / 'pipeline/assemblies' / (cfg['assembly'] + '.json')).read_text())
+        why = make_esp(host, cfg, repo, out, assembly['donor_build'])
+        lap('esp')
+        if why:
+            record['reasons'].append(why)
+            return record
+        port = free_port()
+        record['ssh_port'] = port
+        boot = out / 'boot'
+        if host.start(target, out / 'esp', boot, 'candidate-' + (a.commit or 'image')[:8], port, cfg['memory'],
+                      out / 'qemu-start.log'):
+            record['reasons'].append('qemu-vm start failed (see %s)' % (out / 'qemu-start.log'))
+            return record
+        started = True
+        print('qemu-first-boot: QEMU started (%s, ssh %d); waiting at most %d s for sshd' % (
+            boot, port, cfg['boot_timeout_seconds']), flush=True)
+        t0 = clock()
+        while True:
+            text = serial(boot)
+            if any(p in text for p in PANIC):
+                outcome = 'panic'
+                break
+            if 'SSH-UP' in host.ssh(port, 45, 'echo SSH-UP; uptime')[1]:
+                outcome = 'sshd'
+                break
+            if not host.alive(boot):
+                outcome = 'QEMU exited'
+                break
+            if clock() - t0 > cfg['boot_timeout_seconds']:
+                outcome = 'timeout'
+                break
+            sleep(10)
+        lap('boot')
+        record['outcome'] = outcome
+        if outcome != 'sshd':
+            record['reasons'].append('no first-boot marker: %s (see %s)' % (outcome, boot / 'serial.log'))
+            return record
+        rc, ps = host.ssh(port, 300, 'ps -axo pid,comm; echo REPORTS $(ls /Library/Logs/DiagnosticReports | wc -l)')
+        (out / 'state.txt').write_text(ps)
+        lap('check')
+        reports = re.search(r'^REPORTS\s+(\d+)', ps, re.M)
+        record['diagnostic_reports'] = int(reports[1]) if reports else None
+        absent = missing_processes(ps, cfg['running'])
+        if absent:
+            record['reasons'].append('not running: %s' % ', '.join(absent))
+        if 'panic(' in serial(boot):
+            record['reasons'].append('panic( in %s' % (boot / 'serial.log'))
+        if not record['reasons']:
+            record['qemu_boot'] = 'PASS'
+            record['marker'] = 'sshd answered; %s running; no panic' % ' and '.join(cfg['running'])
+        return record
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError) as x:
+        record['reasons'].append('error: %s' % x)
+        return record
+    finally:
+        if started:
+            host.stop(out / 'boot', out / 'qemu-stop.log')
+            text = serial(out / 'boot')
+            (out / 'boot' / 'serial.txt').write_text(''.join(c for c in text if c in '\t\n' or ' ' <= c <= '~'))
+        for f in (out / 'target.img', out / 'boot' / 'guest.qcow2'):
+            f.unlink(missing_ok=True)
+        if record['marker'] is None and record['reasons']:
+            record['marker'] = 'see ' + '; '.join(record['reasons'])
+        record['finished'] = now()
+
+
+def main(argv=None, host=None, clock=time.monotonic, sleep=time.sleep):
+    ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    ap.add_argument('--out', type=Path, required=True)
+    ap.add_argument('--image', type=Path, help='the image repository (default OUT/image)')
+    ap.add_argument('--no-build', action='store_true', help='boot the image repository as it is')
+    ap.add_argument('--commit', help='the commit the image is built from (default HEAD)')
+    ap.add_argument('--config', type=Path, default=TOP / 'pipeline/qemu-boot.json')
+    ap.add_argument('--ssh-key', default=os.path.expanduser(os.environ.get('SSDIMG_TEST_KEY', '~/.ssh/mbp92_test')))
+    a = ap.parse_args(argv)
+    a.out = a.out.resolve()
+    a.image = (a.image or a.out / 'image').resolve()
+    if a.no_build and not a.image.is_dir():
+        ap.error('--no-build needs an existing --image REPO')
+    if not a.no_build and a.image.exists():
+        ap.error('%s exists; give another --image or --no-build' % a.image)
+    if a.commit is None:
+        a.commit = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=TOP, capture_output=True, text=True).stdout.strip()
+    cfg = json.loads(a.config.read_text())
+    a.out.mkdir(parents=True, exist_ok=True)
+    record = first_boot(a, cfg, host or Host(a.ssh_key), clock, sleep)
+    (a.out / 'qemu-boot.json').write_text(json.dumps(record, indent=1) + '\n')
+    if a.image.is_dir():
+        verdict = dict(qemu_boot=record['qemu_boot'], image=record['image'], rev=record['rev'],
+                       commit=record['commit'], qemu_run=record['run'], marker=record['marker'], esp=record['esp'],
+                       date=record['finished'])
+        (a.image / 'candidate.json').write_text(json.dumps(verdict, indent=2) + '\n')
+    print('qemu-first-boot: %s %s%s  (%s)' % ((a.commit or '')[:8], record['qemu_boot'],
+                                              ': ' + '; '.join(record['reasons']) if record['reasons'] else '',
+                                              a.out / 'qemu-boot.json'), flush=True)
+    return 0 if record['qemu_boot'] == 'PASS' else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
