@@ -1,0 +1,109 @@
+#!/usr/bin/env python3.14
+"""Build the pinned LLVM X86 MC decoder: make OUTPUT [--archive SOURCE.tar.xz].
+
+Requires macOS compiler/SDK, CMake and make. The resulting library needs none of
+those tools. OUTPUT must be new; source and intermediates stay under OUTPUT/work.
+Reproducibility requires the same compiler, SDK and producer (recorded in build.json).
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tarfile
+import time
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[2]
+TAG = 'llvmorg-21.1.8'
+URL = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/llvm-project-21.1.8.src.tar.xz'
+SHA256 = '4633a23617fa31a3ea51242586ea7fb1da7140e426bd62fc164261fe036aa142'
+
+
+def digest(path):
+    with path.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def capture(*args):
+    return subprocess.check_output(args, text=True, cwd=REPO).strip()
+
+
+def build(output, archive, jobs):
+    started = time.monotonic()
+    revision = capture('git', 'rev-parse', 'HEAD')
+    clean = not bool(capture('git', 'status', '--porcelain'))
+    producer = {p.name: digest(p) for p in sorted(HERE.iterdir()) if p.is_file()}
+    output = output.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    work = output / 'work'
+    work.mkdir()
+    if archive is None:
+        archive = work / 'source.tar.xz'
+        subprocess.run(['/usr/bin/curl', '--fail', '--location', '--retry', '3',
+                        '--output', str(archive), URL], check=True)
+    if digest(archive) != SHA256:
+        raise SystemExit('LLVM source archive SHA256 mismatch')
+    with tarfile.open(archive) as source:
+        source.extractall(work, filter='data')
+    source = work / 'llvm-project-21.1.8.src'
+    sdk = capture('xcrun', '--sdk', 'macosx', '--show-sdk-path')
+    flags = f'-Os -g0 -ffile-prefix-map={work}=/llvm-build -ffile-prefix-map={HERE}=/producer'
+    options = [
+        '-DCMAKE_BUILD_TYPE=MinSizeRel', '-DCMAKE_OSX_ARCHITECTURES=x86_64',
+        '-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0', f'-DCMAKE_OSX_SYSROOT={sdk}',
+        f'-DCMAKE_C_COMPILER={capture("xcrun", "--find", "clang")}',
+        f'-DCMAKE_CXX_COMPILER={capture("xcrun", "--find", "clang++")}',
+        f'-DCMAKE_C_FLAGS={flags}', f'-DCMAKE_CXX_FLAGS={flags}',
+        '-DLLVM_TARGETS_TO_BUILD=X86', '-DLLVM_ENABLE_PROJECTS=',
+        '-DLLVM_INCLUDE_TESTS=OFF', '-DLLVM_INCLUDE_EXAMPLES=OFF',
+        '-DLLVM_INCLUDE_BENCHMARKS=OFF', '-DLLVM_INCLUDE_TOOLS=OFF',
+        '-DLLVM_ENABLE_BINDINGS=OFF', '-DLLVM_ENABLE_ASSERTIONS=OFF',
+        '-DLLVM_ENABLE_RTTI=OFF', '-DLLVM_ENABLE_EH=OFF',
+        '-DLLVM_ENABLE_ZLIB=OFF', '-DLLVM_ENABLE_ZSTD=OFF',
+        '-DLLVM_ENABLE_LIBXML2=OFF', '-DLLVM_ENABLE_TERMINFO=OFF',
+        '-DLLVM_ENABLE_LIBEDIT=OFF', '-DLLVM_BUILD_LLVM_DYLIB=OFF',
+        '-DLLVM_LINK_LLVM_DYLIB=OFF', '-DBUILD_SHARED_LIBS=OFF',
+    ]
+    env = dict(os.environ, MACOSX_DEPLOYMENT_TARGET='13.0', ZERO_AR_DATE='1', SOURCE_DATE_EPOCH='0')
+    build_dir = work / 'build'
+    subprocess.run(['cmake', '-G', 'Unix Makefiles', '-S', str(HERE), '-B', str(build_dir),
+                    f'-DLLVM_SOURCE={source}', *options], env=env, check=True)
+    subprocess.run(['cmake', '--build', str(build_dir), '--target', 'hao_x86_disasm',
+                    '--parallel', str(jobs)], env=env, check=True)
+    library = output / 'libhao-x86-disasm.dylib'
+    shutil.copyfile(build_dir / library.name, library)
+    subprocess.run(['strip', '-x', str(library)], check=True)
+    subprocess.run(['codesign', '--force', '--sign', '-', '--timestamp=none',
+                    '--identifier', 'org.hao.x86-disasm', str(library)], check=True)
+    subprocess.run(['codesign', '--verify', '--strict', str(library)], check=True)
+    if capture('lipo', '-archs', str(library)) != 'x86_64':
+        raise SystemExit('unexpected library architecture')
+    exports = set(capture('nm', '-gjU', str(library)).splitlines())
+    if exports != set((HERE / 'exports.txt').read_text().splitlines()):
+        raise SystemExit(f'unexpected exports: {exports}')
+    shutil.copyfile(source / 'llvm/LICENSE.TXT', output / 'LICENSE.TXT')
+    record = dict(llvm_tag=TAG, source_url=URL, source_sha256=SHA256,
+                  repo_commit=revision, clean_tree=clean, producer_sha256=producer,
+                  environment={k: env[k] for k in ('MACOSX_DEPLOYMENT_TARGET', 'ZERO_AR_DATE', 'SOURCE_DATE_EPOCH')},
+                  flags=[s.replace(str(work), '/llvm-build').replace(str(HERE), '/producer') for s in options],
+                  compiler=capture('xcrun', 'clang', '--version'),
+                  sdk_version=capture('xcrun', '--sdk', 'macosx', '--show-sdk-version'),
+                  cmake=capture('cmake', '--version').splitlines()[0],
+                  output_sha256=digest(library), output_size=library.stat().st_size,
+                  seconds=round(time.monotonic() - started, 3))
+    (output / 'build.json').write_text(json.dumps(record, indent=2) + '\n')
+    print(json.dumps(record, indent=2))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('output', type=Path)
+    parser.add_argument('--archive', type=Path, help='use a local archive, checked against the pinned digest')
+    parser.add_argument('--jobs', type=int, default=min(8, os.cpu_count() or 1))
+    args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error('--jobs must be positive')
+    build(args.output, args.archive, args.jobs)

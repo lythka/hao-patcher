@@ -5,6 +5,8 @@ an instruction boundary. Linear decoding from a supplied start establishes only
 that decoding path, not control flow or runtime reachability.
 """
 import ctypes
+import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -12,6 +14,33 @@ import struct
 from .exports import require
 
 LTO = '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libLTO.dylib'
+
+
+REPO = Path(__file__).resolve().parents[4]
+
+
+def row_library(repo=REPO):
+    """Resolve the optional shipped decoder, verifying the input row before loading."""
+    row = repo / 'pipeline/inputs/common/llvm_disasm'
+    if not row.exists():
+        return None
+    lines = [line.split('#', 1)[0].split() for line in row.read_text().splitlines()]
+    lines = [line for line in lines if line]
+    require(len(lines) == 1 and len(lines[0]) == 2, 'invalid llvm_disasm input row')
+    expected, relative = lines[0]
+    require(re.fullmatch(r'[0-9a-f]{64}', expected), 'llvm_disasm requires SHA256')
+    path = repo / relative
+    if not path.exists():
+        return None
+    with path.open('rb') as stream:
+        actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+    require(actual == expected, 'llvm_disasm SHA256 mismatch')
+    return path
+
+
+def default_library():
+    override = os.environ.get('SHARED_CACHE_DISASM')
+    return Path(override) if override is not None else (row_library() or Path(LTO))
 
 
 def function_starts(data, base, low, high):
@@ -67,8 +96,8 @@ class Instruction:
 
 
 class Disassembler:
-    def __init__(self, library=LTO):
-        self.path = Path(library)
+    def __init__(self, library=None):
+        self.path = default_library() if library is None else Path(library)
         self.lib = ctypes.CDLL(str(self.path))
         self.lib.lto_initialize_disassembler.argtypes = []
         self.lib.lto_initialize_disassembler.restype = None

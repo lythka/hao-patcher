@@ -1,0 +1,4 @@
+_lto_initialize_disassembler
+_LLVMCreateDisasm
+_LLVMDisasmInstruction
+_LLVMDisasmDispose

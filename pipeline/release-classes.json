@@ -7,6 +7,12 @@
   "mbp92": true
  },
  "rows": {
+  "llvm_disasm": {
+   "class": "ours",
+   "publish": "file",
+   "producer": "tools/shared-cache/llvm-disasm/make",
+   "reason": "X86-only LLVM MC decoder built from pinned llvm-project 21.1.8 (Apache 2.0 with LLVM Exceptions), ad-hoc signed; license in the producer output and tools/shared-cache/llvm-disasm/LICENSE.TXT"
+  },
   "test_host_key": {
    "class": "dev-local",
    "reason": "dev-access (pack dev): the test laptop's SSH host key; private, never published; a dev candidate uses the store copy of the Mac that makes it"

@@ -155,7 +155,17 @@ signatures; the normal producer subsequently rebuilds external sidecars. A stage
 output alone is not a deployable artifact. Existing runtime override gates remain
 in force; host lookup checks do not establish boot success or a speedup.
 
+### Standalone x86_64 decoder
+
+Build the decoder with `python3.14 -I tools/shared-cache/llvm-disasm/make OUTPUT` (CMake, make and a macOS
+compiler/SDK). The output contains the signed library, LLVM license and `build.json`; `work/` is disposable.
+The library itself needs only macOS system libraries. Run the cache tool with x86_64 Python when using it
+(on Apple silicon: `SHARED_CACHE_DISASM=OUTPUT/libhao-x86-disasm.dylib arch -x86_64 python3.14 -I tools/shared-cache/make ...`).
+An arm64 Python process can explicitly select Xcode's libLTO with `SHARED_CACHE_DISASM`.
+
 ## Revisions
+- r94 2026-11-20 Build a pinned, redistributable x86_64 LLVM decoder with llvm-disasm/make. Decoding uses
+  SHARED_CACHE_DISASM, then the verified llvm_disasm input row when present, then Xcode's libLTO.
 - r93 2026-11-20 toolchain/make applies source.patch with --forward --batch: a DYLD_SOURCE already patched in place
   stops the build instead of being silently un-patched (patch took such hunks as reversed).
 - r92 2026-11-20 tools/prespecialization-adoption.py: on a running target, checks that the Swift runtime reads the

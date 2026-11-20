@@ -20,3 +20,6 @@ family it writes are the user's own files and keep Apple's terms.
   `toolchain/make`) and Apple's
   [AvailabilityVersions](https://github.com/apple-oss-distributions/AvailabilityVersions) (tag
   AvailabilityVersions-157.2, cloned by `toolchain/make`, which generates dyld's `VersionMap.h` from it).
+- `llvm-disasm/make` downloads [llvm-project 21.1.8](https://github.com/llvm/llvm-project/releases/tag/llvmorg-21.1.8)
+  to build the X86 decoder, under Apache License 2.0 with LLVM Exceptions. The artifact includes LLVM's
+  `LICENSE.TXT`; the source archive URL and SHA256 are pinned in the producer.
