@@ -561,7 +561,7 @@ def serve(vmdir, bootstrap_port=None):
 EXEC_UNDELIVERED = 75   # exec's exit status when the guest never took the command; it was withdrawn: safe to resend
 
 
-def exec_cmd(vmdir, cmd, timeout=600, gui=False, q=None):
+def exec_cmd(vmdir, cmd, timeout=int(os.environ.get('VMCTL_EXEC_TIMEOUT', '600')), gui=False, q=None):
     """Queue CMD for the guest agent and wait for its rc. When no reply comes within TIMEOUT and the agent never took
     the command (still CID.cmd), it is withdrawn and EXEC_UNDELIVERED returned, so a caller may send it again without
     a second run; a command the agent took (CID.run) is never withdrawn."""
