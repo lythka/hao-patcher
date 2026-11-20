@@ -313,8 +313,10 @@ class Recipe(unittest.TestCase):
                  'dev-bs-test-fold-catalog.txt': 'golden-gate-shared-cache-catalog',
                  'dev-beta-candidate-fold.txt': 'golden-gate-shared-cache',
                  'alpha-v0.1.0-fold.txt': 'golden-gate-shared-cache',
-                 'dev-ssh-alpha-v0.1.0-fold-catalog.txt': 'golden-gate-shared-cache-catalog'}
+                 'dev-ssh-alpha-v0.1.0-fold-catalog.txt': 'golden-gate-shared-cache-catalog',
+                 'dev-ssh-full-witness.txt': 'golden-gate-shared-cache-catalog'}
         extra = {'dev-beta-candidate-fold.txt': ['golden-gate-ids', 'golden-gate-store'],
+                 'dev-ssh-full-witness.txt': ['golden-gate-store'],
                  'alpha-v0.1.0-fold.txt': []}
         apple_derived = ['golden-gate-wallpaper-export', 'golden-gate-mobile-assets']   # dev profiles only
         dropped = {'dev-beta-candidate-fold.txt': ['dev-diagnostics', 'dev-keepawake', 'dev-capture', 'dev-session'] + apple_derived,
@@ -322,7 +324,10 @@ class Recipe(unittest.TestCase):
                                              'golden-gate-appstore-slices'] + apple_derived,
                    # the release set on the catalog cache plus dev-access alone (observed test boots)
                    'dev-ssh-alpha-v0.1.0-fold-catalog.txt': ['dev-diagnostics', 'dev-keepawake', 'dev-capture', 'dev-session',
-                                                             'golden-gate-appstore-slices'] + apple_derived}
+                                                             'golden-gate-appstore-slices'] + apple_derived,
+                   # the same plus the opt-in dev recipes: one observed boot of every fix awaiting validation
+                   'dev-ssh-full-witness.txt': ['dev-diagnostics', 'dev-keepawake', 'dev-capture', 'dev-session',
+                                                'golden-gate-appstore-slices']}
         for recipe in set(folds.values()):
             self.assertEqual(sorted(n for n, s in sets.items() if recipe in s),
                              sorted(k for k, v in folds.items() if v == recipe))

@@ -1,0 +1,14 @@
+{
+ "comment": "dev-ssh-full-witness: alpha-v0.1.0 on the rebuilt shared cache (variants cache-fold and cache-catalog: the witness family) plus every opt-in recipe a dev image carries (golden-gate-store, golden-gate-wallpaper-export, golden-gate-mobile-assets) and dev-access (root SSH by the test key, Screen Sharing), so one observed boot exercises every fix awaiting validation. golden-gate-metal-gva is left out: it edits AppleGVA, a folded provider. A dev profile: never released.",
+ "target": "mbp92",
+ "recipes": [
+  "golden-gate-wallpaper-export",
+  "golden-gate-mobile-assets",
+  "golden-gate-store",
+  "dev-access"
+ ],
+ "variants": [
+  "cache-fold",
+  "cache-catalog"
+ ]
+}
