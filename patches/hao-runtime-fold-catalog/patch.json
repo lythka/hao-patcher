@@ -1,5 +1,5 @@
 {
- "revision": 3,
+ "revision": 4,
  "pack": "base",
  "variant": "cache-catalog",
  "replaces": "hao-runtime-fold",

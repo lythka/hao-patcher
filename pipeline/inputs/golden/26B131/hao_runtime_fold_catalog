@@ -1,5 +1,4 @@
-# hao runtime payload for the B+catalog fold-in image (family 322743F4, row rebuilt_cache_catalog: the 66k-record Swift
-# catalog family), from hao-runtime b05855f (the same runtime as row hao_runtime, libhao 9b40371a).
-# Its records name 322743F4 only.
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=b3b5a7c75eaf8ac23162fc262897b844e71a5d98c41b1c6523f73fd6ba9270ee
-0ff512fff936338a8c67d46e578b8388c9b4608713937f756580fbeafdf640ec store/artifacts/hao-runtime-26B131-20261120-b05855f-fold-66k-322743f4/payload
+# hao runtime payload for the B+catalog fold-in image (family 31DA2287, row rebuilt_cache_catalog: the witness family),
+# from hao-runtime b05855f (the same runtime as row hao_runtime, libhao 9b40371a). Its records name 31DA2287 only.
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=b0e74e49b6d897d035909a8de81fa35a335f6878de33c59697dd1fa267e81022
+4ce75aed87d2dbe072cf95b18bf45a886e6f4343b5f2a3379384223371a24c3c store/artifacts/hao-runtime-26B131-20261120-b05855f-fold-witness-31da2287/payload
