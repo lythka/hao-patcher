@@ -49,7 +49,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-wifi-compat | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-19 Validated r3 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-windowserver-filter | r10 | oclp-hook | product |  | x | x |  |  | ok (r5) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
 | hao-command | r13 | post | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
-| hao-opencore | r85 | post | product |  | x | x |  |  | **needs** | r85 2026-11-18 Names no model (S15): the reasons and provenance of the mbp92 target's OCLP-generated kexts (US |
+| hao-opencore | r86 | post | product |  | x | x |  |  | **needs** | r86 2026-11-20 config-reasons.json records SIP 0x807 (dev-capture r4 adds task-for-pid on dev images); without |
 | hao-runtime | r92 | oclp-hook | product |  | x | x |  |  | **needs** | r92 2026-11-19 Row hao_runtime (26B131, A family) is hao-runtime 5a7d3fc: the RC runtime 1691020 with the JIT  |
 | hao-runtime-fold | r10 | oclp-hook | product |  |  |  |  |  | **needs** | r10 2026-11-18 Row `hao_runtime_fold` -> hao-runtime cabc1d5 payload for fold family B 31C0215A (manifest 8e45 |
 | hao-runtime-fold-catalog | r2 | oclp-hook | experiment |  |  |  |  |  | **needs** | r2 2026-11-20 Row `hao_runtime_fold_catalog`: hao-runtime aba5ce7 (the RC runtime with the JIT arena and the W |

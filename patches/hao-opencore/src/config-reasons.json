@@ -55,6 +55,7 @@
  "nvram-add:4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102:revpatch=sbvmm,f16c": "RestrictEvents: f16c (CoreGraphics on Ivy Bridge) and sbvmm (reports a VMM board so software update offers this Mac updates; OCLP adds it unless a serial is set)",
  "nvram-add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args": "the boot arguments; each argument's reason is in edits/config.json arg_reasons (checked by patches.py check)",
  "nvram-add:7C436110-AB2A-4BBB-A880-FE41995C9F82:csr-active-config=03080000": "SIP 0x803 (untrusted kexts, unrestricted filesystem, unauthenticated root): the image installs modified System files and third-party kexts",
+ "nvram-add:7C436110-AB2A-4BBB-A880-FE41995C9F82:csr-active-config=07080000": "dev images only (dev-capture r4): 0x807 adds task-for-pid to 0x803 so hao-runtime's crash capture can read a faulting process",
  "nvram-add:7C436110-AB2A-4BBB-A880-FE41995C9F82:csr-active-config=27080000": "dev images only (dev-diagnostics): 0x827 adds task-for-pid and unrestricted DTrace",
  "nvram-add:7C436110-AB2A-4BBB-A880-FE41995C9F82:run-efi-updater": "generic image only (opencore-generic, pack generic; from the tested QEMU reference): run-efi-updater=No: macOS never tries to run Apple's firmware updater, which has no firmware to update on a VM or PC and must not touch it",
  "nvram-delete:4D1EDE05-38C7-4A6A-9CC6-4BCCA8B38C14:DefaultBackgroundColor": "OpenCore replaces the stored value with the one above at every boot",
