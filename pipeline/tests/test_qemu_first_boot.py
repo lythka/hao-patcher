@@ -31,6 +31,12 @@ class FakeHost:
     def build(self, assembly, repo, log):
         self.calls.append(('build', assembly))
         repo.mkdir(parents=True)
+        if log:
+            rec = self.root / 'record'
+            rec.mkdir(exist_ok=True)
+            (rec / 'build.json').write_text(json.dumps(dict(status='committed', repository=str(repo),
+                                                            work='/store/tmp/golden-x', vm='/store/vm/golden-x/vm')))
+            Path(log).write_text('...\nGolden image committed: %s\nRecord: %s\n' % (repo, rec))
         (repo / 'image.json').write_text(json.dumps({'size': 1000}))
         payload = self.root / 'payload-src' / 'payload' / 'EFI' / 'OC'
         for k in [CFG['commpage_kext']] + CFG['kexts']:
@@ -40,6 +46,10 @@ class FakeHost:
         subprocess.run(['zip', '-q', '-r', str(repo / 'boot-efi.zip'), 'payload', 'manifest.json'],
                        cwd=self.root / 'payload-src', check=True)
         return self.build_rc
+
+    def remove_leftovers(self, left):
+        self.calls.append(('remove', left['work']))
+        return [left['work']]
 
     def newest_rev(self, repo):
         return 'abc1234'
@@ -115,7 +125,8 @@ class FirstBoot(unittest.TestCase):
         self.assertFalse((self.out / 'boot' / 'guest.qcow2').exists())
         self.assertTrue((self.out / 'boot' / 'serial.txt').exists())
         self.assertIn(('stop',), host.calls)
-        self.assertEqual([c[0] for c in host.calls][:3], ['slot', 'build', 'disk'])
+        self.assertEqual([c[0] for c in host.calls][:4], ['slot', 'build', 'remove', 'disk'])
+        self.assertEqual(rec['removed'], ['/store/tmp/golden-x'])
 
     def test_the_esp_is_made_from_the_image_with_its_kernel_patches(self):
         host = FakeHost(self.root)
@@ -173,6 +184,18 @@ class FirstBoot(unittest.TestCase):
 
 
 class Helpers(unittest.TestCase):
+    def test_build_leftovers_only_for_a_committed_build_of_this_repo(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / 'build.json').write_text(json.dumps(dict(status='committed', repository=str(d / 'repo'),
+                                                          work='/w', vm='/v/vm')))
+            log = 'Record: %s\n' % d
+            self.assertEqual(Q['build_leftovers'](log, d / 'repo'), dict(record=str(d), work='/w', vm='/v/vm'))
+            self.assertIsNone(Q['build_leftovers'](log, d / 'other'))
+            self.assertIsNone(Q['build_leftovers']('no record\n', d / 'repo'))
+            (d / 'build.json').write_text(json.dumps(dict(status='failed', repository=str(d / 'repo'))))
+            self.assertIsNone(Q['build_leftovers'](log, d / 'repo'))
+
     def test_macos_vms_counts_builder_vms_only(self):
         rows = ['/x/store/vm/bin/ssdvm run /x/vm/a --headless', 'ssdvm run /y', '/opt/homebrew/bin/qemu-system-x86_64 -m 8G',
                 'grep ssdvm']

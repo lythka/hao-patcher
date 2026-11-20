@@ -9,7 +9,9 @@ that must run, and how many macOS VMs this host may run at once.
 
   1. pipeline/golden-run ASSEMBLY --repo REPO (default OUT/image), once fewer than max_macos_vms builder VMs
      (`ssdvm run`) are running: every macOS guest on this Mac counts against Virtualization's limit, the fresh-Mac
-     VM too. golden-run checks the disk itself. --no-build boots REPO as it is.
+     VM too. golden-run checks the disk itself. --no-build boots REPO as it is. golden-run leaves its work folder
+     (the workspace image, over 100 GB) and its stopped VM clone behind; once its build record says the image is
+     committed to REPO, both are removed, so the export below has room.
   2. tools/bin/ssdimg export of REPO's newest revision to OUT/target.img (raw and sparse; diskguard checks its
      logical size first).
   3. The QEMU ESP, OUT/esp: tools/kernel-foundation/make vm-esp with the reference row (pipeline/lock.py, for the
@@ -82,6 +84,21 @@ def serial(run):
         return ''
 
 
+def build_leftovers(log_text, repo):
+    """golden-run's work folder and VM clone (its build record, from the log's last "Record:" line), when the record
+    says the image was committed to REPO; else None."""
+    records = re.findall(r'^Record: (.+)$', log_text, re.M)
+    if not records:
+        return None
+    try:
+        build = json.loads((Path(records[-1].strip()) / 'build.json').read_text())
+    except (OSError, ValueError):
+        return None
+    if build.get('status') != 'committed' or Path(build.get('repository') or '/').resolve() != Path(repo).resolve():
+        return None
+    return dict(record=records[-1].strip(), work=build.get('work'), vm=build.get('vm'))
+
+
 def missing_processes(ps_text, names):
     return [n for n in names if not re.search(r'(?:^|/|\s)%s\s*$' % re.escape(n), ps_text, re.M)]
 
@@ -112,6 +129,21 @@ class Host:
     def build(self, assembly, repo, log):
         return self.call([PY, '-I', 'pipeline/golden-run', 'pipeline/assemblies/%s.json' % assembly, '--repo', repo],
                          log)
+
+    def remove_leftovers(self, left):
+        """Remove golden-run's work folder and VM clone; returns what was removed."""
+        removed = []
+        work = Path(left['work'] or '')
+        if left['work'] and work.is_dir() and work.parent.name == 'tmp' and work.name.startswith('golden-'):
+            shutil.rmtree(work, ignore_errors=True)
+            removed.append(str(work))
+        if left['vm']:
+            name = Path(left['vm']).parent.name
+            p = subprocess.run([PY, '-I', 'pipeline/vm/clones.py', 'remove-clone', name], cwd=TOP,
+                               capture_output=True, text=True)
+            if p.returncode == 0:
+                removed.append(str(Path(left['vm']).parent))
+        return removed
 
     def newest_rev(self, repo):
         p = subprocess.run([str(TOP / 'tools/bin/ssdimg'), '-C', str(repo), 'log'], cwd=TOP, capture_output=True,
@@ -207,6 +239,10 @@ def first_boot(a, cfg, host, clock=time.monotonic, sleep=time.sleep):
             if rc:
                 record['reasons'].append('golden-run failed (see %s)' % (out / 'golden-run.log'))
                 return record
+            left = build_leftovers((out / 'golden-run.log').read_text(errors='replace'), repo)
+            if left:
+                record['build_record'] = left['record']
+                record['removed'] = host.remove_leftovers(left)
         rev = record['rev'] = host.newest_rev(repo)
         if not rev:
             record['reasons'].append('the image repository has no revision')
