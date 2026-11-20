@@ -97,3 +97,4 @@ ce2c606294c894ccc2afdf2254fa90cb0b7761757edae26a7da03c88b5771c20	/usr/lib/hao/li
 f3072c3cc86e03ca9cc68521021091681168896d0814e40a51765ca9791b241a	/usr/lib/hao/libhao.dylib	row hao_runtime: hao-runtime 256dd30 on 0dee681 (Control Center opens: buffer copies in a value scope and a native callback-call contract); ships in the payload built from it
 dea7480779c243669647c0359463dd078b09e722a4b3fd3aecc399c4081dc6f1	/private/var/db/hao/manifests/golden-gate-font-registry.json	recipe golden-gate-font-registry
 c124bc292ef6d0aaf89996e09e8586f4e9f3fecb294d4bd3f2b0eb5f7b1b178a	/private/var/db/hao/manifests/golden-gate-icon-caches.json	recipe golden-gate-icon-caches
+f4c6bbe735d5e8852532e32f886b148fbe780ec9b2dc4caf52af89991bf53d4e	/usr/lib/hao/libhao.dylib	dropped: superseded by Weather pass 4 (Sol review: revise; pass 4 replaces this libhao)
