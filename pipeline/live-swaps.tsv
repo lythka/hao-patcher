@@ -100,3 +100,4 @@ c124bc292ef6d0aaf89996e09e8586f4e9f3fecb294d4bd3f2b0eb5f7b1b178a	/private/var/db
 f4c6bbe735d5e8852532e32f886b148fbe780ec9b2dc4caf52af89991bf53d4e	/usr/lib/hao/libhao.dylib	dropped: superseded by Weather pass 4 (Sol review: revise; pass 4 replaces this libhao)
 9cf47561d7d5c07da77a4bc83060570d443a4529aa889dce9d875fd14248b30f	/usr/lib/hao/libhao.dylib	dropped: superseded by Weather pass 5 (libhao db500576, carried by row hao_runtime_fold_catalog)
 db500576355318658988b76e6b6b1304231fc323c24174e7ac3f5275c347d196	/usr/lib/hao/libhao.dylib	row hao_runtime_fold_catalog: hao-runtime aba5ce7 (arena and Weather) for the 66k cache; ships in the payload built from it
+582796eb0d48cbd2f7eee717fecc4690f3b1259d1ad5511397712bb301b13565	/usr/lib/hao/libhao.dylib	dropped: superseded by row hao_runtime r93 (hao-runtime b05855f, libhao 9b40371a), which carries the same JIT arena plus the report-only fix
