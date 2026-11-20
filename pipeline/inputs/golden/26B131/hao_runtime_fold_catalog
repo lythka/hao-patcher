@@ -1,5 +1,5 @@
 # hao runtime payload for the B+catalog fold-in image (family 322743F4, row rebuilt_cache_catalog: the 66k-record Swift
-# catalog family), from hao-runtime aba5ce7 (the RC runtime with the JIT arena and the Weather fix): libhao db500576.
+# catalog family), from hao-runtime b05855f (the same runtime as row hao_runtime, libhao 9b40371a).
 # Its records name 322743F4 only.
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=42b429982eb76e4df605c2fc789fdf37b67e93350b141a84dfad5e2a49c58078
-ae6b32aa2c64b18909ea010ffca604b6765afefd89dc6bcb41e2ef3fd7fe3e54 store/artifacts/hao-runtime-26B131-20261119-aba5ce7-fold-66k-322743f4/payload
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=b3b5a7c75eaf8ac23162fc262897b844e71a5d98c41b1c6523f73fd6ba9270ee
+0ff512fff936338a8c67d46e578b8388c9b4608713937f756580fbeafdf640ec store/artifacts/hao-runtime-26B131-20261120-b05855f-fold-66k-322743f4/payload
