@@ -103,3 +103,4 @@ db500576355318658988b76e6b6b1304231fc323c24174e7ac3f5275c347d196	/usr/lib/hao/li
 582796eb0d48cbd2f7eee717fecc4690f3b1259d1ad5511397712bb301b13565	/usr/lib/hao/libhao.dylib	dropped: superseded by row hao_runtime r93 (hao-runtime b05855f, libhao 9b40371a), which carries the same JIT arena plus the report-only fix
 f18394a28177edfb4d65c0e91a90a8fdc5d478460ce524624529a422d88dd1d2	/System/Library/Extensions/AppleIntelHD4000GraphicsGLDriver.bundle/Contents/MacOS/iCBE.dylib	row metal_argbuf: f60029d7, the inline-constant-buffer pointer rewrite (#26 RealityKit lit materials)
 9b40371a71399b0b01a96dccc9cae84064cd17fb4df35e9cb4a73189bcc31634	/usr/lib/hao/libhao.dylib	dropped: superseded by row hao_runtime r94 (hao-runtime 90c2b9e, libhao 076cc54f), which carries b05855f plus #78 and install-live
+d838eee06c923edbd3324c2569c726928dd29b0d128573a4ceaa3154b1ca5dbb	/usr/libexec/hao	row hao_runtime (same bytes in its 90c2b9e payload)
