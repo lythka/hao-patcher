@@ -28,7 +28,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-launchd-warm | r6 | oclp-hook | product |  | x |  |  |  | **needs** | r6 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
 | golden-gate-live-text-service | r8 | post | product |  | x |  |  |  | ok (r7) | r8 2026-11-19 Validated r7 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-live-text-shared | r14 | oclp-hook | product |  | x |  |  |  | ok (r13) | r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes. |
-| golden-gate-metal-argbuf | r11 | oclp-hook | product |  | x |  |  |  | ok (r10) | r11 2026-11-19 Validated r10 on hardware (Validation). Nothing it installs changes. |
+| golden-gate-metal-argbuf | r12 | oclp-hook | product |  | x |  |  |  | ok | r12 2026-11-20 Row metal_argbuf from f60029d7: the wrapper reads constant pointers through the inline constant |
 | golden-gate-metal-framebuffer | r14 | oclp-hook | product |  | x | x |  |  | ok (r13) | r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-metal-gva | r2 | oclp-hook | product |  |  |  |  |  | **needs** | r2 2026-11-20 Current recipe format: kc-hook.sh, pack metal-3802-extras (opt-in), 26B131 requires; overlaps no |
 | golden-gate-metal-libraries | r23 | oclp-hook | product |  | x | x |  |  | **needs** | r23 2026-11-17 `requires`: os 26A428/26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmwar |

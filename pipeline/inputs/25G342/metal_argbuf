@@ -10,5 +10,8 @@
 # make at fe579412, whose libargbuf is the d9fa28e7 bytes (60ca7435), so only iCBE.dylib changes.
 # 546fe915: libargbuf emulates placement and shared-storage heaps (RealityKit, diag#0019) and reports ASTC formats; a full
 # make at 546fe915 (tools/metal-argbuf as d977ced2); iCBE.dylib and iCBE-real are the fe579412 bytes.
+# f60029d7: the wrapper's IGIL rewrite reads constant pointers through the inline constant buffer (C0) when the program
+# has program-scope constants (#26, RealityKit lit materials black); a full make at f60029d7. Only iCBE.dylib changes
+# (f18394a2); libargbuf and iCBE-real are the 546fe915 bytes.
 # hash: release-files  (lock.py scope(): the published files plus the made-on-Mac ones, release-classes.json)
-144f8ca355111ad4b1b488eeb3a870793fbc1b875fcc4006b946605a4e70051a store/artifacts/metal-argbuf-26B131-20261117-546fe915
+3b7d403238bab0979798b8ebece175f1c08c32719bb8f3c42d7cb52c6b74d3b6 store/artifacts/metal-argbuf-26B131-20261120-f60029d7
