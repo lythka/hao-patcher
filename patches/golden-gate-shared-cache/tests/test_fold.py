@@ -312,13 +312,17 @@ class Recipe(unittest.TestCase):
         folds = {'dev-bs-test-fold.txt': 'golden-gate-shared-cache',
                  'dev-bs-test-fold-catalog.txt': 'golden-gate-shared-cache-catalog',
                  'dev-beta-candidate-fold.txt': 'golden-gate-shared-cache',
-                 'alpha-v0.1.0-fold.txt': 'golden-gate-shared-cache'}
+                 'alpha-v0.1.0-fold.txt': 'golden-gate-shared-cache',
+                 'dev-ssh-alpha-v0.1.0-fold-catalog.txt': 'golden-gate-shared-cache-catalog'}
         extra = {'dev-beta-candidate-fold.txt': ['golden-gate-ids', 'golden-gate-store'],
                  'alpha-v0.1.0-fold.txt': []}
         apple_derived = ['golden-gate-wallpaper-export', 'golden-gate-mobile-assets']   # dev profiles only
         dropped = {'dev-beta-candidate-fold.txt': ['dev-diagnostics', 'dev-keepawake', 'dev-capture', 'dev-session'] + apple_derived,
                    'alpha-v0.1.0-fold.txt': ['dev-diagnostics', 'dev-keepawake', 'dev-capture', 'dev-session', 'dev-access',
-                                             'golden-gate-appstore-slices'] + apple_derived}
+                                             'golden-gate-appstore-slices'] + apple_derived,
+                   # the release set on the catalog cache plus dev-access alone (observed test boots)
+                   'dev-ssh-alpha-v0.1.0-fold-catalog.txt': ['dev-diagnostics', 'dev-keepawake', 'dev-capture', 'dev-session',
+                                                             'golden-gate-appstore-slices'] + apple_derived}
         for recipe in set(folds.values()):
             self.assertEqual(sorted(n for n, s in sets.items() if recipe in s),
                              sorted(k for k, v in folds.items() if v == recipe))
@@ -326,7 +330,7 @@ class Recipe(unittest.TestCase):
             b = sets[name]
             self.assertEqual(b.index(recipe) + 1, b.index('golden-gate-native-identities'), name)
             self.assertEqual(b[b.index(recipe) - len(extra.get(name, [])):b.index(recipe)], extra.get(name, []), name)
-            runtime = 'hao-runtime-fold-catalog' if name == 'dev-bs-test-fold-catalog.txt' else 'hao-runtime-fold'
+            runtime = 'hao-runtime-fold-catalog' if recipe == 'golden-gate-shared-cache-catalog' else 'hao-runtime-fold'
             expect = [runtime if n == 'hao-runtime' else n for n in sets['dev-bs-test.txt']
                       if n not in dropped.get(name, [])]
             self.assertEqual([n for n in b if n != recipe and n not in extra.get(name, [])], expect, name)
