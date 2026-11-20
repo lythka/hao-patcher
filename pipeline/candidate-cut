@@ -29,7 +29,14 @@ committed tree); there:
   --generic: the release is cut with the generic assembly too (release-cut ASSEMBLY GENERIC_ASSEMBLY, one release
      for both profiles), and after the 9,2 stick a second one, hao create-installer --profile generic --image
      OUT/generic/stick.img (OUT/generic/stick.img.sha256), listed in "sticks" as "generic".
-  7. with --fresh-mac, last: pipeline/fresh-mac-run OUT/release COMMIT --out OUT/fresh-mac (the release stick made
+  7. with --qemu-boot, first of the two checks (never at the same time as --fresh-mac: both use a macOS VM):
+     pipeline/qemu-first-boot --out OUT/qemu-boot builds the commit's dev-lite image (OUT/qemu-boot/image;
+     pipeline/qemu-boot.json says which), boots it once in QEMU to the first-boot marker (sshd up, the listed processes
+     running, no panic) and writes OUT/qemu-boot/qemu-boot.json. candidate.json "qemu_boot" is "PASS" or "FAIL" and
+     "qemu_boot_record" that record (null without --qemu-boot). candidate.json (and each stick folder's copy) is
+     written as soon as it finishes, with "fresh_mac" "PENDING" when --fresh-mac follows, so a laptop install can
+     start on the QEMU result while the fresh-Mac run goes on; it is written again at the end.
+  8. with --fresh-mac, last: pipeline/fresh-mac-run OUT/release COMMIT --out OUT/fresh-mac (the release stick made
      again the user's way, `sudo ./hao create-installer` from a git clone on a reset Tahoe VM, every download from the
      local mirror URL, default http://192.168.64.1:8765, in strict mode; VMDIR default $HAO_FRESH_MAC_VM).
      candidate.json "fresh_mac" is "PASS" or "FAIL" and "fresh_mac_result" its OUT/fresh-mac/fresh-mac.json (null
@@ -41,12 +48,7 @@ committed tree); there:
      default $HAO_MIRROR_FILL, the mirror's tool), so a new release asset never fails the run as a mirror miss.
      Recorded as candidate.json "mirror_fill" (added, not_in_release, failed); what is still missing fails
      fresh-mac-run as before.
-  8. with --qemu-boot, after --fresh-mac (never at the same time: both use a macOS VM): pipeline/qemu-first-boot
-     --out OUT/qemu-boot builds the commit's dev-lite image (OUT/qemu-boot/image; pipeline/qemu-boot.json says
-     which), boots it once in QEMU to the first-boot marker (sshd up, the listed processes running, no panic) and
-     writes OUT/qemu-boot/qemu-boot.json. candidate.json "qemu_boot" is "PASS" or "FAIL" and "qemu_boot_record" that
-     record (null without --qemu-boot). Both checks run even when the other failed; either FAIL makes candidate-cut
-     exit 1.
+     Both checks run even when the other failed; either FAIL makes candidate-cut exit 1.
 OUT defaults to store/artifacts/candidate-COMMIT8; CACHE to store/cache/candidate-fetch. Rows made on this Mac are
 reused by their pins (make-on-mac leaves a row whose sha256 checks), so the dev stick costs about one more kit write.
 """
@@ -160,6 +162,16 @@ def fill_mirror(release_dir, host_mirror, tool, needs, check, run=subprocess.run
     if rec['failed'] and not tool:
         rec['error'] = 'no mirror tool (--mirror-tool or $HAO_MIRROR_FILL): release assets not added'
     return rec
+
+
+def write_records(record, out):
+    """OUT/candidate.json, and in each other stick folder the cut's whole record plus that stick's entry (a bench's
+    arm gate reads candidate.json in the folder of the stick it writes)."""
+    (out / 'candidate.json').write_text(json.dumps(record, indent=1) + '\n')
+    for entry in record['sticks']:
+        folder = Path(entry['path']).parent
+        if folder != out and folder.is_dir():
+            (folder / 'candidate.json').write_text(json.dumps(dict(record, stick=entry), indent=1) + '\n')
 
 
 def run_step(cmd, cwd, log, env):
@@ -393,6 +405,19 @@ def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkou
                        release_json_sha256=dev_entry['release_json_sha256'], passed=True)
             record['sticks'].append(dev_entry)
         failed_checks = []
+        if a.qemu_boot:
+            where = out / 'qemu-boot'
+            try:
+                step('qemu-boot', [PY, '-I', 'pipeline/qemu-first-boot', '--out', where, '--commit', sha], record, out)
+            except SystemExit:
+                failed_checks.append('qemu-boot')
+            finally:
+                result = qemu_boot_result(where)
+                record['qemu_boot'] = 'PASS' if result and result.get('qemu_boot') == 'PASS' else 'FAIL'
+                record['qemu_boot_record'] = result
+            if a.fresh_mac:
+                record['fresh_mac'] = 'PENDING'
+            write_records(record, out)          # the QEMU result on disk now, not after the fresh-Mac run
         if a.fresh_mac:
             m = mirror or {}
             fill = record['mirror_fill'] = fill_mirror(
@@ -412,16 +437,6 @@ def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkou
                 result = fresh_mac_result(fresh)
                 record['fresh_mac'] = 'PASS' if result and result.get('passed') else 'FAIL'
                 record['fresh_mac_result'] = result
-        if a.qemu_boot:
-            where = out / 'qemu-boot'
-            try:
-                step('qemu-boot', [PY, '-I', 'pipeline/qemu-first-boot', '--out', where, '--commit', sha], record, out)
-            except SystemExit:
-                failed_checks.append('qemu-boot')
-            finally:
-                result = qemu_boot_result(where)
-                record['qemu_boot'] = 'PASS' if result and result.get('qemu_boot') == 'PASS' else 'FAIL'
-                record['qemu_boot_record'] = result
         if failed_checks:
             current.update(rec=record, out=out)
             raise SystemExit(1)
@@ -448,13 +463,7 @@ def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkou
         if isinstance(record.get('dev'), dict) and 'steps' in record['dev'] and 'phases' not in record['dev']:
             record['dev']['phases'] = phases(out / 'dev' / 'logs')
         record['finished'] = datetime.datetime.now().astimezone().isoformat(timespec='seconds')
-        (out / 'candidate.json').write_text(json.dumps(record, indent=1) + '\n')
-        # a bench's arm gate reads candidate.json in the folder of the stick it writes: each other stick folder
-        # gets the cut's whole record plus that stick's entry
-        for entry in record['sticks']:
-            folder = Path(entry['path']).parent
-            if folder != out and folder.is_dir():
-                (folder / 'candidate.json').write_text(json.dumps(dict(record, stick=entry), indent=1) + '\n')
+        write_records(record, out)
         worktree[1](tree)
         shutil.rmtree(work, ignore_errors=True)
 

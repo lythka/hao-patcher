@@ -192,6 +192,11 @@ class Cut(unittest.TestCase):
                 self.calls.append((cmd, env['HAO_LOGS']))
                 log.write_text('ran\n')
                 where = Path(cmd[cmd.index('--out') + 1])
+                # what a bench sees on disk while the fresh-Mac run is going
+                self.during_fresh = {f.parent.name: json.loads(f.read_text())
+                                     for f in where.parent.glob('*candidate.json')}
+                self.during_fresh.update({f.parent.name: json.loads(f.read_text())
+                                          for f in where.parent.glob('*/candidate.json')})
                 where.mkdir(parents=True)
                 (where / 'fresh-mac.json').write_text(json.dumps(dict(passed=fresh)))
                 return 0 if fresh else 1
@@ -210,14 +215,14 @@ class Cut(unittest.TestCase):
             args += ['--fresh-mac', '--fresh-mac-vm', str(self.root / 'vm')]
         return self.cut(*args)
 
-    def test_qemu_boot_runs_last_and_is_recorded(self):
+    def test_qemu_boot_runs_before_fresh_mac_and_is_recorded(self):
         rc, rec, out = self.checks(fresh=True, qemu='PASS')
         self.assertEqual(rc, 0)
         self.assertTrue(rec['passed'])
         self.assertEqual((rec['fresh_mac'], rec['qemu_boot']), ('PASS', 'PASS'))
         self.assertEqual(rec['qemu_boot_record']['rev'], 'abc1234')
-        self.assertEqual([s['name'] for s in rec['steps']][-2:], ['fresh-mac', 'qemu-boot'])
-        cmd = self.calls[-1][0]
+        self.assertEqual([s['name'] for s in rec['steps']][-2:], ['qemu-boot', 'fresh-mac'])
+        cmd = [c for c, _ in self.calls if 'pipeline/qemu-first-boot' in c][-1]
         self.assertEqual(cmd[cmd.index('--out') + 1], str(out / 'qemu-boot'))
         self.assertEqual(cmd[cmd.index('--commit') + 1], rec['commit'])
 
@@ -233,6 +238,24 @@ class Cut(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertEqual(rec['qemu_boot'], 'FAIL')
         self.assertIsNone(rec['qemu_boot_record'])
+
+    def test_the_qemu_result_is_on_disk_while_fresh_mac_runs(self):
+        rc, rec, out = self.checks(fresh=True, qemu='PASS', extra=['--generic'])
+        self.assertEqual(rc, 0)
+        for folder in (out.name, 'generic'):
+            got = self.during_fresh[folder]
+            self.assertEqual((got['qemu_boot'], got['fresh_mac']), ('PASS', 'PENDING'))
+            self.assertEqual(got['qemu_boot_record']['rev'], 'abc1234')
+            self.assertNotIn('passed', got)
+        self.assertEqual(self.during_fresh['generic']['stick']['kind'], 'generic')
+        final = json.loads((out / 'generic' / 'candidate.json').read_text())
+        self.assertEqual((final['fresh_mac'], final['passed']), ('PASS', True))
+
+    def test_a_qemu_boot_failure_still_runs_fresh_mac(self):
+        rc, rec, out = self.checks(fresh=True, qemu='FAIL')
+        self.assertEqual(rc, 1)
+        self.assertEqual((rec['fresh_mac'], rec['qemu_boot']), ('PASS', 'FAIL'))
+        self.assertEqual(self.during_fresh[out.name]['qemu_boot'], 'FAIL')
 
     def test_a_fresh_mac_failure_still_boots_in_qemu(self):
         rc, rec, out = self.checks(fresh=False, qemu='PASS')
