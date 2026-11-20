@@ -28,6 +28,7 @@ NEEDS VALIDATION: not built by golden-run. A QEMU boot of an aae0ab3 image with 
 payload swapped in reached sshd in 559 s, with no panic and no launchd refusal.
 
 ## Revisions
+- r5 2026-11-20 Row hao_runtime_fold_catalog is hao-runtime 90c2b9e built for the witness family 31DA2287 (1892 of 1892 units match); libhao 076cc54f.
 - r4 2026-11-20 Row hao_runtime_fold_catalog is hao-runtime b05855f built for the witness family 31DA2287 (row rebuilt_cache_catalog r8): 1892 of 1892 units name its images; libhao 9b40371a.
 - r3 2026-11-20 Row hao_runtime_fold_catalog is hao-runtime b05855f built for the 66k family 322743F4 (the runtime of row hao_runtime r93; libhao 9b40371a).
 - r2 2026-11-20 Row `hao_runtime_fold_catalog`: hao-runtime aba5ce7 (the RC runtime with the JIT arena and the Weather fix) for the 66k-record catalog family 322743F4, libhao db500576: the runtime of the v0.0.1 rebuilt-cache image.

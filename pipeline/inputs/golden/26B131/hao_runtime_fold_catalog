@@ -1,4 +1,4 @@
 # hao runtime payload for the B+catalog fold-in image (family 31DA2287, row rebuilt_cache_catalog: the witness family),
-# from hao-runtime b05855f (the same runtime as row hao_runtime, libhao 9b40371a). Its records name 31DA2287 only.
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=b0e74e49b6d897d035909a8de81fa35a335f6878de33c59697dd1fa267e81022
-4ce75aed87d2dbe072cf95b18bf45a886e6f4343b5f2a3379384223371a24c3c store/artifacts/hao-runtime-26B131-20261120-b05855f-fold-witness-31da2287/payload
+# from hao-runtime 90c2b9e (the same runtime as row hao_runtime, libhao 076cc54f). Its records name 31DA2287 only.
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=bc89c71dd4d77a057fe2fbbf93a325dcd4b48e50e49c2691e23d5f4f1d96a9e4
+d065580c0b6be10535b1d908324389fd90e712e22ea3c6e03f2610348ed40329 store/artifacts/hao-runtime-26B131-20261120-90c2b9e-fold-witness-31da2287/payload

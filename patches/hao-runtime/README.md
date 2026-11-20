@@ -46,6 +46,7 @@ NEEDS VALIDATION: r92 (row hao-runtime 5a7d3fc, the JIT arena): its libhao was s
 Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r90): hao runs the image's ARM programs to a logged-in desktop; 965 AOT files are in place; fma64 equals native arm64; Control Center, Notification Center, Font Book, Stocks and Tips run with no refusal. Open and tracked on their own: Weather (#9, #62), gamed (#18), the AOT job's done marker (#78).
 
 ## Revisions
+- r94 2026-11-20 Row hao_runtime is hao-runtime 90c2b9e: b05855f plus #78 (the auto-AOT marker) and install-live; libhao 076cc54f. The Maps PreferencesOutputs crash (#87) is not fixed by it.
 - r93 2026-11-20 Row hao_runtime is hao-runtime b05855f (integration/v0.0.1-r2): report-only values pass untouched (hao no longer writes partial nil patches into values it declined to certify), plus #76, #77, thunk pairs without JIT memory and the Weather fixes; libhao 9b40371a.
 - r92 2026-11-19 Row hao_runtime (26B131, A family) is hao-runtime 5a7d3fc: the RC runtime 1691020 with the JIT arena (Maps refusal, #84), libhao 582796eb, shown working on a MacBookPro9,2 running image 5e30343 with that libhao in place. The payload changes: libhao and the AOT files the Mac makes from it.
 - r91 2026-11-19 Validated r90 on hardware (Validation). Nothing it installs changes.

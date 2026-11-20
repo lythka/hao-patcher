@@ -51,9 +51,9 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-windowserver-filter | r10 | oclp-hook | product |  | x | x |  |  | ok (r5) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
 | hao-command | r13 | post | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
 | hao-opencore | r86 | post | product |  | x | x |  |  | **needs** | r86 2026-11-20 config-reasons.json records SIP 0x807 (dev-capture r4 adds task-for-pid on dev images); without |
-| hao-runtime | r93 | oclp-hook | product |  | x | x |  |  | **needs** | r93 2026-11-20 Row hao_runtime is hao-runtime b05855f (integration/v0.0.1-r2): report-only values pass untouch |
+| hao-runtime | r94 | oclp-hook | product |  | x | x |  |  | **needs** | r94 2026-11-20 Row hao_runtime is hao-runtime 90c2b9e: b05855f plus #78 (the auto-AOT marker) and install-live |
 | hao-runtime-fold | r10 | oclp-hook | product |  |  |  |  |  | **needs** | r10 2026-11-18 Row `hao_runtime_fold` -> hao-runtime cabc1d5 payload for fold family B 31C0215A (manifest 8e45 |
-| hao-runtime-fold-catalog | r4 | oclp-hook | experiment |  |  |  |  |  | **needs** | r4 2026-11-20 Row hao_runtime_fold_catalog is hao-runtime b05855f built for the witness family 31DA2287 (row r |
+| hao-runtime-fold-catalog | r5 | oclp-hook | experiment |  |  |  |  |  | **needs** | r5 2026-11-20 Row hao_runtime_fold_catalog is hao-runtime 90c2b9e built for the witness family 31DA2287 (1892  |
 | metal-compiler-compat | r13 | oclp-hook | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
 | metal-metalold | r4 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r4 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces |
 | metalold-selectors | r10 | oclp-hook | product |  | x | x |  |  | ok | r10 2026-11-18 Row metalold_selectors hashes and publishes only libmetalold-selectors.dylib (`# hash: release- |

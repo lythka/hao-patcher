@@ -193,11 +193,11 @@
   "hao_runtime": {
    "class": "ours",
    "publish": "file",
-   "url": "https://github.com/lythka/hao-runtime/releases/download/v0.0.1/hao-runtime-26B131-b05855fa1002-public.tar.gz",
+   "url": "https://github.com/lythka/hao-runtime/releases/download/v0.0.1/hao-runtime-26B131-90c2b9e42fd3-public.tar.gz",
    "unpack": {"strip": 1, "into": "parent"},
-   "source": "../hao-runtime-26B131-b05855fa1002-public.tar.gz",
-   "source_sha256": "a01659d9a0be8fcfdb363dee8e84311d532cd49c0e88eba1586ab8ae655bf887",
-   "reason": "hao-runtime's public archive of the b05855f payload (its make-public-archive.py, deterministic): hao's own binaries (hao, libhao, libhao_identity, libhao_async_contract, HaoExec.kext unstamped), install helpers, interface units and thunk libraries, the async provider, trusted cdhashes and stub identities (hashes), the stub skeletons (Apple bytes zeroed), the generators and GENERATE.md. What is made from Apple binaries is not in it: see completed_on_mac",
+   "source": "../hao-runtime-26B131-90c2b9e42fd3-public.tar.gz",
+   "source_sha256": "a55a34a64bb8e1191aecb3bf58d9f3a2e77d62b63f42219a18e93426a95a931b",
+   "reason": "hao-runtime's public archive of the 90c2b9e payload (its make-public-archive.py, deterministic): hao's own binaries (hao, libhao, libhao_identity, libhao_async_contract, HaoExec.kext unstamped), install helpers, interface units and thunk libraries, the async provider, trusted cdhashes and stub identities (hashes), the stub skeletons (Apple bytes zeroed), the generators and GENERATE.md. What is made from Apple binaries is not in it: see completed_on_mac",
    "made_on_mac_files": [
     {
      "path": "payload/embed/stubs",

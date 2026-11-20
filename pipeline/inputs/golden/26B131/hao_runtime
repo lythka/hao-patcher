@@ -1,6 +1,7 @@
-# hao runtime payload for the unfolded 26B131 x86_64 cache (A family, 262FA161), from hao-runtime b05855f
+# hao runtime payload for the unfolded 26B131 x86_64 cache (A family, 262FA161), from hao-runtime 90c2b9e
 # (integration/v0.0.1-r2: the release runtime with the JIT arena, the Weather fixes, #76, #77, thunk pairs without JIT
-# memory, and report-only values passed untouched; the Maps PreferencesOutputs crash, #87, is not fixed by it): libhao 9b40371a.
+# memory, report-only values passed untouched, #78 and install-live; the Maps PreferencesOutputs crash, #87, is not
+# fixed by it): libhao 076cc54f.
 # hash: without root/usr/lib/hao/aot  # made on the user's Mac after the first boot (made_on_mac_files)
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=be6f108063805342c978e3889578f2ad4fc5e40e154086fdd4d7f037f3bee2b5
-5b83001dd753a94d9e1fe73899734fbf97fbe7c85a7ac3da2891ec6c718e46f2 store/artifacts/hao-runtime-26B131-20261120-b05855f-stock/payload
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=d3fe7190c91589cca8541ba8bef3a91d2794bfd9e8ca80e929da3e65ac086c7f
+653f722c652e77346eeda18fcf83e59cf5a074677353e9d0aa4ecf9747aeaf54 store/artifacts/hao-runtime-26B131-20261120-90c2b9e-stock/payload
