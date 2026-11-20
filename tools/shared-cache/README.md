@@ -161,9 +161,11 @@ Build the decoder with `python3.14 -I tools/shared-cache/llvm-disasm/make OUTPUT
 compiler/SDK). The output contains the signed library, LLVM license and `build.json`; `work/` is disposable.
 The library itself needs only macOS system libraries. Run the cache tool with x86_64 Python when using it
 (on Apple silicon: `SHARED_CACHE_DISASM=OUTPUT/libhao-x86-disasm.dylib arch -x86_64 python3.14 -I tools/shared-cache/make ...`).
-An arm64 Python process can explicitly select Xcode's libLTO with `SHARED_CACHE_DISASM`.
+An arm64 Python process uses Xcode's libLTO, since it cannot load the x86_64 decoder.
 
 ## Revisions
+- r95 2026-11-20 The decoder follows the process architecture: x86_64 Python (Intel or Rosetta) uses the
+  llvm_disasm row, arm64 Python uses Xcode's libLTO. r94 loaded the x86_64 row on arm64 and failed 6 host tests.
 - r94 2026-11-20 Build a pinned, redistributable x86_64 LLVM decoder with llvm-disasm/make. Decoding uses
   SHARED_CACHE_DISASM, then the verified llvm_disasm input row when present, then Xcode's libLTO.
 - r93 2026-11-20 toolchain/make applies source.patch with --forward --batch: a DYLD_SOURCE already patched in place

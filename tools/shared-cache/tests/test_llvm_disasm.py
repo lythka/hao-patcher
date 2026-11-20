@@ -53,10 +53,17 @@ class SelectionTests(unittest.TestCase):
         with patch.dict(os.environ, {'SHARED_CACHE_DISASM': '/explicit/library'}), patch.object(x86, 'row_library') as lookup:
             self.assertEqual(x86.default_library(), Path('/explicit/library'))
             lookup.assert_not_called()
-        with patch.dict(os.environ, {}, clear=True), patch.object(x86, 'row_library', return_value=Path('/row/library')):
+        x86_host = patch.object(x86.platform, 'machine', return_value='x86_64')
+        with patch.dict(os.environ, {}, clear=True), x86_host, patch.object(x86, 'row_library', return_value=Path('/row/library')):
             self.assertEqual(x86.default_library(), Path('/row/library'))
-        with patch.dict(os.environ, {}, clear=True), patch.object(x86, 'row_library', return_value=None):
+        with patch.dict(os.environ, {}, clear=True), x86_host, patch.object(x86, 'row_library', return_value=None):
             self.assertEqual(x86.default_library(), Path(x86.LTO))
+
+    def test_arm64_host_uses_xcode_not_the_x86_64_decoder(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(x86.platform, 'machine', return_value='arm64'), \
+                patch.object(x86, 'row_library', return_value=Path('/row/library')) as lookup:
+            self.assertEqual(x86.default_library(), Path(x86.LTO))
+            lookup.assert_not_called()
 
 
 class EquivalenceTests(unittest.TestCase):
