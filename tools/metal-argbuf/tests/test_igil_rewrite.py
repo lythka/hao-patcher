@@ -133,6 +133,27 @@ class Rewrite(unittest.TestCase):
         _, out, _ = self.fixture('c1-dynfloat.igil')
         self.assertEqual(set(re.findall(r'IADD r\d+\.x, (r\d+)\.y, -?\d+;', out)), {'r4'})
 
+    def test_constant_pointer_through_inline_buffer(self):
+        # diag#0019 (RealityKit lit materials black): in a program with program-scope constants the 3802 front end
+        # reads a `constant` pointer loaded from a plain buffer through its inline constant buffer (C0) instead of
+        # C-1, so fsRealityPbr read its instance and material tables from its own literals. c0-inline-ptr: the IGIL
+        # of fixtures/c0-inline-ptr.metal (same shape: pointers at bytes 0 and 40 of buffer 21).
+        src = (FIX / 'c0-inline-ptr.igil').read_text()
+        for form in ('LD_RAW r15, r14.x, C0;', 'MOV r23, C0[r22.x];', 'MOV r31, C0[r30.x];'):
+            self.assertIn(form, src)
+        changed, out, info = self.fixture('c0-inline-ptr.igil')
+        self.assertTrue(changed)
+        self.assertIn('unresolved 0', info)
+        bti = -self.cfg['BUF_BTI']
+        self.assertRegex(out, r'IADD (r\d+)\.x, r10\.y, %d;\n\tLD_RAW r15, r14\.x, u\[\1\.x\];' % bti)
+        for addr, dst in (('r21', 'r23'), ('r29', 'r31')):   # 16-byte reads: aligned quad from the pointer's UAV
+            self.assertRegex(out, r'AND (r\d+)\.x, %s\.x, -16;\n\tIADD (r\d+)\.x, r16\.y, %d;\n'
+                                  r'\tLD_RAW (r\d+), \1\.x, u\[\2\.x\];\n\tMOV %s, \3;' % (addr, bti, dst))
+        # reads of the program's own constants (global base r0), also with an index loaded from a buffer, stay on C0
+        self.assertIn('LD_RAW r27, r26.x, C0;', out)
+        self.assertIn('LD_RAW r40, r39.x, C0;', out)
+        self.assertEqual(len(re.findall(r', C0[;\[]', out)), 2)
+
     def test_constant_pointer_raw_load_vertex(self):
         # vertex programs ignore a dynamic surface index: one compare per buffer slot
         changed, out, info = self.fixture('c1-vertex.igil')

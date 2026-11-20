@@ -241,6 +241,11 @@ static char *rewrite_resources(const char *in, const igil_config *cfg, igil_stat
 //   `LD_RAW rD, rA.x, C-1`  constant pointer, raw dword load at byte address rA: scalars, float2, packed_float3,
 //                           a float at byte 16 (WebGPU uniforms), dynamic scalar indexing, and byte/short/half reads
 //                           (rA = address & -4, then shift and mask)
+//   `LD_RAW rD, rA.x, C0` / `MOV rD, C0[rI.x]` in a program with program-scope constants: the front end names its
+//                           inline constant buffer (here C0) instead of C-1 for a constant pointer (fsRealityPbr,
+//                           diag#0019). A read of the inline buffer is a pointer read only when its address comes from
+//                           a pointer loaded from another constant buffer and from no global base register (the
+//                           `MOV rN, imm` of the declarations; every program-scope constant is read at base + offset).
 //   `LD_RAW rD, rA.x, u0`   device pointer (u0 undeclared). Only the pointer's low word (byte offset) survives; its high
 // word, BUF_BTI + h, is still in .y of the LD_RAW that loaded the pointer (air_pass.c makes that a 64-bit load). Each
 // access becomes LD_RAW from a declared raw-UAV range selected by h: u(ubase+h) at buffer slot BUF_SLOT+h (emit_read).
@@ -261,10 +266,13 @@ static void emit_read(buf *o, int vertex, int T, int ptr, const char *dst, const
 static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, igil_stats *st) {
     int vertex = strstr(in, "VERTEXSHADER ") != NULL;
     int nl; line *L = split(in, &nl);
-    int temps = -1, temps_at = -1, umax = -1, karg = -1, dcl_at = -1;
+    int temps = -1, temps_at = -1, umax = -1, karg = -1, dcl_at = -1, inl = -1, dcl_end = -1;
     for (int i = 0; i < nl; i++) {
         char t[256]; size_t n = L[i].n < 255 ? L[i].n : 255; memcpy(t, L[i].s, n); t[n] = 0;
         const char *d;
+        if (strstr(t, "\tDCL_") == t) dcl_end = i;
+        if ((d = strstr(t, "DCL_CONSTANTBUFFER C")) && isdigit((unsigned char)d[20]))   // inline: INLINE_CONSTANT follows
+            for (int j = i + 1; j < nl && j <= i + 3; j++) if (memmem(L[j].s, L[j].n, "INLINE_CONSTANT", 15)) { inl = atoi(d + 20); break; }
         if ((d = strstr(t, "DCL_TEMPS r0..r"))) { temps = atoi(d + 15); temps_at = i; }
         if ((d = strstr(t, "DCL_UAV")) && (d = strstr(d, " u")) && isdigit((unsigned char)d[2]) && atoi(d + 2) > umax) umax = atoi(d + 2);
         if ((d = strstr(t, "KERNEL_ARGUMENT, ")) && atoi(d + 17) > karg) karg = atoi(d + 17);
@@ -272,12 +280,30 @@ static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, ig
     }
     if (temps < 0 || dcl_at < 0) { free(L); return NULL; }
     gdef *g = malloc(((size_t)temps + 1) * sizeof *g);
+    char *gb = calloc((size_t)temps + 1, 1);   // derived from a global base register
+    char *pr = calloc((size_t)nl, 1);          // line i reads the inline constant buffer through a pointer
     for (int r = 0; r <= temps; r++) g[r] = (gdef){ -1, -1, 0 };
     insn x;
+    char inlc[16] = "", inlb[16] = "";
+    if (inl >= 0) { snprintf(inlc, sizeof inlc, "C%d", inl); snprintf(inlb, sizeof inlb, "C%d[r", inl); }
     // pointer provenance, in program order (graphics programs here are straight-line apart from waterfall loops)
     for (int i = temps_at + 1; i < nl; i++) {
         if (!parse(L[i], &x) || x.na < 2) continue;
+        if (inl >= 0) for (int k = 0; k < x.na; k++) if (startswith(x.a[k], inlb)) {   // C0[rI.x]: 16-byte read
+            int ri = reg(x.a[k] + strlen(inlb) - 1);
+            if (ri >= 0 && ri <= temps && g[ri].ptr >= 0 && g[ri].addr >= 0 && !gb[ri]) pr[i] = 1;
+        }
         int d = reg(x.a[0]); if (d < 0 || d > temps) continue;
+        if (!strcmp(x.op, "MOV") && x.na == 2 && i < dcl_end && reg(x.a[1]) < 0 && (isdigit((unsigned char)x.a[1][0]) || x.a[1][0] == '-')) {
+            gb[d] = 1; g[d] = (gdef){ -1, -1, 0 }; continue; }
+        if (!strcmp(x.op, "LD_RAW") && x.na == 3 && inl >= 0 && !strcmp(x.a[2], inlc)) {
+            int a = reg(x.a[1]);
+            if (a >= 0 && a <= temps && g[a].ptr >= 0 && !gb[a]) { pr[i] = 1; g[d] = (gdef){ d, -1, 1 }; }
+            else g[d] = (gdef){ -1, -1, 0 };   // program-scope constant data
+            gb[d] = 0; continue;
+        }
+        if (!is_load(&x)) { int b = 0; for (int k = 1; k < x.na; k++) { int s2 = reg(x.a[k]); if (s2 >= 0 && s2 <= temps && gb[s2]) b = 1; } gb[d] = (char)b; }
+        else gb[d] = 0;
         if (!strcmp(x.op, "LD_RAW") && x.na == 3 && (x.a[2][0] == 'C' || x.a[2][0] == 'u')) {
             // C0..Cn: the argument buffer (a pointer source); C-1 / u0: a load through a pointer, kept as a possible
             // nested pointer but ranked below a first-level one
@@ -300,7 +326,8 @@ static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, ig
         if (!strcmp(x.op, "LD_RAW") && x.na == 3 && !strcmp(x.a[2], "u0") && umax < 0) need = 1;
         if (!strcmp(x.op, "LD_RAW") && x.na == 3 && !strcmp(x.a[2], "C-1")) need = 1;
     }
-    if (!need) { free(g); free(L); return NULL; }
+    for (int i = 0; i < nl; i++) if (pr[i]) need = 1;
+    if (!need) { free(g); free(gb); free(pr); free(L); return NULL; }
     int ubase = umax + 1, T = temps + 1;   // scratch T (index), T+1 (address), T+2 (loaded register)
     buf o = {0}; int fails = 0;
     for (int i = 0; i < nl; i++) {
@@ -320,7 +347,7 @@ static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, ig
                 }
                 fails++;
             }
-            if (!strcmp(x.op, "LD_RAW") && x.na == 3 && !strcmp(x.a[2], "C-1")) {   // constant pointer, raw dword load
+            if (!strcmp(x.op, "LD_RAW") && x.na == 3 && (!strcmp(x.a[2], "C-1") || (pr[i] && !strcmp(x.a[2], inlc)))) {   // constant pointer, raw dword load
                 int a = reg(x.a[1]);
                 if (a >= 0 && a <= temps && g[a].ptr >= 0) {
                     emit_read(&o, vertex, T, g[a].ptr, x.a[0], x.a[1], ubase, cfg);
@@ -329,9 +356,9 @@ static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, ig
                 fails++;
             }
             int ck = -1;
-            for (int k = 0; k < x.na; k++) if (startswith(x.a[k], "C-1[")) ck = k;
+            for (int k = 0; k < x.na; k++) if (startswith(x.a[k], "C-1[") || (pr[i] && startswith(x.a[k], inlb))) ck = k;
             if (ck >= 0) {   // constant pointer: load the 16-byte register the operand names, keep its swizzle
-                int ri = reg(x.a[ck] + 4); const char *close = strchr(x.a[ck], ']');
+                int ri = reg(strchr(x.a[ck], '[') + 1); const char *close = strchr(x.a[ck], ']');
                 if (ri >= 0 && ri <= temps && close && g[ri].ptr >= 0 && g[ri].addr >= 0) {
                     char d2[16], a2[16]; snprintf(d2, sizeof d2, "r%d", T + 2); snprintf(a2, sizeof a2, "r%d.x", T + 1);
                     putf(&o, "\tAND r%d.x, r%d.x, -16;\n", T + 1, g[ri].addr);
@@ -351,7 +378,7 @@ static char *rewrite_graphics_buffers(const char *in, const igil_config *cfg, ig
     if (o.n && in[strlen(in) - 1] != '\n') o.p[--o.n] = 0;
     if (fails) st->unresolved += fails;
     st->buf_base = ubase;
-    free(g); free(L);
+    free(g); free(gb); free(pr); free(L);
     return o.p;
 }
 

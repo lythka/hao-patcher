@@ -1,0 +1,85 @@
+
+	PIXELSHADER fmain
+
+	VERSION_3_0
+
+	DCL_CONSTANTBUFFER C1=
+	{
+	  KERNEL_ARGUMENT, 1,
+	  LOCATION_INDEX, 21, 0,
+	  EMULATION_ARGUMENT, FALSE,
+	  STRIDE, 4, 4
+	};
+
+	DCL_CONSTANTBUFFER C2=
+	{
+	  KERNEL_ARGUMENT, 2,
+	  LOCATION_INDEX, 28, 0,
+	  EMULATION_ARGUMENT, FALSE,
+	  STRIDE, 4, 4
+	};
+
+	DCL_CONSTANTBUFFER C0=
+	{
+	  INLINE_CONSTANT,
+	  0x3DCCCCCD,
+	  0x3E4CCCCD,
+	  0x3E99999A,
+	  0x3ECCCCCD,
+	  0x3F000000,
+	  0x3F19999A,
+	  0x3F333333,
+	  0x3F4CCCCD
+	};
+
+	DCL_TEMPS r0..r41;
+	MOV r0, 0;
+	DCL_INPUT i0.x, UNKNOWN, CONSTANT, 0;
+
+	MOV r1, 0;
+	DCL_OUTPUT o0.xyzw, PRIMARYCOLOR, 0;
+
+
+
+	DCL_EARLY_DEPTH_STENCIL_TEST_MODE NORMAL;
+
+
+	AND r7.x, i0.x, 3;
+	SHL r8.x, r7.x, 2;
+	LD_RAW r9, r8.x, C2;
+	LD_RAW r10, 0, C1;
+	MOV r11.x, r10.x;
+	SHL r12.x, r9.x, 6;
+	IADD r13.x, r11.x, r12.x;
+	IADD r14.x, r13.x, 16;
+	LD_RAW r15, r14.x, C0;
+	LD_RAW r16, 40, C1;
+	MOV r17.x, r16.x;
+	MOV r18.x, 288;
+	IMUL r20.x, r19.x, r15.x, r18.x;
+	IADD r21.x, r17.x, r19.x;
+	SHR r22.x, r21.x, 4;
+	MOV r23, C0[r22.x];
+	AND r24.x, i0.x, 7;
+	SHL r25.x, r24.x, 2;
+	IADD r26.x, r25.x, r0.x;
+	LD_RAW r27, r26.x, C0;
+	MOV_SWZ r28, r27.x, r27.x, r27.x, r27.x;
+	IADD r29.x, r21.x, 16;
+	SHR r30.x, r29.x, 4;
+	MOV r31, C0[r30.x];
+	FMAD r32, r28, r23, r31;
+	IADD r33.x, i0.x, 1;
+	AND r34.x, r33.x, 3;
+	SHL r35.x, r34.x, 2;
+	LD_RAW r36, r35.x, C2;
+	AND r37.x, r36.x, 7;
+	SHL r38.x, r37.x, 2;
+	IADD r39.x, r38.x, r0.x;
+	LD_RAW r40, r39.x, C0;
+	MOV_SWZ r41, r40.x, r40.x, r40.x, r40.x;
+	FADD r2, r32, r41;
+	MOV o0.xyzw, r2.xyzw;
+	RET;
+
+	END
