@@ -249,7 +249,9 @@ agent_transfer() {
   phase=$1; shift
   attempt=1
   while [ "$attempt" -le 5 ]; do
-    if curl -gsSf --connect-timeout 5 --max-time 30 -H "X-SSDVM-Agent: $SSDVM_AGENT_ID" "$@"; then
+    # Two VMs loading the host made 5 s / 30 s too short (a build's job never arrived); fetching a command and
+    # posting a result are idempotent, so a retry never runs a job twice.
+    if curl -gsSf --connect-timeout 30 --max-time 300 -H "X-SSDVM-Agent: $SSDVM_AGENT_ID" "$@"; then
       return 0
     fi
     echo "ssd agent: $id $phase delivery failed (attempt $attempt/5)" >&2
@@ -450,8 +452,14 @@ def serve(vmdir, bootstrap_port=None):
         server.serve_forever()
 
 
-def exec_cmd(vmdir, cmd, timeout=600, gui=False):
-    q = agent_dir(vmdir) if not gui else share_dir(vmdir) / ".agent-gui"
+EXEC_UNDELIVERED = 75   # exec's exit status when the guest never took the command; it was withdrawn: safe to resend
+
+
+def exec_cmd(vmdir, cmd, timeout=600, gui=False, q=None):
+    """Queue CMD for the guest agent and wait for its rc. When no reply comes within TIMEOUT and the agent never took
+    the command (still CID.cmd), it is withdrawn and EXEC_UNDELIVERED returned, so a caller may send it again without
+    a second run; a command the agent took (CID.run) is never withdrawn."""
+    q = q or (agent_dir(vmdir) if not gui else share_dir(vmdir) / ".agent-gui")
     cid = uuid.uuid4().hex[:12]
     tmp = q / (cid + ".tmp")
     tmp.write_text(cmd + "\n")
@@ -467,7 +475,13 @@ def exec_cmd(vmdir, cmd, timeout=600, gui=False):
                 x.unlink(missing_ok=True)
             return int(r) if r.isdigit() else 1
         time.sleep(0.3)
-    sys.exit(f"vmctl: no reply within {timeout}s (agent running in the guest Terminal? try: vmctl VMDIR up)")
+    try:
+        (q / (cid + ".cmd")).rename(q / (cid + ".withdrawn"))
+    except FileNotFoundError:
+        sys.exit(f"vmctl: no reply within {timeout}s; the guest took the command (agent running in the guest "
+                 f"Terminal? try: vmctl VMDIR up)")
+    print(f"vmctl: no reply within {timeout}s and the guest never took the command; withdrawn", file=sys.stderr)
+    return EXEC_UNDELIVERED
 
 
 def vnc_sock(vmdir):
