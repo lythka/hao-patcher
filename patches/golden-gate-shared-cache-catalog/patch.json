@@ -1,5 +1,5 @@
 {
- "revision": 8,
+ "revision": 9,
  "pack": "base",
  "variant": "cache-catalog",
  "replaces": "golden-gate-shared-cache",
@@ -8,7 +8,7 @@
   "rebuilt_cache_catalog"
  ],
  "status": "experiment",
- "validated": false,
+ "validated": true,
  "files": [
   {
    "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64",
