@@ -214,11 +214,26 @@ class Helpers(unittest.TestCase):
         self.assertEqual(Q['macos_vms'](rows), 2)
 
     def test_wait_vm_slot(self):
-        counts = iter([2, 2, 1])
-        self.assertTrue(Q['wait_vm_slot'](2, count=lambda: next(counts), clock=lambda: 0, sleep=lambda s: None))
-        t = iter(range(0, 10 ** 6, 100))
-        self.assertFalse(Q['wait_vm_slot'](2, count=lambda: 2, clock=lambda: next(t), sleep=lambda s: None,
-                                           timeout=500))
+        with tempfile.TemporaryDirectory() as d:
+            lock = Path(d) / 'builder.lock'
+            counts = iter([2, 2, 1])
+            self.assertTrue(Q['wait_vm_slot'](2, count=lambda: next(counts), clock=lambda: 0, sleep=lambda s: None,
+                                              lock=lock))
+            t = iter(range(0, 10 ** 6, 100))
+            self.assertFalse(Q['wait_vm_slot'](2, count=lambda: 2, clock=lambda: next(t), sleep=lambda s: None,
+                                               timeout=500, lock=lock))
+
+    def test_wait_for_the_builder_lock(self):
+        with tempfile.TemporaryDirectory() as d:
+            lock = Path(d) / 'builder.lock'
+            lock.mkdir()
+            waits = []
+
+            def sleep(s):
+                waits.append(s)
+                lock.rmdir()
+            self.assertTrue(Q['wait_vm_slot'](2, count=lambda: 0, clock=lambda: 0, sleep=sleep, lock=lock))
+            self.assertEqual(waits, [60])
 
     def test_missing_processes(self):
         self.assertEqual(Q['missing_processes'](PS, ['WindowServer', 'loginwindow', 'Dock']), ['Dock'])

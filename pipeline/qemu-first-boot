@@ -8,8 +8,8 @@ the Darwin major, the kexts and boot-args the QEMU ESP gets, the guest's memory,
 that must run, and how many macOS VMs this host may run at once.
 
   1. pipeline/golden-run ASSEMBLY --repo REPO (default OUT/image), once fewer than max_macos_vms builder VMs
-     (`ssdvm run`) are running: every macOS guest on this Mac counts against Virtualization's limit, the fresh-Mac
-     VM too. golden-run checks the disk itself. --no-build boots REPO as it is. golden-run leaves its work folder
+     (`ssdvm run`) are running (every macOS guest on this Mac counts against Virtualization's limit, the fresh-Mac
+     VM too) and no other build holds the builder lock (store/tmp/builder.lock: golden-run refuses to start then). golden-run checks the disk itself. --no-build boots REPO as it is. golden-run leaves its work folder
      (the workspace image, over 100 GB) and its stopped VM clone behind; once its build record says the image is
      committed to REPO, both are removed, so the export below has room.
   2. OUT/target.img, the raw image of REPO's newest revision: when that revision is HEAD and `ssdimg status` says
@@ -65,18 +65,21 @@ def macos_vms(rows=None):
     return sum(1 for r in rows if re.search(r'(?:^|/)ssdvm run ', r))
 
 
-def wait_vm_slot(limit, count=macos_vms, clock=time.monotonic, sleep=time.sleep, timeout=6 * 3600):
-    """True once fewer than LIMIT macOS VMs run; False after TIMEOUT seconds."""
+def wait_vm_slot(limit, count=macos_vms, clock=time.monotonic, sleep=time.sleep, timeout=6 * 3600,
+                 lock=TOP / 'store/tmp/builder.lock'):
+    """True once fewer than LIMIT macOS VMs run and no build holds LOCK; False after TIMEOUT seconds."""
     end, said = clock() + timeout, False
-    while count() >= limit:
+    while True:
+        running, held = count(), Path(lock).exists()
+        if running < limit and not held:
+            return True
         if clock() > end:
             return False
         if not said:
-            print('qemu-first-boot: %d macOS VMs running (limit %d); waiting for a free slot' % (count(), limit),
-                  flush=True)
+            print('qemu-first-boot: %d macOS VMs running (limit %d)%s; waiting' % (
+                running, limit, ', the builder lock is held' if held else ''), flush=True)
             said = True
         sleep(60)
-    return True
 
 
 def serial(run):
