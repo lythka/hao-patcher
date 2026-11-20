@@ -43,7 +43,7 @@ Undeclared: opencore-generic, opencore-mbp92.
 | golden-gate-root-launchservices | r5 | experiment | post | no: row root_launchservices_golden_gate | - | root_launchservices_golden_gate - root-launchservices-26B131-not-made-yet |
 | golden-gate-shader-caches | r17 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, golden-gate-26B131 | shader_caches_golden_gate e2d206dc shader-caches-26B131-20261112-3834bc34ea70 |
 | golden-gate-shared-cache | r11 | product | oclp-hook | yes | alpha-v0.1.0-fold, dev-beta-candidate-fold, dev-bs-test-fold | rebuilt_cache 22489f4a rebuilt-cache-fold-in-26B131-20261118-5aacad92 |
-| golden-gate-shared-cache-catalog | r6 | experiment | oclp-hook | yes | dev-bs-test-fold-catalog, dev-ssh-alpha-v0.1.0-fold-catalog | rebuilt_cache_catalog c2398aee rebuilt-cache-fold-in-catalog-26B131-20261118-5aacad92 |
+| golden-gate-shared-cache-catalog | r7 | experiment | oclp-hook | yes | dev-bs-test-fold-catalog, dev-ssh-alpha-v0.1.0-fold-catalog | rebuilt_cache_catalog 45984877 rebuilt-cache-fold-in-catalog-66k-26B131-20261118-851adc54-fe70eccb |
 | golden-gate-store | r7 | product | oclp-hook | yes | dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-lite-alpha-v0.1.0 | store_service 032e5b52 store-26B131-20261116-1f9b799c; edit_engine - edit-engine |
 | golden-gate-unsupported-daemons | r4 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, generic, golden-gate-26B131 | - |
 | golden-gate-update-policy | r3 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, generic, golden-gate-26B131 | - |
@@ -203,7 +203,7 @@ Undeclared: opencore-generic, opencore-mbp92.
   - `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.atlas`: from hao (row rebuilt_cache)
   - `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.map`: from hao (row rebuilt_cache)
   - `System/Library/CoreServices/golden-gate-shared-cache.json`: from hao
-- **golden-gate-shared-cache-catalog** r6
+- **golden-gate-shared-cache-catalog** r7
   - 33 files under `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/`, from hao (row rebuilt_cache_catalog)
   - `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64`: from hao (row rebuilt_cache_catalog)
   - `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.atlas`: from hao (row rebuilt_cache_catalog)
@@ -542,7 +542,7 @@ Image 8fb92d5, pushed 2026-11-14 10:11:23 (built 2026-11-14 09:13 from d970c5b3,
 - golden-gate-metal-framebuffer r14 is newer than every image built with it (newest r13).
 - golden-gate-native-identities r14 is newer than every image built with it (newest r11).
 - golden-gate-shared-cache r11 is newer than every image built with it (newest r4).
-- golden-gate-shared-cache-catalog r6 is newer than every image built with it (newest r1).
+- golden-gate-shared-cache-catalog r7 is newer than every image built with it (newest r1).
 - golden-gate-store r7 is newer than every image built with it (newest r6).
 - golden-gate-update-policy r3 is newer than every image built with it (newest r2).
 - golden-gate-user-seed r16 is newer than every image built with it (newest r14).
@@ -560,7 +560,7 @@ Image 8fb92d5, pushed 2026-11-14 10:11:23 (built 2026-11-14 09:13 from d970c5b3,
 - row metal_compiler_compat 954ee9d0 is in no image yet (images have 66e1e6dd, e4780509).
 - row metalold_selectors 7075829d is in no image yet (images have c9d748d7).
 - row rebuilt_cache 22489f4a is in no image yet (images have a8a847b6).
-- row rebuilt_cache_catalog c2398aee is in no image yet (images have d56244ea).
+- row rebuilt_cache_catalog 45984877 is in no image yet (images have d56244ea).
 - Test machine B: `/usr/lib/hao/libhao.dylib` (b8f0480f) differs from image 8fb92d5: row hao_runtime.
 - Test machine B: `/Library/LaunchDaemons/org.hao.slice-guard.plist` (a53b4de7) differs from image 8fb92d5: recipe golden-gate-appstore-slices.
 - Test machine B: `/usr/local/libexec/hao-slice-guard` (45466f53) differs from image 8fb92d5: recipe golden-gate-appstore-slices.

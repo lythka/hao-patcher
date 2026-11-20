@@ -32,6 +32,7 @@ records name the cache UUID, so this family needs its own payload). That image b
 no panic and no launchd refusal.
 
 ## Revisions
+- r7 2026-11-20 Row `rebuilt_cache_catalog`: rebuilt-cache-fold-in-catalog-66k-26B131-20261118-851adc54-fe70eccb (cache 322743F4, the 66k-record Swift catalog family with the ObjC method lists fixed), the cache image 3957131 booted to the desktop with sharingd and WiFiAgent up.
 - r6 2026-11-19 Stages golden-gate-shared-cache r11's fold.py: the folded OS cryptex is compacted to what it holds
   before it is sealed (about 14.6 GB instead of 26 GB on 26B131).
 - r5 2026-11-18 Row `rebuilt_cache_catalog`: rebuilt-cache-fold-in-catalog-26B131-20261118-5aacad92 (cache UUID
