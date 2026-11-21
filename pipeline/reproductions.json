@@ -69,11 +69,11 @@
    "result": "identical"
   },
   "metal_argbuf": {
-   "artifact": "metal-argbuf-26B131-20261117-fe579412",
+   "artifact": "metal-argbuf-26B131-20261120-f60029d7",
    "repo": "hao-patcher",
-   "commit": "fe579412",
+   "commit": "29c79006",
    "result": "identical",
-   "command": "tools/metal-argbuf/make OUT --icbe ICBE_REAL (iCBE-real.dylib is made on the Mac)",
+   "command": "tools/asset-build/asset-build metal_argbuf OUT (tools/metal-argbuf/make OUT --icbe ICBE_REAL; iCBE-real.dylib is made on the Mac)",
    "toolchain": "Xcode 27.2 (27B52), python3.14 -I"
   },
   "appstore_slice_guard": {
