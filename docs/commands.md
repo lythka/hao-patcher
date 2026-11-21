@@ -17,6 +17,7 @@ and macOS versions; `hao help --all` adds the developer commands; `hao COMMAND -
 | [`verify`](#hao-verify) | a Mac with hao | checks every installed pack file against its manifest |
 | [`explain`](#hao-explain) | a Mac with hao, or the Mac that made the installer | where a file comes from and every edit to it |
 | [`run`](#hao-run) | a Mac with hao | runs an ARM program with the runtime's diagnostics |
+| [`cache build`](#hao-cache-build) | a Mac with hao | builds and verifies the release shared cache; does not activate it |
 | [`aot`](#hao-aot) | a Mac with hao | the runtime's ahead-of-time caches |
 
 A command started where it doesn't belong stops and says where it runs (exit code 5).
@@ -168,6 +169,26 @@ sudo hao aot --clear         # remove the caches; the start-up job builds them a
 The runtime's ahead-of-time caches make ARM programs start faster. They are in `/private/var/db/hao`, which every user,
 root and the system's services read, so building and removing them needs your password. A start-up job (`hao.aot`)
 builds them once after the first start-up and again after each runtime update; `hao status` shows how far it is.
+
+## hao cache build
+
+For an installed Intel Mac, build and verify the shared cache pinned by its release:
+
+```sh
+sudo hao cache build --release /path/to/release.json --dry-run
+sudo hao cache build --release /path/to/release.json
+```
+
+The release supplies the offline builder and compressed Swift catalog (about 27 MB combined).
+The command reads Apple binaries from this Mac, requires the exact release build and 55 GB free,
+keeps the Mac awake, and checks the resulting UUID and every cache file's SHA256. Xcode is not needed.
+`--work DIR` chooses a root-owned workspace; each attempt gets a separate folder and a `build.log`.
+A failed attempt can be restarted with the same command. A successful attempt prints the verified
+family's path and saves `result.json` in its workspace. Duration on an MBP9,2 has not yet been measured.
+
+This command currently **builds only**. It does not activate the cache or change the running system.
+Automatic cache/runtime activation and revert still require a verified cryptex transition.
+Do not copy the output over the running cache by hand.
 
 ## Output
 

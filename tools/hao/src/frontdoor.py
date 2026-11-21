@@ -25,6 +25,7 @@ COMMANDS = (
     ('verify-release', ('build', 'installer', 'installed'), 'check a release yourself: signatures, files, tag'),
     ('explain', ('installed', 'build'), 'where a file comes from and every edit to it'),
     ('run', ('installed',), 'an ARM program through hao, with diagnostics (-v, --stats, --interp)'),
+    ('cache', ('installed',), 'build and verify the release shared cache (sudo; activation is separate)'),
     ('aot', ('installed',), 'the ahead-of-time caches: build (sudo), --status, --background, --clear'),
     ('doctor', ('build',), 'is this Mac ready to make the USB installer: Python, Xcode, disk, downloads'),
     ('status', ('build', 'installer', 'installed'), 'hao on this Mac: release, macOS, SIP, install, caches, last stop'),

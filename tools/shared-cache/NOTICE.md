@@ -34,3 +34,8 @@ family it writes are the user's own files and keep Apple's terms.
 - `shared_cache_generator`, `shared_cache_objc_writer`, `shared_cache_swift_table_writer`, and
   `shared_cache_swift_conformance_writer`: source-built dyld-1378 serializers under the licenses listed above;
   `helpers/make` links them into universal executables.
+
+- `shared_cache_builder`: the offline bundle combines this producer with the pinned dyld-based helper
+  executables, Frida relocator/runtime object and LLVM decoder. `package-user-inputs` includes dyld's
+  `APPLE_LICENSE`, this notice, and the LLVM/Frida licence files. The Swift metadata catalog is a separate
+  gzip asset; neither bundle contains the user's Apple executable files or rebuilt shared cache.

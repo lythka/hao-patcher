@@ -208,6 +208,21 @@ def classes():
     return json.loads((TOP / 'pipeline' / 'release-classes.json').read_text())['rows']
 
 
+def cache_rebuild_config(assembly):
+    """An assembly may offer a pinned, post-install cache producer independently of its image set."""
+    a = json.loads(Path(assembly).read_text())
+    relative = a.get('cache_rebuild')
+    if relative is None:
+        return None
+    path = (TOP / relative).resolve()
+    if not path.is_relative_to((TOP / 'pipeline/cache-rebuild').resolve()):
+        raise ValueError('cache rebuild config is outside pipeline/cache-rebuild')
+    config = json.loads(path.read_text())
+    if config.get('build') != a['golden_build'] or config.get('format') != 1:
+        raise ValueError('cache rebuild configuration differs from assembly')
+    return config
+
+
 def release_rows(assembly):
     """[(row, hit)] for everything a release of ASSEMBLY involves: the rows release-cut always classified (the set
     and the donors), the rows golden-run reads besides the set (tools/hao/src/assets.py: KDK, both CPythons, site
@@ -221,6 +236,9 @@ def release_rows(assembly):
     tables = [(f, lock['rows'](str(f))) for f in folders if f.is_dir()]
     out = list(rows_for(assembly))
     names = list(assets['FIXED']) + ['opencore_' + a.get('opencore', 'release')]
+    cache_rebuild = cache_rebuild_config(assembly)
+    if cache_rebuild:
+        names += list(cache_rebuild['rows'].values())
     if (TOP / 'store' / 'oclp').exists():
         names.append('psp_' + assets['oclp_psp'](TOP / 'store', a['oclp']))
     data = classes()
@@ -556,6 +574,9 @@ def build_release(assembly, name, stage=None, prerelease=True, channel='dev', ve
            'packs': {n: {'phase': p['phase'], 'recipes': p.get('recipes', [])} for n, p in sorted(packs.items())},
            'in_checkout': in_checkout, **({'dev_local': dev_local} if dev else {}), 'pending': pending, 'notes': notes,
            'archive_format': json.loads((TOP / 'pipeline' / 'release-classes.json').read_text())['archive']}
+    cache_rebuild = cache_rebuild_config(assembly)
+    if cache_rebuild:
+        rel['cache_rebuild'] = cache_rebuild
     rel['profiles'] = {a['patch_set']: profile_entry(rel, patches, packs)}
     refs = private_refs(json.dumps(rel).encode())
     if refs:
@@ -594,6 +615,10 @@ def merge_releases(cuts):
                   'dev'):
             if other.get(k) != rel.get(k):
                 raise ValueError('the profiles of one release must share %s (%r, %r)' % (k, rel.get(k), other.get(k)))
+        if other.get('cache_rebuild'):
+            if rel.get('cache_rebuild') not in (None, other['cache_rebuild']):
+                raise ValueError('release profiles have different cache rebuild configurations')
+            rel['cache_rebuild'] = other['cache_rebuild']
         problems += [p for p in more if p not in problems]
         for name in other.get('profiles', {}):
             if name in rel['profiles']:

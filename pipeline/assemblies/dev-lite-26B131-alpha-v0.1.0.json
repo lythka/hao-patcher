@@ -16,5 +16,6 @@
     "hardware": "oclp_hardware"
   },
   "workspace_size_bytes": 171798691840,
-  "repo": "store/images/dev-lite-26B131-alpha-v0.1.0"
+  "repo": "store/images/dev-lite-26B131-alpha-v0.1.0",
+  "cache_rebuild": "pipeline/cache-rebuild/26B131.json"
 }

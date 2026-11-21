@@ -9,7 +9,7 @@ x86_64 CPython 3.12. macOS 27 has no working `python3`, so `hao` brings its own 
 |---|---|
 | `usr/local/bin/hao` | A two-line launcher: `exec /usr/local/lib/hao/python/bin/python3.12 -I /usr/local/lib/hao/hao/tools/hao/hao "$@"` |
 | `usr/local/lib/hao/python/` | Input row `python_x86_64` (python-build-standalone install_only), unpacked |
-| `usr/local/lib/hao/hao/` | `tools/hao` of this release without its tests, with `tools/hao/vendor` (Rich, MIT) and the notices; `make.sh` stages it |
+| `usr/local/lib/hao/hao/` | `tools/hao` of this release without its tests, the pinned-asset downloader `tools/acquire/acquire`, with `tools/hao/vendor` (Rich, MIT) and the notices; `make.sh` stages it |
 
 Everything is on the Data volume, root:wheel, not writable by others, so `hao update` can replace it without
 touching the sealed System.
@@ -20,9 +20,12 @@ On the installed Mac: `hao`, `hao status`, `hao --help`.
 
 ## Validation
 
+NEEDS VALIDATION: r14 adds the pinned-asset downloader for `hao cache build`.
+
 Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r12): `/usr/local/bin/hao verify` runs and reports against 38 pack manifests, and the listing of /private/var/log/hao collected from that boot shows `drwxr-xr-x root wheel`.
 
 ## Revisions
+- r14 2026-11-21 Stage the downloader used by the installed cache rebuild command.
 - r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes.
 - r12 2026-11-18 Makes hao's log folder /private/var/log/hao root:wheel 755 on Data. launchd created it 744 for the AOT job's log, so per-user hao logs were lost.
 - r11 2026-11-18 SHA256SUMS staged with release.json (an unsigned release, v0.0.1, is checked against it)

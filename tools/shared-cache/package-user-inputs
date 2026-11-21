@@ -1,0 +1,71 @@
+#!/usr/bin/env python3.14
+"""Package the pinned offline producer and a Swift catalog; never package a cache or programs."""
+import argparse
+import gzip
+import hashlib
+import io
+import json
+from pathlib import Path
+import subprocess
+import tarfile
+
+REPO = Path(__file__).resolve().parents[2]
+# The offline build uses these prelinked helpers, not Xcode's intermediate object tree.
+HELPERS = ('generator', 'objc-writer', 'swift-table-writer', 'swift-conformance-writer',
+           'runtime-object', 'relocate', 'witness-template')
+
+
+def digest(path):
+    with path.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def package(output, catalog, dyld_license):
+    output.mkdir(parents=True, exist_ok=False)
+    files = {}
+    for name in subprocess.check_output(['git', '-C', str(REPO), 'ls-files', 'tools/shared-cache'], text=True).splitlines():
+        path = REPO / name
+        if path.is_file():
+            files[name] = (path.read_bytes(), 0o755 if path.stat().st_mode & 0o111 else 0o644)
+    files['LICENSE'] = ((REPO / 'LICENSE').read_bytes(), 0o644)
+    for name in ['shared_cache_' + n.replace('-', '_') for n in HELPERS] + ['llvm_disasm']:
+        row = REPO / 'pipeline/inputs/common' / name
+        lines = [s.split('#', 1)[0].split() for s in row.read_text().splitlines()]
+        expected, relative = next(s for s in lines if s)
+        path = REPO / relative
+        if digest(path) != expected:
+            raise ValueError('input row mismatch: ' + name)
+        destination = 'inputs/' + name
+        files[destination] = (path.read_bytes(), 0o755 if path.stat().st_mode & 0o111 else 0o644)
+        files['pipeline/inputs/common/' + name] = ((expected + ' ' + destination + '\n').encode(), 0o644)
+    # Include the upstream dyld licence carried with the source-built toolchain.
+    files['licenses/dyld-APPLE_LICENSE'] = (dyld_license.read_bytes(), 0o644)
+    bundle = output / 'cache-builder.tar.gz'
+    with bundle.open('wb') as raw, gzip.GzipFile(fileobj=raw, mode='wb', filename='', mtime=0, compresslevel=6) as gz:
+        with tarfile.open(fileobj=gz, mode='w', format=tarfile.PAX_FORMAT) as archive:
+            for name, (data, mode) in sorted(files.items()):
+                info = tarfile.TarInfo(name)
+                info.mode, info.size = mode, len(data)
+                archive.addfile(info, io.BytesIO(data))
+    compressed = output / 'swift-catalog.json.gz'
+    with catalog.open('rb') as source, compressed.open('wb') as raw:
+        with gzip.GzipFile(fileobj=raw, mode='wb', filename='', mtime=0, compresslevel=6) as gz:
+            while block := source.read(1 << 20):
+                gz.write(block)
+    result = {p.name: dict(size=p.stat().st_size, sha256=digest(p)) for p in (bundle, compressed)}
+    commit = subprocess.check_output(['git', '-C', str(REPO), 'rev-parse', 'HEAD'], text=True).strip()
+    dirty = bool(subprocess.check_output(['git', '-C', str(REPO), 'status', '--porcelain'], text=True).strip())
+    record = dict(commit=commit, dirty=dirty, outputs=result,
+                  inputs=dict(catalog_sha256=digest(catalog), dyld_license_sha256=digest(dyld_license)))
+    (output / 'build.json').write_text(json.dumps(record, indent=2) + '\n')
+    print(json.dumps(result, indent=2))
+    return result
+
+
+if __name__ == '__main__':
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--catalog', type=Path, required=True)
+    p.add_argument('--dyld-license', type=Path, required=True)
+    a = p.parse_args()
+    package(a.output, a.catalog, a.dyld_license)

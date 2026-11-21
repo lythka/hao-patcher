@@ -150,6 +150,7 @@ import progress as PROG  # noqa: E402
 import frontdoor as FD   # noqa: E402
 import status as STATUS  # noqa: E402
 import run as RUN        # noqa: E402
+import cachebuild as CACHEBUILD  # noqa: E402
 import aot as AOT        # noqa: E402
 import doctor as DOCTOR  # noqa: E402
 import signing as SIGN   # noqa: E402
@@ -967,6 +968,14 @@ def main():
     q = sub.add_parser('help', help='the commands for where hao runs')
     q.add_argument('--all', action='store_true', help='also the developer commands')
     q.set_defaults(fn=cmd_help)
+    q = sub.add_parser('cache', help='rebuild the release shared cache on this Mac')
+    q.add_argument('operation', choices=['build'])
+    q.add_argument('--release', default=str(HERE / 'release.json'))
+    q.add_argument('--work', default='/private/var/db/hao/cache-build')
+    q.add_argument('--assets-from')
+    q.add_argument('--dry-run', action='store_true')
+    signed_args(q)
+    q.set_defaults(fn=guarded(lambda a, c: CACHEBUILD.command(a, c, signed_release(a, c, a.release)), log='cache'))
     q = sub.add_parser('patch')
     q.add_argument('overlays', nargs='*')
     q.add_argument('--root'); q.add_argument('--state'); q.add_argument('--id'); q.add_argument('--deferred')

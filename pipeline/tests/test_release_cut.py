@@ -53,6 +53,17 @@ class ReleaseCut(unittest.TestCase):
             self.assertIn(want, rows)
         self.assertEqual(len(rows), len(set(rows)))
 
+    def test_cache_rebuild_is_an_explicit_post_install_input(self):
+        config = R['cache_rebuild_config'](ALPHA_ASSEMBLY)
+        rows = dict(R['release_rows'](ALPHA_ASSEMBLY))
+        self.assertEqual(config['build'], '26B131')
+        self.assertEqual(len(config['files']), 36)
+        for row in config['rows'].values():
+            self.assertIn(row, rows)
+            self.assertEqual(R['classes']()[row]['class'], 'ours')
+        self.assertNotIn('rebuilt_cache_catalog', config['rows'].values())
+        self.assertIsNone(R['cache_rebuild_config'](ASSEMBLY))
+
     @unittest.skipUnless(STORE, 'needs the store')
     def test_dry_run_on_the_real_store(self):
         r = subprocess.run([sys.executable, '-I', str(TOP / 'pipeline/release-cut'), '--dry-run', str(ASSEMBLY),
@@ -453,6 +464,16 @@ def two_profiles():
 
 class Profiles(unittest.TestCase):
     """One release, several profiles (the 9,2 image and the generic one), cut from one commit."""
+
+    def test_cache_rebuild_survives_merge_and_conflicts_refuse(self):
+        cuts = two_profiles()
+        config = R['cache_rebuild_config'](ALPHA_ASSEMBLY)
+        cuts[1][0]['cache_rebuild'] = config
+        result, _ = R['merge_releases'](cuts)
+        self.assertEqual(result['cache_rebuild'], config)
+        cuts[0][0]['cache_rebuild'] = dict(config, cache_uuid='different')
+        with self.assertRaisesRegex(ValueError, 'different cache rebuild'):
+            R['merge_releases'](cuts)
 
     def test_shared_assets_once_each_profile_says_its_rows(self):
         rel, problems = R['merge_releases'](two_profiles())

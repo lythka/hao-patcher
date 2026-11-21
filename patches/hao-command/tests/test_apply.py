@@ -1,5 +1,8 @@
 """apply.sh into a scratch Data root: the launcher, the CPython and tools/hao land where /usr/local/bin/hao expects."""
 import os
+import json
+import shutil
+import sys
 from pathlib import Path
 import subprocess
 import tarfile
@@ -11,6 +14,39 @@ RECIPE = HERE.parent
 
 
 class Apply(unittest.TestCase):
+    def test_release_archive_stages_cache_download_consumer(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name) / 'release'
+            recipe = root / 'patches/hao-command'
+            recipe.mkdir(parents=True)
+            shutil.copy2(RECIPE / 'make.sh', recipe / 'make.sh')
+            top = RECIPE.parents[1]
+            shutil.copytree(top / 'tools/hao', root / 'tools/hao', ignore=shutil.ignore_patterns('__pycache__'))
+            (root / 'tools/acquire').mkdir()
+            shutil.copy2(top / 'tools/acquire/acquire', root / 'tools/acquire/acquire')
+            shutil.copy2(top / 'NOTICE.md', root / 'NOTICE.md')
+            out = Path(name) / 'staged'
+            subprocess.run(['sh', str(recipe / 'make.sh'), str(out)], check=True)
+            spec = json.loads((top / 'pipeline/cache-rebuild/26B131.json').read_text())
+            release = out / 'release.json'
+            release.write_text(json.dumps({'cache_rebuild':spec, 'assets':[
+                {'row':row,'file':row+'.gz','url':'https://example.invalid/'+row+'.gz',
+                 'size':1,'sha256':'0'*64} for row in spec['rows'].values()]}))
+            script = """import sys, types
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+import cachebuild
+cachebuild.preflight=lambda *a,**k:None
+args=types.SimpleNamespace(work=sys.argv[3],dry_run=True,assets_from=None)
+console=types.SimpleNamespace(item=print)
+raise SystemExit(cachebuild.command(args,console,sys.argv[2]))
+"""
+            result = subprocess.run([sys.executable,'-I','-B','-c',script,
+                str(out/'hao/tools/hao/src'),str(release),str(out/'no-write')],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertIn('Dry run:',result.stdout)
+            self.assertFalse((out/'no-write').exists())
+
     def run_apply(self, d, prepare=None):
         """make.sh then apply.sh into D/data (chown left out: no root here); PREPARE(data) runs before apply.sh."""
         p = d / 'recipe'

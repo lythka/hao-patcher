@@ -94,6 +94,13 @@ that made each, and what the user's Mac makes from Apple's files with our public
 Apart from four harvested caches for the MacBook Pro (Mid 2012), nothing Apple-derived ships: recipes that install
 other harvested Apple files (the wallpaper export, MobileAssets) are in dev profiles only. A final cut also needs every shipped recipe validated or waived by the owner.
 
+## Rebuilding the shared cache after install
+
+A release with cache rebuild inputs can run `sudo hao cache build --release /path/to/release.json`
+on the installed Intel Mac. It downloads about 27 MB, requires 55 GB free, and builds and verifies the
+release's exact cache family without Xcode. See [the command](commands.md#hao-cache-build) for a dry run.
+This currently saves a verified artifact only; cache/runtime activation and revert remain unproven.
+
 ## Not done yet
 
 - **Rebuild from source, checked.** That a rebuild from the public tag reproduces the release's files is not yet
