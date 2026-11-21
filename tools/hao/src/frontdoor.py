@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import subprocess
 
 PLACES = {'build': 'this Mac (the build Mac)', 'installer': 'the USB installer', 'installed': 'this Mac (macOS 27 with hao)'}
 THERE = {'build': 'any Mac on its own macOS (the build Mac)', 'installer': 'the USB installer',
@@ -42,6 +43,16 @@ DEVELOPER = (
 INSTEAD = {'build': 'hao create-installer', 'installer': '/Volumes/HAO/install', 'installed': 'hao verify'}
 
 
+def translated():
+    """Rosetta describes this process as Intel, but the machine is a build host."""
+    try:
+        result = subprocess.run(['/usr/sbin/sysctl', '-n', 'sysctl.proc_translated'],
+                                capture_output=True, text=True, timeout=5)
+        return result.returncode == 0 and result.stdout.strip() == '1'
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def where(env=None, top=None, record=Path('/private/var/db/hao/install-record.json'), mac=None, machine=None):
     """'installer' (started from the USB installer: its launchers set HAO_STICK, and hao sits beside the kit),
     'installed' (macOS 27 on an Intel Mac, or an install record), else 'build'."""
@@ -51,7 +62,7 @@ def where(env=None, top=None, record=Path('/private/var/db/hao/install-record.js
         return 'installer'
     mac = platform.mac_ver()[0] if mac is None else mac
     machine = platform.machine() if machine is None else machine
-    if record.is_file() or (mac.split('.')[0] == '27' and machine == 'x86_64'):
+    if record.is_file() or (mac.split('.')[0] == '27' and machine == 'x86_64' and not translated()):
         return 'installed'
     return 'build'
 

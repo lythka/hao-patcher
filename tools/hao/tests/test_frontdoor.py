@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / 'src'))
@@ -19,13 +20,22 @@ class Pipe(io.StringIO):
 
 
 class Where(unittest.TestCase):
-    def test_places(self):
+    @patch.object(FD, "translated", return_value=False)
+    def test_places(self, _translated):
         none = Path('/nonexistent/record.json')
         self.assertEqual(FD.where({'HAO_STICK': '/Volumes/HAO'}, top='/x', record=none), 'installer')
         self.assertEqual(FD.where({}, top='/x', record=none, mac='27.2', machine='x86_64'), 'installed')
         self.assertEqual(FD.where({}, top='/x', record=none, mac='27.2', machine='arm64'), 'build')
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(FD.where({}, top='/x', record=Path(d), mac='26.7', machine='arm64'), 'build')
+
+    @patch.object(FD, 'translated', return_value=True)
+    def test_rosetta_is_build_host(self, _translated):
+        self.assertEqual(FD.where({}, top='/x', record=Path('/nonexistent'),
+                                  mac='27.2', machine='x86_64'), 'build')
+        with tempfile.NamedTemporaryFile() as record:
+            self.assertEqual(FD.where({}, top='/x', record=Path(record.name),
+                                      mac='27.2', machine='x86_64'), 'installed')
 
     def test_wrong_place(self):
         self.assertIsNone(FD.wrong_place('create-installer', 'build'))
