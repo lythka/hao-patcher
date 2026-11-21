@@ -33,16 +33,11 @@ def sources():
 
 def prepare(output, arch='x86_64'):
     output.mkdir(parents=True, exist_ok=False)
-    sdk = subprocess.check_output(['xcrun', '--show-sdk-path'], text=True).strip()
-    binary = output/'swift-reflection-reader'
-    subprocess.run(['xcrun', 'clang', '-arch', arch, '-mmacosx-version-min=15.0',
-                    '-O2', '-Wall', '-Wextra', '-Werror', '-I',
-                    str(ROOT/'vendor/swift-remote-mirror'),
-                    str(ROOT/'tools/swift-reflection-reader.c'),
-                    '-L'+sdk+'/usr/lib/swift', '-lswiftRemoteMirror', '-o', str(binary)], check=True)
-    subprocess.run(['codesign', '-s', '-', str(binary)], check=True)
+    from .helper_build import probe
+    require(arch in ('arm64', 'x86_64'), 'unsupported reflection reader architecture')
+    binary = probe('swift-reflection-reader', output/'swift-reflection-reader')
     write_json(output/'build.json', provenance(sources()+[binary], operation='swift-reflection-reader',
-                                              architecture=arch, sdk=sdk))
+                                              architecture=arch))
 
 
 class Identities:

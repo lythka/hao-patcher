@@ -16,14 +16,10 @@ show it.
 
 ## Requirements
 
-- A Mac with Apple silicon or an Intel Mac. Built and checked on Apple silicon with macOS 27.2 and Xcode 27.2.
-- Xcode (the full app: `xcodebuild` builds Apple's cache builder) and its command-line tools.
-- Python 3.14 (`python3.14` on the `PATH`).
-- Apple's published dyld source, tag `dyld-1378`, from
-  [apple-oss-distributions/dyld](https://github.com/apple-oss-distributions/dyld/tree/dyld-1378).
-- Network access while the toolchain is built: `toolchain/make` clones Apple's
-  [AvailabilityVersions](https://github.com/apple-oss-distributions/AvailabilityVersions) at tag
-  AvailabilityVersions-157.2 to generate dyld's `VersionMap.h` (`--availability DIR` uses a copy instead).
+- A Mac with Apple silicon or an Intel Mac, and Python 3.14 (`python3.14` on the `PATH`).
+- The artifacts pinned by `llvm_disasm` and `shared_cache_*` in `pipeline/inputs/common`. The decoder and host
+  serializers are universal; target probes are x86_64. Rebuilding a cache needs no Xcode or SDK.
+- Xcode, CMake, and the published dyld/Swift/LLVM sources are needed only to produce those helper artifacts.
 - The macOS 27 26B131 system to rebuild, mounted read-only: the System volume (or its snapshot), the OS and App
   cryptexes and the Data volume. A hao image built with `tools/hao` has all four.
 - About 30 GB free: the work folder holds about 21 GB during a build (removed at the end), the family about 7 GB.
@@ -31,18 +27,12 @@ show it.
 ## Build
 
 ```sh
-git clone --depth 1 --branch dyld-1378 https://github.com/apple-oss-distributions/dyld.git DYLD_SOURCE
-
-# Apple's cache builder and the host adapters, from DYLD_SOURCE plus toolchain/source.patch and
-# toolchain/added-source; built for this Mac's architecture (--arch arm64|x86_64 to choose).
-python3.14 -I tools/shared-cache/toolchain/make DYLD_SOURCE TOOLCHAIN
-
 # The fold-in family: the 26 providers of features/fold-in-26B131.json, Apple's Swift entries kept,
 # no prebuilt loader sets (dyld uses its just-in-time loaders).
 python3.14 -I -B tools/shared-cache/make \
   --system SYSTEM --os OS_CRYPTEX --app APP_CRYPTEX --data DATA \
   --features fold-in-26B131 --no-swift-catalog --no-prebuilt-loaders \
-  --toolchain TOOLCHAIN --work NEW_WORK --output NEW_FAMILY
+  --work NEW_WORK --output NEW_FAMILY
 ```
 
 `SYSTEM`, `OS_CRYPTEX`, `APP_CRYPTEX` and `DATA` are the mount points of the image's System, OS cryptex, App
@@ -73,7 +63,7 @@ pointer-keyed table next to Apple's. Without it (`--no-swift-catalog`) Apple's e
 - `provider-provenance.json`: each provider's source (system or file), install path and sha256.
 - `optimizations.json`: what the readback of the final family found: images, ObjC roots and header-infos, Swift
   keys (retained and added) and relocated pointers.
-- `build.json`: the generator's revision (the newest line of Revisions below) and git commit, the date, and the
+- `build.json`: the generator's revision, source-content SHA256, optional checkout commit label, date, and the
   path and sha256 of every input. It names the build machine's paths; it stays with the family.
 
 The build refuses, rather than guesses, when an input does not fit: an import no image defines, a provider outside
@@ -145,7 +135,7 @@ python3.14 -I tools/shared-cache/make swift-conformance --cache CACHE --output N
 python3.14 -I tools/shared-cache/make swift-conformance --manifest MANIFEST --output NEW_DIRECTORY
 ```
 
-Set `CACHE_TOOLCHAIN` to a `toolchain/make` output. `--writer` reuses a compiled
+The writer comes from its verified input row. `--writer` selects an explicit compiled
 adapter. `--replay-existing` with `--cache` calibrates serialization against the
 existing records instead of scanning sections.
 
@@ -155,15 +145,41 @@ signatures; the normal producer subsequently rebuilds external sidecars. A stage
 output alone is not a deployable artifact. Existing runtime override gates remain
 in force; host lookup checks do not establish boot success or a speedup.
 
-### Standalone x86_64 decoder
+### Portable helpers
 
-Build the decoder with `python3.14 -I tools/shared-cache/llvm-disasm/make OUTPUT` (CMake, make and a macOS
-compiler/SDK). The output contains the signed library, LLVM license and `build.json`; `work/` is disposable.
-The library itself needs only macOS system libraries. Run the cache tool with x86_64 Python when using it
-(on Apple silicon: `SHARED_CACHE_DISASM=OUTPUT/libhao-x86-disasm.dylib arch -x86_64 python3.14 -I tools/shared-cache/make ...`).
-An arm64 Python process uses Xcode's libLTO, since it cannot load the x86_64 decoder.
+`llvm-disasm/make OUTPUT` builds the universal LLVM decoder. Both Python architectures use the same verified
+`llvm_disasm` row; `SHARED_CACHE_DISASM` remains an explicit override. Its artifact includes the LLVM license.
+
+The rebuild verifies helper hashes before use. An absent row permits compilation only with `--developer-build`;
+a missing or corrupt pinned file always refuses. Developer compilation also needs the relevant source toolchains
+(`--toolchain` or `CACHE_TOOLCHAIN` for dyld). It never runs implicitly on an installed Mac.
+
+| Former Xcode dependency | Replacement and input rows |
+| --- | --- |
+| Host C++ serializers and cache-builder objects | `helpers/make`; `shared_cache_generator`, `shared_cache_objc_writer`, `shared_cache_swift_table_writer`, `shared_cache_swift_conformance_writer` |
+| Target C/ObjC probes, capture and reflection reader | `helpers/make`; `shared_cache_objc_probe`, `shared_cache_bind_runtime_probes`, `shared_cache_swift_*`, `shared_cache_witness_probe`, `shared_cache_witness_v4`, `shared_cache_witness_v5` |
+| Swift/C++ witness consumer and graph/replay fixtures | `consumer-helpers/make`; `shared_cache_witness_consumer`, `shared_cache_witness_graph`, `shared_cache_dependency_*` |
+| Per-cache witness runtime link | `shared_cache_witness_template`: Python places checked address fields and relocations, preserving the platform linker's bytes |
+| Runtime relocator and target object | `runtime-helpers/make`; `shared_cache_relocate`, `shared_cache_runtime_object` |
+| `dwarfdump --uuid` | Python reads the x86_64 Mach-O `LC_UUID` |
+| `swift-demangle` | `swift-demangle/make`; `shared_cache_swift_demangle`, a universal upstream Swift demangler |
+| SDK discovery and private-framework search paths | Used only by explicit artifact producers |
+| System Git shim used for build records | Python reads checkout HEAD and hashes source; `git_dirty: null` means Git cleanliness was not queried |
+
+Profile-dependent probes read generated data files beside their executables or candidate, instead of compiling
+profile values into code. `runtime-helpers/make` takes the two pinned Frida devkits. `consumer-helpers/make` takes
+those target headers, a prepared Swift source toolchain, LLVM headers and the runtime object. Each producer's
+`--help` lists its inputs. `helpers/make` takes arm64 and x86_64 outputs from `toolchain/make`; the resulting
+executables include the builder code, so cache rebuilding does not need its source or object tree.
+
+`arch-gate --help` lists the explicit witness inputs. The gate rebuilds under arm64 and x86_64 Python, denies Xcode
+on the x86_64 leg, and requires both UUIDs and all 36 file hashes to match the reference with no refused tool calls.
+It retains commands, logs, hashes and elapsed times, then removes the generated families. This checks host output
+identity; installed-image acceptance is separate. Metallib build and test tools are unchanged.
 
 ## Revisions
+- r96 2026-11-20 Use a universal decoder and pinned serializers, probes and Swift helpers; place the witness runtime
+  in Python and verify cross-host cache identity with an Xcode-denying gate. Rosetta Python is a build host.
 - r95 2026-11-20 The decoder follows the process architecture: x86_64 Python (Intel or Rosetta) uses the
   llvm_disasm row, arm64 Python uses Xcode's libLTO. r94 loaded the x86_64 row on arm64 and failed 6 host tests.
 - r94 2026-11-20 Build a pinned, redistributable x86_64 LLVM decoder with llvm-disasm/make. Decoding uses

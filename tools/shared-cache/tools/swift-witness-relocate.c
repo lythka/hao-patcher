@@ -16,12 +16,12 @@ int main(int argc,char **argv) {
   size_t size=fread(input,1,sizeof(input),f); fclose(f); check(size>=32,"truncated source instructions");
   gum_init_embedded();
   GumX86Writer entry,output;
-  gum_x86_writer_init(&entry,patch); entry.pc=original;
+  gum_x86_writer_init(&entry,patch); gum_x86_writer_set_target_cpu(&entry,GUM_CPU_AMD64); entry.pc=original;
   check(gum_x86_writer_put_jmp_address(&entry,wrapper),"entry destination is out of range");
   // An absolute jump embeds a pointer that cannot slide as ordinary text. The
   // image allocator must place this wrapper within rel32 reach of the entry.
   check(gum_x86_writer_offset(&entry)==5,"entry requires a non-position-independent jump");
-  gum_x86_writer_init(&output,code); output.pc=trampoline;
+  gum_x86_writer_init(&output,code); gum_x86_writer_set_target_cpu(&output,GUM_CPU_AMD64); output.pc=trampoline;
   GumX86Relocator relocator;
   gum_x86_relocator_init(&relocator,input,&output); relocator.input_pc=original;
   guint consumed=0;

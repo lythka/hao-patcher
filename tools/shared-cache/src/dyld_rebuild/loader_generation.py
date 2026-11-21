@@ -424,45 +424,11 @@ def prepare_cache_path_adapter(source):
 
 
 def build_helper(directory):
-    directory = Path(directory)
-    require(not directory.exists(), 'helper build directory already exists')
-    manifest_path = ROOT / 'tools/loader-generator/build-inputs.json'
-    manifest = json.loads(manifest_path.read_text())
-    require(manifest.get('schema') == 1, 'unknown helper build pins')
-    for record in manifest['files']:
-        verify_file(ROOT / record['path'], record)
-    directory.mkdir()
-    base = Path(os.environ['CACHE_TOOLCHAIN'])  # a toolchain/make output
-    source = base / 'source'
-    adapted = prepare_adapter((source / 'dyld/JustInTimeLoader.cpp').read_text())
-    (directory / 'JustInTimeLoader.cpp').write_text(adapted)
-    cache_adapter=prepare_cache_path_adapter((source/'dyld/DyldProcessConfig.cpp').read_text())
-    (directory/'DyldProcessConfig.cpp').write_text(cache_adapter)
-    flags = ['xcrun', 'clang++', '-std=c++20', '-fblocks', '-fno-exceptions', '-fno-rtti',
-             '-DINTERNAL_BUILD=1', '-DBUILDING_CACHE_BUILDER=1', '-DBUILDING_MRM_CACHE_BUILDER=1',
-             '-DBUILDING_MACHO_WRITER=1', '-DBOM_SUPPORT=1', '-DOBJC_OLD_DISPATCH_PROTOTYPES=0']
-    flags += ['-I' + str(source / p) for p in ('include', 'include/mach-o', 'dyld', 'common', 'mach_o', 'cache_builder', 'lsl', 'ld', 'libdyld')]
-    flags += ['-I' + str(base / 'products/Release/include'), '-I' + str(base / 'objects/dyld.build/Release/libslc_builder.dylib.build/DerivedSources')]
-    commands = [flags + ['-c', str(ROOT / 'tools/loader-generator/generator.cpp'), '-o', str(directory / 'generator.o')],
-                flags + ['-c', str(directory / 'JustInTimeLoader.cpp'), '-o', str(directory / 'JustInTimeLoader.o')],
-                flags + ['-c', str(directory/'DyldProcessConfig.cpp'), '-o', str(directory/'DyldProcessConfig.o')]]
-    objects = [str(directory / Path(path).name) if Path(path).name in ('JustInTimeLoader.o','DyldProcessConfig.o') else str(ROOT / path)
-               for path in manifest['link_object_paths']]
-    commands.append(['xcrun', 'clang++', '-Wl,-dead_strip', str(directory / 'generator.o'), *objects,
-                     '-framework', 'Foundation', '-framework', 'Bom',
-                     '-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/PrivateFrameworks',
-                     '-o', str(directory / 'generator')])
-    results = []
-    for index, command in enumerate(commands):
-        process = subprocess.run(command, capture_output=True, text=True)
-        (directory / f'build-{index}.txt').write_text(process.stdout + process.stderr)
-        results.append({'command': command, 'exit': process.returncode})
-        require(process.returncode == 0, f'helper compile/link failed; see {directory}/build-{index}.txt')
-    report = {'classification': 'host-only ARM helper links genuine Apple serializers; target code is never executed.',
-              'manifest_sha256': sha(manifest_path), 'compiler': subprocess.check_output(['xcrun', 'clang++', '--version'], text=True),
-              'commands': results, 'generator_sha256': sha(directory / 'generator'), 'adapter_sha256': sha(directory / 'JustInTimeLoader.cpp'), 'cache_path_adapter_sha256': sha(directory/'DyldProcessConfig.cpp')}
-    (directory / 'build.json').write_text(json.dumps(report, indent=2) + '\n')
-    return directory / 'generator', report
+    from .host_tools import loader
+    binary = loader(directory)
+    report = {'classification': 'host serializer', 'generator_sha256': sha(binary)}
+    (Path(directory) / 'build.json').write_text(json.dumps(report, indent=2) + '\n')
+    return binary, report
 
 
 def check_target_schema(path):

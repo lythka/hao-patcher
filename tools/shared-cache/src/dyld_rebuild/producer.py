@@ -265,10 +265,12 @@ def build(system, os_root, app, data, build_id, selection, work, output, program
     if swift_runtime_toolchain:
         inputs.update(str((Path(swift_runtime_toolchain)/name).resolve()) for name in ('runtime.o','relocate','build.json'))
     # These are external, source-built linker inputs, not products of this cache run.
-    toolchain = Path(os.environ['CACHE_TOOLCHAIN'])
-    inputs.update(str(p.resolve()) for p in builder_objects(toolchain).glob('*.o'))
-    inputs.update(str(toolchain / 'products/Release' / name) for name in ('libmach_o.a', 'libmach_o_writer.a'))
-    inputs.update(str(p.resolve()) for p in (toolchain / 'source').rglob('*') if p.is_file())
+    from .artifacts import helper
+    for name in ('generator', 'objc-writer', 'swift-table-writer'):
+        artifact = helper(name)
+        if artifact is not None:
+            inputs.add(str(artifact.resolve()))
+
     record = provenance(sorted(inputs), build=build_id, architecture='x86_64', providers=selected,
           images=images, cache_files=files, system=str(system), os=str(os_root),
           program_files=str(program_files) if program_files else None, native_acceptance='OPEN', optimizations=optimizations,

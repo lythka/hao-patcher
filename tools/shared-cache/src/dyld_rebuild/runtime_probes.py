@@ -555,15 +555,10 @@ def prepare_main(argv):
     root=Path(__file__).resolve().parents[2]
     source=root/'tools/objc-runtime-probe.m'
     binary=a.output/'objc-probe'
-    subprocess.run(['xcrun','clang','-arch','x86_64','-mmacosx-version-min=14.0',
-                    '-fobjc-arc','-O2','-Wall','-Wextra','-Werror','-framework','Foundation',
-                    str(source),'-o',str(binary)],check=True)
-    subprocess.run(['codesign','-s','-',str(binary)],check=True)
+    from .helper_build import probe
+    probe('objc-probe', binary)
     binder=a.output/'bind-runtime-probes'
-    subprocess.run(['xcrun','clang','-arch','x86_64','-mmacosx-version-min=14.0',
-                    '-O2','-Wall','-Wextra','-Werror',
-                    str(root/'tools/bind-runtime-probes.c'),'-o',str(binder)],check=True)
-    subprocess.run(['codesign','-s','-',str(binder)],check=True)
+    probe('bind-runtime-probes', binder)
     from .swift_metadata import provenance, write_json
     inputs=[Path(row['path']) for row in p['inputs']]+[Path(__file__),source,
             root/'tools/bind-runtime-probes.c']

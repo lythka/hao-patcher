@@ -29,6 +29,9 @@ def mounted(image):
 
 
 def main():
+    if '--developer-build' in sys.argv:
+        sys.argv.remove('--developer-build')
+        os.environ['SHARED_CACHE_DEVELOPER_BUILD'] = '1'
     if len(sys.argv)>1 and sys.argv[1]=='swift-conformance':
         from dyld_rebuild.swift_conformance import main as conformance_main
         return conformance_main(sys.argv[2:])
@@ -110,14 +113,15 @@ def main():
     parser.add_argument('--swift-runner', type=Path, help='native execution adapter; executable argv[1], stdin names, stdout JSONL')
     parser.add_argument('--swift-base-catalog', type=Path, help='catalog retained when extending with a generic-value recipe')
     parser.add_argument('--features', nargs='+', required=True, help='names under features/, or JSON files')
-    parser.add_argument('--toolchain', type=Path, required=True, help='output of toolchain/make')
+    parser.add_argument('--toolchain', type=Path, help='developer fallback: output of toolchain/make')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--keep-work', action='store_true',
                         help='keep WORK/build (about 21 GB) and an exported source.img after the family is written; '
                              'by default they are removed')
     args = parser.parse_args()
-    os.environ['CACHE_TOOLCHAIN'] = str(args.toolchain.resolve())
+    if args.toolchain:
+        os.environ['CACHE_TOOLCHAIN'] = str(args.toolchain.resolve())
     export_gb = 0                           # an image repository is exported whole into WORK first
     if args.run and (args.run / 'image.json').is_file():
         export_gb = -(-json.loads((args.run / 'image.json').read_text())['size'] // 10**9)
@@ -129,6 +133,9 @@ def main():
         from dyld_rebuild.swift_metadata import capture
         args.swift_catalog = capture(args.swift_runtime_cache, args.swift_recipe, args.work / 'swift-capture', args.swift_runner,
                                      base_catalog=args.swift_base_catalog)
+    if args.swift_catalog and args.swift_runtime_toolchain is None:
+        from dyld_rebuild.witness_runtime import prepare as prepare_runtime
+        args.swift_runtime_toolchain = prepare_runtime(None, args.work/'runtime-toolchain')
     selected, sources = {}, {}
     for name in args.features:
         path = Path(name) if name.endswith('.json') else HERE / 'features' / (name + '.json')

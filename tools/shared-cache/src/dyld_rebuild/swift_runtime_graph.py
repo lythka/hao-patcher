@@ -116,7 +116,7 @@ def main(argv):
     write_json(a.output/'profile.json',profile)
     source=Path(__file__).resolve().parents[2]/'tools/bind-runtime-probes.c'
     binary=a.output/'bind-runtime-probes'
-    subprocess.run(['xcrun','clang','-arch','x86_64','-O2',str(source),'-o',str(binary)],check=True)
-    subprocess.run(['codesign','-s','-',str(binary)],check=True)
+    from .helper_build import probe
+    probe('bind-runtime-probes', binary)
     write_json(a.output/'build.json',provenance([a.profile,Path(__file__),source],operation='swift-runtime-constructor-capture'))
     return 0

@@ -56,6 +56,22 @@ def profile(family):
 
 
 def prepare(devkit,output):
+    from .artifacts import helper
+    relocator = helper('relocate')
+    obj = helper('runtime-object')
+    if relocator is None or obj is None:
+        require(devkit is not None, 'developer runtime production requires a Frida devkit')
+        return produce(devkit, output)
+    import shutil
+    output = output.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    shutil.copy2(relocator, output/'relocate')
+    shutil.copy2(obj, output/'runtime.o')
+    write_json(output/'build.json', provenance([relocator, obj], operation='swift-witness-runtime-toolchain'))
+    return output
+
+
+def produce(devkit,output):
     output=output.resolve();output.mkdir(parents=True,exist_ok=False)
     gum=gum_devkit(devkit,output)
     # The amalgamated devkit already contains these public declarations. The
@@ -66,7 +82,7 @@ def prepare(devkit,output):
     relocate=ROOT/'tools/swift-witness-relocate.c'
     runtime=ROOT/'tools/swift-witness-runtime.c'
     flags=['xcrun','clang','-arch','x86_64','-mmacosx-version-min=14.0','-O2','-Wall','-Wextra','-Werror']
-    commands=[flags+['-I',str(gum),'-I',str(vendor),str(relocate),'-L',str(gum),'-lfrida-gum','-lresolv','-o',str(output/'relocate')],
+    commands=[flags+['-Wl,-reproducible','-ffile-prefix-map='+str(output)+'=/build','-I',str(gum),'-I',str(vendor),str(relocate),'-L',str(gum),'-lfrida-gum','-lresolv','-o',str(output/'relocate')],
         ['codesign','-s','-',str(output/'relocate')],
         flags+['-ffreestanding','-fno-stack-protector','-fno-asynchronous-unwind-tables','-fvisibility=hidden',
                '-c',str(runtime),'-o',str(output/'runtime.o')]]
@@ -79,6 +95,15 @@ def prepare(devkit,output):
 
 
 def link(toolchain,code_address,data_address,output):
+    from .artifacts import helper
+    from .witness_template import emit
+    template = helper('witness-template')
+    if template is not None:
+        return emit(template, toolchain / 'runtime.o', code_address, data_address)
+    return developer_link(toolchain, code_address, data_address, output)
+
+
+def developer_link(toolchain,code_address,data_address,output):
     """Let the platform linker resolve all code-to-configuration references."""
     binary=output/'runtime.dylib'
     command=['xcrun','clang','-arch','x86_64','-dynamiclib','-mmacosx-version-min=14.0',
@@ -109,6 +134,8 @@ def recipe(family,toolchain,layout,output,*,metatypes=False,metadata_shapes=None
     code_address=layout['swift_runtime_code']['address']
     data_address=layout['swift_runtime_data']['address']
     blob,symbols,command=link(toolchain,code_address,data_address,output)
+    from .artifacts import helper
+    relocator = helper('relocate') or toolchain/'relocate'
     patches,relocations,pointers=[],{},[]
     data_size=0
     families=[('witness',p['entry'],layout['swift_witness_table']['address'])]
@@ -126,7 +153,7 @@ def recipe(family,toolchain,layout,output,*,metatypes=False,metadata_shapes=None
         source=output/(name+'-entry.bin');source.write_bytes(family.read(entry,256))
         def relocate(slide,suffix):
             patch=output/(name+'-entry-patch'+suffix+'.bin');fallback=output/(name+'-fallback'+suffix+'.bin')
-            result=subprocess.run([str(toolchain/'relocate'),str(source),hex(entry+slide),hex(wrapper+slide),
+            result=subprocess.run([str(relocator),str(source),hex(entry+slide),hex(wrapper+slide),
                 hex(trampoline+slide),str(patch),str(fallback)],check=True,capture_output=True,text=True)
             return patch.read_bytes(),fallback.read_bytes(),json.loads(result.stdout)
         patch,fallback,relocation=relocate(0,'')

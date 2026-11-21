@@ -33,7 +33,8 @@ def native_flags(toolchain, devkit, output, llvm):
     manifest = json.loads((toolchain / 'build.json').read_text())
     source = toolchain / ('swift-' + manifest['swift_commit'])
     flags = ['xcrun', 'clang++', '-arch', 'x86_64', '-std=c++17', '-O2',
-             '-mmacosx-version-min=14.0', '-Wall', '-Wextra', '-Werror',
+             '-mmacosx-version-min=14.0', '-Wl,-reproducible', '-g0',
+             '-ffile-prefix-map=' + str(output) + '=/build', '-Wall', '-Wextra', '-Werror',
              '-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1']
     for include in (source / 'include', source / 'stdlib/public/SwiftShims',
                     toolchain / 'build/include', llvm / 'include', gum):
@@ -42,6 +43,20 @@ def native_flags(toolchain, devkit, output, llvm):
 
 
 def prepare(toolchain, devkit, output, llvm):
+    from .artifacts import helper
+    pinned = helper('witness-consumer')
+    if pinned is None:
+        return produce(toolchain, devkit, output, llvm)
+    import shutil
+    output = output.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    shutil.copy2(pinned, output / 'witness-consumer')
+    shutil.copy2(ROOT / 'tools/swift-witness-consumer-run.sh', output / 'run.sh')
+    write_json(output / 'build.json', provenance([pinned], operation='witness-consumer-fixture'))
+    return output
+
+
+def produce(toolchain, devkit, output, llvm):
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     flags = native_flags(toolchain, devkit, output, llvm)
@@ -54,7 +69,7 @@ def prepare(toolchain, devkit, output, llvm):
     binary = output / 'witness-consumer'
     commands = [
         ['xcrun', 'swiftc', '-target', 'x86_64-apple-macos14.0', '-parse-as-library',
-         '-O', '-emit-object', str(values), '-o', str(object_file)],
+         '-O', '-module-name', 'HaoWitnessFixture', '-emit-object', str(values), '-o', str(object_file)],
     ]
     swiftc = Path(subprocess.check_output(['xcrun', '--find', 'swiftc'], text=True).strip())
     flags += [str(cpp), str(object_file), '-L', str(gum), '-lfrida-gum', '-lresolv',

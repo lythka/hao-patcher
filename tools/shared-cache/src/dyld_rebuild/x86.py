@@ -7,7 +7,6 @@ that decoding path, not control flow or runtime reachability.
 import ctypes
 import hashlib
 import os
-import platform
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -40,14 +39,11 @@ def row_library(repo=REPO):
 
 
 def default_library():
-    """The override, else the shipped x86_64 decoder when this process runs x86_64 (Intel or Rosetta),
-    else Xcode's libLTO (arm64 hosts cannot load the shipped decoder)."""
+    """The explicit override, else the verified universal decoder, else libLTO."""
     override = os.environ.get('SHARED_CACHE_DISASM')
     if override is not None:
         return Path(override)
-    if platform.machine() == 'x86_64':
-        return row_library() or Path(LTO)
-    return Path(LTO)
+    return row_library() or Path(LTO)
 
 
 def function_starts(data, base, low, high):

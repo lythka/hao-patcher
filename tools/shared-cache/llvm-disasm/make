@@ -52,7 +52,7 @@ def build(output, archive, jobs):
     sdk = capture('xcrun', '--sdk', 'macosx', '--show-sdk-path')
     flags = f'-Os -g0 -ffile-prefix-map={work}=/llvm-build -ffile-prefix-map={HERE}=/producer'
     options = [
-        '-DCMAKE_BUILD_TYPE=MinSizeRel', '-DCMAKE_OSX_ARCHITECTURES=x86_64',
+        '-DCMAKE_BUILD_TYPE=MinSizeRel', '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64',
         '-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0', f'-DCMAKE_OSX_SYSROOT={sdk}',
         f'-DCMAKE_C_COMPILER={capture("xcrun", "--find", "clang")}',
         f'-DCMAKE_CXX_COMPILER={capture("xcrun", "--find", "clang++")}',
@@ -79,9 +79,9 @@ def build(output, archive, jobs):
     subprocess.run(['codesign', '--force', '--sign', '-', '--timestamp=none',
                     '--identifier', 'org.hao.x86-disasm', str(library)], check=True)
     subprocess.run(['codesign', '--verify', '--strict', str(library)], check=True)
-    if capture('lipo', '-archs', str(library)) != 'x86_64':
+    if set(capture('lipo', '-archs', str(library)).split()) != {'arm64', 'x86_64'}:
         raise SystemExit('unexpected library architecture')
-    exports = set(capture('nm', '-gjU', str(library)).splitlines())
+    exports = set(capture('nm', '-arch', 'arm64', '-gjU', str(library)).splitlines())
     if exports != set((HERE / 'exports.txt').read_text().splitlines()):
         raise SystemExit(f'unexpected exports: {exports}')
     shutil.copyfile(source / 'llvm/LICENSE.TXT', output / 'LICENSE.TXT')

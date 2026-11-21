@@ -500,7 +500,10 @@ def demangle(names):
     wanted = [n for n in names if n and not re.match(r'^(metadata|witness|metatype)#', n)]
     if not wanted:
         return {}
-    out = subprocess.run(['xcrun', 'swift-demangle', '--simplified', '--compact'],
+    from .artifacts import helper
+    binary = helper('swift-demangle')
+    command = [str(binary)] if binary is not None else ['xcrun', 'swift-demangle', '--simplified', '--compact']
+    out = subprocess.run(command,
                          input=''.join('$s' + n.removeprefix('$s') + '\n' for n in wanted),
                          capture_output=True, text=True, check=True).stdout.splitlines()
     return {n: d for n, d in zip(wanted, out) if d != '$s' + n.removeprefix('$s')}

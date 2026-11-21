@@ -1,0 +1,48 @@
+#!/usr/bin/env python3.14
+"""Produce a universal offline x86 relocator and the target witness runtime object."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tarfile
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'src'))
+from dyld_rebuild.witness_runtime import produce
+ARM_SHA256 = 'e086360a6f611b6e36fb92291611e04e009ed1249b8500c71e4e6eff8ed34a62'
+
+
+def build(a):
+    produce(a.x86_devkit, a.output)
+    if hashlib.sha256(a.arm_devkit.read_bytes()).hexdigest() != ARM_SHA256:
+        raise ValueError('expected Frida Gum 17.25.0 macos-arm64 devkit')
+    arm = a.output / 'arm'
+    arm.mkdir()
+    with tarfile.open(a.arm_devkit) as archive:
+        for name in ('frida-gum.h', 'libfrida-gum.a'):
+            (arm/name).write_bytes(archive.extractfile('./'+name).read())
+    for name in ('gumx86writer.h', 'capstone.h'):
+        (arm/name).write_text('#include "frida-gum.h"\n')
+    binary = arm/'relocate'
+    subprocess.run(['xcrun','clang','-arch','arm64','-mmacosx-version-min=14.0','-O2',
+                    '-Wl,-reproducible','-ffile-prefix-map='+str(a.output)+'=/build','-I',str(arm),'-I',str(ROOT/'vendor/frida-gum'),
+                    str(ROOT/'tools/swift-witness-relocate.c'),'-L',str(arm),'-lfrida-gum',
+                    '-lresolv','-o',str(binary)],check=True)
+    subprocess.run(['lipo','-create',str(binary),str(a.output/'relocate'),'-output',str(a.output/'universal')],check=True)
+    (a.output/'universal').replace(a.output/'relocate')
+    from dyld_rebuild.helper_sign import sign
+    sign(a.output/'relocate', 'org.hao.relocate')
+    record = json.loads((a.output/'build.json').read_text())
+    record.update(arm_devkit_sha256=ARM_SHA256, outputs={n:hashlib.sha256((a.output/n).read_bytes()).hexdigest() for n in ('relocate','runtime.o')})
+    (a.output/'build.json').write_text(json.dumps(record,indent=2)+'\n')
+    print(json.dumps(record['outputs'],indent=2))
+
+
+if __name__ == '__main__':
+    ap=argparse.ArgumentParser(description=__doc__)
+    for name in ('output','x86-devkit','arm-devkit'):
+        ap.add_argument('--'+name,type=Path,required=True)
+    build(ap.parse_args())

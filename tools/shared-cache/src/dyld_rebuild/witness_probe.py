@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 import uuid
+from .exports import require
 
 from .runtime_probes import LoaderFamily, Disassembler, cached_symbols, unique_symbol
 from .swift_metadata import pointer_entries, provenance, write_json
@@ -145,22 +146,16 @@ def main(argv):
         write_json(a.output,r);print(json.dumps(r));return 0 if r['complete'] else 1
     p=profile(a.cache);a.output.mkdir(parents=True)
     write_json(a.output/'profile.json',p);(a.output/'witness.d').write_text(script(p))
-    header='#define CACHE_UUID '+json.dumps(p['cache_uuid'])+'\n'
-    for name,key in (('TABLE_OFFSET','table'),('DATA_OFFSET','data'),('MODE_OFFSET','mode')):
-        header+=f'#define {name} {p[key]-p["base"]:#x}ULL\n'
-    header+=f'#define POSITIVE_VALUE {p["value"]:#x}ULL\n'
-    header+='static const uintptr_t positive_key[] __attribute__((unused))={'+','.join(hex(k)+'ULL' for k in p['key'])+'};\n'
-    (a.output/'witness-profile.h').write_text(header)
+    import struct
+    require(0 < len(p['key']) <= 64, 'witness profile key exceeds helper capacity')
+    (a.output/'witness-profile.bin').write_bytes(struct.pack('<40s69Q',
+        p['cache_uuid'].encode(), p['table']-p['base'], p['data']-p['base'], p['mode']-p['base'],
+        p['value'], len(p['key']), *p['key'], *([0]*(64-len(p['key'])))))
+    from .helper_build import probe
     root=Path(__file__).resolve().parents[2];source=root/'tools/swift-witness-probe.c'
-    for name,options in (('witness-probe',[]),('v4.dylib',['-dynamiclib','-DTABLE_LIBRARY','-DMINOR=4']),
-                         ('v5.dylib',['-dynamiclib','-DTABLE_LIBRARY','-DMINOR=5'])):
-        output=a.output/name
-        subprocess.run(['xcrun','clang','-arch','x86_64','-mmacosx-version-min=14.0','-O2',
-                        '-Wall','-Wextra','-Werror','-I',str(a.output),*options,str(source),'-o',str(output)],check=True)
-        subprocess.run(['codesign','-s','-',str(output)],check=True)
-    binder=a.output/'bind-runtime-probes'
-    subprocess.run(['xcrun','clang','-arch','x86_64','-mmacosx-version-min=14.0',str(root/'tools/bind-runtime-probes.c'),'-o',str(binder)],check=True)
-    subprocess.run(['codesign','-s','-',str(binder)],check=True)
+    for name, filename in (('witness-probe', 'witness-probe'), ('witness-v4', 'v4.dylib'), ('witness-v5', 'v5.dylib')):
+        probe(name, a.output/filename)
+    probe('bind-runtime-probes', a.output/'bind-runtime-probes')
     runner=a.output/'run.sh'
     runner.write_bytes((root/'tools/swift-witness-run.sh').read_bytes());runner.chmod(0o755)
     family=LoaderFamily(a.cache)

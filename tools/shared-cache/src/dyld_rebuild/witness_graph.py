@@ -14,9 +14,35 @@ from .host_tools import builder_objects
 
 
 def prepare(cache, recipe, catalog, toolchain, devkit, output, llvm):
+    from .artifacts import helper
+    pinned = helper('witness-graph')
+    if pinned is None:
+        return produce(cache, recipe, catalog, toolchain, devkit, output, llvm)
+    import shutil
+    capture(cache, recipe, output, prepare_only=True, base_catalog=catalog)
+    shutil.copy2(output / 'build.json', output / 'capture-build.json')
+    shutil.copy2(pinned, output / 'swift-capture')
+    write_json(output / 'build.json', provenance([pinned, cache, recipe, catalog],
+               operation='witness-constructor-graph', architecture='x86_64'))
+    return output
+
+
+def produce(cache, recipe, catalog, toolchain, devkit, output, llvm):
     output = output.resolve()
     capture(cache, recipe, output, prepare_only=True, base_catalog=catalog)
     (output/'capture-build.json').write_bytes((output/'build.json').read_bytes())
+    commands = compile_fixture(toolchain, devkit, output, llvm)
+    c_source = ROOT/'tools/swift-graph.c'
+    cpp_source = ROOT/'tools/swift-witness-graph.cpp'
+    inputs = [cache, recipe, catalog, toolchain/'build.json', devkit, output/'capture-build.json',
+              c_source, cpp_source, ROOT/'tools/cache-address.h', ROOT/'tools/witness-runtime.h',
+              Path(__file__), Path(__file__).with_name('witness_consumer.py')]
+    write_json(output/'build.json', provenance(inputs, operation='witness-constructor-graph',
+               architecture='x86_64', frida_gum=GUM_VERSION, commands=commands))
+    return output
+
+
+def compile_fixture(toolchain, devkit, output, llvm):
     flags = native_flags(toolchain, devkit, output, llvm)
     c_source = ROOT/'tools/swift-graph.c'
     cpp_source = ROOT/'tools/swift-witness-graph.cpp'
@@ -31,12 +57,7 @@ def prepare(cache, recipe, catalog, toolchain, devkit, output, llvm):
     with (output/'compile.log').open('w') as log:
         for command in commands:
             subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True)
-    inputs = [cache, recipe, catalog, toolchain/'build.json', devkit, output/'capture-build.json',
-              c_source, cpp_source, ROOT/'tools/cache-address.h', ROOT/'tools/witness-runtime.h',
-              Path(__file__), Path(__file__).with_name('witness_consumer.py')]
-    write_json(output/'build.json', provenance(inputs, operation='witness-constructor-graph',
-               architecture='x86_64', frida_gum=GUM_VERSION, commands=commands))
-    return output
+    return commands
 
 
 def materialize(cache, catalog_path, output, address):
@@ -66,12 +87,9 @@ def materialize(cache, catalog_path, output, address):
                       pointers=allocation['pointers'],records=allocation['records'],maps=maps,
                       scope='Relocated payload and separately verified lookup tables; not an installed image.')
         write_json(output/'allocation.json',layout)
-        toolchain = Path(os.environ['CACHE_TOOLCHAIN']).resolve()
-        toolchain_inputs = [p for subdir in ('source','products/Release/include',
-            'objects/dyld.build/Release/libslc_builder.dylib.build/DerivedSources',
-            builder_objects(toolchain).relative_to(toolchain))
-            for p in sorted((toolchain/subdir).rglob('*')) if p.is_file()]
-        toolchain_inputs += [toolchain/'products/Release'/name for name in ('libmach_o.a','libmach_o_writer.a')]
+        from .artifacts import helper
+        binary = helper('swift-table-writer')
+        toolchain_inputs = [binary] if binary is not None else []
         write_json(output/'build.json',provenance([catalog_path,Path(__file__),
             Path(__file__).with_name('swift_graph.py'),Path(__file__).with_name('swift_metadata.py'),
             Path(__file__).with_name('witness_initializers.py'),
@@ -126,29 +144,50 @@ def replay_prepare(allocation_path, catalog_path, toolchain, devkit, output, llv
         loads.update(ref['image'] for ref in row['key']+[p['ref'] for p in row['pointers']] if 'image' in ref)
     (output/'loads.txt').write_text(''.join(path+'\n' for path in sorted(loads)))
     source=ROOT/'tools/swift-dependency-replay.cpp'
-    flags=native_flags(toolchain,devkit,output,llvm)
-    if installed:flags+=['-DSWIFT_DEPENDENCY_INSTALLED']
+    from .artifacts import helper
+    from .exports import require
+    name = 'dependency-installed' if installed else 'dependency-replay'
     runtime_inputs=[]
     if runtime_profile is not None:
-        from .exports import require
         profile=json.loads(runtime_profile.read_text())
         require(profile['cache_uuid']==layout['cache_uuid'],'witness runtime profile belongs to another cache')
         require(runtime_toolchain is not None,'runtime replay needs its source-built toolchain')
-        header=''.join(f'#define WITNESS_{field.upper()}_OFFSET {profile[field]-profile["base"]:#x}ULL\n'
-                       for field in ('once','initialize','mode'))
-        (output/'runtime-profile.h').write_text(header)
-        flags+=['-DSWIFT_WITNESS_RUNTIME','-I',str(output),str(runtime_toolchain/'runtime.o')]
-        runtime_inputs=[runtime_profile,runtime_toolchain/'runtime.o',runtime_toolchain/'build.json',ROOT/'tools/swift-witness-runtime.h']
-    commands=[flags+[str(source),'-L',str(output/'gum'),'-lfrida-gum','-lresolv','-o',str(output/'dependency-replay')],
-              ['codesign','-s','-',str(output/'dependency-replay')]]
-    with (output/'compile.log').open('w') as log:
-        for command in commands: subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,check=True)
-    write_json(output/'build.json',provenance(allocation_inputs+[catalog_path,toolchain/'build.json',devkit,source,ROOT/'tools/witness-runtime.h',
+        pinned_object = helper('runtime-object')
+        if pinned_object is not None:
+            require((runtime_toolchain/'runtime.o').read_bytes() == pinned_object.read_bytes(),
+                    'runtime replay object differs from pinned runtime')
+        (output/'runtime-profile.bin').write_bytes(struct.pack('<3Q',
+            *(profile[field]-profile['base'] for field in ('once','initialize','mode'))))
+        runtime_inputs=[runtime_profile,runtime_toolchain/'runtime.o',ROOT/'tools/swift-witness-runtime.h']
+        name = 'dependency-runtime'
+    binary = helper(name, output/'dependency-replay')
+    if binary is None:
+        compile_replay(toolchain, devkit, output/'developer', llvm, name,
+                       runtime_toolchain/'runtime.o' if runtime_toolchain else None)
+        import shutil
+        shutil.copy2(output/'developer/dependency-replay', output/'dependency-replay')
+    commands=[]
+    write_json(output/'build.json',provenance(allocation_inputs+[catalog_path,output/'dependency-replay',source,ROOT/'tools/witness-runtime.h',
         Path(__file__),Path(__file__).with_name('witness_consumer.py')]+runtime_inputs,operation='swift-installed-verification' if installed else 'swift-dependency-replay',
         commands=commands,architecture='x86_64',frida_gum=GUM_VERSION,cache_uuid=layout['cache_uuid'],
         scope=('Installed exact-key identity verification without runtime replacements; application adoption remains open.' if installed else
                'Isolated native relocated-record replay; no installed dyld table or app adoption is proven.')))
     return output
+
+
+def compile_replay(toolchain, devkit, output, llvm, name, runtime_object=None):
+    output.mkdir(parents=True, exist_ok=False)
+    flags=native_flags(toolchain,devkit,output,llvm)
+    if name == 'dependency-installed':
+        flags += ['-DSWIFT_DEPENDENCY_INSTALLED']
+    if name == 'dependency-runtime':
+        flags += ['-DSWIFT_WITNESS_RUNTIME', str(runtime_object)]
+    binary = output/'dependency-replay'
+    subprocess.run(flags+[str(ROOT/'tools/swift-dependency-replay.cpp'),'-L',str(output/'gum'),
+                         '-lfrida-gum','-lresolv','-o',str(binary)],check=True)
+    from .helper_sign import sign
+    sign(binary, 'org.hao.'+name)
+    return binary
 
 
 def replay_summary(layout, events):

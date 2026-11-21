@@ -11,7 +11,10 @@
 extern "C" {
 #include "swift-witness-runtime.h"
 }
-#include "runtime-profile.h"
+static uintptr_t witness_offsets[3];
+#define WITNESS_ONCE_OFFSET witness_offsets[0]
+#define WITNESS_INITIALIZE_OFFSET witness_offsets[1]
+#define WITNESS_MODE_OFFSET witness_offsets[2]
 #endif
 #include <atomic>
 #include <cstdio>
@@ -184,6 +187,14 @@ static void fault(int signal) {
 }
 int main(int argc,char **argv) {
   if (argc!=3) return 2;
+#ifdef SWIFT_WITNESS_RUNTIME
+  std::string profilePath(argv[1]);
+  auto slash=profilePath.find_last_of('/');
+  profilePath=(slash==std::string::npos?std::string():profilePath.substr(0,slash+1))+"runtime-profile.bin";
+  FILE *profile=fopen(profilePath.c_str(),"rb");
+  if (!profile || fread(witness_offsets,1,sizeof(witness_offsets),profile)!=sizeof(witness_offsets) || fgetc(profile)!=EOF) return 3;
+  fclose(profile);
+#endif
   keepGoing=getenv("REPLAY_CONTINUE")!=nullptr;
   alarm(keepGoing?900:90);
   setbuf(stdout,nullptr);

@@ -7,12 +7,36 @@
 #include <string.h>
 #include <unistd.h>
 #include <uuid/uuid.h>
-#include "witness-profile.h"
+#include <mach-o/dyld.h>
+#include <limits.h>
+struct Profile {
+    char uuid[40];
+    uint64_t table, data, mode, value, count, key[64];
+};
+static struct Profile profile;
+#define CACHE_UUID profile.uuid
+#define TABLE_OFFSET profile.table
+#define DATA_OFFSET profile.data
+#define MODE_OFFSET profile.mode
+#define POSITIVE_VALUE profile.value
+#define positive_key profile.key
+static void load_profile(void) {
+    char path[PATH_MAX]; uint32_t size=sizeof(path);
+    if (_NSGetExecutablePath(path,&size)) _exit(3);
+    char *slash=strrchr(path,'/');
+    if (!slash || (size_t)(slash-path)+sizeof("/witness-profile.bin")>sizeof(path)) _exit(3);
+    strcpy(slash,"/witness-profile.bin");
+    FILE *f=fopen(path,"rb");
+    if (!f || fread(&profile,1,sizeof(profile),f)!=sizeof(profile) || fgetc(f)!=EOF) _exit(3);
+    fclose(f);
+    if (profile.uuid[36] || strlen(profile.uuid)!=36 || profile.count<1 || profile.count>64) _exit(3);
+}
 
 struct Data { uint32_t major,minor; const void *names,*disabled,*metadata;
               uintptr_t options; const void *descriptors,*witnesses; };
 _Static_assert(__builtin_offsetof(struct Data,witnesses)==48,"witness map ABI");
 static uintptr_t cache_base(void) {
+    load_profile();
     size_t length=0;
     const void *(*range)(size_t*)=dlsym(RTLD_DEFAULT,"_dyld_get_shared_cache_range");
     _Bool (*getuuid)(uuid_t)=dlsym(RTLD_DEFAULT,"_dyld_get_shared_cache_uuid");
@@ -65,8 +89,8 @@ int main(int argc,char **argv) {
     unsigned mode=*(const unsigned*)(base+MODE_OFFSET);
     printf("{\"start\":true,\"cache_uuid\":\"%s\",\"minor\":%u,\"mode\":%u,\"override\":%s}\n",
            CACHE_UUID,data->minor,mode,overridden()?"true":"false");
-    const void *args[sizeof(positive_key)/sizeof(*positive_key)];
-    for(unsigned i=1;i<sizeof(positive_key)/sizeof(*positive_key);i++) args[i-1]=(void*)(base+positive_key[i]);
+    const void *args[profile.count];
+    for(unsigned i=1;i<profile.count;i++) args[i-1]=(void*)(base+positive_key[i]);
     hao_witness_phase(1);
     const uintptr_t *results[8];
     for(unsigned i=0;i<8;i++) {
@@ -80,7 +104,7 @@ int main(int argc,char **argv) {
     hao_witness_phase(2);
     for(unsigned i=0;i<2;i++)
         if(lookup((void*)(base+TABLE_OFFSET),(void*)(base+positive_key[0]),
-                  sizeof(positive_key)/sizeof(*positive_key)-1,args)!=(void*)(base+POSITIVE_VALUE)) return 9;
+                  profile.count-1,args)!=(void*)(base+POSITIVE_VALUE)) return 9;
     hao_witness_phase(3);
     printf("{\"complete\":true,\"requests\":8,\"positive_hits\":2,\"mode\":%u,\"override\":%s}\n",
            *(const unsigned*)(base+MODE_OFFSET),overridden()?"true":"false");

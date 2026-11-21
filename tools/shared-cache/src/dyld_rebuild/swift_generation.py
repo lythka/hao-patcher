@@ -23,9 +23,9 @@ def identify_inputs(portable, reflected, binaries):
     from .metadata_expand import binary_inputs
     observed = {image['uuid'].lower() for image in reflected['images']}
     for binary in binaries:
-        headers = subprocess.check_output(['xcrun', 'dwarfdump', '--uuid', '--arch=x86_64', str(binary)], text=True)
-        identities = re.findall(r'UUID: ([0-9A-Fa-f-]{36}) \(x86_64\)', headers)
-        require(len(identities) == 1 and identities[0].lower() in observed,
+        from .producer import x86_64_uuid
+        identity = x86_64_uuid(binary)
+        require(identity is not None and str(uuid.UUID(hex=identity)).lower() in observed,
                 'reflection input binary UUID was not captured; renew reflection')
     portable['inputs'] = binary_inputs(binaries)
 

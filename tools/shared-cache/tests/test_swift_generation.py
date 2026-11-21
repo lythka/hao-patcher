@@ -38,16 +38,17 @@ class GenerationTests(unittest.TestCase):
         from dyld_rebuild.metadata_expand import reused_graph
         import json
         with tempfile.TemporaryDirectory() as folder:
-            binary=Path(folder)/'application'; binary.write_bytes(b'fixture')
+            binary=Path(folder)/'application'
+            import uuid
+            binary.write_bytes(struct.pack('<8I', 0xfeedfacf, 0x01000007, 3, 2, 1, 24, 0, 0) +
+                               struct.pack('<II', 0x1b, 24) + uuid.UUID(UUID).bytes)
             document=MetadataGraph().document
             reflected=dict(images=[dict(uuid=UUID)])
-            with patch('dyld_rebuild.swift_generation.subprocess.check_output',
-                       return_value=f'UUID: {UUID} (x86_64) application\n'):
-                identify_inputs(document,reflected,[binary])
-                output=Path(folder)/'graph.json';output.write_text(json.dumps(document))
-                self.assertEqual(reused_graph(output,[binary]).document,document)
-                with self.assertRaisesRegex(Refusal,'was not captured'):
-                    identify_inputs(document,dict(images=[]),[binary])
+            identify_inputs(document,reflected,[binary])
+            output=Path(folder)/'graph.json';output.write_text(json.dumps(document))
+            self.assertEqual(reused_graph(output,[binary]).document,document)
+            with self.assertRaisesRegex(Refusal,'was not captured'):
+                identify_inputs(document,dict(images=[]),[binary])
     def test_opaque_protocol_recipe_preserves_subject_context_and_order(self):
         recipe = dict(schema=1, kind='generic-values', cache_uuid=UUID,
             definitions=[dict(id='1', operation='resolve', name='Su'),

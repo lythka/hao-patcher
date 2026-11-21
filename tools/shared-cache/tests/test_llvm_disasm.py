@@ -53,17 +53,11 @@ class SelectionTests(unittest.TestCase):
         with patch.dict(os.environ, {'SHARED_CACHE_DISASM': '/explicit/library'}), patch.object(x86, 'row_library') as lookup:
             self.assertEqual(x86.default_library(), Path('/explicit/library'))
             lookup.assert_not_called()
-        x86_host = patch.object(x86.platform, 'machine', return_value='x86_64')
-        with patch.dict(os.environ, {}, clear=True), x86_host, patch.object(x86, 'row_library', return_value=Path('/row/library')):
+        with patch.dict(os.environ, {}, clear=True), patch.object(x86, 'row_library', return_value=Path('/row/library')):
             self.assertEqual(x86.default_library(), Path('/row/library'))
-        with patch.dict(os.environ, {}, clear=True), x86_host, patch.object(x86, 'row_library', return_value=None):
+        with patch.dict(os.environ, {}, clear=True), patch.object(x86, 'row_library', return_value=None):
             self.assertEqual(x86.default_library(), Path(x86.LTO))
 
-    def test_arm64_host_uses_xcode_not_the_x86_64_decoder(self):
-        with patch.dict(os.environ, {}, clear=True), patch.object(x86.platform, 'machine', return_value='arm64'), \
-                patch.object(x86, 'row_library', return_value=Path('/row/library')) as lookup:
-            self.assertEqual(x86.default_library(), Path(x86.LTO))
-            lookup.assert_not_called()
 
 
 class EquivalenceTests(unittest.TestCase):
@@ -72,15 +66,14 @@ class EquivalenceTests(unittest.TestCase):
         if library is None or not Path(x86.LTO).exists():
             self.skipTest('standalone decoder and Xcode libLTO both required')
         results = []
-        for path in (library, Path(x86.LTO)):
-            arches = subprocess.check_output(['lipo', '-archs', str(path)], text=True).split()
-            arch = 'x86_64' if 'x86_64' in arches else 'arm64'
+        for arch, path in (('arm64', library), ('x86_64', library), ('arm64', Path(x86.LTO))):
             output = subprocess.check_output(['arch', '-' + arch, sys.executable, '-I', '-B',
                                               str(Path(__file__).resolve()), '--decode', str(path)], text=True)
             results.append(json.loads(output))
-        for raw, standalone, xcode in zip(CORPUS, *results):
+        for index, raw in enumerate(CORPUS):
             with self.subTest(bytes=raw):
-                self.assertEqual(standalone, xcode)
+                for result in results[1:]:
+                    self.assertEqual(results[0][index], result[index])
 
 
 if __name__ == '__main__':

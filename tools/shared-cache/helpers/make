@@ -1,0 +1,63 @@
+#!/usr/bin/env python3.14
+"""Build universal host serializers from two prepared dyld toolchains.
+
+This producer may use Xcode. The rebuild consumes the resulting pinned binaries.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'src'))
+from dyld_rebuild.host_tools import _compile_adapter, _build_loader
+
+
+def build(args):
+    args.output.mkdir(parents=True, exist_ok=False)
+    names = {'objc-writer': 'objc-table-writers/writer.cpp',
+             'swift-table-writer': 'swift-table-writer.cpp',
+             'swift-conformance-writer': 'swift-conformance-writer.cpp'}
+    results = {}
+    for arch, toolchain in (('arm64', args.arm_toolchain), ('x86_64', args.x86_toolchain)):
+        os.environ['CACHE_TOOLCHAIN'] = str(toolchain.resolve())
+        for name, source in names.items():
+            results[arch, name] = _compile_adapter(args.output / 'work' / arch / name, name,
+                                                   [ROOT / 'tools' / source])
+        results[arch, 'generator'] = _build_loader(args.output / 'work' / arch / 'generator')
+    from dyld_rebuild.helper_build import SOURCES, compile_probe
+    records = {}
+    for name in SOURCES:
+        binary = compile_probe(name, args.output / name)
+        records[name] = hashlib.sha256(binary.read_bytes()).hexdigest()
+    if args.runtime_toolchain:
+        from dyld_rebuild.witness_template import produce
+        template_dir = args.output / 'work/template'
+        template_dir.mkdir(parents=True)
+        produce(args.runtime_toolchain, template_dir)
+        shutil.copyfile(template_dir / 'witness-template.json', args.output / 'witness-template.json')
+        records['witness-template.json'] = hashlib.sha256((args.output / 'witness-template.json').read_bytes()).hexdigest()
+    for name in (*names, 'generator'):
+        output = args.output / name
+        subprocess.run(['lipo', '-create', *[str(results[a, name]) for a in ('arm64', 'x86_64')],
+                        '-output', str(output)], check=True)
+        subprocess.run(['strip', '-x', str(output)], check=True)
+        subprocess.run(['codesign', '--force', '--sign', '-', '--timestamp=none',
+                        '--identifier', 'org.hao.' + name, str(output)], check=True)
+        subprocess.run(['codesign', '--verify', '--strict', str(output)], check=True)
+        records[name] = hashlib.sha256(output.read_bytes()).hexdigest()
+    (args.output / 'build.json').write_text(json.dumps(dict(outputs=records,
+        toolchains=dict(arm64=str(args.arm_toolchain), x86_64=str(args.x86_toolchain))), indent=2) + '\n')
+    print(json.dumps(records, indent=2))
+
+
+if __name__ == '__main__':
+    ap = argparse.ArgumentParser(description=__doc__)
+    for name in ('output', 'arm-toolchain', 'x86-toolchain'):
+        ap.add_argument('--' + name, type=Path, required=True)
+    ap.add_argument('--runtime-toolchain', type=Path)
+    build(ap.parse_args())

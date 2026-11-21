@@ -1,0 +1,107 @@
+#!/usr/bin/env python3.14
+"""Rebuild a witness family on both host architectures, denying Xcode on Intel.
+
+Pass explicit inputs and a reference sha256 list. Each leg records its command,
+exit status, UUID, file digests and time before deleting its family output.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE / 'src'))
+from dyld_rebuild import disk_guard
+
+
+def hashes(directory):
+    result = {}
+    for path in sorted(directory.glob('dyld_shared_cache_x86_64*')):
+        if path.is_file():
+            with path.open('rb') as stream:
+                result[path.name] = hashlib.file_digest(stream, 'sha256').hexdigest()
+    return result
+
+
+def run(args):
+    reference = {}
+    for line in args.reference.read_text().splitlines():
+        digest, name = line.split(maxsplit=1)
+        name = Path(name.lstrip('*')).name
+        if name in reference:
+            raise ValueError('duplicate reference filename')
+        reference[name] = digest
+    if len(reference) != 36:
+        raise ValueError('witness reference must contain exactly 36 files')
+    args.output.mkdir(parents=True, exist_ok=False)
+    shim = args.output / 'deny-tools'
+    shim.mkdir()
+    developer = args.output / 'empty-developer'
+    developer.mkdir()
+    for name in ('xcrun', 'xcodebuild', 'clang', 'clang++', 'swiftc', 'dwarfdump', 'swift-demangle'):
+        path = shim / name
+        path.write_text('#!/bin/sh\nprintf "%s" "$0" >> "$HAO_XCRUN_LOG"\n'
+                        'printf " %s" "$@" >> "$HAO_XCRUN_LOG"\n'
+                        'printf "\\n" >> "$HAO_XCRUN_LOG"\nexit 1\n')
+        path.chmod(0o755)
+    report = dict(reference=str(args.reference), expected_uuid=args.uuid.lower(), legs=[])
+    for arch, toolchain in (('arm64', args.arm_toolchain), ('x86_64', args.x86_toolchain)):
+        work = args.output / (arch + '-work')
+        family = args.output / (arch + '-family')
+        disk_guard.check(work, family, 'architecture gate ' + arch)
+        calls = args.output / (arch + '-refused.log')
+        calls.touch()
+        env = dict(os.environ)
+        env.pop('SHARED_CACHE_DEVELOPER_BUILD', None)
+        env.pop('SHARED_CACHE_DISASM', None)
+        if arch == 'x86_64':
+            env.update(PATH=str(shim) + ':' + str(Path(sys.executable).parent) + ':/usr/bin:/bin:/usr/sbin:/sbin',
+                       DEVELOPER_DIR=str(developer), HAO_XCRUN_LOG=str(calls))
+            env.pop('SDKROOT', None)
+        command = ['/usr/bin/arch', '-' + arch, sys.executable, '-I', '-B', str(HERE / 'make'),
+                   str(args.image), '--features', args.features,
+                   '--swift-catalog', str(args.catalog), '--swift-runtime-toolchain', str(args.runtime_toolchain),
+                   '--program-files', str(args.program_files), '--toolchain', str(toolchain),
+                   '--work', str(work), '--output', str(family)]
+        started = time.monotonic()
+        with (args.output / (arch + '.log')).open('w') as log:
+            code = subprocess.run(command, env=env, stdout=log, stderr=subprocess.STDOUT).returncode
+        files = hashes(family)
+        main = family / 'dyld_shared_cache_x86_64'
+        identity = None
+        if main.is_file():
+            with main.open('rb') as stream:
+                stream.seek(88)
+                identity = stream.read(16).hex()
+        leg = dict(architecture=arch, command=command, exit_code=code,
+                   seconds=round(time.monotonic()-started, 3), uuid=identity, hashes=files,
+                   refused=calls.read_text().splitlines())
+        leg['pass'] = code == 0 and files == reference and identity == args.uuid.lower() and not leg['refused']
+        report['legs'].append(leg)
+        report['pass'] = len(report['legs']) == 2 and all(row['pass'] for row in report['legs'])
+        (args.output / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
+        print(f"{arch}: {'PASS' if leg['pass'] else 'FAIL'}, {leg['seconds']}s, {len(files)} files", flush=True)
+        # This invocation owns these fresh paths. Preserve logs and hashes, not cache copies.
+        if family.exists():
+            shutil.rmtree(family)
+        if work.exists():
+            disk_guard.remove_intermediates(work)
+    return 0 if report['pass'] else 1
+
+
+if __name__ == '__main__':
+    ap = argparse.ArgumentParser(description=__doc__)
+    for name in ('image', 'catalog', 'runtime-toolchain', 'program-files', 'arm-toolchain',
+                 'x86-toolchain', 'reference', 'output'):
+        ap.add_argument('--' + name, required=True, type=lambda value: Path(value).resolve())
+    ap.add_argument('--features', required=True)
+    ap.add_argument('--uuid', required=True, help='expected 32 hexadecimal UUID digits')
+    args = ap.parse_args()
+    if len(args.uuid) != 32 or any(c not in '0123456789abcdefABCDEF' for c in args.uuid):
+        ap.error('--uuid requires 32 hexadecimal digits')
+    sys.exit(run(args))

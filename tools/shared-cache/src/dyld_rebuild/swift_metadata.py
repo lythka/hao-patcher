@@ -39,9 +39,9 @@ def revision():
 
 
 def provenance(inputs, **fields):
-    commit = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()
-    dirty = subprocess.check_output(['git', '-C', str(ROOT), 'status', '--porcelain', '--', '.'], text=True)
-    return dict(unit='cache/shared-cache', revision=revision(), git_commit=commit, git_dirty=bool(dirty),
+    from .source_identity import head, content_hash
+    return dict(unit='cache/shared-cache', revision=revision(), git_commit=head(ROOT), git_dirty=None,
+                source_sha256=content_hash(ROOT),
                 date=datetime.now(timezone.utc).isoformat(), inputs=[pin(p) for p in inputs], **fields)
 
 
@@ -218,9 +218,8 @@ def capture(cache, recipe_path, output, runner=None, captured=None, prepare_only
         inputs.append(ROOT / "tools/cache-address.h")
     if captured is None:
         binary = output / 'swift-capture'
-        subprocess.run(['xcrun', 'clang', '-arch', 'x86_64', '-O2', '-Wall', '-Wextra', '-Werror',
-                        str(source), '-o', str(binary)], check=True)
-        subprocess.run(['codesign', '-s', '-', str(binary)], check=True)
+        from .helper_build import probe
+        probe('swift-graph' if graph else 'swift-capture', binary)
         if prepare_only:
             family = LoaderFamily(cache)
             try:

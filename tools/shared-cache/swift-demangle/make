@@ -1,0 +1,43 @@
+#!/usr/bin/env python3.14
+"""Build a universal simplified Swift demangler from the pinned Swift/LLVM sources."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+
+HERE = Path(__file__).resolve().parent
+SOURCES = 'Ownership Demangler Context ManglingUtils NodeDumper NodePrinter OldDemangler OldRemangler Punycode Remangler DemanglingErrorHandling'.split()
+
+
+def build(a):
+    a.output.mkdir(parents=True, exist_ok=False)
+    swift = a.swift_toolchain / ('swift-' + json.loads((a.swift_toolchain / 'build.json').read_text())['swift_commit'])
+    llvm = a.llvm_decoder / 'work/llvm-project-21.1.8.src/llvm'
+    llbuild = a.llvm_decoder / 'work/build/llvm'
+    sources = [HERE/'main.cpp', *[swift/'lib/Demangling'/(name+'.cpp') for name in SOURCES]]
+    binary = a.output/'swift-demangle'
+    command = ['xcrun','clang++','-arch','arm64','-arch','x86_64','-std=c++17','-O2','-g0',
+               '-Wl,-reproducible','-ffile-prefix-map='+str(swift)+'=/swift',
+               '-ffile-prefix-map='+str(HERE)+'=/producer',
+               '-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1','-DSWIFT_SUPPORT_OLD_MANGLING=1',
+               '-DSWIFT_STDLIB_HAS_TYPE_PRINTING=1','-DSWIFT_ENABLE_REFLECTION=1']
+    for folder in (swift/'include',swift/'stdlib/public/SwiftShims',a.swift_toolchain/'build/include',
+                   llvm/'include',llbuild/'include'):
+        command += ['-I',str(folder)]
+    command += [*map(str,sources),str(llbuild/'lib/libLLVMSupport.a'),str(llbuild/'lib/libLLVMDemangle.a'),
+                '-framework','CoreFoundation','-o',str(binary)]
+    subprocess.run(command,check=True)
+    subprocess.run(['codesign','--force','--sign','-','--timestamp=none','--identifier','org.hao.swift-demangle',str(binary)],check=True)
+    shutil.copyfile(swift/'LICENSE.txt',a.output/'LICENSE.txt')
+    record = dict(command=command,sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
+                  sources={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources})
+    (a.output/'build.json').write_text(json.dumps(record,indent=2)+'\n')
+
+
+if __name__ == '__main__':
+    ap=argparse.ArgumentParser(description=__doc__)
+    for name in ('output','swift-toolchain','llvm-decoder'):
+        ap.add_argument('--'+name,type=Path,required=True)
+    build(ap.parse_args())
