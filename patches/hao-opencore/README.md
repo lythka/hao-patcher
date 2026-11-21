@@ -294,6 +294,7 @@ reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox ad
 Golden Gate boot to the desktop on the laptop was not yet proven.
 
 ## Revisions
+- r87 2026-11-21 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 497f126 (hao-runtime-26B131-20261120-497f126-stock). No recipe change.
 - r86 2026-11-20 config-reasons.json records SIP 0x807 (dev-capture r4 adds task-for-pid on dev images); without it every dev-lite build stopped at the efi-bundle check. Nothing it installs changes.
 - r85 2026-11-18 Names no model (S15): the reasons and provenance of the mbp92 target's OCLP-generated kexts (USB-Map, USB-Map-Tahoe, ECM-Override) moved to the mbp92 target's `platform_data`, and `config_reasons.py` reads the target's (`--target-data`, default `HAO_TARGET_DATA`). The generic image is known from its target (`opencore_generic`), not an SMBIOS model. README wording names no model or GPU. Nothing it installs changes.
 - r84 2026-11-18 Reasons and tests state what each setting does and why, with no review IDs or weakness notes (owner: no vulnerability details in public text). Nothing it installs changes.

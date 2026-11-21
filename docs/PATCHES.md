@@ -403,7 +403,7 @@ Revision r11, status product. [Recipe](../patches/golden-gate-user-template/READ
 
 ## golden-gate-userspace
 
-Revision r96, status product. [Recipe](../patches/golden-gate-userspace/README.md)
+Revision r97, status product. [Recipe](../patches/golden-gate-userspace/README.md)
 
 - `usr/lib/dss_shim.dylib`: whole file from hao (row display_state_shim). New file: the display-state shim (tools/display-state-shim), installed by the display installer helper; WindowServer loads it. Installed mode 0755, owner root:wheel.
 - `System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFi`: whole file from hao (row corewifi_compat). The CoreWiFi compatibility library (src/corewifi), installed under the framework's own name in front of Tahoe's CoreWiFi from the native donors; it re-exports Tahoe's, kept as CoreWiFiTahoe.dylib. Installed mode 0755, owner root:wheel, flags restricted.
@@ -597,7 +597,7 @@ Revision r13, status product. [Recipe](../patches/hao-command/README.md)
 
 ## hao-opencore
 
-Revision r86, status product. [Recipe](../patches/hao-opencore/README.md)
+Revision r87, status product. [Recipe](../patches/hao-opencore/README.md)
 
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for the target's model, as pipeline/stages/build-efi.py generates it; 5 edits, applied by the installer. Made after `System/Library/KernelCollections/BootKernelExtensions.kc` (kc.bind reads it).
   1. `kernel-repairs`: kc.bind (applied by tools/kc-binder, against the target's linked BootKC).
@@ -624,7 +624,7 @@ Revision r86, status product. [Recipe](../patches/hao-opencore/README.md)
 
 ## hao-runtime
 
-Revision r94, status product. [Recipe](../patches/hao-runtime/README.md)
+Revision r95, status product. [Recipe](../patches/hao-runtime/README.md)
 
 - `usr/libexec/hao`: whole file from hao (row hao_runtime). The hao launcher that runs ARM64 programs on Intel (payload root/usr/libexec/hao, copied by hao-install.py). Installed mode 0755, owner root:wheel, flags restricted.
 - `usr/lib/hao/libhao.dylib`: whole file from hao (row hao_runtime). Hao runtime library (payload root). Installed mode 0755, owner root:wheel.

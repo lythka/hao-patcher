@@ -1,7 +1,7 @@
-# hao runtime payload for the unfolded 26B131 x86_64 cache (A family, 262FA161), from hao-runtime 90c2b9e
-# (integration/v0.0.1-r2: the release runtime with the JIT arena, the Weather fixes, #76, #77, thunk pairs without JIT
-# memory, report-only values passed untouched, #78 and install-live; the Maps PreferencesOutputs crash, #87, is not
-# fixed by it): libhao 076cc54f.
+# hao runtime payload for the unfolded 26B131 x86_64 cache (A family, 262FA161), from hao-runtime 497f126
+# (integration/v0.0.1-aot-combined: the 90c2b9e release runtime plus the walk memo (4c3675a) and batched lazy AOT
+# copies (e52846a); mapped AOT is built in but dormant, no .aot9 files): libhao 9e318504 (UUID 1205E53A).
+# Laptop A/B 2026-11-20: Maps cold relaunch 60-70 s -> 15-22 s; runs/jobA-497f126-20261120/RESULT.md.
 # hash: without root/usr/lib/hao/aot  # made on the user's Mac after the first boot (made_on_mac_files)
-# check: payload os_build=26B131 layout_version=1 manifest_sha256=d3fe7190c91589cca8541ba8bef3a91d2794bfd9e8ca80e929da3e65ac086c7f
-653f722c652e77346eeda18fcf83e59cf5a074677353e9d0aa4ecf9747aeaf54 store/artifacts/hao-runtime-26B131-20261120-90c2b9e-stock/payload
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=1f4e4acff1dcbf4c3488ff6b84b238e31fef77ff5f50e06d6a04a5f2324de0c8
+50b4175ab4353d781339874a68a02903aeefc42616f10815f5b41eef47eb7323 store/artifacts/hao-runtime-26B131-20261120-497f126-stock/payload

@@ -45,13 +45,13 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-update-policy | r3 | post | product |  | x |  |  |  | ok (r2) | r3 2026-11-18 Validated r2 on hardware (Validation); nothing it installs changes. |
 | golden-gate-user-seed | r16 | post | product | caches | x |  |  |  | ok (r15) | r16 2026-11-19 Validated r15 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-user-template | r11 | post | product | caches | x |  |  |  | **needs** | r11 2026-11-17 Leaves out Mail's containers (8 of 336), fixes #47: a schema-0 Mail container was migrated unde |
-| golden-gate-userspace | r96 | oclp-hook | product |  | x | x |  |  | **needs** | r96 2026-11-19 compact_image keeps its first image under a .dmg name (`built_path`: .golden-gate-os.built.dmg) |
+| golden-gate-userspace | r97 | oclp-hook | product |  | x | x |  |  | **needs** | r97 2026-11-21 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 497f126 (hao-runt |
 | golden-gate-wallpaper-export | r2 | post | product | caches |  |  |  |  | **needs** | r2 2026-11-19 Pack os-extras: dev profiles name it, release profiles leave it out (Apple-derived; returns when |
 | golden-gate-wifi-compat | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-19 Validated r3 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-windowserver-filter | r10 | oclp-hook | product |  | x | x |  |  | ok (r5) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
 | hao-command | r13 | post | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
-| hao-opencore | r86 | post | product |  | x | x |  |  | **needs** | r86 2026-11-20 config-reasons.json records SIP 0x807 (dev-capture r4 adds task-for-pid on dev images); without |
-| hao-runtime | r94 | oclp-hook | product |  | x | x |  |  | **needs** | r94 2026-11-20 Row hao_runtime is hao-runtime 90c2b9e: b05855f plus #78 (the auto-AOT marker) and install-live |
+| hao-opencore | r87 | post | product |  | x | x |  |  | **needs** | r87 2026-11-21 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 497f126 (hao-runt |
+| hao-runtime | r95 | oclp-hook | product |  | x | x |  |  | **needs** | r95 2026-11-21 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 497f126 (hao-runt |
 | hao-runtime-fold | r10 | oclp-hook | product |  |  |  |  |  | **needs** | r10 2026-11-18 Row `hao_runtime_fold` -> hao-runtime cabc1d5 payload for fold family B 31C0215A (manifest 8e45 |
 | hao-runtime-fold-catalog | r5 | oclp-hook | experiment |  |  |  |  |  | **needs** | r5 2026-11-20 Row hao_runtime_fold_catalog is hao-runtime 90c2b9e built for the witness family 31DA2287 (1892  |
 | metal-compiler-compat | r13 | oclp-hook | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
