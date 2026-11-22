@@ -54,6 +54,8 @@ class FakeHost:
         self.root, self.calls, self.partitioned = Path(root), [], False
         self.moved = {}                 # mount point -> another disk's partition (a swapped drive)
         self.uuid = 'UUID-1'            # the VolumeUUID diskutil reports for mounted partitions
+        self.unmounted = set()          # partitions diskutil reports with no mount point until `diskutil mount`
+        self.efi_needs_root = False     # a real drive: macOS mounts its EFI partition only for root
 
     def run(self, argv, check=True, timeout=120):
         argv = [str(a) for a in argv]
@@ -71,9 +73,15 @@ class FakeHost:
                 parts += [{'DeviceIdentifier': 'disk4s2', 'VolumeName': 'HAOBOOT'},
                           {'DeviceIdentifier': 'disk4s3', 'VolumeName': 'HAO'}]
             out = plistlib.dumps({'AllDisksAndPartitions': [{'DeviceIdentifier': 'disk4', 'Partitions': parts}]})
+        elif argv[:2] == ['diskutil', 'mount']:
+            if self.calls[-1][:2] != ['sudo', '-n'] and self.efi_needs_root and argv[2] == 'disk4s1':
+                return subprocess.CompletedProcess(argv, 1, b'', b'Volume on disk4s1 failed to mount')
+            self.unmounted.discard(argv[2])
         elif argv[:3] == ['diskutil', 'info', '-plist']:
             devs = {'disk4s1': 'EFI', 'disk4s2': 'HAOBOOT', 'disk4s3': 'HAO'}
-            if argv[3] in devs:
+            if argv[3] in self.unmounted:
+                out = plistlib.dumps({'DeviceIdentifier': argv[3], 'ParentWholeDisk': 'disk4'})
+            elif argv[3] in devs:
                 out = plistlib.dumps(dict({'MountPoint': str(self.root / devs[argv[3]]), 'DeviceIdentifier': argv[3],
                                       'ParentWholeDisk': 'disk4'}, **({'VolumeUUID': self.uuid} if self.uuid else {})))
             else:                               # a mount point: which partition is mounted there now
@@ -138,6 +146,24 @@ class StickTest(unittest.TestCase):
             with mock.patch.object(STICK, 'own_device', lambda disk: True):   # an image this user attached
                 STICK.partition(host, 'disk4', 1900)
             self.assertFalse([x for x in host.calls if x[0] == 'sudo'])      # its own device: no sudo
+
+    def test_a_user_mounts_the_erased_drives_efi_through_sudo(self):
+        # issue 97: on a real drive the erase leaves EFI unmounted, and macOS mounts it only for root
+        with tempfile.TemporaryDirectory() as d:
+            host = FakeHost(d)
+            host.euid = lambda: 501
+            host.unmounted, host.efi_needs_root = {'disk4s1'}, True
+            parts = STICK.partition(host, 'disk4', 1900)
+            self.assertIn(['sudo', '-n', 'diskutil', 'mount', 'disk4s1'], host.calls)
+            self.assertEqual(parts['EFI'][1], str(Path(d) / 'EFI'))
+            from unittest import mock
+            host = FakeHost(d + '/image'); Path(d + '/image').mkdir()
+            host.euid = lambda: 501
+            host.unmounted = {'disk4s1'}
+            with mock.patch.object(STICK, 'own_device', lambda disk: True):   # an image this user attached
+                STICK.partition(host, 'disk4', 1900)
+            self.assertIn(['diskutil', 'mount', 'disk4s1'], host.calls)       # its own device: no sudo
+            self.assertFalse([x for x in host.calls if x[0] == 'sudo'])
 
     def test_writes_both_partitions(self):
         host = FakeHost(self.mnt)

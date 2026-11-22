@@ -392,6 +392,36 @@ class Unsigned(unittest.TestCase):
             self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
             self.assertNotIn('UNSIGNED release', r.stdout + r.stderr)
 
+    def published(self, rel_bytes, source_listed=True):
+        """GitHub as beta.1 publishes an unsigned release: no .sig files; the assets release's SHA256SUMS lists the
+        release.json given; the source release's lists the tag's archive."""
+        name = json.loads(rel_bytes)['release']
+        files = {'/hao-assets/releases/download/%s/SHA256SUMS' % name:
+                 ('%s  release.json\n' % hashlib.sha256(rel_bytes).hexdigest()).encode()}
+        if source_listed:
+            files['/hao-patcher/releases/download/v0.0.1/SHA256SUMS'] = ('%s  hao-patcher-v0.0.1.tar\n' % ('c' * 64)).encode()
+        return github(files=files)
+
+    def test_verify_release_vxyz_of_an_unsigned_release(self):
+        # beside hao, as the bootstrap leaves it: release.json and SHA256SUMS, no signatures
+        f = self.folder()
+        dest = Path(self.d.name) / 'dest'
+        dest.mkdir()
+        opener = self.published((f / 'release.json').read_bytes())
+        got = RC.download('v0.0.1', opener, beside=f, dest=dest, keys=KEYS)
+        checks = RC.check_folder(got, KEYS, tag='v0.0.1', opener=opener) + RC.tag_extra(got, KEYS, 'v0.0.1')
+        self.assertNotIn('FAIL', [s for _, s in states(checks)], checks)
+        self.assertIn(('tag', 'PASS'), states(checks))
+        self.assertIn('release.json is the file listed in the assets release\'s SHA256SUMS',
+                      [k['detail'] for k in checks])
+        # a release.json the assets release does not list is still refused
+        (f / 'release.json').write_text((f / 'release.json').read_text().replace('27.2.1', '27.2.1 '))
+        dest2 = Path(self.d.name) / 'dest2'
+        dest2.mkdir()
+        got = RC.download('v0.0.1', opener, beside=f, dest=dest2, keys=KEYS)
+        checks = RC.check_folder(got, KEYS, tag='v0.0.1', opener=opener) + RC.tag_extra(got, KEYS, 'v0.0.1')
+        self.assertIn('FAIL', [s for _, s in states(checks)])
+
     def _tampered(self):
         f = Path(self.d.name) / 'tampered'
         f.mkdir()

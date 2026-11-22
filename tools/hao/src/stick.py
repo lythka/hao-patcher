@@ -688,7 +688,7 @@ def partition(host, disk, boot_size_mb, expect=None):
     host.run(admin + ['diskutil', 'unmountDisk', 'force', '/dev/' + disk], check=False)
     host.run(admin + ['diskutil', 'partitionDisk', '/dev/' + disk, 'GPT',
                       'MS-DOS', BOOT_NAME, '%dM' % boot_size_mb, 'JHFS+', KIT_NAME, 'R'], timeout=1200)
-    parts = mounted_parts(host, disk, 'after partitioning %s' % disk)
+    parts = mounted_parts(host, disk, 'after partitioning %s' % disk, admin)
     if admin:
         # made by root: HAO is handed to the user running hao, who writes everything else on the drive
         for name, part in parts.items():
@@ -729,15 +729,18 @@ def check_mounts(host, disk, parts):
             raise StickError('%s (%s) is no longer /dev/%s on the USB drive: was it unplugged?' % (mount, name, dev))
 
 
-def mounted_parts(host, disk, when=None):
-    """DISK's EFI, HAOBOOT and HAO partitions, each mounted: {name: (device, mount point)}."""
+def mounted_parts(host, disk, when=None, admin=None):
+    """DISK's EFI, HAOBOOT and HAO partitions, each mounted: {name: (device, mount point)}. A partition that is not
+    mounted is mounted through ADMIN (as_admin's prefix, found from DISK when not given): macOS mounts an EFI
+    partition only for root, and the erase leaves it unmounted."""
+    admin = as_admin(host, disk) if admin is None else admin
     found = {}
     for part in _plist(host, 'diskutil', 'list', '-plist', disk).get('AllDisksAndPartitions', [{}])[0].get('Partitions', []):
         name = 'EFI' if part.get('Content') == 'EFI' else part.get('VolumeName')
         if name in ('EFI', BOOT_NAME, KIT_NAME):
             info = _plist(host, 'diskutil', 'info', '-plist', part['DeviceIdentifier'])
             if not info.get('MountPoint'):
-                host.run(['diskutil', 'mount', part['DeviceIdentifier']])
+                host.run(admin + ['diskutil', 'mount', part['DeviceIdentifier']])
                 info = _plist(host, 'diskutil', 'info', '-plist', part['DeviceIdentifier'])
             found[name] = (part['DeviceIdentifier'], info.get('MountPoint'), info.get('VolumeUUID') or info.get('DiskUUID'))
     missing = [n for n in ('EFI', BOOT_NAME, KIT_NAME) if not (found.get(n) or (None, None))[1]]

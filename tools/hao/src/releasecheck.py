@@ -337,6 +337,10 @@ def download(tag, opener, beside=None, dest=None, keys=None):
     for name in ('SHA256SUMS', 'SHA256SUMS.sig'):
         get(lay['source'], tag, name, dest / 'source')
     rel_bytes, _ = signed(dest, 'release.json', keys, tag) if keys is not None else (None, None)
+    if rel_bytes is None and (dest / 'release.json').is_file() and not (dest / 'release.json.sig').exists():
+        # an unsigned release (owner waiver): release.json is checked against the assets release's SHA256SUMS, so
+        # that list is fetched by the name release.json claims; nothing in release.json is used before it matches
+        rel_bytes = (dest / 'release.json').read_bytes()
     try:                                       # the assets release is found by the verified release.json only
         name = json.loads(rel_bytes).get('release') if rel_bytes is not None else None
     except (ValueError, AttributeError):
