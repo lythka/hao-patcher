@@ -9,7 +9,7 @@ A file made on the target lists what it is made *after* there. A *seed* file is 
 changes after install (`"content": "seed"` with a `"reason"`): `hao verify` checks it is there with its
 attributes, not its bytes.
 
-62 of 65 patches declare their files so far.
+62 of 64 patches declare their files so far.
 
 ## darwin27-kernel
 
@@ -811,4 +811,4 @@ Revision r5, status product. [Recipe](../patches/rec-wifi-autojoin/README.md)
 
 ## Not declared yet
 
-opencore-generic, opencore-mbp121, opencore-mbp92
+opencore-generic, opencore-mbp92

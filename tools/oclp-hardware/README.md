@@ -48,26 +48,11 @@ their file operations in order. `lib/` holds OCLP's own volume and file-operatio
 code, ported with local imports (`provenance.json` names the upstream files and
 their hashes). Another model or support package needs its own reviewed profile.
 
-`profile.py` makes a profile from OCLP's own patch-set detection on the target's
-`oclp_hardware_profile` (`pipeline/targets/NAME.json`), run with the kit's Python and
-site packages; nothing is typed by hand. It reproduces `profiles/mbp92.json` byte for
-byte; `profiles/mbp121.json` (MacBookPro12,1) was made with it. `make build` still reads
-`profiles/mbp92.json` only: a 12,1 overlay needs its own artifact and row.
-
-```sh
-python3.12 -I tools/oclp-hardware/profile.py --source OCLP_SOURCE --site SITE \
-  --target pipeline/targets/mbp121.json --like tools/oclp-hardware/profiles/mbp92.json \
-  tools/oclp-hardware/profiles/mbp121.json
-```
-
 ## Verify
 
 ```sh
 python3.14 -I -B -m unittest discover -s tools/oclp-hardware/tests
 ```
-
-With `OCLP_SOURCE`, `OCLP_SITE` and `OCLP_PYTHON` set, `tests/test_profile.py` also
-regenerates every profile from its target and compares the bytes.
 
 The fixtures cover input hashes, file semantics, application order and use of the
 standalone installer.

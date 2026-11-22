@@ -59,7 +59,6 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | metal-metalold | r4 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r4 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces |
 | metalold-selectors | r10 | oclp-hook | product |  | x | x |  |  | ok | r10 2026-11-18 Row metalold_selectors hashes and publishes only libmetalold-selectors.dylib (`# hash: release- |
 | opencore-generic | r6 | post | experiment |  |  |  |  |  | **needs** | r6 2026-11-18 Test only: hao-opencore knows the generic config from the generic target's `platform_data` (`ope |
-| opencore-mbp121 | r1 | post | experiment |  |  |  |  |  | **needs** | r1 2026-11-17 New: CryptexFixup for the MacBookPro12,1, which OCLP leaves out on AVX2 CPUs. |
 | opencore-mbp92 | r6 | post | product |  | x | x |  |  | ok (r5) | r6 2026-11-19 Validated r5 on hardware (Validation). Nothing it installs changes. |
 | rec-audio | r5 | recovery | product |  |  |  | x |  | **needs** | r5 2026-11-17 Every path in apply.sh is quoted: an install runs recipe scripts from the installer volume, whos |
 | rec-bluetooth-input | r5 | recovery | product |  |  |  | x |  | **needs** | r5 2026-11-17 Every path in apply.sh is quoted: an install runs recipe scripts from the installer volume, whos |
