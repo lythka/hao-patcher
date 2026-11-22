@@ -1,0 +1,7 @@
+Lane plug-ins for tools/hao-check (bench's image check, gates v0.0.1; pm item bench/20261117-1358).
+One POSIX sh file per lane area, named LANE-AREA.sh (e.g. runtime-swift.sh, metal-render.sh, patcher-kexts.sh,
+diag-regressions.sh). Each runs on the laptop's dev image as root over SSH with OUT (a folder for evidence), CUSER and CUID
+(the console user) set, bounded (no hangs), and prints one line per check:
+    HAOCHECK CHECK <name> <PASS|FAIL|SKIP> <detail> [issue=#N]
+A check that names its issue (issue=#N) is that issue's regression check. No persistent changes; no secrets.
+Add yours by a commit to tools/hao-accept/hao-check.d/checks in this repository.

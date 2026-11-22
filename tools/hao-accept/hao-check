@@ -1,0 +1,355 @@
+#!/usr/bin/env python3.14
+"""hao-check: the image check of a candidate's dev image on a bench laptop, hands-free, one table per candidate.
+
+    tools/hao-check run --laptop NAME --out DIR [--source CUT] [--app-wait S] [--apps-only | --no-apps]
+                        [--no-sleep-wake] [--only REGEX]
+    tools/hao-check report DIR
+
+Owner 2026-11-17: "We need an automated image check for all apps and behaviors that will likely break" (gates v0.0.1;
+pm item bench/20261117-1358, ROBUSTNESS IMG1). The laptop runs the candidate's dev image (root SSH, the console user
+logged in: bench's push routine). Steps, each a row of DIR/result.md and DIR/result.json:
+  1. preflight: macOS (not the Recovery) answers root SSH, a console user is logged in; hao-lock taken.
+  2. apps: every app of /System/Applications, its Utilities and /Applications (minus EXCLUDE), one at a time, opened in
+     the console user's session; `laptop-perf windows` polled for an on-screen window of its process (the launch time is
+     the first one, recorded as time_to_window_s), within --app-wait s (45), the process still running --app-hold s (10)
+     after it, no new crash report for it (DiagnosticReports diffed
+     before and after), then quit (SIGTERM, then SIGKILL). Rows: app:NAME. Before them the app-load-gate row waits for
+     load1 < --quiet-load (4) for at most --quiet-max s (1200; pm 2026-11-18: the 15 s rows measured first-login load).
+  3. behaviours: hao-check.d/behaviours.sh (Wi-Fi, Bluetooth, sound, camera, Metal, Spotlight, network, Terminal shell,
+     AOT, hao verify, FileVault, timings, Control Center and Dock, crashes since boot) and every lane's plug-in
+     hao-check.d/checks/*.sh, run as root with OUT, CUSER and CUID set; each prints
+     "HAOCHECK CHECK name PASS|FAIL|SKIP detail [issue=#N]".
+  4. sleep-wake, last (diag #79): an RTC wake in 90 s and `pmset sleepnow`; PASS when root SSH answers again within
+     5 min with no new panic report. A laptop that does not come back gets a Wake-on-LAN (the NetBoot daemon's WAKE).
+Every laptop command is bounded. Nothing is installed into the image except laptop-perf's probe (its own install step).
+"""
+import argparse, datetime, json, os, re, shlex, subprocess, sys, time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+D = HERE / 'hao-check.d'
+TOP = HERE.parents[1]                                    # the hao-patcher checkout
+TOOLS = Path(os.environ.get('HAO_LAPTOP_TOOLS', '/nonexistent/laptop-tools')).expanduser()
+LAPTOP_SSH = Path(os.environ.get('HAO_LAPTOP_SSH', '/nonexistent/laptop-shell'))
+LAPTOP_GUI = Path(os.environ.get('HAO_LAPTOP_GUI', '/nonexistent/gui-helper'))
+LAPTOP_PERF = TOOLS / 'laptop-perf'
+HAO_LOCK = Path(os.environ.get('HAO_LOCK_TOOL', 'hao-lock')).expanduser()
+NETBOOT_WAKE = Path(os.environ.get('HAO_NETBOOT_WAKE', '/nonexistent/netboot-wake')).expanduser()
+EXCLUDE = re.compile(r'^(Migration Assistant|Boot Camp Assistant|Install macOS.*|Geekbench.*)\.app$')
+REPORT_DIRS = '/Library/Logs/DiagnosticReports /Users/{u}/Library/Logs/DiagnosticReports'
+
+
+def stamp():
+    return datetime.datetime.now().strftime('%H:%M:%S')
+
+
+class Check:
+    def __init__(self, out):
+        self.out = out
+        self.rows = []
+        self.log = open(out / 'hao-check.log', 'a')
+
+    def say(self, text):
+        line = '%s %s' % (stamp(), text)
+        print(line, flush=True)
+        self.log.write(line + '\n'); self.log.flush()
+
+    def row(self, name, result, detail='', issue='', **metric):
+        self.rows.append(dict(name=name, result=result, detail=detail, issue=issue, **metric))
+        self.say('CHECK %s %s %s%s' % (name, result, detail, (' issue=' + issue) if issue else ''))
+
+
+def ssh(a, cmd, t=60, stdin=None):
+    env = dict(os.environ, LAPTOP_NAME=a.laptop)
+    try:
+        r = subprocess.run([str(LAPTOP_SSH), '-t', str(t), '--', cmd], capture_output=True, env=env,
+                           input=stdin if stdin is not None else b'', timeout=t + 30)
+    except subprocess.TimeoutExpired:
+        return 124, ''
+    return r.returncode, (r.stdout + r.stderr).decode('utf-8', 'replace')
+
+
+def windows(a):
+    """[(pid, process, layer)] of the on-screen windows (laptop-perf windows; its probe runs in the console session)."""
+    env = dict(os.environ, LAPTOP_NAME=a.laptop, HAO_PERF_WHO='bench', OUT=str(a.out_dir / 'windows-last.tsv'))
+    try:
+        r = subprocess.run([str(LAPTOP_PERF), 'windows'], capture_output=True, text=True, env=env, timeout=90)
+    except subprocess.TimeoutExpired:
+        return None
+    rows = []
+    for line in r.stdout.splitlines():
+        f = line.split('\t')
+        if len(f) >= 5 and f[1].isdigit():
+            rows.append((int(f[1]), f[2], f[4]))
+    return rows
+
+
+def reports(a, user):
+    rc, o = ssh(a, 'ls -1 %s 2>/dev/null' % REPORT_DIRS.format(u=user), t=30)
+    return {l.strip() for l in o.splitlines() if l.strip().endswith(('.ips', '.panic', '.crash'))}
+
+
+class LockLost(SystemExit):
+    pass
+
+
+def lock_guard(a, C, where):
+    """pm 2026-11-18 (a running hao-check kept driving laptop 1 after pm took its lock): before every stage, app and
+    script, stop unless hao-lock shows the laptop held by bench (or free when this run took no lock: never)."""
+    st = subprocess.run([str(HAO_LOCK), 'status'], capture_output=True, text=True).stdout
+    for line in st.splitlines():
+        f = line.split()
+        if len(f) >= 3 and f[0] == a.laptop:
+            if f[1] == 'held' and f[2] == 'bench':
+                return
+            C.row('lock-guard', 'FAIL', 'stopped before %s: %s is %s by %s' % (where, a.laptop, f[1], f[2] if f[1] == 'held' else '-'))
+            raise LockLost('hao-check: %s not held by bench (before %s); stopped' % (a.laptop, where))
+    C.row('lock-guard', 'FAIL', 'stopped before %s: %s not in hao-lock status' % (where, a.laptop))
+    raise LockLost('hao-check: no lock row for %s; stopped' % a.laptop)
+
+
+def crash_free_boot(a, C):
+    """CB1 (owner 2026-11-18): crash reports and jobs spawned > 5 times in 5 min, from boot until the login settled."""
+    rc, o = ssh(a, 'OUT=/private/var/tmp/hao-check/out /bin/sh -s', t=300, stdin=(D / 'crash-free-boot.sh').read_bytes())
+    entries = []
+    for line in o.splitlines():
+        f = line.split(' ', 5)
+        if line.startswith('HAOCHECK CB1 ') and len(f) >= 5:
+            entries.append(dict(process=f[2], count=f[3], kind=f[4], reason=f[5] if len(f) > 5 else ''))
+        elif line.startswith('HAOCHECK CHECK crash-free-boot '):
+            res = line.split()[3]; detail = line.split(' ', 4)[4] if len(line.split(' ', 4)) > 4 else ''
+            C.row('crash-free-boot', res, detail, 'CB1', entries=entries)
+            return
+    C.row('crash-free-boot', 'FAIL', 'no result from crash-free-boot.sh (rc %s): %s' % (rc, o.strip()[-200:]), 'CB1')
+
+
+def apps(a, C, user, uid):
+    rc, o = ssh(a, 'for d in /System/Applications /System/Applications/Utilities /Applications; do '
+                   'for p in "$d"/*.app; do [ -d "$p" ] && printf "%s\\t%s\\n" "$p" '
+                   '"$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$p/Contents/Info.plist" 2>/dev/null)"; '
+                   'done; done', t=60)
+    found = [l.split('\t') for l in o.splitlines() if l.startswith('/') and '\t' in l]
+    found = [(p, e) for p, e in found if e and not EXCLUDE.match(Path(p).name)
+             and (not a.only or re.search(a.only, Path(p).name))]
+    C.say('apps: %d to open' % len(found))
+    # pm 2026-11-18: the app rows measured first-login load, not correctness (C2/C3 apps at 15-20 s under load). Wait for a
+    # quiet system first; a window within --app-wait (45 s) passes and its time is recorded as a number (perf metric).
+    t0 = time.time(); load = None
+    while True:
+        rc, o = ssh(a, 'sysctl -n vm.loadavg', t=20)
+        try:
+            load = float(o.split()[1])
+        except (IndexError, ValueError):
+            load = None
+        if (load is not None and load < a.quiet_load) or time.time() - t0 > a.quiet_max:
+            break
+        time.sleep(30)
+    C.row('app-load-gate', 'PASS' if load is not None and load < a.quiet_load else 'NOTE',
+          'load1 %s after %d s (want < %s, at most %d s)' % (load, time.time() - t0, a.quiet_load, a.quiet_max),
+          load1=load, waited_s=round(time.time() - t0))
+    crash_free_boot(a, C)
+    for path, exe in found:
+        name = Path(path).stem
+        lock_guard(a, C, 'app %s' % name)
+        before = reports(a, user)
+        t0 = time.time()
+        ssh(a, 'launchctl asuser %d sudo -u %s open -a %s' % (uid, user, shlex.quote(path)), t=30)
+        first = None; deadline = t0 + a.app_wait
+        while time.time() < deadline:
+            w = windows(a)
+            if w and any(p == exe and layer == '0' for _, p, layer in w):
+                first = round(time.time() - t0, 1)
+                break
+            time.sleep(1)
+        # still running a.app_hold s after the window (or after the limit when none came)
+        rest = (time.time() + a.app_hold) if first is not None else deadline
+        rest -= time.time()
+        if rest > 0:
+            time.sleep(rest)
+        rc, o = ssh(a, 'pgrep -x %s | head -1' % shlex.quote(exe[:15]), t=20)
+        running = rc == 0 and o.strip().isdigit()
+        new = sorted(r for r in reports(a, user) - before if exe.split()[0].lower() in r.lower() or name.split()[0].lower() in r.lower())
+        ssh(a, 'pkill -TERM -x %s; sleep 3; pkill -KILL -x %s' % (shlex.quote(exe[:15]), shlex.quote(exe[:15])), t=20)
+        ok = running and first is not None and not new
+        C.row('app:%s' % name, 'PASS' if ok else 'FAIL',
+              'window %s, %s, %s' % ('%.1f s' % first if first is not None else 'none in %d s' % a.app_wait,
+                                    'running' if running else 'EXITED', ('new reports: ' + ' '.join(new)) if new else 'no new report'),
+              time_to_window_s=first)
+        if new:
+            ssh(a, 'mkdir -p /private/var/tmp/hao-check/reports; for f in %s; do for d in %s; do [ -f "$d/$f" ] && '
+                   'cp "$d/$f" /private/var/tmp/hao-check/reports/; done; done' % (' '.join(shlex.quote(n) for n in new),
+                                                                                    REPORT_DIRS.format(u=user)), t=30)
+
+
+def payloads(a, C):
+    """Copy the lanes' kits (hao-check.d/payloads.tsv) to the laptop; verify each folder's SHA256SUMS there."""
+    f = D / 'payloads.tsv'
+    if not f.exists():
+        return
+    for line in f.read_text().splitlines():
+        if not line.strip() or line.startswith('#'):
+            continue
+        src, dst = [x.strip() for x in line.split('\t')[:2]]
+        src = Path(src).expanduser()
+        src = src if src.is_absolute() else TOP / src     # store/... is the checkout's store link
+        if not src.is_dir():
+            C.row('payload:%s' % src.name, 'FAIL', 'missing on the host: %s' % src); continue
+        tar = subprocess.run(['tar', '-C', str(src), '-cf', '-', '.'], capture_output=True).stdout
+        rc, o = ssh(a, 'rm -rf %s && mkdir -p %s && tar -C %s -xf - && chmod -R a+rX %s && cd %s && '
+                       'if [ -f SHA256SUMS ]; then bad=0; while read -r h n; do [ "$(/sbin/sha256 -q "$n")" = "$h" ] || bad=$((bad+1)); '
+                       'done < SHA256SUMS; echo "SUMS-BAD $bad"; else echo "SUMS-NONE"; fi'
+                    % ((shlex.quote(dst),) * 5), t=120, stdin=tar)
+        ok = rc == 0 and ('SUMS-BAD 0' in o or 'SUMS-NONE' in o)
+        C.row('payload:%s' % src.name, 'PASS' if ok else 'FAIL', '%s -> %s (%s)' % (src.name, dst, o.strip().splitlines()[-1:] or rc))
+
+
+def behaviours(a, C, user, uid):
+    scripts = [D / 'behaviours.sh'] + (sorted((D / 'checks').glob('*.sh')) if (D / 'checks').is_dir() else [])
+    for s in scripts:
+        if not s.exists():
+            C.row('script:%s' % s.name, 'SKIP', 'not present'); continue
+        lock_guard(a, C, s.name)
+        C.say('running %s' % s.name)
+        rc, o = ssh(a, 'mkdir -p /private/var/tmp/hao-check/out && OUT=/private/var/tmp/hao-check/out CUSER=%s CUID=%d '
+                       'KIT=/var/tmp/hao-check/kit-fma /bin/sh -s' % (user, uid), t=900, stdin=s.read_bytes())
+        (a.out_dir / ('%s.txt' % s.stem)).write_text(o)
+        n = 0
+        for line in o.splitlines():
+            g = re.match(r'HAOCHECK CHECK (\S+) (PASS|FAIL|SKIP) ?(.*?)(?: issue=(#\d+))?\s*$', line)
+            if g:
+                C.row(g[1], g[2], g[3], g[4] or ''); n += 1
+        if n == 0:
+            C.row('script:%s' % s.name, 'FAIL', 'no CHECK lines (rc %d): %s' % (rc, o.strip()[-200:]))
+
+
+def sleep_wake(a, C, user):
+    before = reports(a, user)
+    rc, o = ssh(a, 'pmset relative wake 90 && (sleep 2; pmset sleepnow) > /dev/null 2>&1 < /dev/null &', t=20)
+    C.say('sleep-wake: RTC wake in 90 s, sleeping now (rc %d)' % rc)
+    time.sleep(30)
+    t0 = time.time(); back = None; woke = False
+    while time.time() - t0 < 300:
+        rc, o = ssh(a, 'echo UP', t=15)
+        if rc == 0 and 'UP' in o:
+            back = round(time.time() - t0 + 30); break
+        if not woke and time.time() - t0 > 150:
+            NETBOOT_WAKE.touch(); woke = True
+            C.say('sleep-wake: no answer at +180 s; Wake-on-LAN sent')
+        time.sleep(10)
+    if back is None:
+        C.row('sleep-wake', 'FAIL', 'no SSH answer within 330 s after sleepnow (Wake-on-LAN sent at +180 s)', '#79')
+        return
+    new = sorted(reports(a, user) - before)
+    rc, o = ssh(a, 'pmset -g log | grep -E " (Sleep|Wake|DarkWake) " | tail -4', t=60)
+    (a.out_dir / 'sleep-wake.txt').write_text(o)
+    panics = [r for r in new if r.endswith('.panic') or 'panic' in r.lower()]
+    C.row('sleep-wake', 'FAIL' if panics else 'PASS', 'back after %s s%s; %s' % (
+        back, ' (after Wake-on-LAN)' if woke else '', ('new: ' + ' '.join(new)) if new else 'no new report'), '#79')
+
+
+def run(a):
+    out = Path(a.out).expanduser().resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    a.out_dir = out
+    C = Check(out)
+    t_all = time.time()
+    meta = dict(tool='hao-check', date=datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
+                laptop=a.laptop, source=a.source)
+    rc, o = ssh(a, '[ -e /System/Library/CoreServices/Finder.app ] && echo MACOS || echo RECOVERY; '
+                   'stat -f "%Su %u" /dev/console; sw_vers -buildVersion', t=30)
+    g = re.search(r'^MACOS\s*\n(\S+) (\d+)\s*\n(\S+)', o, re.M)
+    if rc != 0 or not g or g[1] == 'root':
+        C.row('preflight', 'FAIL', 'need the dev image with a console user logged in: %s' % o.strip()[:120])
+        return finish(C, meta, t_all)
+    user, uid, build = g[1], int(g[2]), g[3]
+    meta.update(user=user, build=build)
+    if not a.lock_held:
+        r = subprocess.run([str(HAO_LOCK), 'take', a.laptop, '--who', 'bench', '--why', 'hao-check %s' % (a.source or ''),
+                            '--hours', '2', '--wait', '30'], capture_output=True, text=True)
+        C.say('hao-lock: rc %d %s' % (r.returncode, (r.stdout + r.stderr).strip()))
+        if r.returncode != 0:
+            raise SystemExit('hao-lock refused')
+    try:
+        lock_guard(a, C, 'the first stage')
+        C.row('preflight', 'PASS', 'dev image %s, console user %s (%d)' % (build, user, uid))
+        # The GUI helper (bench's post-push routine) for the plug-ins' GUI checks (diag's R8, R10, R29 ...): best effort.
+        try:
+            g = subprocess.run([str(LAPTOP_GUI), 'install'], env=dict(os.environ, LAPTOP_NAME=a.laptop),
+                               capture_output=True, text=True, timeout=600)
+            C.row('gui-helper', 'PASS' if g.returncode == 0 else 'FAIL', 'GUI helper install rc %d %s'
+                  % (g.returncode, (g.stdout + g.stderr).strip().splitlines()[-1:] or ''))
+        except subprocess.TimeoutExpired:
+            C.row('gui-helper', 'FAIL', 'GUI helper install did not finish in 600 s')
+        if not a.no_apps:
+            subprocess.run([str(LAPTOP_PERF), 'install'], env=dict(os.environ, LAPTOP_NAME=a.laptop, HAO_PERF_WHO='bench'),
+                           capture_output=True, timeout=300)
+            apps(a, C, user, uid)
+        if not a.apps_only:
+            payloads(a, C)
+            behaviours(a, C, user, uid)
+            if not a.no_sleep_wake:
+                lock_guard(a, C, 'sleep-wake')
+                sleep_wake(a, C, user)
+        env = dict(os.environ, LAPTOP_NAME=a.laptop)
+        r = subprocess.run([str(LAPTOP_SSH), '-t', '120', '--', 'cd /private/var/tmp/hao-check 2>/dev/null && tar -cf - out reports 2>/dev/null'],
+                           capture_output=True, env=env, timeout=180)
+        if r.stdout:
+            (out / 'laptop').mkdir(exist_ok=True)
+            subprocess.run(['tar', '-xf', '-', '-C', str(out / 'laptop')], input=r.stdout)
+    finally:
+        if not a.lock_held:
+            r = subprocess.run([str(HAO_LOCK), 'release', a.laptop, '--who', 'bench', '--state',
+                                'hao-check done; the dev image as before (apps quit)'], capture_output=True, text=True)
+            C.say('hao-lock release: rc %d' % r.returncode)
+    return finish(C, meta, t_all)
+
+
+def finish(C, meta, t_all):
+    meta['seconds'] = round(time.time() - t_all)
+    counts = {k: sum(1 for r in C.rows if r['result'] == k) for k in ('PASS', 'FAIL', 'SKIP')}
+    res = dict(meta, result='PASS' if counts['FAIL'] == 0 and C.rows else 'FAIL', counts=counts, rows=C.rows)
+    (C.out / 'result.json').write_text(json.dumps(res, indent=1) + '\n')
+    (C.out / 'result.md').write_text(markdown(res))
+    print(markdown(res))
+    return 0 if res['result'] == 'PASS' else 1
+
+
+def markdown(res):
+    L = ['# hao-check %s' % res['result'], '',
+         'Date %s; laptop %s; source %s; build %s; %d PASS, %d FAIL, %d SKIP; %s s.' % (
+             res['date'], res.get('laptop'), res.get('source'), res.get('build'), res['counts']['PASS'],
+             res['counts']['FAIL'], res['counts']['SKIP'], res.get('seconds')), '',
+         '| check | result | detail | issue |', '|---|---|---|---|']
+    for r in sorted(res['rows'], key=lambda r: (r['result'] != 'FAIL', r['name'])):
+        L.append('| %s | %s | %s | %s |' % (r['name'], '**FAIL**' if r['result'] == 'FAIL' else r['result'],
+                                             r['detail'].replace('|', '/'), r['issue']))
+    return '\n'.join(L) + '\n'
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    sub = p.add_subparsers(dest='op', required=True)
+    r = sub.add_parser('run')
+    r.add_argument('--laptop', default='laptop2')
+    r.add_argument('--out', required=True)
+    r.add_argument('--source', help='the candidate cut (recorded)')
+    r.add_argument('--app-wait', type=int, default=45, help='seconds an app gets to show its first window (pm 2026-11-18: 45)')
+    r.add_argument('--app-hold', type=int, default=10, help='seconds after the window the app must still be running')
+    r.add_argument('--quiet-load', type=float, default=4.0, help='before the app rows, wait until load1 is under this')
+    r.add_argument('--quiet-max', type=int, default=1200, help='... but at most this many seconds (then a NOTE row)')
+    r.add_argument('--apps-only', action='store_true')
+    r.add_argument('--no-apps', action='store_true')
+    r.add_argument('--no-sleep-wake', action='store_true')
+    r.add_argument('--only', help='apps whose name matches this regex')
+    r.add_argument('--lock-held', action='store_true', help='the caller (hao-accept laptop --then-check) holds the laptop lock')
+    s = sub.add_parser('report')
+    s.add_argument('dir')
+    a = p.parse_args()
+    if a.op == 'report':
+        print(markdown(json.loads((Path(a.dir) / 'result.json').read_text())))
+        return 0
+    return run(a)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -1,0 +1,1276 @@
+#!/usr/bin/env python3.14
+"""hao-accept: the acceptance run of a hao build, in QEMU, by someone who did not write the installer.
+
+    tools/hao-accept run --hao PATH/hao --out DIR [--source COMMIT] [--stick IMG] [--esp DIR] [--break-setid PATH]
+    tools/hao-accept report DIR          print DIR/result.md again
+
+Steps (each timed, each a pass/fail line in DIR/result.json and DIR/result.md):
+  1. the USB installer: `hao create-installer --image DIR/stick.img --model MacBookPro9,2` with the given hao (the
+     released command; --image instead of a USB drive), or --stick IMG to reuse one;
+  2. QEMU run 1 (qemu-vm, x86_64 TCG): the installer's Recovery from the stick, an empty 90 GB internal disk and the
+     test disk HAOACCEPT. hao-accept types one command into the Recovery's Terminal (QMP keys); recovery.sh installs
+     with the installer's own `install`, checks set-ID modes, `hao verify`, the documented `report` command and
+     `fsck_apfs -n`, and writes a TEST-ONLY first-boot job into the installed Data volume (never on the stick);
+  3. QEMU run 2: the installed disk alone (plus HAOACCEPT); the job measures WindowServer and loginwindow, checks a
+     login shell, su -l and sudo, removes itself and its test user, and powers off;
+  4. the fenced commands of docs/install.md that run on a host (`hao report`), in DIR/docs.
+Result lines come from the guests' serial console ("HAOACCEPT CHECK name PASS|FAIL detail"). The run passes only when
+every expected check is present and passes. --break-setid usr/bin/su is the demo of a failing run.
+
+    tools/hao-accept laptop --stick IMG --out DIR [--laptop laptop2] [--stick-sha256 H] [--source C] [--dry-run]
+
+The laptop mode runs the same guest scripts on a real MacBookPro9,2, hands-free, from its NetBoot Recovery over root SSH
+(the laptop shell, $HAO_LAPTOP_SSH): it takes the test-machine lock, writes the stick image raw to the laptop's one USB drive and hashes it read back,
+runs recovery.sh from the Recovery's RAM disk (the installer's own install, set-ID, hao verify, report, fsck; no
+power-off), puts NetBoot back as the firmware default (the install blesses its own disk), boots the installed disk once
+(bless --nextonly), and reads the first boot's results from the installed Data volume when the laptop is back in its
+Recovery: on a laptop the first-boot job restarts instead of powering off, with a 40 min watchdog. It needs the laptop
+in its NetBoot Recovery with NetBoot as the default and a USB drive as large as the image; --dry-run checks just that.
+It does not cover the stick's own OpenCore and Recovery on the firmware (the owner's boot from the stick does).
+The installed release replaces the laptop's dev image; the lock is released with that state.
+
+QEMU boots the stick through the QEMU OpenCore ESP (qemu_esp_hao), not the stick's own MacBookPro9,2 OpenCore: a
+QEMU run proves the installer and the installed system, not the target's firmware path (that is the laptop's job).
+Needs ~140 GB free (sparse disks; hao-disk check is run first).
+"""
+import argparse, datetime, hashlib, json, math, os, re, shlex, shutil, socket, subprocess, sys, time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+GUEST = HERE / 'hao-accept.d'
+TOP = HERE.parents[1]                                    # the hao-patcher checkout
+QEMU_VM = Path(os.environ.get('HAO_QEMU_VM', TOP / 'tools/qemu-vm/qemu-vm')).expanduser()
+QEMU_IMG = '/opt/homebrew/bin/qemu-img'
+PY = 'python3.14'
+DEFAULT_ESP = Path(os.environ.get('HAO_QEMU_ESP', TOP / 'store/artifacts/qemu-esp-26B131-bootstrap')).expanduser()
+# bench tools outside this repository: named by environment variables on the bench Mac
+HAO_DISK = Path(os.environ.get('HAO_DISK_TOOL', 'hao-disk')).expanduser()
+EXPECTED = ['install', 'volumes', 'setid:usr/bin/login', 'setid:usr/bin/sudo', 'setid:usr/bin/su', 'setid:all',
+            'hao-verify', 'docs:/Volumes/HAO/report', 'fsck', 'boot', 'loginwindow', 'live-setid:/usr/bin/login',
+            'live-setid:/usr/bin/sudo', 'live-setid:/usr/bin/su', 'user', 'login-shell', 'su-login', 'sudo-root',
+            'sudo-user', 'cleanup', 'docs:hao report --output report.txt']
+EXPECTED_RUN = None
+RECOVERY_CMD = 'script -q -t 1 /dev/console sh /Volumes/HAOACCEPT/recovery.sh'
+
+
+def stamp():
+    return datetime.datetime.now().strftime('%H:%M:%S')
+
+
+class Run:
+    def __init__(self, out):
+        self.out = out
+        self.steps, self.times, self.notes = [], {}, []
+        self.log = open(out / 'hao-accept.log', 'a')
+
+    def say(self, text):
+        line = '%s %s' % (stamp(), text)
+        print(line, flush=True)
+        self.log.write(line + '\n'); self.log.flush()
+
+    def check(self, name, ok, detail='', where='host'):
+        self.steps.append(dict(name=name, ok=ok, detail=detail, where=where))
+        self.say('CHECK %s %s %s' % (name, 'PASS' if ok else 'FAIL', detail))
+
+
+# --- QMP --------------------------------------------------------------------------------------------------------
+KEYS = {' ': 'spc', '\n': 'ret', '-': 'minus', '=': 'equal', '/': 'slash', '.': 'dot', ',': 'comma', ';': 'semicolon',
+        "'": 'apostrophe', '\\': 'backslash', '[': 'bracket_left', ']': 'bracket_right', '`': 'grave_accent'}
+SHIFTED = {'_': 'minus', '+': 'equal', '?': 'slash', '>': 'dot', '<': 'comma', ':': 'semicolon', '"': 'apostrophe',
+           '|': 'backslash', '{': 'bracket_left', '}': 'bracket_right', '~': 'grave_accent', '!': '1', '@': '2',
+           '#': '3', '$': '4', '%': '5', '^': '6', '&': '7', '*': '8', '(': '9', ')': '0'}
+
+
+class QMP:
+    def __init__(self, path):
+        self.s = socket.socket(socket.AF_UNIX)
+        self.s.settimeout(30)
+        self.s.connect(str(path))
+        self.f = self.s.makefile('rwb', buffering=0)
+        self._read()
+        self.cmd('qmp_capabilities')
+
+    def _read(self):
+        while True:
+            m = json.loads(self.f.readline())
+            if 'event' not in m:
+                return m
+
+    def cmd(self, name, args=None):
+        self.f.write(json.dumps({'execute': name, **({'arguments': args} if args else {})}).encode() + b'\n')
+        r = self._read()
+        if 'error' in r:
+            raise RuntimeError('%s: %s' % (name, r['error']))
+        return r.get('return')
+
+    def keys(self, *qcodes):
+        self.cmd('send-key', {'keys': [{'type': 'qcode', 'data': k} for k in qcodes], 'hold-time': 60})
+        time.sleep(0.08)
+
+    def type(self, text):
+        for ch in text:
+            if ch.isalpha() and ch.isupper():
+                self.keys('shift', ch.lower())
+            elif ch.isalnum():
+                self.keys(ch)
+            elif ch in KEYS:
+                self.keys(KEYS[ch])
+            elif ch in SHIFTED:
+                self.keys('shift', SHIFTED[ch])
+            else:
+                raise ValueError('cannot type %r' % ch)
+
+    def shot(self, path):
+        ppm = path.with_suffix('.ppm')
+        self.cmd('screendump', {'filename': str(ppm)})
+        time.sleep(0.5)
+        subprocess.run(['sips', '-s', 'format', 'png', str(ppm), '--out', str(path)], capture_output=True)
+        ppm.unlink(missing_ok=True)
+
+
+# --- helpers ----------------------------------------------------------------------------------------------------
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for b in iter(lambda: f.read(1 << 22), b''):
+            h.update(b)
+    return h.hexdigest()
+
+
+def serial_lines(run):
+    p = run / 'serial.log'
+    if not p.exists():
+        return []
+    return p.read_bytes().decode('utf-8', 'replace').splitlines()
+
+
+def marks(run):
+    """HAOACCEPT lines of a qemu-vm run folder's serial log, without the console's prefixes."""
+    out = []
+    for line in serial_lines(run):
+        i = line.find('HAOACCEPT ')
+        if i >= 0:
+            m = line[i + len('HAOACCEPT '):].strip()
+            if m not in out:
+                out.append(m)
+    return out
+
+
+def qemu_alive(run):
+    r = subprocess.run(['pgrep', '-f', 'qemu-system-x86_64.*%s/' % re.escape(str(run))], capture_output=True)
+    return r.returncode == 0
+
+
+def free_port():
+    """A free local port for qemu-vm's SSH forward (unused here; another VM may hold the default)."""
+    with socket.socket() as s:
+        s.bind(('127.0.0.1', 0))
+        return s.getsockname()[1]
+
+
+def start_vm(R, name, image, esp, usb, memory):
+    run = R.out / name
+    cmd = [PY, '-B', '-I', str(QEMU_VM), 'start', '--image', str(image), '--esp', str(esp), '--out', str(run), '--name', name,
+           '--memory', memory, '--ssh-port', str(free_port())] + sum([['--usb-disk', str(u)] for u in usb], [])
+    R.say('start %s: %s' % (name, ' '.join(cmd)))
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    (R.out / ('%s-start.txt' % name)).write_text(r.stdout + r.stderr)
+    if r.returncode != 0:
+        raise SystemExit('qemu-vm start %s failed (rc %d): %s' % (name, r.returncode, (r.stdout + r.stderr)[-800:]))
+    started = json.loads((run / 'started.json').read_text())
+    return run, QMP(Path(started['sockets']) / 'qmp.sock')
+
+
+def stop_vm(R, run):
+    r = subprocess.run([PY, '-B', '-I', str(QEMU_VM), 'stop', str(run)], capture_output=True, text=True)
+    R.say('stop %s: rc %d %s' % (run.name, r.returncode, (r.stdout + r.stderr).strip()[-300:]))
+
+
+def wait_kernel(R, run, qmp, shots, label, tries=4):
+    """Past the OpenCore picker: wait for the kernel banner on serial; on a picker that did not boot, choose again:
+    entry 2 first (the stick's "(dmg)" entry; entry 1 stops with "Already started"), then 1, 3, 4."""
+    t0 = time.time()
+    for n in range(tries):
+        deadline = time.time() + 150
+        while time.time() < deadline:
+            if any('Darwin Kernel Version' in l for l in serial_lines(run)):
+                R.say('%s: kernel after %.0f s' % (label, time.time() - t0))
+                return time.time()
+            time.sleep(5)
+        qmp.shot(shots / ('%s-picker-%d.png' % (label, n)))
+        downs = [1, 0, 2, 3][n % 4]
+        R.say('%s: no kernel yet, choosing picker entry %d' % (label, downs + 1))
+        qmp.keys('home')
+        for _ in range(downs):
+            qmp.keys('down')
+        qmp.keys('ret')
+    raise SystemExit('%s: no kernel after %d picker tries; screenshots in %s' % (label, tries, shots))
+
+
+def wait_mark(R, run, qmp, prefix, timeout, shots, label):
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        for m in marks(run):
+            if m.startswith(prefix):
+                return m
+        if not qemu_alive(run):
+            return None
+        time.sleep(10)
+    qmp.shot(shots / ('%s-timeout.png' % label))
+    return None
+
+
+def wait_exit(run, timeout):
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        if not qemu_alive(run):
+            return True
+        time.sleep(5)
+    return False
+
+
+def run_esp(R, esp):
+    """A per-run copy of the QEMU OpenCore ESP with Misc.Security.DmgLoading Any: the stick's Recovery BaseSystem.dmg
+    is unsigned (as on the 2026-11-13 stick runs). Nothing else changes."""
+    import plistlib
+    dst = R.out / 'esp'
+    shutil.rmtree(dst, ignore_errors=True)
+    shutil.copytree(esp, dst, ignore=shutil.ignore_patterns('build.json'))
+    cfg = dst / 'EFI' / 'OC' / 'config.plist'
+    c = plistlib.loads(cfg.read_bytes())
+    old = c['Misc']['Security'].get('DmgLoading')
+    c['Misc']['Security']['DmgLoading'] = 'Any'
+    # English and the US keyboard for the Recovery: typing at the Language Chooser once picked Turkish, Polish or
+    # Croatian, whose layouts then garble the typed command (2026-11-16).
+    g = '7C436110-AB2A-4BBB-A880-FE41995C9F82'
+    c['NVRAM']['Add'].setdefault(g, {})['prev-lang:kbd'] = b'en-US:0'
+    if 'prev-lang:kbd' not in c['NVRAM']['Delete'].setdefault(g, []):
+        c['NVRAM']['Delete'][g].append('prev-lang:kbd')
+    cfg.write_bytes(plistlib.dumps(c))
+    R.say('esp: %s copied to %s, DmgLoading %s -> Any, prev-lang:kbd en-US:0' % (esp, dst, old))
+    return dst
+
+
+def platform_version():
+    return subprocess.run(['sw_vers', '-productVersion'], capture_output=True, text=True).stdout.strip() + ' ' + \
+        subprocess.run(['sw_vers', '-buildVersion'], capture_output=True, text=True).stdout.strip()
+
+
+def fat_disk(R, break_setid, make_image=True):
+    src = R.out / 'haoaccept-src'
+    shutil.rmtree(src, ignore_errors=True)
+    src.mkdir()
+    for f in ('recovery.sh', 'boot.sh', 'dev.hao.accept.plist'):
+        shutil.copy(GUEST / f, src / f)
+    # The set-ID reference: this host's stock macOS 27 (sealed system volume), "mode uid gid path" per file.
+    r = subprocess.run(['find', '/usr', '/bin', '/sbin', '/System/Library', '-xdev', '-type', 'f', '(', '-perm', '-4000',
+                        '-o', '-perm', '-2000', ')'], capture_output=True, text=True)
+    rows = []
+    for f in sorted(r.stdout.split()):
+        st = os.stat(f)
+        rows.append('%o %d %d %s' % (st.st_mode & 0o7777, st.st_uid, st.st_gid, f.lstrip('/')))
+    (src / 'setid-reference.txt').write_text('\n'.join(rows) + '\n')
+    shutil.copy(src / 'setid-reference.txt', R.out / 'setid-reference.txt')
+    R.say('set-ID reference: %d files from this host (%s)' % (len(rows), platform_version()))
+    if break_setid:
+        (src / 'BREAK-SETID').write_text(break_setid + '\n')
+    if not make_image:
+        return src
+    img = R.out / 'haoaccept.img'
+    img.unlink(missing_ok=True)
+    subprocess.run(['hdiutil', 'create', '-quiet', '-size', '64m', '-fs', 'MS-DOS', '-volname', 'HAOACCEPT', '-layout',
+                    'MBRSPUD', '-format', 'UDTO', '-srcfolder', str(src), str(R.out / 'haoaccept')], check=True)
+    (R.out / 'haoaccept.cdr').rename(img)
+    return img
+
+
+def read_fat(R, run, n, dest):
+    """Copy HAOACCEPT/out from a run's USB overlay (raw copy, attached read-only, no APFS)."""
+    raw = R.out / ('%s-haoaccept.img' % run.name)
+    subprocess.run([QEMU_IMG, 'convert', '-O', 'raw', str(run / ('usb%d.qcow2' % n)), str(raw)], check=True)
+    r = subprocess.run(['hdiutil', 'attach', '-readonly', '-nobrowse', '-noverify', '-imagekey',
+                        'diskimage-class=CRawDiskImage', '-plist', str(raw)], capture_output=True)
+    if r.returncode != 0:
+        R.say('could not attach %s: %s' % (raw, r.stderr.decode()[-200:]))
+        return raw
+    import plistlib
+    ents = plistlib.loads(r.stdout).get('system-entities', [])
+    mps = [e['mount-point'] for e in ents if e.get('mount-point')]
+    try:
+        for mp in mps:
+            if (Path(mp) / 'out').is_dir():
+                shutil.copytree(Path(mp) / 'out', dest, dirs_exist_ok=True)
+    finally:
+        dev = [e['dev-entry'] for e in ents if re.fullmatch(r'/dev/disk\d+', e.get('dev-entry', ''))]
+        for d in dev:
+            subprocess.run(['hdiutil', 'detach', d], capture_output=True)
+    return raw
+
+
+def guest_checks(R, run, where):
+    for m in marks(run):
+        g = re.match(r'CHECK (\S+) (PASS|FAIL) ?(.*)', m)
+        if g:
+            R.check(g[1], g[2] == 'PASS', g[3], where)
+        g = re.match(r'TIME (\S+) (\S+)', m)
+        if g:
+            R.times['guest:' + g[1]] = g[2]
+        if m.startswith(('SETID-DIFF', 'SETID-UNCOMPARED', 'DEMO', 'ARMED', 'TARGET', 'VOLUMES', 'INFO')):
+            R.notes.append('%s: %s' % (where, m))
+
+
+# --- the run ----------------------------------------------------------------------------------------------------
+def run(a):
+    out = Path(a.out).expanduser().resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    R = Run(out)
+    shots = out / 'screens'
+    shots.mkdir(exist_ok=True)
+    meta = dict(tool='hao-accept', revision=1, date=datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
+                source=a.source, hao=str(a.hao) if a.hao else None, esp=str(a.esp), break_setid=a.break_setid)
+    t_all = time.time()
+    if HAO_DISK.exists():
+        r = subprocess.run([str(HAO_DISK), 'check', '--need', '140', '--who', 'bench', '--what', 'hao-accept ' + out.name],
+                           capture_output=True, text=True)
+        R.say('hao-disk: rc %d %s' % (r.returncode, (r.stdout + r.stderr).strip()[-200:]))
+        if r.returncode != 0:
+            raise SystemExit('hao-disk refused')
+
+    if a.from_run2:
+        # Resume at stage 3 after a fix: run 1's records stay; its checks are read again from its serial log.
+        prev = out / 'result.json'
+        if prev.exists():
+            R.times.update(json.loads(prev.read_text()).get('times', {}))
+        meta['resumed_at_run2'] = True
+        esp, run1 = out / 'esp', out / 'run1'
+        guest_checks(R, run1, 'recovery')
+        if not (out / 'run1-haoaccept.img').exists():
+            read_fat(R, run1, 1, out / 'guest')
+        if (out / 'run2').exists():
+            n = 1
+            while (out / ('run2-prev%d' % n)).exists():
+                n += 1
+            (out / 'run2').rename(out / ('run2-prev%d' % n))
+        return boot_stage(R, a, out, esp, shots, run1, meta, t_all)
+
+    # 1. The USB installer image.
+    if a.stick:
+        stick = Path(a.stick).expanduser().resolve()
+        R.say('stick: reusing %s' % stick)
+        meta['stick_reused'] = True
+    else:
+        stick = out / 'stick.img'
+        cmd = [PY, '-B', '-I', str(a.hao), 'create-installer', '--image', str(stick), '--model', 'MacBookPro9,2'] + a.create_arg
+        R.say('create-installer: %s' % ' '.join(cmd))
+        t0 = time.time()
+        with open(out / 'create-installer.txt', 'w') as f:
+            rc = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL).returncode
+        R.times['create-installer'] = round(time.time() - t0)
+        R.check('create-installer', rc == 0 and stick.exists(), 'rc %d, %d s' % (rc, R.times['create-installer']))
+        if rc != 0 or not stick.exists():
+            return finish(R, meta, t_all)
+    meta['stick_sha256'] = sha256(stick) if not a.no_hash else None
+
+    # 2. QEMU run 1: the installer's Recovery installs onto an empty disk and checks it.
+    esp = run_esp(R, a.esp)
+    fat = fat_disk(R, a.break_setid)
+    blank = out / 'blank.img'
+    blank.unlink(missing_ok=True)
+    subprocess.run(['mkfile', '-n', '90g', str(blank)], check=True)
+    t0 = time.time()
+    run1, q = start_vm(R, 'run1', blank, esp, [stick, fat], a.memory)
+    tk = wait_kernel(R, run1, q, shots, 'run1')
+    R.times['run1:start-to-kernel'] = round(tk - t0)
+    # The Recovery: wait for the Language Chooser on serial (launchd logs it); English is preselected (prev-lang:kbd in
+    # the ESP), so only Return; typing there moves the selection. Then open Terminal (shift-cmd-T) and type the command;
+    # repeat the Terminal step until recovery.sh's BEGIN shows on serial.
+    t1 = time.time()
+    while time.time() - t1 < 1200 and not any('Language Choose' in l for l in serial_lines(run1)):
+        time.sleep(5)
+    R.times['run1:kernel-to-chooser'] = round(time.time() - tk)
+    time.sleep(45)
+    q.shot(shots / 'run1-chooser.png')
+    q.keys('ret')
+    time.sleep(30)
+    began = None
+    for n in range(8):
+        q.shot(shots / ('run1-recovery-%02d.png' % n))
+        q.keys('shift', 'meta_l', 't')
+        time.sleep(10)
+        q.type(RECOVERY_CMD + '\n')
+        deadline = time.time() + 60
+        while time.time() < deadline and not began:
+            began = next((m for m in marks(run1) if m.startswith('BEGIN recovery')), None)
+            time.sleep(5)
+        if began:
+            break
+    if not began:
+        R.check('recovery-terminal', False, 'recovery.sh never started; screenshots in %s' % shots)
+        q.shot(shots / 'run1-no-terminal.png')
+        stop_vm(R, run1)
+        return finish(R, meta, t_all)
+    R.times['run1:kernel-to-terminal'] = round(time.time() - tk)
+    R.say('run1: recovery.sh started')
+    end = wait_mark(R, run1, q, 'END recovery', a.install_timeout, shots, 'run1')
+    q.shot(shots / 'run1-end.png') if qemu_alive(run1) else None
+    R.times['run1:total'] = round(time.time() - t0)
+    if not end:
+        R.say('run1: no END recovery within %d s (install timeout); stopping it' % a.install_timeout)
+    elif not wait_exit(run1, 300):
+        R.say('run1: still running 5 min after END; stopping it')
+    stop_vm(R, run1)
+    guest_checks(R, run1, 'recovery')
+    read_fat(R, run1, 1, out / 'guest')
+    if not end or not any(s['name'] == 'install' and s['ok'] for s in R.steps):
+        return finish(R, meta, t_all)
+    return boot_stage(R, a, out, esp, shots, run1, meta, t_all)
+
+
+def boot_stage(R, a, out, esp, shots, run1, meta, t_all):
+    # 3. QEMU run 2: the installed disk boots; the first-boot job checks it and powers off.
+    installed = out / 'installed.img'
+    t0 = time.time()
+    installed.unlink(missing_ok=True)
+    subprocess.run([QEMU_IMG, 'convert', '-O', 'raw', str(run1 / 'guest.qcow2'), str(installed)], check=True)
+    R.times['convert-installed'] = round(time.time() - t0)
+    fat2 = out / 'run1-haoaccept.img'
+    t0 = time.time()
+    run2, q = start_vm(R, 'run2', installed, esp, [fat2], a.memory)
+    tk = wait_kernel(R, run2, q, shots, 'run2')
+    R.times['run2:start-to-kernel'] = round(tk - t0)
+    end = wait_mark(R, run2, q, 'END boot', a.boot_timeout, shots, 'run2')
+    try:
+        q.shot(shots / 'run2-end.png')
+    except Exception:
+        pass
+    R.times['run2:total'] = round(time.time() - t0)
+    if not end:
+        R.check('boot-job', False, 'no END boot on serial (the first-boot job did not finish)', 'boot')
+    wait_exit(run2, 300)
+    stop_vm(R, run2)
+    guest_checks(R, run2, 'boot')
+    read_fat(R, run2, 0, out / 'guest')
+    meta['note'] = 'the test-only job dev.hao.accept removed itself in the guest (check cleanup); installed.img keeps /Library/hao-accept'
+    return finish(R, meta, t_all, docs=a)
+
+
+def docs_checks(R, a):
+    """The fenced commands of docs/install.md that run on a host. The other block (git clone + create-installer
+    on a USB drive) is step 1, run with --image instead of a drive."""
+    d = R.out / 'docs'
+    d.mkdir(exist_ok=True)
+    if not a.hao:
+        R.check('docs:hao report --output report.txt', False, 'no --hao given')
+        return
+    r = subprocess.run([PY, '-B', '-I', str(a.hao), 'report', '--output', str(d / 'report.txt')], capture_output=True, text=True,
+                       stdin=subprocess.DEVNULL, timeout=600)
+    (d / 'report-cmd.txt').write_text(r.stdout + r.stderr)
+    R.check('docs:hao report --output report.txt', r.returncode == 0, 'rc %d' % r.returncode)
+
+
+def finish(R, meta, t_all, docs=None):
+    if docs is not None:
+        docs_checks(R, docs)
+    R.times['total'] = round(time.time() - t_all)
+    names = [s['name'] for s in R.steps]
+    missing = [n for n in (EXPECTED_RUN or EXPECTED) if n not in names]
+    ok = not missing and all(s['ok'] for s in R.steps)
+    res = dict(meta, result='PASS' if ok else 'FAIL', missing=missing, checks=R.steps, times=R.times, notes=R.notes)
+    (R.out / 'result.json').write_text(json.dumps(res, indent=1) + '\n')
+    (R.out / 'result.md').write_text(markdown(res))
+    print(markdown(res))
+    return 0 if ok else 1
+
+
+def markdown(res):
+    L = ['# hao-accept %s' % res['result'], '',
+         'Date %s; source %s; hao %s; stick sha256 %s%s.' % (res['date'], res.get('source'), res.get('hao'),
+                                                         res.get('stick_sha256'), ' (reused)' if res.get('stick_reused') else ''),
+         ('Demo: set-ID bit cleared on %s before the checks.' % res['break_setid']) if res.get('break_setid') else '', '',
+         '| check | where | result | detail |', '|---|---|---|---|']
+    for s in res['checks']:
+        L.append('| %s | %s | %s | %s |' % (s['name'], s['where'], 'PASS' if s['ok'] else '**FAIL**', s['detail'].replace('|', '/')))
+    for n in res['missing']:
+        L.append('| %s | - | **MISSING** | not reached |' % n)
+    L += ['', '| time | seconds |', '|---|---|'] + ['| %s | %s |' % kv for kv in res['times'].items()]
+    if res['notes']:
+        L += ['', 'Notes:'] + ['- ' + n for n in res['notes']]
+    return '\n'.join(L) + '\n'
+
+
+# --- hao-accept laptop: the same guest checks on a real MacBookPro9,2, hands-free -------------------------------------
+LAPTOP_SSH = Path(os.environ.get('HAO_LAPTOP_SSH', '/nonexistent/laptop-shell')).expanduser()
+HAO_LOCK = Path(os.environ.get('HAO_LOCK_TOOL', 'hao-lock')).expanduser()
+NETBOOT_WAKE = Path(os.environ.get('HAO_NETBOOT_WAKE', '/nonexistent/netboot-wake')).expanduser()
+LT = '/private/var/tmp/haoaccept'            # the guest files in the NetBoot Recovery (its RAM disk)
+LAPTOP_EXPECTED = ['recovery', 'netboot-default', 'usb-write', 'usb-sha256', 'usb-unbootable', 'restore-netboot-default', 'launcher-disabled', 'one-time-boot',
+                   'returned'] + EXPECTED
+IS_RECOVERY = 'if [ -e /System/Library/CoreServices/Finder.app ]; then echo MACOS; else echo RECOVERY; fi'
+
+
+def lssh(R, a, cmd, t=120, stdin=None, quiet=False):
+    """One command on the laptop (the laptop shell, bounded); stdin a bytes string or an open file."""
+    env = dict(os.environ, LAPTOP_NAME=a.laptop)
+    kw = dict(stdin=stdin) if hasattr(stdin, 'read') else dict(input=stdin if stdin is not None else b'')
+    try:
+        r = subprocess.run([str(LAPTOP_SSH), '-t', str(t), '--', cmd], capture_output=True, env=env, **kw)
+    except subprocess.TimeoutExpired:
+        return 124, ''
+    out = (r.stdout + r.stderr).decode('utf-8', 'replace')
+    if not quiet:
+        with open(R.out / 'laptop-commands.txt', 'a') as f:
+            f.write('%s $ %s\n[rc %d]\n%s\n' % (stamp(), cmd if len(cmd) < 400 else cmd[:400] + ' ...', r.returncode, out))
+    return r.returncode, out
+
+
+def marks_text(text):
+    out = []
+    for line in text.splitlines():
+        i = line.find('HAOACCEPT ')
+        if i >= 0:
+            m = line[i + len('HAOACCEPT '):].strip()
+            if m not in out:
+                out.append(m)
+    return out
+
+
+def checks_from(R, lines, where):
+    for m in lines:
+        g = re.match(r'CHECK (\S+) (PASS|FAIL) ?(.*)', m)
+        if g:
+            R.check(g[1], g[2] == 'PASS', g[3], where)
+        g = re.match(r'TIME (\S+) (\S+)', m)
+        if g:
+            R.times['guest:' + g[1]] = g[2]
+        if m.startswith(('SETID-DIFF', 'SETID-UNCOMPARED', 'DEMO', 'ARMED', 'TARGET', 'VOLUMES', 'INFO', 'WATCHDOG')):
+            R.notes.append('%s: %s' % (where, m))
+
+
+def netboot_server(xml):
+    """The NetBoot server of an `nvram -x efi-boot-device` dump, or None when the default is not NetBoot."""
+    import plistlib
+    g = re.search(r'<\?xml.*?</plist>', xml, re.S)
+    try:
+        v = plistlib.loads(g[0].encode()).get('efi-boot-device', b'') if g else b''
+    except Exception:
+        return None
+    v = v.decode('utf-8', 'replace') if isinstance(v, bytes) else str(v)
+    g = re.search(r'RemoteIpAddress</key>\s*<string>([0-9.]+)</string>', v)
+    return g[1] if g else None
+
+
+def power_cycle(R, a):
+    """Cut and restore the laptop's power through its smart plug (--plug: a Shelly Plug Gen2+ address, local RPC over
+    HTTP, no cloud). Only for a laptop with its battery out and 'start up after a power failure' on (laptop 3): the cold
+    boot then comes back through the firmware default, NetBoot. Returns True when the plug answered both calls."""
+    import urllib.request
+    ok = True
+    for on in ('false', 'true'):
+        url = 'http://%s/rpc/Switch.Set?id=0&on=%s' % (a.plug, on)
+        try:
+            urllib.request.urlopen(url, timeout=10).read()
+        except Exception as e:
+            R.say('plug %s: %s' % (url, e)); ok = False
+        if on == 'false':
+            time.sleep(15)
+    R.say('laptop: power-cycled through the plug (%s)' % ('ok' if ok else 'the plug did not answer'))
+    R.notes.append('laptop: power-cycled through the smart plug at %s' % stamp())
+    return ok
+
+
+def wait_recovery(R, a, timeout, wake_after):
+    """Until the laptop answers SSH as the NetBoot Recovery; a Wake-on-LAN (the daemon's WAKE file) every 5 min after
+    WAKE_AFTER seconds. Returns seconds waited, or None."""
+    t0 = time.time(); last_wake = 0
+    while time.time() - t0 < timeout:
+        rc, out = lssh(R, a, IS_RECOVERY, t=20, quiet=True)
+        if rc == 0 and 'RECOVERY' in out:
+            return round(time.time() - t0)
+        if time.time() - t0 > wake_after and time.time() - last_wake > 300:
+            NETBOOT_WAKE.touch(); last_wake = time.time()
+            R.say('laptop: no answer after %d s; Wake-on-LAN sent' % (time.time() - t0))
+        time.sleep(30)
+    return None
+
+
+def unboot_usb(R, a, disk, nbytes):
+    """Zero the USB drive's GPT (both copies), so a restart cannot boot it: with a bootable drive attached, laptop 2's
+    NetBoot Recovery boot went to the drive's own Recovery (no SSH), 2026-11-17 06:16. The stick image stays on the host."""
+    blocks = nbytes // 512
+    rc, o = lssh(R, a, 'diskutil unmountDisk force /dev/%s > /dev/null 2>&1; dd if=/dev/zero of=/dev/r%s bs=1m count=4 2>&1 | tail -1; '
+                 'dd if=/dev/zero of=/dev/r%s bs=512 seek=%d count=8192 2>&1 | tail -1; '
+                 'echo "GPT-HEADERS $(dd if=/dev/r%s bs=512 skip=1 count=1 2> /dev/null | grep -c "EFI PART")'
+                 '$(dd if=/dev/r%s bs=512 skip=%d count=1 2> /dev/null | grep -c "EFI PART")"'
+                 % (disk, disk, disk, blocks - 8192, disk, disk, blocks - 1), t=120)
+    ok = rc == 0 and 'GPT-HEADERS 00' in o
+    R.check('usb-unbootable', ok, 'GPT zeroed on /dev/%s' % disk if ok else o.strip()[-200:], 'laptop')
+    return ok
+
+
+def raw_sha256_cmd(dev, off, length, bs, tag):
+    """Shell: sha256 of LENGTH bytes at OFF of the raw device /dev/rDEV, plus dd's own report and exit status.
+    A raw-device read that is not whole sectors fails with EINVAL and dd reads 0 bytes (laptop 1's hand-run with
+    bs=1000000, 2026-11-18): `dd ... 2> /dev/null | sha256` then hashes nothing and reads as a mismatch. So the
+    sizes are checked here, and raw_sha256_result reports a failed or short read as that, not as a mismatch."""
+    if bs <= 0 or bs % 512 or off % bs or length % bs or length <= 0:
+        raise ValueError('raw read of /dev/r%s: offset %d, length %d, block size %d must be whole 512-byte sectors '
+                         '(and offset and length whole blocks)' % (dev, off, length, bs))
+    err = '%s/%s.dd' % (LT, tag)
+    return ('mkdir -p %s; { dd if=/dev/r%s bs=%d skip=%d count=%d 2> %s; echo $? > %s.rc; } | /sbin/sha256; '
+            'echo "DD-RC $(cat %s.rc)"; tail -1 %s' % (LT, dev, bs, off // bs, length // bs, err, err, err, err))
+
+
+def raw_sha256_result(out, length):
+    """(sha256, None) for a complete read, else ('', why): dd failed or read fewer bytes than asked."""
+    rc = re.findall(r'^DD-RC (\d+)', out, re.M)
+    got = re.findall(r'^(\d+) bytes transferred', out, re.M)
+    sha = (re.findall(r'[0-9a-f]{64}', out) or [''])[-1]
+    if not rc or rc[-1] != '0':
+        return '', 'read FAILED: dd exit %s, %s' % (rc[-1] if rc else '?', out.strip()[-120:])
+    if not got or int(got[-1]) != length:
+        return '', 'read SHORT: %s of %d bytes' % (got[-1] if got else '?', length)
+    return sha, None
+
+
+def write_usb(R, a, D, D_bytes, stick, size, meta, HEAD):
+    """The stick image onto the laptop's USB drive (GPT zeroed first), the part after the first MiB then the first MiB,
+    each read back and compared with the image's own sha256."""
+    if size % 512 or size <= HEAD:
+        # the drive is written and read back in whole sectors: a ragged tail would be left out of the read-back
+        R.check('usb-write', False, 'stick image %d bytes: not a whole number of 512-byte sectors' % size, 'host')
+        return False
+    if not unboot_usb(R, a, D, D_bytes):
+        return False
+    t0 = time.time()
+    with open(stick, 'rb') as f:
+        f.seek(HEAD)
+        rc, o = lssh(R, a, 'diskutil unmountDisk force /dev/%s > /dev/null 2>&1; dd ibs=1m obs=1m seek=1 of=/dev/r%s 2> %s.dd; '
+                     'rc=$?; tail -1 %s.dd; exit $rc' % (D, D, LT, LT), t=4 * 3600, stdin=f)
+    R.times['usb-write'] = round(time.time() - t0)
+    R.check('usb-write', rc == 0, 'rc %d, %d s, %s' % (rc, R.times['usb-write'], o.strip().splitlines()[-1:] or ''), 'laptop')
+    t0 = time.time()
+    n = (size - HEAD) // 512
+    bs = 512 * math.gcd(2048, n, 8192)
+    rc, o = lssh(R, a, raw_sha256_cmd(D, HEAD, size - HEAD, bs, 'usb-tail'), t=3 * 3600)
+    tail, tail_err = raw_sha256_result(o, size - HEAD)
+    with open(stick, 'rb') as f:
+        head = f.read(HEAD)
+    rc2, o2 = lssh(R, a, 'mkdir -p %s && cat > %s/head.bin && dd if=%s/head.bin of=/dev/r%s bs=1m count=1 2> /dev/null && '
+                   '%s' % (LT, LT, LT, D, raw_sha256_cmd(D, 0, HEAD, HEAD, 'usb-head')), t=120, stdin=head)
+    headgot, head_err = raw_sha256_result(o2, HEAD)
+    R.times['usb-sha256'] = round(time.time() - t0)
+    ok = tail == meta['stick_tail_sha256'] and headgot == meta['stick_head_sha256']
+    R.check('usb-sha256', ok, 'read back: after the first MiB %s (%s), first MiB %s (%s); %d s'
+            % (tail[:12] or tail_err, 'match' if tail == meta['stick_tail_sha256'] else 'not read' if tail_err else 'DIFFERS',
+               headgot[:12] or head_err, 'match' if headgot == meta['stick_head_sha256'] else 'not read' if head_err
+               else 'DIFFERS',
+               R.times['usb-sha256']), 'laptop')
+    return ok
+
+
+def usb_verified_by(R, a, run, stick_sha256):
+    """The USB checks of an earlier run (its hao-accept.log) that wrote this image to this laptop's drive."""
+    log = (Path(run).expanduser() / 'hao-accept.log').read_text()
+    same = ('CHECK stick-file PASS %s' % stick_sha256) in log and ('laptop %s: USB disks' % a.laptop) in log
+    ok = same
+    for name in ('usb-unbootable', 'usb-write', 'usb-sha256'):
+        g = re.search(r'^(\S+) CHECK %s (PASS|FAIL) (.*)$' % name, log, re.M)
+        good = bool(g) and g[2] == 'PASS' and same
+        R.check(name, good, 'by the run %s at %s: %s' % (Path(run).name, g[1], g[3]) if g else 'not in %s' % run, 'laptop')
+        ok = ok and good
+    return ok
+
+# The external disks of a laptop's Recovery as "USB diskN BYTES LUN" (LUN: the SCSI logical unit in its USB enclosure,
+# "-" when none). A two-bay enclosure reports no per-drive serial and its bays are the same size as the internal disk
+# (laptop 1, 2026-11-17), so a laptop's installer drive can be pinned to a LUN in DRIVES.
+USB_LIST = ('ioreg -l -w0 -p IOService 2>/dev/null | grep -E "\\"SCSI Logical Unit Number\\"=|\\"BSD Name\\" = \\"disk[0-9]+\\"$" '
+            '| sed -E "s/.*\\"SCSI Logical Unit Number\\"=([0-9]+).*/L \\1/; s/.*\\"BSD Name\\" = \\"(disk[0-9]+)\\"$/B \\1/" > /tmp/hao-luns; '
+            'for d in $(diskutil list external physical | awk \'/^\\/dev\\/disk/{sub("/dev/","",$1); print $1}\'); do '
+            'l=$(awk -v d=$d \'$1=="L"{l=$2} $1=="B" && $2==d {print l; exit}\' /tmp/hao-luns); '
+            'v=$(diskutil list $d | awk \'/Apple_HFS/{print $NF; exit}\'); m=; [ -n "$v" ] && m=$(diskutil info $v | sed -n "s/^ *Mount Point: *//p"); '
+            'r=no; [ -n "$m" ] && ls -d "$m"/hao-install-* > /dev/null 2>&1 && r=resumable; '
+            'echo "USB $d $(diskutil info $d | sed -n \'s/.*Disk Size:.*(\\([0-9]*\\) Bytes).*/\\1/p\') ${l:--} $r"; done')
+DRIVES = Path(os.environ.get('HAO_ACCEPT_DRIVES', '/nonexistent/hao-accept-drives.tsv')).expanduser()   # private, outside the repository: NAME<TAB>lun<TAB>N
+
+
+RESUMABLE = set()   # diskN of the probed laptop whose installer volume holds an install's work folder (hao-install-*)
+
+
+def usb_disks(text, laptop_name):
+    """[(diskN, bytes)] from USB_LIST output, limited to the laptop's pinned LUN when DRIVES names one. Drives that hold
+    a resumable install go into RESUMABLE (owner 2026-11-17: keep a resumable installer drive intact)."""
+    rows = [l.split() for l in text.splitlines() if re.match(r'USB disk\d+ \d+ \S+( \S+)?$', l)]
+    RESUMABLE.clear()
+    RESUMABLE.update(r[1] for r in rows if len(r) > 4 and r[4] == 'resumable')
+    pin = None
+    if DRIVES.exists():
+        for l in DRIVES.read_text().splitlines():
+            f = l.split('\t')
+            if len(f) >= 3 and f[0] == laptop_name and f[1] == 'lun':
+                pin = f[2].strip()
+    return [(r[1], int(r[2])) for r in rows if pin is None or r[3] == pin]
+
+
+def pick_laptop(a):
+    """--laptop auto: the first of --candidates that no one holds in hao-lock and that answers as its NetBoot Recovery,
+    with NetBoot as its default and one USB drive as large as the stick (read-only probes). None when none is ready."""
+    st = subprocess.run([str(HAO_LOCK), 'status'], capture_output=True, text=True).stdout
+    held = {l.split()[0] for l in st.splitlines() if len(l.split()) > 1 and l.split()[1] == 'held'}
+    size = Path(a.stick).expanduser().stat().st_size
+    for name in a.candidates.split(','):
+        if name in held:
+            print('%s laptop %s: held in hao-lock, skipped' % (stamp(), name))
+            continue
+        env = dict(os.environ, LAPTOP_NAME=name)
+        cmd = IS_RECOVERY + '; nvram -x efi-boot-device; ' + USB_LIST
+        try:
+            r = subprocess.run([str(LAPTOP_SSH), '-t', '40', '--', cmd], capture_output=True, env=env, timeout=70)
+        except subprocess.TimeoutExpired:
+            print('%s laptop %s: no answer, skipped' % (stamp(), name)); continue
+        o = (r.stdout + r.stderr).decode('utf-8', 'replace')
+        usb = [b for _, b in usb_disks(o, name)]
+        ready = r.returncode == 0 and 'RECOVERY' in o and netboot_server(o) and len([b for b in usb if b >= size]) == 1
+        print('%s laptop %s: %s' % (stamp(), name, 'ready' if ready else 'not ready (recovery %s, NetBoot default %s, USB %s)'
+              % ('RECOVERY' in o, netboot_server(o), usb)))
+        if ready:
+            return name
+    return None
+
+
+def laptop(a):
+    out = Path(a.out).expanduser().resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    R = Run(out)
+    stick = Path(a.stick).expanduser().resolve() if a.stick else None
+    meta = dict(tool='hao-accept laptop', revision=1, date=datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
+                source=a.source, hao=str(a.hao) if a.hao else None, laptop=a.laptop, stick=str(stick),
+                break_setid=a.break_setid, expected=LAPTOP_EXPECTED)
+    t_all = time.time()
+    global EXPECTED_RUN
+    EXPECTED_RUN = [c for c in LAPTOP_EXPECTED if not (getattr(a, 'keep_up', False) and c == 'returned')]
+
+    size = stick.stat().st_size if stick else a.kit_min_bytes
+
+    def probe():
+        """(in the Recovery, NetBoot server of the default, [(USB disk, bytes)], text)"""
+        rc, o = lssh(R, a, IS_RECOVERY + '; nvram -x efi-boot-device', t=60)
+        usb = []
+        if rc == 0:
+            rc2, o2 = lssh(R, a, USB_LIST, t=60)
+            usb = usb_disks(o2, a.laptop)
+        return rc == 0 and 'RECOVERY' in o, netboot_server(o), usb, o
+
+    # 0. bench's lock (a real run), then the laptop in its NetBoot Recovery with NetBoot as the firmware default (the
+    # way back). --return-from-image restarts a dev image (root SSH) into that Recovery first.
+    state = 'hao-accept laptop stopped before changing anything'
+    if not a.dry_run:
+        # pm 2026-11-17: an action that writes or boots a laptop checks its image and target first (tools/arm-gate).
+        if a.kit_url:
+            art = Path(a.kit_artifact).expanduser() if a.kit_artifact else None
+        else:
+            art = stick.parent if (stick.parent / 'candidate.json').exists() or (stick.parent / 'release').is_dir() else stick.parent.parent
+        if art is None and not a.no_arm_gate:
+            R.check('arm-gate', False, '--kit-url needs --kit-artifact DIR (the candidate cut) for arm-gate, or --no-arm-gate REASON', 'host')
+            return finish(R, meta, t_all)
+        if a.no_arm_gate:
+            R.say('arm-gate skipped: %s' % a.no_arm_gate)
+            meta['arm_gate'] = 'skipped: ' + a.no_arm_gate
+        else:
+            g = subprocess.run([PY, '-B', '-I', str(HERE / 'arm-gate'), '--laptop', a.laptop, '--artifact', str(art)],
+                               capture_output=True, text=True)
+            (out / 'arm-gate.txt').write_text(g.stdout + g.stderr)
+            R.check('arm-gate', g.returncode == 0, (g.stdout.strip().splitlines() or ['?'])[-1] + ' (arm-gate.txt)', 'host')
+            if g.returncode != 0:
+                return finish(R, meta, t_all)
+        r = subprocess.run([str(HAO_LOCK), 'take', a.laptop, '--who', 'bench', '--why', 'hao-accept laptop %s'
+                            % (a.source or (stick.name if stick else 'network-kit')), '--hours', '4', '--wait', str(a.lock_wait)], capture_output=True, text=True)
+        R.say('hao-lock: rc %d %s' % (r.returncode, (r.stdout + r.stderr).strip()))
+        if r.returncode != 0:
+            raise SystemExit('hao-lock refused')
+    try:
+        rec, server, usb, o = probe()
+        (out / 'nvram-before.txt').write_text(o)
+        fit0 = [(d, b) for d, b in usb if b >= size and (not a.usb_disk or d == a.usb_disk)]
+        if not rec and server and len(fit0) == 1 and a.return_from_image and not a.dry_run:
+            if not unboot_usb(R, a, *fit0[0]):
+                return finish(R, meta, t_all)
+            R.say('laptop: in an image (%s); restarting it into its NetBoot Recovery' % o.strip().splitlines()[0][:40])
+            lssh(R, a, '(sleep 2; shutdown -r now) > /dev/null 2>&1 < /dev/null &', t=20)
+            state = 'hao-accept laptop restarted the dev image to return to the NetBoot Recovery'
+            time.sleep(60)
+            back = wait_recovery(R, a, 20 * 60, wake_after=8 * 60)
+            if back is None and a.plug and power_cycle(R, a):
+                back = wait_recovery(R, a, 20 * 60, wake_after=8 * 60)
+            R.times['return-to-recovery'] = back and back + 60
+            rec, server, usb, o = probe()
+            state += ('; it is back there and the run stopped' if rec else
+                      '; it did NOT come back to the Recovery within 20 min (no SSH): needs the owner')
+        R.check('recovery', rec, 'NetBoot Recovery' if rec else 'not the Recovery: ' + (o.strip().splitlines() or ['no answer'])[0][:40],
+                'laptop')
+        R.check('netboot-default', bool(server), 'efi-boot-device NetBoot from %s' % server if server else 'not NetBoot: no way back',
+                'laptop')
+        fit = [d for d, b in usb if b >= size and (not a.usb_disk or d == a.usb_disk)]
+        # Prefer a drive without a resumable install; overwrite one only with --overwrite-resumable (owner 2026-11-17).
+        free = [d for d in fit if d not in RESUMABLE]
+        if free:
+            fit = free
+        elif fit and not a.overwrite_resumable and not getattr(a, 'usb_verified_by', None) and not a.resume_after_install:
+            R.check('usb-write', False, 'the only drive (%s) holds a resumable install: resume it (--install-resume), or '
+                    'write anyway with --overwrite-resumable' % ', '.join(fit), 'laptop')
+            return finish(R, meta, t_all)
+        if len(fit) > 1:
+            R.say('laptop: %d drives qualify (%s); using %s' % (len(fit), ', '.join(fit), fit[0]))
+            fit = fit[:1]
+        R.say('laptop %s: USB disks %s; the stick needs %d bytes' % (a.laptop, usb or 'none', size))
+        if len(fit) != 1:
+            R.check('usb-write', False, 'need exactly one external USB disk of %d bytes or more (or --usb-disk); found %s'
+                    % (size, usb or 'none'), 'laptop')
+        if size % 512:
+            R.check('usb-write', False, 'the stick image is not a whole number of 512-byte blocks', 'host')
+        if not (rec and server) or len(fit) != 1 or size % 512:
+            return finish(R, meta, t_all)
+        D = fit[0]
+        D_bytes = dict(usb)[D]
+        if a.dry_run:
+            R.say('dry run: would write the stick to /dev/%s, install, boot once, read the results' % D)
+            meta['dry_run'] = True
+            return finish(R, meta, t_all)
+        state = 'hao-accept laptop stopped early; the laptop is in its NetBoot Recovery'
+        lssh(R, a, 'nohup caffeinate -i -s -t %d > /dev/null 2>&1 < /dev/null &' % (a.install_timeout + 3 * 3600), t=20)
+        # 1. The USB installer onto the laptop's USB drive, raw. macOS mounts the stick's volumes as soon as it sees a
+        # partition table and writes to them (rehearsal 2, 07:36: the first 4 GiB differed in 7 places), so the table
+        # goes last: the drive's GPT is zeroed, everything after the first MiB is written and read back while the drive
+        # has no partitions, then the first MiB (the GPT) is written and read back. Both parts are compared with the
+        # image's own (computed here in one pass with the whole image's sha256).
+        HEAD = 1 << 20
+        if a.kit_url:
+            # The network kit (builder 2026-11-17): no stick. The USB SSD becomes a fresh APFS volume HAO-NET and the
+            # kit is streamed onto it; install's own manifest check verifies the folder.
+            t0 = time.time()
+            rc, o = lssh(R, a, 'diskutil unmountDisk force /dev/%s > /dev/null 2>&1; diskutil eraseDisk APFS HAO-NET GPT /dev/%s '
+                         '> /dev/null && M=$(diskutil info HAO-NET | sed -n "s/^ *Mount Point: *//p") && [ "$M" = /Volumes/HAO-NET ] && '
+                         '{ curl -fsS %s | tar -xf - -C "$M"; echo "TAR-RC $?"; test -x "$M/install" && echo KIT-OK; '
+                         'du -sk "$M" | cut -f1; }' % (D, D, shlex.quote(a.kit_url)), t=3600)
+            R.times['kit-fetch'] = round(time.time() - t0)
+            ok = 'TAR-RC 0' in o and 'KIT-OK' in o
+            R.check('kit-fetch', ok, '%s -> /Volumes/HAO-NET on /dev/%s, %d s, %s' % (a.kit_url, D, R.times['kit-fetch'],
+                    ' '.join(o.split()[-3:])), 'laptop')
+            meta['kit_url'] = a.kit_url
+            if not ok:
+                return finish(R, meta, t_all)
+            hh = ht = hf = None
+        else:
+            hh, ht, hf = hashlib.sha256(), hashlib.sha256(), hashlib.sha256()
+        if a.kit_url:
+            pass
+        else:
+          with open(stick, 'rb') as f:
+            b = f.read(HEAD); hh.update(b); hf.update(b)
+            for b in iter(lambda: f.read(1 << 24), b''):
+                ht.update(b); hf.update(b)
+        if not a.kit_url:
+          meta['stick_sha256'] = hf.hexdigest()
+        meta['stick_head_sha256'], meta['stick_tail_sha256'] = hh.hexdigest(), ht.hexdigest()
+        if a.stick_sha256 and not a.kit_url:
+            R.check('stick-file', hf.hexdigest() == a.stick_sha256, hf.hexdigest(), 'host')
+            if hf.hexdigest() != a.stick_sha256:
+                return finish(R, meta, t_all)
+        if a.kit_url:
+            ok = True
+        elif a.usb_verified_by:
+            # Written and read back by an earlier run of the same image on this laptop's drive; its volumes have been
+            # mounted since (normal use), so the drive is not hashed again.
+            ok = usb_verified_by(R, a, a.usb_verified_by, meta['stick_sha256'])
+        else:
+            ok = write_usb(R, a, D, D_bytes, stick, size, meta, HEAD)
+        if not ok:
+            return finish(R, meta, t_all)
+        # 2. recovery.sh from the NetBoot Recovery, the same script as QEMU's run 1 (no power-off at the end).
+        src = out / 'haoaccept-src'
+        shutil.rmtree(src, ignore_errors=True)
+        fat_disk(R, a.break_setid, make_image=False)
+        (src / 'LAPTOP').write_text('hao-accept laptop\n')
+        if a.then_check:
+            (src / 'STAY').write_text('the dev build: no restart after the job; hao-check follows in this boot\n')
+        t0 = time.time()
+        if a.resume_after_install:
+            # The install a stopped run started is still running (or done) in the Recovery: its files are left as they
+            # are; only wait for its END (owner 2026-11-17: hold the boot, keep the install).
+            R.say('laptop: resuming after the install recovery.sh is running (or ran) in %s' % LT)
+        else:
+            tar = subprocess.run(['tar', '-C', str(src), '-cf', '-', '.'], capture_output=True, check=True).stdout
+            # An earlier run's stale, empty /Volumes/HAO made macOS mount the installer at "/Volumes/HAO 1" (laptop 2,
+            # 2026-11-17 16:08): remove an empty stale mount point first, then use the HFS partition's real mount point.
+            # Unmount the installer's volumes first, so a stale empty /Volumes/HAO can go and the volume mounts at
+            # /Volumes/HAO again (a path with a space broke recipe 29-dev-access's unquoted $P; 2026-11-17 17:04).
+            if a.kit_url:
+                rc, o = lssh(R, a, 'rm -rf %s; mkdir -p %s && tar -C %s -xf - && test -x /Volumes/HAO-NET/install && '
+                             'echo "HAO-MOUNTED /Volumes/HAO-NET"' % (LT, LT, LT), t=120, stdin=tar)
+            else:
+              rc, o = lssh(R, a, 'diskutil unmountDisk /dev/%s > /dev/null 2>&1; if [ -d /Volumes/HAO ] && ! mount | grep -q " on /Volumes/HAO ("; '
+                         'then mv /Volumes/HAO /private/var/tmp/stale-Volumes-HAO-$(date +%%H%%M%%S); fi; diskutil mountDisk /dev/%s; '
+                         'sleep 5; rm -rf %s; mkdir -p %s && tar -C %s -xf - && '
+                         'V=$(diskutil list %s | awk \'/Apple_HFS/{print $NF; exit}\'); '
+                         'M=$(diskutil info $V | sed -n "s/^ *Mount Point: *//p"); test -x "$M/install" && echo "HAO-MOUNTED $M"'
+                         % (D, D, LT, LT, LT, D), t=120, stdin=tar)
+            g = re.search(r'HAO-MOUNTED (.+)', o)
+            if rc != 0 or not g:
+                R.check('install', False, 'the USB installer did not mount: %s' % o.strip()[-200:], 'recovery')
+                return finish(R, meta, t_all)
+            hao_dir = g[1].strip()
+            R.say('laptop: the USB installer is at %s' % hao_dir)
+            if hao_dir not in ('/Volumes/HAO', '/Volumes/HAO-NET') or ' ' in hao_dir:
+                # pm 2026-11-17: refuse rather than install from another path (recipe scripts split on a space).
+                R.check('install', False, 'the installer is at %r, not /Volumes/HAO or /Volumes/HAO-NET: refused' % hao_dir, 'recovery')
+                return finish(R, meta, t_all)
+            # The Recovery's nohup refuses ("can't detach from console"); a subshell that ignores SIGHUP outlives the session.
+            lssh(R, a, 'cd / && (trap "" HUP; HAOACCEPT_DIR=%s HAO_DIR=%s INSTALL_RESUME=%s exec sh %s/recovery.sh) > %s/run.txt 2>&1 < /dev/null &'
+                 % (LT, shlex.quote(hao_dir), shlex.quote(a.install_resume.replace('{HAO}', hao_dir)) if a.install_resume else "''", LT, LT), t=30)
+            time.sleep(20)
+            rc, o = lssh(R, a, 'cat %s/out/recovery.txt 2>&1 | head -3' % LT, t=30)
+            if 'BEGIN recovery' not in o:
+                R.check('install', False, 'recovery.sh did not start: %s' % o.strip()[-200:], 'recovery')
+                return finish(R, meta, t_all)
+            R.say('laptop: recovery.sh started (install onto the internal disk)')
+        end = False
+        while time.time() - t0 < a.install_timeout:
+            time.sleep(60)
+            rc, o = lssh(R, a, 'grep -c "END recovery" %s/out/recovery.txt 2>/dev/null' % LT, t=30, quiet=True)
+            if o.strip().startswith('1'):
+                end = True; break
+        R.times['recovery:total'] = round(time.time() - t0)
+        guest = out / 'guest'; guest.mkdir(exist_ok=True)
+        r = subprocess.run([str(LAPTOP_SSH), '-t', '300', '--', 'tar -C %s -cf - out run.txt' % LT], capture_output=True,
+                           env=dict(os.environ, LAPTOP_NAME=a.laptop))
+        subprocess.run(['tar', '-C', str(guest), '-xf', '-'], input=r.stdout)
+        lines = marks_text((guest / 'out' / 'recovery.txt').read_text() if (guest / 'out' / 'recovery.txt').exists() else '')
+        checks_from(R, lines, 'recovery')
+        if not end:
+            R.say('laptop: no END recovery within %d s (install timeout)' % a.install_timeout)
+        if not end or not any(s['name'] == 'install' and s['ok'] for s in R.steps):
+            return finish(R, meta, t_all)
+        target = next((m.split()[1] for m in lines if m.startswith('TARGET ')), None)
+        if not unboot_usb(R, a, D, D_bytes):
+            return finish(R, meta, t_all)
+        if a.hold_file:
+            # pm 2026-11-17: hold the first boot until the dev pack's boot path is cleared; the install is kept.
+            th = time.time()
+            if Path(a.hold_file).expanduser().exists():
+                R.say('laptop: install done; holding the first boot while %s exists' % a.hold_file)
+            while Path(a.hold_file).expanduser().exists():
+                time.sleep(30)
+            R.times['held-before-boot'] = round(time.time() - th)
+        # 3. The installer blesses its own disk as the start-up disk; put NetBoot back as the default (what it was
+        # before the run), then boot the installed disk once.
+        rc, o = lssh(R, a, 'nvram -x efi-boot-device', t=30)
+        (out / 'nvram-after-install.txt').write_text(o)
+        if netboot_server(o) != server:
+            lssh(R, a, 'bless --netboot --server bsdp://en0@%s' % server, t=60)
+            rc, o = lssh(R, a, 'nvram -x efi-boot-device', t=30)
+        R.check('restore-netboot-default', netboot_server(o) == server, 'efi-boot-device NetBoot from %s' % netboot_server(o),
+                'laptop')
+        if netboot_server(o) != server:
+            return finish(R, meta, t_all)
+        # The release's OpenCore ships LauncherOption Full, which makes OpenCore the firmware's first boot entry on every
+        # boot: the first-boot job's restart then booted the release again, not NetBoot (laptop 2, rehearsal 5, 06:13
+        # PST; system.log BOOT_TIME twice). As every bench push does (ssdimg push: disable_launcher), set it Disabled
+        # with the NetBoot Recovery's oc-launcher. A bench deviation from the release as shipped, written in the record.
+        rc, o = lssh(R, a, '/usr/local/ssdtools/bin/oc-launcher Disabled', t=60)
+        R.check('launcher-disabled', rc == 0 and 'Disabled' in o, o.strip()[-160:], 'laptop')
+        meta['deviation'] = ('bench set the installed OpenCore LauncherOption Full -> Disabled before the first boot, '
+                             'so the laptop returns to NetBoot (as every bench push does)')
+        if rc != 0:
+            return finish(R, meta, t_all)
+        rc, o = lssh(R, a, 'E=$(diskutil list %s | awk \'/ EFI /{print $NF; exit}\'); diskutil mount $E > /dev/null; '
+                     'M=$(diskutil info $E | sed -n "s/^ *Mount Point: *//p"); F=$M/EFI/OC/OpenCore.efi; '
+                     '[ -f "$F" ] || F=$M/System/Library/CoreServices/boot.efi; echo "BLESS $E $F"; '
+                     'bless --mount "$M" --file "$F" --setBoot --nextonly && nvram -x efi-boot-device' % target, t=60)
+        ok = rc == 0 and netboot_server(o) == server
+        R.check('one-time-boot', ok, (re.findall(r'BLESS .*', o) or ['no bless'])[0] + ('; NetBoot still the default' if ok else ''),
+                'laptop')
+        if not ok:
+            return finish(R, meta, t_all)
+        t0 = time.time()
+        lssh(R, a, '(sleep 3; /sbin/reboot) > /dev/null 2>&1 < /dev/null &', t=20)
+        R.say('laptop: restarting into the installed disk once')
+        time.sleep(90)
+        if a.then_check:
+            state = ('hao-accept laptop --then-check %s: the dev build installed on the internal disk, booted once (job checks, '
+                     'hao-check), restarted once' % (a.source or (stick.name if stick else 'network-kit')))
+            return dev_boot(R, a, meta, t_all, stick, out)
+        state = 'hao-accept laptop: release installed on the internal disk; the laptop did not come back to its Recovery'
+        back = wait_recovery(R, a, a.boot_timeout, wake_after=50 * 60)
+        if back is None and a.plug and power_cycle(R, a):
+            back = wait_recovery(R, a, 20 * 60, wake_after=8 * 60)
+            back = back and back + a.boot_timeout
+        R.times['first-boot-and-return'] = back and back + 90
+        R.check('returned', back is not None, 'back in the NetBoot Recovery %d s after the restart' % (back + 90) if back is not None
+                else 'not back in the NetBoot Recovery within %d s of the restart' % (a.boot_timeout + 90), 'laptop')
+        if back is None:
+            return finish(R, meta, t_all)
+        lssh(R, a, 'nohup caffeinate -i -s -t 3600 > /dev/null 2>&1 < /dev/null &', t=20)
+        # 4. The first boot's results from the installed Data volume (the job removed itself; its log stays).
+        rc, o = lssh(R, a, 'C=$(diskutil apfs list | awk -v s="%ss2" \'/APFS Container Reference:/ {c=$NF} '
+                     '/APFS Physical Store Disk:/ && $NF==s {print c; exit}\'); '
+                     'V=$(diskutil apfs list "$C" | awk \'/APFS Volume Disk \\(Role\\):/ && /\\(Data\\)/ {print $(NF-1); exit}\'); '
+                     'diskutil mount $V > /dev/null; M=$(diskutil info $V | sed -n "s/^ *Mount Point: *//p"); '
+                     'cat "$M/Library/hao-accept/boot.txt"; ls -l "$M/Library/LaunchDaemons/dev.hao.accept.plist" 2>&1; '
+                     'diskutil unmount $V > /dev/null' % target, t=120)
+        (guest / 'boot.txt').write_text(o)
+        if not any(m.startswith('END boot') for m in marks_text(o)):
+            R.check('boot-job', False, 'no END boot in the job log (the first-boot job did not finish)', 'boot')
+        checks_from(R, marks_text(o), 'boot')
+        state = ('hao-accept laptop %s: release installed on the internal disk (the dev image is gone); the laptop is in its '
+                 'NetBoot Recovery, NetBoot the default; the USB drive holds the installer' % (a.source or (stick.name if stick else 'network-kit')))
+        meta['note'] = 'the test-only job dev.hao.accept removed itself on the laptop (check cleanup); /Library/hao-accept stays'
+        return finish(R, meta, t_all, docs=a)
+    finally:
+        if not a.dry_run:
+            # Leave it as found: the firmware default checked again, and written into the lock's state.
+            rc, o = lssh(R, a, IS_RECOVERY + '; nvram -x efi-boot-device', t=60)
+            got = netboot_server(o) if rc == 0 else None
+            state += ('; efi-boot-device NetBoot from %s (checked %s)' % (got, stamp()) if got else
+                      '; efi-boot-device NOT checked (no SSH answer)' if rc != 0 else
+                      '; efi-boot-device is NOT NetBoot (checked %s): needs the owner' % stamp())
+            r = subprocess.run([str(HAO_LOCK), 'release', a.laptop, '--who', 'bench', '--state', state], capture_output=True, text=True)
+            R.say('hao-lock release: rc %d %s; state: %s' % (r.returncode, (r.stdout + r.stderr).strip(), state))
+
+
+def dev_boot(R, a, meta, t_all, stick, out):
+    """The dev build's one boot: wait for root SSH from the booted system, read the job's checks from it, run hao-check
+    in this same boot (the lock stays with this run), then restart once to the NetBoot Recovery."""
+    t0 = time.time(); up = None
+    while time.time() - t0 < a.boot_timeout:
+        rc, o = lssh(R, a, 'if [ -e /System/Library/CoreServices/Finder.app ]; then grep -c "END boot" /Library/hao-accept/boot.txt '
+                     '2>/dev/null || echo 0; else echo RECOVERY; fi', t=20, quiet=True)
+        if rc == 0 and o.strip().splitlines()[-1:] == ['1']:
+            up = round(time.time() - t0 + 90); break
+        if rc == 0 and 'RECOVERY' in o:
+            break
+        time.sleep(20)
+    R.check('dev-boot', up is not None, 'the dev build answered root SSH with the job finished %s s after the restart' % up
+            if up is not None else 'no root SSH from the dev build with the job finished within %d s (owner: on a failed boot, '
+            'stop and tell pm)' % (a.boot_timeout + 90), 'boot')
+    if up is None:
+        return finish(R, meta, t_all)
+    rc, o = lssh(R, a, 'cat /Library/hao-accept/boot.txt', t=30)
+    (out / 'guest' / 'boot.txt').write_text(o)
+    checks_from(R, marks_text(o), 'boot')
+    R.say('laptop: hao-check in the same boot')
+    t1 = time.time()
+    hc = subprocess.run([PY, '-B', '-I', str(HERE / 'hao-check'), 'run', '--laptop', a.laptop, '--out', str(out / 'hao-check'),
+                         '--source', a.source or (stick.name if stick else 'network-kit'), '--lock-held'], capture_output=True, text=True)
+    (out / 'hao-check.txt').write_text(hc.stdout + hc.stderr)
+    R.times['hao-check'] = round(time.time() - t1)
+    try:
+        res = json.loads((out / 'hao-check' / 'result.json').read_text())
+        R.check('hao-check', res['result'] == 'PASS', '%d PASS, %d FAIL, %d SKIP (hao-check/result.md)' % (
+            res['counts']['PASS'], res['counts']['FAIL'], res['counts']['SKIP']), 'boot')
+    except Exception as e:
+        R.check('hao-check', False, 'no result: %s' % e, 'boot')
+    if a.keep_up:
+        # The live bench (owner 2026-11-17: "We need laptop 2 to install!! How else will you fix it live."): stays in this
+        # boot, awake, for live swaps; no final restart.
+        # The first-boot job's 150 min watchdog (STAY) would restart the live bench: stop it.
+        rc, o = lssh(R, a, 'pkill -f "sleep 9000"; sleep 1; pgrep -f "sleep 9000" > /dev/null && echo WATCHDOG-LEFT || echo WATCHDOG-STOPPED; '
+                     'pmset -a sleep 0 displaysleep 0 disksleep 0; (trap "" HUP; exec caffeinate -dims) > /dev/null 2>&1 < /dev/null &', t=30)
+        R.check('kept-up', 'WATCHDOG-STOPPED' in o, 'left running as the live bench (no final restart); keep-awake set; %s'
+                % ('first-boot watchdog stopped' if 'WATCHDOG-STOPPED' in o else 'first-boot watchdog NOT stopped: %s' % o.strip()[-80:]), 'laptop')
+        meta['note'] = 'one install and one boot of the dev build, kept up as the live bench'
+        return finish(R, meta, t_all, docs=a)
+    lssh(R, a, '(sleep 2; shutdown -r now) > /dev/null 2>&1 < /dev/null &', t=20)
+    time.sleep(60)
+    back = wait_recovery(R, a, 20 * 60, wake_after=10 * 60)
+    R.check('returned', back is not None, 'back in the NetBoot Recovery %s s after the final restart' % back if back is not None
+            else 'not back in the NetBoot Recovery within 20 min of the final restart', 'laptop')
+    meta['note'] = 'one install and one boot of the dev build (owner: minimize boots): job checks, hao-check, one restart'
+    return finish(R, meta, t_all, docs=a)
+
+
+# --- hao-accept job: a test-only first-boot job on an installed disk, booted once per ESP (QEMU) ---------------------
+ARM_CMD = 'script -q -t 1 /dev/console sh /Volumes/HAOACCEPT/arm.sh'
+
+
+def job_fat(R, job, payload, name):
+    """The HAOACCEPT test disk for `job`: arm.sh, jobwrap.sh, the job's plist, JOB as job.sh, PAYLOAD as payload/."""
+    src = R.out / (name + '-src')
+    shutil.rmtree(src, ignore_errors=True)
+    src.mkdir()
+    for f in ('arm.sh', 'jobwrap.sh', 'dev.hao.job.plist'):
+        shutil.copy(GUEST / f, src / f)
+    shutil.copy(job, src / 'job.sh')
+    if payload:
+        shutil.copytree(payload, src / 'payload')
+    else:
+        (src / 'payload').mkdir()
+    out = R.out / name
+    img = out.with_suffix('.img')
+    img.unlink(missing_ok=True)
+    subprocess.run(['hdiutil', 'create', '-quiet', '-size', '256m', '-fs', 'MS-DOS', '-volname', 'HAOACCEPT', '-layout',
+                    'MBRSPUD', '-format', 'UDTO', '-srcfolder', str(src), str(out)], check=True)
+    out.with_suffix('.cdr').rename(img)
+    return img
+
+
+def recovery_command(R, run, q, shots, label, cmd, begin, tries=8):
+    """At the Recovery from the stick: Return at the Language Chooser (English preselected through the ESP's NVRAM),
+    then Terminal (shift-cmd-T) and CMD, until BEGIN shows on serial."""
+    t1 = time.time()
+    while time.time() - t1 < 1200 and not any('Language Choose' in l for l in serial_lines(run)):
+        time.sleep(5)
+    time.sleep(45)
+    q.shot(shots / ('%s-chooser.png' % label))
+    q.keys('ret')
+    time.sleep(30)
+    for n in range(tries):
+        q.shot(shots / ('%s-recovery-%02d.png' % (label, n)))
+        q.keys('shift', 'meta_l', 't')
+        time.sleep(10)
+        q.type(cmd + '\n')
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            if any(m.startswith(begin) for m in marks(run)):
+                return True
+            time.sleep(5)
+    return False
+
+
+def job(a):
+    """Arm the job once (the stick's Recovery writes it into the disk's Data volume), then boot the armed disk once per
+    --esp NAME=DIR (each boot from its own copy-on-write overlay of the same armed disk) and read each job's out/."""
+    out = Path(a.out).expanduser().resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    R = Run(out)
+    shots = out / 'screens'
+    shots.mkdir(exist_ok=True)
+    sides = [e.split('=', 1) for e in a.esp_side]
+    meta = dict(tool='hao-accept job', revision=1, date=datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
+                source=a.source, disk=str(a.disk), stick=str(a.stick), job=str(a.job), sides=dict(sides))
+    armed = out / 'armed.img'
+    if not armed.exists():
+        esp = run_esp(R, a.recovery_esp)
+        fat = job_fat(R, Path(a.job), a.payload, 'haoaccept-arm')
+        t0 = time.time()
+        run1, q = start_vm(R, 'arm', Path(a.disk).expanduser().resolve(), esp, [Path(a.stick).expanduser().resolve(), fat],
+                           a.memory)
+        wait_kernel(R, run1, q, shots, 'arm')
+        if not recovery_command(R, run1, q, shots, 'arm', ARM_CMD, 'BEGIN arm'):
+            stop_vm(R, run1)
+            raise SystemExit('arm.sh never started; screenshots in %s' % shots)
+        end = wait_mark(R, run1, q, 'END arm', 1800, shots, 'arm')
+        wait_exit(run1, 300)
+        stop_vm(R, run1)
+        checks = [m for m in marks(run1) if m.startswith('CHECK arm')]
+        R.say('arm: %s (%d s)' % (checks or 'no CHECK arm line', time.time() - t0))
+        if not end or not any(' PASS' in c for c in checks):
+            raise SystemExit('arming failed; see %s' % run1)
+        subprocess.run([QEMU_IMG, 'convert', '-O', 'raw', str(run1 / 'guest.qcow2'), str(armed)], check=True)
+    results = {}
+    for name, esp in sides:
+        fat = job_fat(R, Path(a.job), a.payload, 'haoaccept-%s' % name)
+        t0 = time.time()
+        run, q = start_vm(R, name, armed, Path(esp).expanduser().resolve(), [fat], a.memory)
+        wait_kernel(R, run, q, shots, name)
+        end = wait_mark(R, run, q, 'END job', a.boot_timeout, shots, name)
+        try:
+            q.shot(shots / ('%s-end.png' % name))
+        except Exception:
+            pass
+        wait_exit(run, 300)
+        stop_vm(R, run)
+        read_fat(R, run, 0, out / name / 'guest')
+        # The job's files as it printed them on the console ("OUT|name| line"), whether or not the test disk copy worked.
+        files = {}
+        for line in serial_lines(run):
+            i = line.find('HAOACCEPT OUT|')
+            if i >= 0:
+                fname, _, text = line[i + len('HAOACCEPT OUT|'):].partition('| ')
+                files.setdefault(fname, []).append(text)
+        (out / name / 'console').mkdir(parents=True, exist_ok=True)
+        for fname, lines in files.items():
+            (out / name / 'console' / fname).write_text('\n'.join(lines) + '\n')
+        results[name] = dict(end=bool(end), seconds=round(time.time() - t0), marks=[m for m in marks(run) if not m.startswith('OUT|')],
+                             files=sorted(files))
+        R.say('%s: %s in %d s' % (name, 'END job' if end else 'no END job', time.time() - t0))
+    meta['results'] = results
+    (out / 'job-result.json').write_text(json.dumps(meta, indent=1) + '\n')
+    return 0 if all(r['end'] for r in results.values()) else 1
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    sub = p.add_subparsers(dest='op', required=True)
+    r = sub.add_parser('run')
+    r.add_argument('--hao', type=Path, help='the released hao command (tools/hao/hao of the release)')
+    r.add_argument('--out', required=True)
+    r.add_argument('--source', help='the commit or release id under test (recorded)')
+    r.add_argument('--stick', help='reuse a stick image instead of running create-installer')
+    r.add_argument('--create-arg', action='append', default=[], help='extra create-installer argument (repeatable)')
+    r.add_argument('--esp', type=Path, default=DEFAULT_ESP)
+    r.add_argument('--memory', default='16G')
+    r.add_argument('--break-setid', metavar='PATH', help='demo: clear the set-ID bit of PATH (e.g. usr/bin/su)')
+    r.add_argument('--install-timeout', type=int, default=8 * 3600)
+    r.add_argument('--boot-timeout', type=int, default=2 * 3600)
+    r.add_argument('--from-run2', action='store_true', help='resume an --out folder at stage 3 (boot the installed disk)')
+    r.add_argument('--no-hash', action='store_true', help='skip the stick sha256')
+    l = sub.add_parser('laptop', help='the same checks on a real laptop from its NetBoot Recovery, hands-free')
+    l.add_argument('--laptop', default='auto', help='a laptop name as the laptop shell knows it (its LAPTOP_NAME), or auto')
+    l.add_argument('--candidates', default='laptop2', help='with --laptop auto: the laptops to try, in order (owner 2026-11-17: laptop 2 is the batch bench; laptop 1 the live-fix bench)')
+    l.add_argument('--stick', help='the USB installer image (create-installer --image); or --kit-url')
+    l.add_argument('--kit-url', help='a network kit (one tar stream of the HAO folder, builder): erased onto the USB SSD as HAO-NET, no stick')
+    l.add_argument('--kit-artifact', help='with --kit-url: the candidate cut folder for arm-gate')
+    l.add_argument('--kit-min-bytes', type=int, default=40_000_000_000, help='with --kit-url: the USB SSD must be at least this large')
+    l.add_argument('--stick-sha256', help='its expected sha256 (else hashed here)')
+    l.add_argument('--usb-disk', help='the USB drive on the laptop (diskN), when it has more than one')
+    l.add_argument('--hao', type=Path, help='the released hao command (for the docs check on this host)')
+    l.add_argument('--out', required=True)
+    l.add_argument('--source', help='the commit or release id under test (recorded)')
+    l.add_argument('--break-setid', metavar='PATH')
+    l.add_argument('--install-timeout', type=int, default=3 * 3600)
+    l.add_argument('--boot-timeout', type=int, default=75 * 60)
+    l.add_argument('--no-hash', action='store_true', help='with --stick-sha256: do not hash the file here')
+    l.add_argument('--dry-run', action='store_true', help='read-only: check the laptop is ready, change nothing (no lock)')
+    l.add_argument('--return-from-image', action='store_true', help='restart a dev image (root SSH) into the NetBoot Recovery')
+    l.add_argument('--usb-verified-by', metavar='RUN', help='an earlier run folder that wrote and read back this image on the drive')
+    l.add_argument('--plug', metavar='ADDR', help='the laptop\'s Shelly Plug (Gen2+, local RPC): power-cycle it when it does not come back')
+    l.add_argument('--resume-after-install', action='store_true', help='continue a stopped run whose install runs (or ran) in the Recovery; with --usb-verified-by')
+    l.add_argument('--hold-file', help='before the first boot, wait while this file exists')
+    l.add_argument('--install-resume', metavar='DIR', help='continue a stopped install at its --resume DIR ({HAO} = the installer volume)')
+    l.add_argument('--overwrite-resumable', action='store_true', help='write the stick even onto a drive whose earlier install could be resumed')
+    l.add_argument('--no-arm-gate', metavar='REASON', help='skip tools/arm-gate (recorded with REASON; e.g. an owner-approved non-candidate stick)')
+    l.add_argument('--keep-up', action='store_true', help='with --then-check: no final restart; the laptop stays up as a live bench')
+    l.add_argument('--then-check', action='store_true', help='the dev build: no restart after the job; hao-check in the same boot, one restart')
+    l.add_argument('--lock-wait', type=int, default=120, help='minutes to wait for the laptop lock')
+    j = sub.add_parser('job', help='a test-only first-boot job on an installed disk image, booted once per ESP (QEMU)')
+    j.add_argument('--disk', required=True, help='an installed disk image (raw), e.g. a run\'s installed.img; never changed')
+    j.add_argument('--stick', required=True, help='the USB installer image whose Recovery arms the job')
+    j.add_argument('--job', required=True, help='the job script (sh); it gets OUT and PAYLOAD')
+    j.add_argument('--payload', help='a folder copied next to the job (probes, kexts)')
+    j.add_argument('--esp-side', action='append', required=True, metavar='NAME=DIR', help='one boot per ESP folder')
+    j.add_argument('--recovery-esp', type=Path, default=DEFAULT_ESP)
+    j.add_argument('--out', required=True)
+    j.add_argument('--source')
+    j.add_argument('--memory', default='16G')
+    j.add_argument('--boot-timeout', type=int, default=90 * 60)
+    s = sub.add_parser('report')
+    s.add_argument('dir')
+    a = p.parse_args()
+    if a.op == 'report':
+        print(markdown(json.loads((Path(a.dir) / 'result.json').read_text())))
+        return 0
+    if a.op == 'laptop':
+        if a.laptop == 'auto':
+            a.laptop = pick_laptop(a)
+            if not a.laptop:
+                print('no laptop of %s is free and ready (Recovery, NetBoot default, one USB drive)' % a.candidates)
+                return 3
+        return laptop(a)
+    if a.op == 'job':
+        return job(a)
+    if not a.hao and not a.stick and not a.from_run2:
+        p.error('--hao or --stick')
+    return run(a)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
