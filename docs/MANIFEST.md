@@ -36,7 +36,7 @@ Undeclared: opencore-generic, opencore-mbp92.
 | golden-gate-metal-argbuf | r12 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131 | metal_argbuf 3b7d4032 metal-argbuf-26B131-20261120-f60029d7 (hao-patcher 29c79006) |
 | golden-gate-metal-framebuffer | r14 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131, golden-gate | metal_framebuffer 107a877d metal-framebuffer-26B131-20261117-be8c1574 (hao-patcher fe579412) |
 | golden-gate-metal-gva | r2 | product | oclp-hook | yes | - | - |
-| golden-gate-metal-libraries | r24 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131, golden-gate | metallib_repairs_golden_gate c7d8d3aa metallib-repairs-llvm15-20261122; metal_quad_runtime_golden_gate d0f0f4e3 metal-ballot-runtime-26A428-20261106-e22a06e77430 (hao-patcher 177dc8a1) |
+| golden-gate-metal-libraries | r25 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131, golden-gate | metallib_repairs_golden_gate c7d8d3aa metallib-repairs-llvm15-20261122; metal_quad_runtime_golden_gate d0f0f4e3 metal-ballot-runtime-26A428-20261106-e22a06e77430 (hao-patcher 177dc8a1) |
 | golden-gate-metal27 | r6 | dev | oclp-hook | yes | dev-metal27 | metal27_installed ee0a9671 metal27-installed-26B131-20261113-d399c6f3 |
 | golden-gate-mobile-assets | r3 | product | post | yes | dev-alpha-v0.1.0, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-full-witness | mobile_assets b5269354 mobile-assets-26B131-9940eab52729 (hao-patcher 9327e059) |
 | golden-gate-model-gates-mbp92 | r1 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131 | - |
@@ -173,7 +173,7 @@ Undeclared: opencore-generic, opencore-mbp92.
   - `usr/lib/libmetal-framebuffer.dylib`: from hao (row metal_framebuffer)
 - **golden-gate-metal-gva** r2
   - `System/Library/PrivateFrameworks/AppleGVA.framework/Versions/A/AppleGVA`: edited (1 edit) from OCLP · Big Sur GVA
-- **golden-gate-metal-libraries** r24
+- **golden-gate-metal-libraries** r25
   - 11 files under `System/`, from hao (row metallib_repairs_golden_gate)
   - `System/Library/Extensions/AppleIntelGraphicsShared.bundle/Contents/Resources/runtime.igil64.split`: from hao (row metal_quad_runtime_golden_gate)
   - `System/Library/Extensions/AppleIntelHD4000GraphicsGLDriver.bundle/Contents/MacOS/iCBE.dylib`: from hao (row metal_quad_runtime_golden_gate)
@@ -548,7 +548,7 @@ Image 8fb92d5, pushed 2026-11-14 10:11:23 (built 2026-11-14 09:13 from d970c5b3,
 - golden-gate-live-text-shared r14 is newer than every image built with it (newest r13).
 - golden-gate-metal-argbuf r12 is newer than every image built with it (newest r10).
 - golden-gate-metal-framebuffer r14 is newer than every image built with it (newest r13).
-- golden-gate-metal-libraries r24 is newer than every image built with it (newest r23).
+- golden-gate-metal-libraries r25 is newer than every image built with it (newest r23).
 - golden-gate-native-identities r16 is newer than every image built with it (newest r14).
 - golden-gate-shader-caches r18 is newer than every image built with it (newest r17).
 - golden-gate-shared-cache r11 is newer than every image built with it (newest r4).

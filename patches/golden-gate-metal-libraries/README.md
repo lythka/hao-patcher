@@ -105,14 +105,10 @@ floating association and GPU performance are not measured.
 
 ## Validation
 
-NEEDS VALIDATION: portable LLVM-produced input bytes need installation acceptance. Host module comparisons are recorded separately.
-
-NEEDS VALIDATION. Host compiler sweeps show no regressions, the added runtime helpers
-match reference GPU results on the HD 4000, and Photos thumbnails render with the
-matching Tungsten library. A complete image with every library, shader-cache
-re-keying and full-workload performance remain open.
+Laptop 2026-11-22, a MacBookPro9,2 (HD 4000) on the dev-beta image c3c0a5b with this revision's eleven LLVM-built metallibs swapped in (row metallib_repairs_golden_gate, byte-checked on the laptop) and the Metal caches cleared: Maps draws its vector tiles (VectorKit, AlloyCommon), Chess draws its lit, textured 3D board with reflections (SceneKit), Weather renders fully; no crash report and no Metal library error in the log.
 
 ## Revisions
+- r25 2026-11-22 Validated r24 on hardware (Validation). Nothing it installs changes.
 - r24 2026-11-22 Pin the portable LLVM 15.0.7 output for 26B131; the builder uses release tools without Xcode.
 - r23 2026-11-17 `requires`: os 26A428/26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces `applies`. status product: it ships in the release profiles (what it installs is unchanged; `validated` stays false until the re-cut's laptop boots prove it).
 - r22 2026-11-16 Declares its pack (metal-3802): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

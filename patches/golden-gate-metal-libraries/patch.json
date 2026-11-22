@@ -1,10 +1,12 @@
 {
- "revision": 24,
+ "revision": 25,
  "pack": "metal-3802",
  "stage": "oclp-hook",
  "inputs": ["metallib_repairs_golden_gate", "metal_quad_runtime_golden_gate"],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 24,
+ "validated_digest": "17209ff2a849edff8f48de2d22fe85cd835f28c781bef4cc8a3b6fbbb35a2391",
  "files": [
   {"path": "System/Library/Frameworks/MetalPerformanceShaders.framework/Versions/A/Frameworks/MPSImage.framework/Versions/A/Resources/default.metallib", "origin": {"kind": "hao", "row": "metallib_repairs_golden_gate", "note": "the build's own library, already rewritten by cache/metallib (profiles/metallib-repairs-golden-gate.txt) so the HD 4000 compiler accepts it; installed whole, and only over the System library its SOURCES line names (or OCLP's copy on the same build)"}},
   {"path": "System/Library/Frameworks/MetalPerformanceShaders.framework/Versions/A/Frameworks/MPSNeuralNetwork.framework/Versions/A/Resources/default.metallib", "origin": {"kind": "hao", "row": "metallib_repairs_golden_gate", "note": "the build's own library, already rewritten by cache/metallib (profiles/metallib-repairs-golden-gate.txt) so the HD 4000 compiler accepts it; installed whole, and only over the System library its SOURCES line names (or OCLP's copy on the same build)"}},

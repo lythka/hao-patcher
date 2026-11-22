@@ -31,7 +31,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-metal-argbuf | r12 | oclp-hook | product |  | x |  |  |  | ok | r12 2026-11-20 Row metal_argbuf from f60029d7: the wrapper reads constant pointers through the inline constant |
 | golden-gate-metal-framebuffer | r14 | oclp-hook | product |  | x | x |  |  | ok (r13) | r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-metal-gva | r2 | oclp-hook | product |  |  |  |  |  | **needs** | r2 2026-11-20 Current recipe format: kc-hook.sh, pack metal-3802-extras (opt-in), 26B131 requires; overlaps no |
-| golden-gate-metal-libraries | r24 | oclp-hook | product |  | x | x |  |  | **needs** | r24 2026-11-22 Pin the portable LLVM 15.0.7 output for 26B131; the builder uses release tools without Xcode. |
+| golden-gate-metal-libraries | r25 | oclp-hook | product |  | x | x |  |  | ok (r24) | r25 2026-11-22 Validated r24 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-metal27 | r6 | oclp-hook | dev |  |  |  |  |  | **needs** | r6 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces |
 | golden-gate-mobile-assets | r3 | post | product | caches |  |  |  |  | **needs** | r3 2026-11-19 Pack os-extras: dev profiles name it, release profiles leave it out (Apple-derived; returns when |
 | golden-gate-model-gates-mbp92 | r1 | oclp-hook | product |  | x |  |  |  | **needs** | r1 2026-11-17 New (GEN1): golden-gate-userspace's model-gates edit, declared for pack mbp92; the 9,2 and its n |
