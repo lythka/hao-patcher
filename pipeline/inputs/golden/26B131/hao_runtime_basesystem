@@ -1,0 +1,6 @@
+# hao runtime payload for the 27.2.1 (26B131) BaseSystem from https://github.com/lythka/hao-runtime (0a2c2aa, clean, the
+# same commit as row hao_runtime), built over row golden_gate_basesystem with --no-embed: no stubs, no interface units,
+# no AOT, no fixed dyld (the BaseSystem's dyld has no x86_64 slice). Its trusted-cdhashes lists all 1,006 BaseSystem
+# programs and guest libraries (anchor apple, the arm64 slice hao runs). Used by tools/gg-recovery (stage A1).
+# check: payload os_build=26B131 layout_version=1 manifest_sha256=549a0863d65b1fd8e438ab7acc819b890c7425f7d4e2e22c398a5a2e8349e3b1
+- store/artifacts/hao-runtime-basesystem-26B131-20261113-0a2c2aad4755/payload
