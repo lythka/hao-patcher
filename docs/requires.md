@@ -60,6 +60,10 @@ the pair of an assembly that builds it.
 `--check` (run by `pipeline/ci`) exits 1 when a profile marked `"release": true` refuses a recipe in an `[own]` cell,
 or no assembly builds it: a release profile must plan cleanly.
 
+For a machine that is not a target yet, `pipeline/candidates` plans each release profile's set against the public
+facts in `pipeline/candidates.json` (model, GPU families, firmware) and reports what it would refuse and what only
+the machine's OCLP profile can settle ([candidates](candidates.md)).
+
 ## Filling it in (patcher and metal, for their own recipes)
 
 1. Write `requires` from what the recipe actually depends on: the builds its rows and edits were made for (`os`,

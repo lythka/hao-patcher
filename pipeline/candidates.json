@@ -1,0 +1,94 @@
+{
+ "format": 1,
+ "comment": "Machines people have asked about, and near neighbours of the proven MacBookPro9,2, with only public facts: model identifier, GPU families from patches.py's GPUS, and firmware from FIRMWARE. A candidate is not a target: it has no board id, CPU flags, PCI list, ioreg or ESP, because those can only come from the machine (docs/candidates.md).",
+ "candidates": [
+  {
+   "id": "macbookpro10-1",
+   "name": "MacBook Pro (Retina, 15-inch, Early 2013)",
+   "model": "MacBookPro10,1",
+   "gpu": ["intel-ivb", "nvidia-kepler"],
+   "firmware": "none",
+   "status": "near-term",
+   "issue": null,
+   "why": "The closest 15-inch to the proven 9,2: same Ivy Bridge generation and HD 4000, plus a Kepler GT 650M the release has no recipe for yet. A target would have to decide which GPU the image drives.",
+   "source": "Apple's MacBook Pro (Retina, 15-inch, Early 2013) specifications: Intel HD Graphics 4000 and NVIDIA GeForce GT 650M."
+  },
+  {
+   "id": "macbookpro11-2",
+   "name": "MacBook Pro (Retina, 15-inch, Late 2013)",
+   "model": "MacBookPro11,2",
+   "gpu": ["intel-hsw"],
+   "firmware": "none",
+   "status": "near-term",
+   "issue": null,
+   "why": "Haswell with Iris Pro 5200 and no discrete GPU: the cleanest first machine for an intel-hsw recipe.",
+   "source": "Apple's MacBook Pro (Retina, 15-inch, Late 2013) specifications: Intel Iris Pro Graphics."
+  },
+  {
+   "id": "macbookpro16-1",
+   "name": "MacBook Pro (16-inch, 2019)",
+   "model": "MacBookPro16,1",
+   "gpu": ["amd-navi"],
+   "firmware": "t2",
+   "status": "requested",
+   "issue": 80,
+   "why": "The reported Navi14/T2 machine: the AMD X6000 stack is a different port, and T2 is a separate question. Its Coffee Lake integrated GPU is not a family in patches.py's GPUS, so only the discrete GPU is listed.",
+   "source": "GitHub issue #80: MacBookPro16,1, Radeon Pro 5500M (Navi14) at 1002:7340, T2."
+  },
+  {
+   "id": "haswell-broadwell-igpu",
+   "name": "Haswell and Broadwell integrated graphics (generation request)",
+   "model": null,
+   "gpu": ["intel-hsw", "intel-bdw"],
+   "firmware": "none",
+   "status": "requested",
+   "issue": 2,
+   "why": "A generation request with no machine named.",
+   "source": "GitHub issue #2; the generation's GPU families are intel-hsw and intel-bdw in patches.py's GPUS."
+  },
+  {
+   "id": "hp-elitebook-840-g4",
+   "name": "HP EliteBook 840 G4 (Kaby Lake, Intel HD 620)",
+   "model": null,
+   "gpu": ["intel-kbl"],
+   "firmware": "none",
+   "status": "requested",
+   "issue": 5,
+   "why": "A Kaby Lake hackintosh with HD 620; the issue reports a sanitised hao report and a working Tahoe graphics stack.",
+   "source": "GitHub issue #5: i5-7300U, Intel HD Graphics 620 (8086:5916), SMBIOS MacBookPro16,2."
+  },
+  {
+   "id": "skylake-igpu",
+   "name": "Skylake integrated graphics (generation request)",
+   "model": null,
+   "gpu": ["intel-skl"],
+   "firmware": "none",
+   "status": "requested",
+   "issue": 7,
+   "why": "A generation request with no machine named.",
+   "source": "GitHub issue #7."
+  },
+  {
+   "id": "hp-pavilion-dv6",
+   "name": "HP Pavilion dv6-7070ex (Ivy Bridge, Intel HD 4000)",
+   "model": null,
+   "gpu": ["intel-ivb"],
+   "firmware": "none",
+   "status": "requested",
+   "issue": 4,
+   "why": "An Ivy Bridge hackintosh that would reuse the 9,2 patch sets; non-Apple firmware is an open scope question.",
+   "source": "GitHub issue #4: i7-3610QM, Intel HD Graphics 4000."
+  },
+  {
+   "id": "vmware-svga",
+   "name": "VMware SVGA 3D (virtual machine, software graphics)",
+   "model": null,
+   "gpu": [],
+   "firmware": "none",
+   "status": "software",
+   "issue": 93,
+   "why": "A virtual-machine graphics device: the generic, software path, not a platform GPU. The issue's AMD part is the same Navi question as #80.",
+   "source": "GitHub issue #93: VMware SVGA 3D."
+  }
+ ]
+}

@@ -1,0 +1,259 @@
+#!/usr/bin/env python3.14
+"""candidates: what the release sets would do on the machines people ask about, before they are targets.
+
+  pipeline/candidates [--profile NAME ...] [--json | --markdown] [--check]
+
+A candidate is a machine someone asked about (a GitHub issue) or a near neighbour of the proven MacBookPro9,2. The
+registry, pipeline/candidates.json, holds only public facts: the model identifier, the GPU families from patches.py's
+GPUS, and the firmware from FIRMWARE. It is not a target: it has no ioreg, no PCI list, no ESP and no OCLP hardware
+profile, because those can only come from the machine itself (docs/candidates.md).
+
+For each candidate and each release profile, the report plans the profile's own set on the profile's build pair and
+puts every recipe in one of four buckets:
+  run      every requirement it can decide is met
+  refused  a known fact (OS, donor, GPU, firmware) does not meet the recipe's "requires"; the reason is printed
+  unknown  only the CPU is undecided, because no OCLP hardware profile exists for the candidate yet
+  skipped  the recipe's "applies" excludes the candidate's model and build
+A recipe without "requires" runs: nothing gates it. A candidate's GPU list may name several families (a Mac with an
+integrated and a discrete GPU); "requires" is met when any of them matches, as patches.py's unmet() decides.
+
+--profile NAME (repeatable) reports on those profiles instead of every profile with "release": true.
+--json writes the report as JSON. --markdown writes the registry table docs/candidates.md embeds.
+--check exits 1 when the registry is malformed; it reads nothing else.
+"""
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+TOP = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(TOP / 'pipeline'))
+import patches  # noqa: E402
+
+REGISTRY = TOP / 'pipeline' / 'candidates.json'
+KEYS = {'id', 'name', 'model', 'gpu', 'firmware', 'status', 'issue', 'why', 'source'}
+STATUSES = ('near-term', 'requested', 'software')
+# A target's measured fields. A candidate that carries one is claiming a measurement no registry row can make.
+MEASURED = {'pci', 'ioreg', 'esp', 'board_id', 'oclp_hardware_profile', 'cpu', 'serial', 'sha256'}
+ID = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*')
+PATCHES = Path(patches.TOP) / 'patches'
+
+
+def read_registry(path=REGISTRY):
+    with open(path) as f:
+        return json.load(f)
+
+
+def problems(reg):
+    """What is wrong with REG (empty: nothing)."""
+    if not isinstance(reg, dict):
+        return ['the registry must be an object']
+    bad = []
+    unknown = set(reg) - {'format', 'comment', 'candidates'}
+    if unknown:
+        bad.append('unknown keys %s' % ', '.join(sorted(unknown)))
+    if reg.get('format') != 1:
+        bad.append('format must be 1')
+    if not isinstance(reg.get('comment'), str) or not reg['comment'].strip():
+        bad.append('comment must say what the registry is and is not')
+    cs = reg.get('candidates')
+    if not isinstance(cs, list) or not cs:
+        return bad + ['candidates must be a non-empty list']
+    ids, models = {}, {}
+    for i, c in enumerate(cs):
+        where = 'candidates[%d]' % i
+        if not isinstance(c, dict):
+            bad.append('%s must be an object' % where)
+            continue
+        measured = set(c) & MEASURED
+        if measured:
+            bad.append('%s: %s belongs to a target, not a candidate (docs/candidates.md)'
+                       % (where, ', '.join(sorted(measured))))
+        unknown = set(c) - KEYS - MEASURED
+        if unknown:
+            bad.append('%s: unknown keys %s' % (where, ', '.join(sorted(unknown))))
+        missing = KEYS - set(c)
+        if missing:
+            bad.append('%s: missing keys %s' % (where, ', '.join(sorted(missing))))
+            continue
+        if not isinstance(c['id'], str) or not ID.fullmatch(c['id']):
+            bad.append('%s: id must be lowercase letters, digits and single hyphens' % where)
+        elif c['id'] in ids:
+            bad.append('%s: id %s is already used by %s' % (where, c['id'], ids[c['id']]))
+        ids[c['id']] = where
+        if c['model'] is not None:
+            if not isinstance(c['model'], str) or not c['model'].strip():
+                bad.append('%s: model must be a name or null' % where)
+            elif c['model'] in models:
+                bad.append('%s: model %s is already a candidate' % (where, c['model']))
+            else:
+                models[c['model']] = where
+        gpu = c['gpu']
+        if not isinstance(gpu, list) or len(set(gpu)) != len(gpu) or not all(isinstance(g, str) for g in gpu):
+            bad.append('%s: gpu must be a list of distinct GPU families' % where)
+        else:
+            wrong = [g for g in gpu if g not in patches.GPUS]
+            if wrong:
+                bad.append('%s: gpu %s not in patches.GPUS' % (where, ', '.join(wrong)))
+        if c['firmware'] not in patches.FIRMWARE:
+            bad.append('%s: firmware must be one of %s' % (where, ', '.join(patches.FIRMWARE)))
+        if c['status'] not in STATUSES:
+            bad.append('%s: status must be one of %s' % (where, ', '.join(STATUSES)))
+        if c['issue'] is not None and not (isinstance(c['issue'], int) and not isinstance(c['issue'], bool)
+                                           and c['issue'] > 0):
+            bad.append('%s: issue must be a GitHub issue number or null' % where)
+        if c['status'] == 'near-term' and c['issue'] is not None:
+            bad.append('%s: near-term is our own sequencing: it names no issue' % where)
+        if c['status'] in ('requested', 'software') and c['issue'] is None:
+            bad.append('%s: %s comes from a report: it names its issue' % (where, c['status']))
+        for k in ('name', 'why', 'source'):
+            if not isinstance(c[k], str) or not c[k].strip():
+                bad.append('%s: %s must be a non-empty string' % (where, k))
+    return bad
+
+
+def facts(c):
+    """The facts unmet() checks, from the registry row: the CPU stays empty (no OCLP profile exists yet)."""
+    return dict(model=c['model'], cpu=set(), gpu=set(c['gpu']), firmware=c['firmware'])
+
+
+def chosen_profiles(wanted=None):
+    """[(name, profile)] for WANTED, or every profile with "release": true."""
+    out = []
+    for f in sorted(Path(patches.PROFILES).glob('*.json')):
+        p = json.loads(f.read_text())
+        if (wanted and f.stem in wanted) or (not wanted and p.get('release') is True):
+            out.append((f.stem, p))
+    return out
+
+
+def pairs_for(profile_name, pairs):
+    """[(os, donor)] of the assemblies that build PROFILE_NAME."""
+    return sorted(p for p, sets in pairs.items() if profile_name in sets)
+
+
+def recipe(name):
+    """NAME's patch.json (a dict)."""
+    return json.loads((PATCHES / name / 'patch.json').read_text())
+
+
+def report(reg, wanted=None):
+    """The report: every candidate x every chosen profile x its build pairs, each recipe classified."""
+    pairs = patches.build_pairs()
+    profiles = chosen_profiles(wanted)
+    out = dict(format=1, profiles=[n for n, _ in profiles],
+               unknown_profiles=sorted(set(wanted or ()) - {n for n, _ in profiles}), candidates=[])
+    for c in reg['candidates']:
+        f = facts(c)
+        row = dict(id=c['id'], model=c['model'], name=c['name'], gpu=c['gpu'], firmware=c['firmware'],
+                   status=c['status'], issue=c['issue'], cells=[])
+        for pname, prof in profiles:
+            sets = pairs_for(pname, pairs)
+            if not sets:
+                row['cells'].append(dict(profile=pname, release=prof.get('release') is True, os=None, donor=None,
+                                         error='no assembly builds this profile', recipes=0, run=[], refused={},
+                                         unknown={}, skipped={}))
+                continue
+            try:
+                names = patches.names(patches.set_path(pname))
+            except (ValueError, KeyError, OSError) as e:
+                row['cells'].append(dict(profile=pname, release=prof.get('release') is True, os=None, donor=None,
+                                         error=str(e), recipes=0, run=[], refused={}, unknown={}, skipped={}))
+                continue
+            for os_build, donor in sets:
+                cell = dict(profile=pname, release=prof.get('release') is True, os=os_build, donor=donor, error=None,
+                            recipes=len(names), run=[], refused={}, unknown={}, skipped={})
+                for name in names:
+                    try:
+                        p = recipe(name)
+                    except (OSError, ValueError) as e:
+                        cell['refused'][name] = ['cannot read patch.json: %s' % e]
+                        continue
+                    if 'requires' not in p:
+                        if 'applies' in p and not patches.applies(p['applies'], f['model'], donor):
+                            cell['skipped'][name] = 'applies excludes %s %s' % (f['model'], donor)
+                        else:
+                            cell['run'].append(name)
+                        continue
+                    try:
+                        why = patches.unmet(p['requires'], f, os_build, donor)
+                    except (KeyError, TypeError) as e:
+                        cell['refused'][name] = ['bad requires: %s' % e]
+                        continue
+                    hard = [w for w in why if not w.startswith('cpu ')]
+                    if hard:
+                        cell['refused'][name] = why
+                    elif why:
+                        cell['unknown'][name] = why
+                    else:
+                        cell['run'].append(name)
+                row['cells'].append(cell)
+        out['candidates'].append(row)
+    return out
+
+
+def text(rep):
+    out = []
+    if rep['unknown_profiles']:
+        out.append('unknown profile(s): %s' % ', '.join(rep['unknown_profiles']))
+    for c in rep['candidates']:
+        out.append('%s  %s  gpu %s  firmware %s  %s' % (
+            c['model'] or c['id'], c['status'], ', '.join(c['gpu']) or 'none', c['firmware'],
+            '#%d' % c['issue'] if c['issue'] else 'no issue'))
+        for cell in c['cells']:
+            if cell['error']:
+                out.append('  %-24s ERROR %s' % (cell['profile'], cell['error']))
+                continue
+            out.append('  %-24s %s/%s  %3d run  %3d refused  %3d unknown  %3d skipped' % (
+                cell['profile'], cell['os'], cell['donor'], len(cell['run']), len(cell['refused']),
+                len(cell['unknown']), len(cell['skipped'])))
+            out += ['    refused %s: %s' % (n, '; '.join(w)) for n, w in cell['refused'].items()]
+            out += ['    unknown %s: %s' % (n, '; '.join(w)) for n, w in cell['unknown'].items()]
+            out += ['    skipped %s: %s' % (n, w) for n, w in cell['skipped'].items()]
+    return '\n'.join(out)
+
+
+def markdown(reg):
+    """The registry table docs/candidates.md embeds."""
+    out = ['| Model | Machine | GPU | Firmware | Status | Issue |', '|---|---|---|---|---|---|']
+    for c in reg['candidates']:
+        issue = ('[#%d](https://github.com/lythka/hao-patcher/issues/%d)' % (c['issue'], c['issue'])
+                 if c['issue'] else '—')
+        out.append('| %s | %s | %s | %s | %s | %s |' % (
+            c['model'] or '—', c['name'], ', '.join(c['gpu']) or 'none', c['firmware'], c['status'], issue))
+    return '\n'.join(out) + '\n'
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog='pipeline/candidates',
+                                 description='what the release sets would do on machines that are not targets yet')
+    ap.add_argument('--profile', action='append', metavar='NAME',
+                    help='report on this profile instead of every release profile (repeatable)')
+    group = ap.add_mutually_exclusive_group()
+    group.add_argument('--json', action='store_true', help='write the report as JSON')
+    group.add_argument('--markdown', action='store_true', help='write the registry table docs/candidates.md embeds')
+    ap.add_argument('--check', action='store_true', help='validate the registry and exit')
+    a = ap.parse_args(argv)
+    reg = read_registry()
+    bad = problems(reg)
+    if bad:
+        for b in bad:
+            print('candidates: %s' % b)
+        return 1
+    if a.check:
+        print('candidates: %d candidates, every row follows the format' % len(reg['candidates']))
+        return 0
+    if a.markdown:
+        print(markdown(reg), end='')
+        return 0
+    rep = report(reg, a.profile)
+    if rep['unknown_profiles']:
+        print('candidates: unknown profile(s): %s' % ', '.join(rep['unknown_profiles']))
+        return 1
+    print(json.dumps(rep, indent=1) if a.json else text(rep))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
