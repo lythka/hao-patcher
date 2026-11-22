@@ -66,8 +66,9 @@ Use hao-patcher only on a **dedicated test Mac** whose contents you can lose.
 
 ## Install
 
-On any Mac, Intel or Apple silicon, running macOS 13 or newer, with a USB drive of at least 64 GB and about 26 GB
-free, run one command. No clone, Xcode or Python installation is needed: the release supplies its own tools.
+On a Mac, Intel or Apple silicon, running macOS 13 or newer (not one already running hao), with a USB drive of at
+least 64 GB and about 26 GB free, run one command. No clone, Xcode or Python installation is needed: the release
+supplies its own tools.
 
 ```sh
 curl -fsSL https://github.com/lythka/hao-assets/releases/download/27.2.1-26B131.1/hao -o hao && sh hao
