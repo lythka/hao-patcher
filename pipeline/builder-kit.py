@@ -69,7 +69,7 @@ def release_assets(top, release, stage):
         tags = subprocess.check_output(['git', '-C', str(top), 'tag', '--points-at', commit], text=True).splitlines()
         if release['version'] not in tags:
             raise ValueError('final builder cut requires the version tag at the producing commit')
-    with tempfile.TemporaryDirectory(prefix='hao-builder-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='hao-kit-') as temporary:
         folder = Path(stage) if stage else Path(temporary)
         kit = folder / ('hao-kit-' + name + '.tar.gz')
         candidate_key = Path(top)/'tools/hao/data/candidate-keys.pub'
