@@ -11,8 +11,8 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | darwin27-kernel | r16 | oclp-hook | product |  | x | x |  |  | ok (r15) | r16 2026-11-19 Validated r15 on hardware (Validation). Nothing it installs changes. |
 | darwin27-sandbox-disk-space | r5 | oclp-hook | experiment |  |  | x |  |  | **needs** | r5 2026-11-17 Declares its scope (`requires`, docs/requires.md): only 26A428 lacks the rule; 27.2 ships it. No |
 | dev-access | r8 | post | dev |  |  |  |  |  | **needs** | r8 2026-11-17 Every path in apply.sh is quoted: the user's install runs posts from the installer volume ("/Vol |
-| dev-capture | r4 | post | dev |  |  |  |  |  | **needs** | r4 2026-11-18 hao_crash=1 and SIP 0x4 in every dev image: dev-lite has no dev-diagnostics, so its images had n |
-| dev-diagnostics | r10 | post | dev |  |  |  |  |  | **needs** | r10 2026-11-17 The dev boot-args follow hao-opencore r80: no `-nokcmismatchpanic`, no `-pmap_pcid_disable`. |
+| dev-capture | r5 | post | dev |  |  |  |  |  | **needs** | r5 2026-11-22 hao_crash=1 left out (owner 2026-11-22): with it a dev image's first boot stalls before sandboxd |
+| dev-diagnostics | r11 | post | dev |  |  |  |  |  | **needs** | r11 2026-11-22 hao_crash=1 left out (owner 2026-11-22): with it a dev image's first boot stalls before sandbox |
 | dev-keepawake | r3 | post | dev |  |  |  |  |  | **needs** | r3 2026-11-17 Declares its scope (`requires`, docs/requires.md): power settings and a launchd job: no build or |
 | dev-session | r2 | post | dev |  |  |  |  |  | **needs** | r2 2026-11-18 The test account's Setup Assistant record is complete, so the per-user Setup Assistant does not  |
 | golden-gate-appstore-slices | r6 | post | diagnostic |  |  | x |  |  | **needs** | r6 2026-11-17 Every path in apply.sh is quoted: an install runs recipe scripts from the installer volume, whos |

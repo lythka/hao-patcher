@@ -47,36 +47,34 @@ Revision r8, status dev. [Recipe](../patches/dev-access/README.md)
 
 ## dev-capture
 
-Revision r4, status dev. [Recipe](../patches/dev-capture/README.md)
+Revision r5, status dev. [Recipe](../patches/dev-capture/README.md)
 
 - `Library/Preferences/Logging/Subsystems/com.hao.plist`: whole file from hao. Data volume; src/com.hao.plist: the com.hao subsystem's messages persist at Info; root:wheel 0644.
 - `usr/local/libexec/hao-capture/hao-capture`: whole file from hao (row hao_capture_job). Data volume; the recorder job: each run dumps every process's Swift metadata with inventory.sh into /private/var/db/hao-capture/<boot>/ (capped at 1 GB); root:wheel 0755. Installed mode 0755, owner root:wheel.
 - `usr/local/libexec/hao-capture/inventory.sh`: whole file from hao (row hao_capture_inventory). Data volume; runs swift-inspect dump-generic-metadata on each process; root:wheel 0755. Installed mode 0755, owner root:wheel.
 - `Library/LaunchDaemons/local.hao.capture.plist`: whole file from hao (row hao_capture_plist). Data volume; root job: at load (first run after 1200 s, past the timed first-login settle), then every 1800 s, Background, low-priority I/O; root:wheel 0644. Installed mode 0644, owner root:wheel.
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist, after hao-opencore (and golden-gate-live-text-service); 1 edit, applied by the installer.
-  1. `hao-crash-lines`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 amfi_get_out_of_my_way=1 amfi_force_policy=8 hao_crash=1 auxKCAtBoot=false".
-     Hao-runtime's crash lines on every dev image (owner 2026-11-18: always capture crashes); dev-lite images have no dev-diagnostics.
+  1. `hao-crash-lines`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 amfi_get_out_of_my_way=1 amfi_force_policy=8 auxKCAtBoot=false".
+     Hao-opencore's boot-args unchanged on dev images: hao_crash=1 left out (owner 2026-11-22): with it a dev image's first boot stalls before sandboxd (QEMU, ab855d51; without it the same image boots in 537 s); hao-runtime's fix is parked until after beta.1.
      - `keepsyms=1`: OCLP's base config: a panic report keeps the kernel's symbols, so it names functions instead of bare addresses.
      - `-lilubetaall`: Lilu and its plug-ins (OCLP's graphics and hardware kexts) load although they do not list Darwin 27 as supported.
      - `ipc_control_port_options=0`: OCLP adds it whenever SIP is lowered (efi_builder/security.py): from macOS 12.3 Electron apps stop launching with SIP lowered unless the IPC control-port policy is relaxed.
      - `amfi_get_out_of_my_way=1`: hao-runtime signs each program's x86_64 slice ad hoc with that program's own entitlements, including Apple-private ones (launchd's); with AMFIPass alone AMFI rejects /sbin/launchd and the kernel panics.
      - `amfi_force_policy=8`: AMFI's dyld policy treats a restricted program (CS_RESTRICT: it holds entitlements) as restricted again although SIP's filesystem bit is allowed, as on a Mac with SIP on, so dyld denies it the DYLD_* path variables (DYLD_INSERT_LIBRARIES, library and framework paths) unless it also requires library validation, which keeps them as on a Mac with SIP on (owner D1, 2026-11-17). Not version-scoped: a Recovery booted through this OpenCore gets it too; the Recovery tools that insert libraries run in the NetBoot Recovery, whose config is OCLP's. Bit 0x8 of AMFI's force_policy (forceDefaultDyldEnvVarsPolicy) is read only by the dyld environment policy; nothing the image ships sets DYLD_* for an entitled program.
-     - `hao_crash=1`: dev only: hao-runtime writes each crashed translated program's reason to its console log (/private/var/log/hao).
      - `auxKCAtBoot=false`: kernelmanagerd loads the System kernel collection at once instead of first building an auxiliary one: 27's kmutil cannot build an x86_64 collection, so that build failed at every boot and held the System collection (and with it the framebuffer and WindowServer) back about 18 s.
 
 ## dev-diagnostics
 
-Revision r10, status dev. [Recipe](../patches/dev-diagnostics/README.md)
+Revision r11, status dev. [Recipe](../patches/dev-diagnostics/README.md)
 
 - `EFI/OC/config.plist`: from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, after hao-opencore (and golden-gate-live-text-service); 3 edits, applied by the installer.
-  1. `diagnostic-boot-args`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 amfi_get_out_of_my_way=1 amfi_force_policy=8 hao_crash=1 hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 auxKCAtBoot=false".
-     Hao-runtime's crash lines (hao_crash=1) and its measurement switches: hao_nx_stats and hao_bridge_stats (NX fault tables, bridge statistics) and hao_diag_time (phase lines and usage counters boot-gantt reads), which cost time on every translated native call; only dev images carry any of them.
+  1. `diagnostic-boot-args`: plist.set NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args = "keepsyms=1 -lilubetaall ipc_control_port_options=0 amfi_get_out_of_my_way=1 amfi_force_policy=8 hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 auxKCAtBoot=false".
+     Hao-runtime's measurement switches (no hao_crash=1 since r11: it stalls a dev image's first boot): hao_nx_stats and hao_bridge_stats (NX fault tables, bridge statistics) and hao_diag_time (phase lines and usage counters boot-gantt reads), which cost time on every translated native call; only dev images carry any of them.
      - `keepsyms=1`: OCLP's base config: a panic report keeps the kernel's symbols, so it names functions instead of bare addresses.
      - `-lilubetaall`: Lilu and its plug-ins (OCLP's graphics and hardware kexts) load although they do not list Darwin 27 as supported.
      - `ipc_control_port_options=0`: OCLP adds it whenever SIP is lowered (efi_builder/security.py): from macOS 12.3 Electron apps stop launching with SIP lowered unless the IPC control-port policy is relaxed.
      - `amfi_get_out_of_my_way=1`: hao-runtime signs each program's x86_64 slice ad hoc with that program's own entitlements, including Apple-private ones (launchd's); with AMFIPass alone AMFI rejects /sbin/launchd and the kernel panics.
      - `amfi_force_policy=8`: AMFI's dyld policy treats a restricted program (CS_RESTRICT: it holds entitlements) as restricted again although SIP's filesystem bit is allowed, as on a Mac with SIP on, so dyld denies it the DYLD_* path variables (DYLD_INSERT_LIBRARIES, library and framework paths) unless it also requires library validation, which keeps them as on a Mac with SIP on (owner D1, 2026-11-17). Not version-scoped: a Recovery booted through this OpenCore gets it too; the Recovery tools that insert libraries run in the NetBoot Recovery, whose config is OCLP's. Bit 0x8 of AMFI's force_policy (forceDefaultDyldEnvVarsPolicy) is read only by the dyld environment policy; nothing the image ships sets DYLD_* for an entitled program.
-     - `hao_crash=1`: dev only (owner 2026-11-17: 'Dev builds only'): hao-runtime writes its crash lines to the console, so a crashed translated program leaves a reason in the log.
      - `hao_nx_stats=1`: dev only: hao-runtime's NX fault tables; costs time on every translated native call.
      - `hao_bridge_stats=1`: dev only: hao-runtime's bridge statistics; costs time on every translated native call.
      - `hao_diag_time=1`: dev only: hao-runtime's phase lines and usage counters, which boot-gantt reads.

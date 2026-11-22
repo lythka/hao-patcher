@@ -19,16 +19,15 @@
      "7C436110-AB2A-4BBB-A880-FE41995C9F82",
      "boot-args"
     ],
-    "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 amfi_get_out_of_my_way=1 amfi_force_policy=8 hao_crash=1 auxKCAtBoot=false"
+    "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 amfi_get_out_of_my_way=1 amfi_force_policy=8 auxKCAtBoot=false"
    },
-   "reason": "hao-runtime's crash lines on every dev image (owner 2026-11-18: always capture crashes); dev-lite images have no dev-diagnostics",
+   "reason": "hao-opencore's boot-args unchanged on dev images: hao_crash=1 left out (owner 2026-11-22): with it a dev image's first boot stalls before sandboxd (QEMU, ab855d51; without it the same image boots in 537 s); hao-runtime's fix is parked until after beta.1.",
    "arg_reasons": {
     "keepsyms=1": "OCLP's base config: a panic report keeps the kernel's symbols, so it names functions instead of bare addresses",
     "-lilubetaall": "Lilu and its plug-ins (OCLP's graphics and hardware kexts) load although they do not list Darwin 27 as supported",
     "ipc_control_port_options=0": "OCLP adds it whenever SIP is lowered (efi_builder/security.py): from macOS 12.3 Electron apps stop launching with SIP lowered unless the IPC control-port policy is relaxed",
     "amfi_get_out_of_my_way=1": "hao-runtime signs each program's x86_64 slice ad hoc with that program's own entitlements, including Apple-private ones (launchd's); with AMFIPass alone AMFI rejects /sbin/launchd and the kernel panics",
     "amfi_force_policy=8": "AMFI's dyld policy treats a restricted program (CS_RESTRICT: it holds entitlements) as restricted again although SIP's filesystem bit is allowed, as on a Mac with SIP on, so dyld denies it the DYLD_* path variables (DYLD_INSERT_LIBRARIES, library and framework paths) unless it also requires library validation, which keeps them as on a Mac with SIP on (owner D1, 2026-11-17). Not version-scoped: a Recovery booted through this OpenCore gets it too; the Recovery tools that insert libraries run in the NetBoot Recovery, whose config is OCLP's. Bit 0x8 of AMFI's force_policy (forceDefaultDyldEnvVarsPolicy) is read only by the dyld environment policy; nothing the image ships sets DYLD_* for an entitled program",
-    "hao_crash=1": "dev only: hao-runtime writes each crashed translated program's reason to its console log (/private/var/log/hao)",
     "auxKCAtBoot=false": "kernelmanagerd loads the System kernel collection at once instead of first building an auxiliary one: 27's kmutil cannot build an x86_64 collection, so that build failed at every boot and held the System collection (and with it the framebuffer and WindowServer) back about 18 s"
    }
   }

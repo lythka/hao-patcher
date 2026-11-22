@@ -13,12 +13,12 @@ p=sys.argv[1]
 with open(p,'rb') as f:d=plistlib.load(f)
 n=d['NVRAM']['Add']['7C436110-AB2A-4BBB-A880-FE41995C9F82']
 args=n.get('boot-args','').split()
-# hao_crash=1: hao-runtime's crash lines on the console (dev images only, owner 2026-11-17: "Dev builds only").
+# No hao_crash=1 (r11): with it a dev image's first boot stalls before sandboxd.
 # hao_nx_stats/hao_bridge_stats: NX fault tables and bridge statistics; hao_diag_time: mach-clock stamps and phase
 # lines, PID 1's pre-Data lines kept and flushed by the bridge_stats report (boot-gantt reads them). Before
 # auxKCAtBoot=false, in this order.
 at=args.index('auxKCAtBoot=false') if 'auxKCAtBoot=false' in args else len(args)
-for arg in reversed(('hao_crash=1','hao_nx_stats=1','hao_bridge_stats=1','hao_diag_time=1')):
+for arg in reversed(('hao_nx_stats=1','hao_bridge_stats=1','hao_diag_time=1')):
     if arg not in args:args.insert(at,arg)
 n['boot-args']=' '.join(args)
 # OpenCore's log: 0x01 logging + 0x40 file on the EFI partition, nothing on screen (0x02 off); info lines (0x40).

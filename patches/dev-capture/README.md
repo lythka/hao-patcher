@@ -14,7 +14,7 @@ Every dev run collects what a failure needs, from its first boot on, with nothin
 Showing hao's `<private>` values cannot be done here: macOS 27 ignores `Enable-Private-Data` in this file (the same test).
 The runtime marks the values it needs as public in its own log calls.
 
-`EFI/OC/config.plist` (after hao-opencore, before dev-diagnostics): boot-arg `hao_crash=1` (hao-runtime's crash lines in
+`EFI/OC/config.plist` (after hao-opencore, before dev-diagnostics): no `hao_crash=1` since r5 (it was hao-runtime's crash lines in
 `/private/var/log/hao`) and SIP bit 0x4 (task-for-pid, for the recorder's swift-inspect). dev-lite images have no
 dev-diagnostics, so without these a refusal showed only in .ips frames (U0 image, 2026-11-18). dev-diagnostics adds the
 same only if missing.
@@ -38,6 +38,7 @@ NEEDS VALIDATION: the logging file was tested live on a test laptop (2026-11-18)
 folder and the image build are untested.
 
 ## Revisions
+- r5 2026-11-22 hao_crash=1 left out (owner 2026-11-22): with it a dev image's first boot stalls before sandboxd (QEMU, ab855d51; without it the same image boots in 537 s); hao-runtime's fix is parked until after beta.1.
 - r4 2026-11-18 hao_crash=1 and SIP 0x4 in every dev image: dev-lite has no dev-diagnostics, so its images had neither. Listed before dev-diagnostics.
 - r3 2026-11-18 Recorder payload 40309773dd00: its first run waits 1200 s instead of 300 s, so it does not load the timed first login.
 - r2 2026-11-18 The metadata recorder: a root launchd job and its two scripts, from three private store rows.

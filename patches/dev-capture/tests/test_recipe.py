@@ -24,11 +24,11 @@ def opencore_config():
 
 
 class Recipe(unittest.TestCase):
-    def test_declared_boot_args_are_hao_opencores_plus_hao_crash(self):
+    def test_declared_boot_args_are_hao_opencores(self):
         opencore = json.loads((PATCH.parent / 'hao-opencore/edits/config.json').read_text())
         declared = [e['args']['value'] for e in opencore['edits'] if e.get('args', {}).get('key', [None])[-1:] == ['boot-args']]
         self.assertEqual(declared, [OPENCORE_ARGS])
-        self.assertEqual(SPEC['edits'][0]['args']['value'], OPENCORE_ARGS.replace('auxKCAtBoot', 'hao_crash=1 auxKCAtBoot'))
+        self.assertEqual(SPEC['edits'][0]['args']['value'], OPENCORE_ARGS)   # r5: no hao_crash=1
 
     def test_profile_persists_info_only(self):
         opts = plistlib.loads((PATCH / 'src/com.hao.plist').read_bytes())['DEFAULT-OPTIONS']

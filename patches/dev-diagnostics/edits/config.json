@@ -19,16 +19,15 @@
      "7C436110-AB2A-4BBB-A880-FE41995C9F82",
      "boot-args"
     ],
-    "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 amfi_get_out_of_my_way=1 amfi_force_policy=8 hao_crash=1 hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 auxKCAtBoot=false"
+    "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 amfi_get_out_of_my_way=1 amfi_force_policy=8 hao_nx_stats=1 hao_bridge_stats=1 hao_diag_time=1 auxKCAtBoot=false"
    },
-   "reason": "hao-runtime's crash lines (hao_crash=1) and its measurement switches: hao_nx_stats and hao_bridge_stats (NX fault tables, bridge statistics) and hao_diag_time (phase lines and usage counters boot-gantt reads), which cost time on every translated native call; only dev images carry any of them",
+   "reason": "hao-runtime's measurement switches (no hao_crash=1 since r11: it stalls a dev image's first boot): hao_nx_stats and hao_bridge_stats (NX fault tables, bridge statistics) and hao_diag_time (phase lines and usage counters boot-gantt reads), which cost time on every translated native call; only dev images carry any of them",
    "arg_reasons": {
     "keepsyms=1": "OCLP's base config: a panic report keeps the kernel's symbols, so it names functions instead of bare addresses",
     "-lilubetaall": "Lilu and its plug-ins (OCLP's graphics and hardware kexts) load although they do not list Darwin 27 as supported",
     "ipc_control_port_options=0": "OCLP adds it whenever SIP is lowered (efi_builder/security.py): from macOS 12.3 Electron apps stop launching with SIP lowered unless the IPC control-port policy is relaxed",
     "amfi_get_out_of_my_way=1": "hao-runtime signs each program's x86_64 slice ad hoc with that program's own entitlements, including Apple-private ones (launchd's); with AMFIPass alone AMFI rejects /sbin/launchd and the kernel panics",
     "amfi_force_policy=8": "AMFI's dyld policy treats a restricted program (CS_RESTRICT: it holds entitlements) as restricted again although SIP's filesystem bit is allowed, as on a Mac with SIP on, so dyld denies it the DYLD_* path variables (DYLD_INSERT_LIBRARIES, library and framework paths) unless it also requires library validation, which keeps them as on a Mac with SIP on (owner D1, 2026-11-17). Not version-scoped: a Recovery booted through this OpenCore gets it too; the Recovery tools that insert libraries run in the NetBoot Recovery, whose config is OCLP's. Bit 0x8 of AMFI's force_policy (forceDefaultDyldEnvVarsPolicy) is read only by the dyld environment policy; nothing the image ships sets DYLD_* for an entitled program",
-    "hao_crash=1": "dev only (owner 2026-11-17: 'Dev builds only'): hao-runtime writes its crash lines to the console, so a crashed translated program leaves a reason in the log",
     "hao_nx_stats=1": "dev only: hao-runtime's NX fault tables; costs time on every translated native call",
     "hao_bridge_stats=1": "dev only: hao-runtime's bridge statistics; costs time on every translated native call",
     "hao_diag_time=1": "dev only: hao-runtime's phase lines and usage counters, which boot-gantt reads",

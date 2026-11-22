@@ -16,8 +16,8 @@ Undeclared: opencore-generic, opencore-mbp92.
 | darwin27-kernel | r16 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-golden-bootstrap, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131, golden-gate | darwin27_kernel 3c931751 kernel; tahoe_kmutil 8117f099 kmutil; tahoe_kc_builder a8653d9b libKernelCollectionBuilder.dylib |
 | darwin27-sandbox-disk-space | r5 | experiment | oclp-hook | yes | golden-gate | - |
 | dev-access | r8 | dev | post | yes | dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, tahoe-dev | test_host_key 474bf917 ssh_host_ed25519_key; test_authorized_key 8522212b mbp92_test.pub; screensharing_users 285943c0 screensharing-users |
-| dev-capture | r4 | dev | post | yes | dev-alpha-v0.1.0, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27 | hao_capture_job 514c46e1 hao-capture; hao_capture_inventory 786b5c50 inventory.sh; hao_capture_plist 1fa1d9e3 local.hao.capture.plist |
-| dev-diagnostics | r10 | dev | post | yes | dev-alpha-v0.1.0, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-metal27 | - |
+| dev-capture | r5 | dev | post | yes | dev-alpha-v0.1.0, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27 | hao_capture_job 514c46e1 hao-capture; hao_capture_inventory 786b5c50 inventory.sh; hao_capture_plist 1fa1d9e3 local.hao.capture.plist |
+| dev-diagnostics | r11 | dev | post | yes | dev-alpha-v0.1.0, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-metal27 | - |
 | dev-keepawake | r3 | dev | post | yes | dev-alpha-v0.1.0, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27 | - |
 | dev-session | r2 | dev | post | yes | dev-alpha-v0.1.0, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27 | dev_session_config 8786bcbc session.conf |
 | golden-gate-appstore-slices | r6 | diagnostic | post | yes | dev-beta-candidate-fold, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-metal27, golden-gate | appstore_slice_guard f61a65ee appstore-slices-20261114-5b3f353e7405 (hao-patcher 1ee6d4a8) |
@@ -96,13 +96,13 @@ Undeclared: opencore-generic, opencore-mbp92.
   - `Library/LaunchDaemons/local.testssh.plist`: from hao
   - `private/var/root/.testssh/screensharing-users`: from hao (row screensharing_users)
   - `Library/LaunchDaemons/dev.hao.screensharing.plist`: from hao
-- **dev-capture** r4
+- **dev-capture** r5
   - `Library/Preferences/Logging/Subsystems/com.hao.plist`: from hao
   - `usr/local/libexec/hao-capture/hao-capture`: from hao (row hao_capture_job)
   - `usr/local/libexec/hao-capture/inventory.sh`: from hao (row hao_capture_inventory)
   - `Library/LaunchDaemons/local.hao.capture.plist`: from hao (row hao_capture_plist)
   - `EFI/OC/config.plist`: edited (1 edit) from OCLP · OCLP's OpenCore config.plist, after hao-opencore (and golden-gate-live-text-service)
-- **dev-diagnostics** r10
+- **dev-diagnostics** r11
   - `EFI/OC/config.plist`: edited (3 edits) from OCLP · OCLP's OpenCore config.plist for MacBookPro9,2, after hao-opencore (and golden-gate-live-text-service)
 - **dev-keepawake** r3
   - `Library/LaunchDaemons/dev.hao.keepawake.plist`: from hao
@@ -534,7 +534,7 @@ Image 8fb92d5, pushed 2026-11-14 10:11:23 (built 2026-11-14 09:13 from d970c5b3,
 
 ## 4. Drift
 
-- dev-diagnostics r10 is newer than every image built with it (newest r4).
+- dev-diagnostics r11 is newer than every image built with it (newest r4).
 - golden-gate-appstore-slices r6 is newer than every image built with it (newest r2).
 - golden-gate-av1-encoder-x86 r5 is newer than every image built with it (newest r4).
 - golden-gate-dyld-internal r5 is newer than every image built with it (newest r4).
