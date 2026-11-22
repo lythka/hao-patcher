@@ -41,11 +41,11 @@ trees with their owners (0, 88, 248, 92); MTLCompilerService CPU during Setup's 
 `make compare` on a new harvest.
 
 ## Validation
-NEEDS VALIDATION (r11 and later). Image 4d1c48c (26B131) with r10, 2026-11-11: MTLCompilerService was not among the
-busiest processes during first boot (without the pack: 4:21 CPU at 9 min). The current pack was harvested before
-golden-gate-metal-argbuf and has to be remade from an image with it.
+
+Laptop 2026-11-22, a MacBookPro9,2: the dev-beta image c3c0a5b (26B131, built from 7459d3e6 with r17; profile dev-beta-v0.0.1: the beta set plus dev-access) was pushed, booted to Setup and used (Maps, System Settings, Weather, Control Center). Its QEMU first boot passed in 490 s with the shared cache rebuilt in place and checked against the release (UUID 31DA2287, 36 files). Known issues, not this recipe's: first boot is slow (load above 400 for several minutes) and Setup's Transfer pane leaves its selection ring on "From a Mac".
 
 ## Revisions
+- r18 2026-11-22 Validated r17 on hardware (Validation). Nothing it installs changes.
 - r17 2026-11-17 The system accounts' Metal cache files (46, under private/var/folders) are declared `"content": "seed"`: Metal appends to them on first GPU use, so `hao verify` checks their presence, mode and owner, not their bytes. The PerUserSeed copies are unchanged sources. Declaration only; nothing installed changes.
 - r16 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces `applies`. status product: it ships in the release profiles (what it installs is unchanged; `validated` stays false until the re-cut's laptop boots prove it).
 - r15 2026-11-16 Declares its pack (intel-hd4000): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

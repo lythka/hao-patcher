@@ -38,7 +38,7 @@ NEEDS VALIDATION: the logging file was tested live on a test laptop (2026-11-18)
 folder and the image build are untested.
 
 ## Revisions
-- r5 2026-11-22 hao_crash=1 left out (owner 2026-11-22): with it a dev image's first boot stalls before sandboxd (QEMU, ab855d51; without it the same image boots in 537 s); hao-runtime's fix is parked until after beta.1.
+- r5 2026-11-22 hao_crash=1 left out: with it a dev image's first boot stalls before sandboxd (QEMU, ab855d51; without it the same image boots in 537 s); hao-runtime's fix is parked until after beta.1.
 - r4 2026-11-18 hao_crash=1 and SIP 0x4 in every dev image: dev-lite has no dev-diagnostics, so its images had neither. Listed before dev-diagnostics.
 - r3 2026-11-18 Recorder payload 40309773dd00: its first run waits 1200 s instead of 300 s, so it does not load the timed first login.
 - r2 2026-11-18 The metadata recorder: a root launchd job and its two scripts, from three private store rows.

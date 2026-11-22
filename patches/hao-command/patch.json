@@ -1,12 +1,14 @@
 {
- "revision": 15,
+ "revision": 16,
  "pack": "base",
  "stage": "post",
  "inputs": [
   "python_x86_64"
  ],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 15,
+ "validated_digest": "681c3cf973127fcda6fa763fc7ecad2ccfbc4143fe6a0852c518fa12b5de286d",
  "files": [
   {
    "path": "usr/local/bin/hao",

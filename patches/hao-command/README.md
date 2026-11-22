@@ -20,11 +20,10 @@ On the installed Mac: `hao`, `hao status`, `hao --help`.
 
 ## Validation
 
-NEEDS VALIDATION: r14 adds the pinned-asset downloader for `hao cache build`.
-
-Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r12): `/usr/local/bin/hao verify` runs and reports against 38 pack manifests, and the listing of /private/var/log/hao collected from that boot shows `drwxr-xr-x root wheel`.
+Laptop 2026-11-22, a MacBookPro9,2: the dev-beta image c3c0a5b (26B131, built from 7459d3e6 with r15; profile dev-beta-v0.0.1: the beta set plus dev-access) was pushed, booted to Setup and used (Maps, System Settings, Weather, Control Center). Its QEMU first boot passed in 490 s with the shared cache rebuilt in place and checked against the release (UUID 31DA2287, 36 files). Known issues, not this recipe's: first boot is slow (load above 400 for several minutes) and Setup's Transfer pane leaves its selection ring on "From a Mac".
 
 ## Revisions
+- r16 2026-11-22 Validated r15 on hardware (Validation). Nothing it installs changes.
 - r15 2026-11-22 Show target cache rebuild requirements and permit resume at its build checkpoint.
 - r14 2026-11-21 Stage the downloader used by the installed cache rebuild command.
 - r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes.

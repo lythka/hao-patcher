@@ -1,12 +1,14 @@
 {
- "revision": 15,
+ "revision": 16,
  "pack": "base",
  "stage": "oclp-hook",
  "inputs": [
   "golden_gate_userspace"
  ],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 15,
+ "validated_digest": "53efe42dff0db73ae7549cc225e2b3133a09ed6ed93822d926c5ca474b0650d3",
  "files": [
   {
    "path": "usr/lib/hao/native-identities",

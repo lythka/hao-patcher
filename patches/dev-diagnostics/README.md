@@ -36,7 +36,7 @@ golden-gate-live-text-service's and this recipe's, applied to the base config of
 `tests/test_edits.py` with `HAO_OPENCORE_INPUT` and `HAO_OPENCORE_IMAGE_CONFIG`): bench images keep the same config.
 
 ## Revisions
-- r11 2026-11-22 hao_crash=1 left out (owner 2026-11-22): with it a dev image's first boot stalls before sandboxd (QEMU, ab855d51; without it the same image boots in 537 s); hao-runtime's fix is parked until after beta.1.
+- r11 2026-11-22 hao_crash=1 left out: with it a dev image's first boot stalls before sandboxd (QEMU, ab855d51; without it the same image boots in 537 s); hao-runtime's fix is parked until after beta.1.
 - r10 2026-11-17 The dev boot-args follow hao-opencore r80: no `-nokcmismatchpanic`, no `-pmap_pcid_disable`.
 - r9 2026-11-17 Declares its scope (`requires`, docs/requires.md): boot-args, OpenCore log settings and SIP flags: no build or hardware dependence. Nothing it installs changes.
 - r8 2026-11-17 Its declared boot-args carry hao-opencore r72's `amfi_force_policy=8`; nothing this recipe adds changes.

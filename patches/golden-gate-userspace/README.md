@@ -362,11 +362,11 @@ creation logs in automatically (authd accepts loginwindow's `FUSAutologinDataKey
 unlisted ad hoc one.
 
 ## Validation
-NEEDS VALIDATION: r96 (r95's fitted OS image, first image named .dmg) has host tests with recorded image steps (copy into the fitted size before sealing; the 26B131 numbers); an image build (os.dmg size, seal, no holes) is open. r94 (#90, fully allocated cryptex images) has host tests (copy and allocate leave no hole and keep the bytes; the copy test fails on r93); an image built with it (os.dmg hole map empty) and the graft read of the x86_64 caches on a booted image are open. r92 was proven on hardware:
 
-Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r92): automatic login to the desktop; Spotlight finds apps, Safari reaches the network, Bluetooth, sound and the camera are up, and 40 of 48 apps open and run 20 s. Open on that image and tracked on their own: Weather and News crash (#9, #62), Books (#15), gamed (#18).
+Laptop 2026-11-22, a MacBookPro9,2: the dev-beta image c3c0a5b (26B131, built from 7459d3e6 with r97; profile dev-beta-v0.0.1: the beta set plus dev-access) was pushed, booted to Setup and used (Maps, System Settings, Weather, Control Center). Its QEMU first boot passed in 490 s with the shared cache rebuilt in place and checked against the release (UUID 31DA2287, 36 files). Known issues, not this recipe's: first boot is slow (load above 400 for several minutes) and Setup's Transfer pane leaves its selection ring on "From a Mac".
 
 ## Revisions
+- r98 2026-11-22 Validated r97 on hardware (Validation). Nothing it installs changes.
 - r97 2026-11-21 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 497f126 (hao-runtime-26B131-20261120-497f126-stock). No recipe change.
 - r96 2026-11-19 compact_image keeps its first image under a .dmg name (`built_path`: .golden-gate-os.built.dmg): hdiutil recognises a raw image by that extension, and r95's .dmg.built stopped the VM build ("attach failed - image not recognized"). install_cryptex removes one an earlier run left.
 - r95 2026-11-19 The OS cryptex image is sized to what it holds (`compact_image`): built as before at its files' logical size, then copied into a new image of the volume's used bytes plus a margin (`fitted_size`: 1 GiB or 3%) and sealed there. Most files are stored compressed, so on 26B131 the image was 26.2 GB with 13.25 GB used; r94 allocates the whole image (#90), and the fitted one keeps Preboot about 12 GB smaller than r94 (about 1 GB more than r93's sparse image).

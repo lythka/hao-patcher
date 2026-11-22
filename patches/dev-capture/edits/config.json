@@ -21,7 +21,7 @@
     ],
     "value": "keepsyms=1 -lilubetaall ipc_control_port_options=0 amfi_get_out_of_my_way=1 amfi_force_policy=8 auxKCAtBoot=false"
    },
-   "reason": "hao-opencore's boot-args unchanged on dev images: hao_crash=1 left out (owner 2026-11-22): with it a dev image's first boot stalls before sandboxd (QEMU, ab855d51; without it the same image boots in 537 s); hao-runtime's fix is parked until after beta.1.",
+   "reason": "hao-opencore's boot-args unchanged on dev images: hao_crash=1 left out: with it a dev image's first boot stalls before sandboxd (QEMU, ab855d51; without it the same image boots in 537 s); hao-runtime's fix is parked until after beta.1.",
    "arg_reasons": {
     "keepsyms=1": "OCLP's base config: a panic report keeps the kernel's symbols, so it names functions instead of bare addresses",
     "-lilubetaall": "Lilu and its plug-ins (OCLP's graphics and hardware kexts) load although they do not list Darwin 27 as supported",

@@ -1,5 +1,5 @@
 {
- "revision": 1,
+ "revision": 2,
  "pack": "base",
  "variant": "cache-install",
  "replaces": "golden-gate-shared-cache-catalog",
@@ -8,8 +8,10 @@
   "shared_cache_builder",
   "swift_metadata_catalog"
  ],
- "status": "experiment",
- "validated": false,
+ "status": "product",
+ "validated": true,
+ "validated_revision": 1,
+ "validated_digest": "63e14c7b471576e6c6ec9811ae3884bd669e51310e66bd96b17d1f82a0672eea",
  "files": [
   {
    "path": "System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64",

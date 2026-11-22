@@ -1,12 +1,14 @@
 {
- "revision": 17,
+ "revision": 18,
  "pack": "intel-hd4000",
  "stage": "post",
  "inputs": [
   "shader_caches_golden_gate"
  ],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 17,
+ "validated_digest": "11656a13e7017df8f9753aaf270c24a4a1c597f1a5c9b72c2f247bba7883b871",
  "optional": "caches",
  "files": [
   {

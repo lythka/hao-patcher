@@ -1,5 +1,5 @@
 {
- "revision": 6,
+ "revision": 7,
  "pack": "base",
  "variant": "cache-catalog",
  "replaces": "hao-runtime-fold",
@@ -7,8 +7,10 @@
  "inputs": [
   "hao_runtime_fold_catalog"
  ],
- "status": "experiment",
- "validated": false,
+ "status": "product",
+ "validated": true,
+ "validated_revision": 6,
+ "validated_digest": "0e0c68ea624f9b9300a11d9c07787d65149a3ae99326a48e6868cc92ee3a52b3",
  "files": [
   {
    "path": "usr/libexec/hao",

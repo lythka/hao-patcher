@@ -1,5 +1,5 @@
 {
- "revision": 87,
+ "revision": 88,
  "pack": "base",
  "stage": "post",
  "inputs": [
@@ -9,7 +9,9 @@
   "intel_commpage_abi"
  ],
  "status": "product",
- "validated": false,
+ "validated": true,
+ "validated_revision": 87,
+ "validated_digest": "1d088d7958afd29fa4d7b411afea03782ddefc10547e8b49a90501f369543cdd",
  "files": [
   {
    "path": "EFI/OC/config.plist",

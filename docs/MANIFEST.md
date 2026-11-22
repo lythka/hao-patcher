@@ -30,7 +30,7 @@ Undeclared: opencore-generic, opencore-mbp92.
 | golden-gate-hello | r13 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131, golden-gate | hello_metallib_golden_gate df65c1dd hello-metallib-llvm15-20261122; libhelloblur 9c273f39 libhelloblur.dylib (hao-patcher f479d6c7) |
 | golden-gate-icon-caches | r10 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131 | icon_caches_golden_gate 788ba7d6 icon-caches-26B131-20261111-de36690716f3 |
 | golden-gate-ids | r3 | product | oclp-hook | yes | dev-beta-candidate-fold | ids_service 6458b30d ids-26B131-20261115-d5aa7a8c |
-| golden-gate-launchd-warm | r6 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131 | - |
+| golden-gate-launchd-warm | r7 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131 | - |
 | golden-gate-live-text-service | r8 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131 | - |
 | golden-gate-live-text-shared | r14 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131 | live_text_framework ebc8535d framework (hao-patcher f479d6c7) |
 | golden-gate-metal-argbuf | r12 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131 | metal_argbuf 3b7d4032 metal-argbuf-26B131-20261120-f60029d7 (hao-patcher 29c79006) |
@@ -40,26 +40,26 @@ Undeclared: opencore-generic, opencore-mbp92.
 | golden-gate-metal27 | r6 | dev | oclp-hook | yes | dev-metal27 | metal27_installed ee0a9671 metal27-installed-26B131-20261113-d399c6f3 |
 | golden-gate-mobile-assets | r3 | product | post | yes | dev-alpha-v0.1.0, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-full-witness | mobile_assets b5269354 mobile-assets-26B131-9940eab52729 (hao-patcher 9327e059) |
 | golden-gate-model-gates-mbp92 | r1 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131 | - |
-| golden-gate-native-identities | r15 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131, golden-gate | golden_gate_userspace 060bd378 payload |
+| golden-gate-native-identities | r16 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131, golden-gate | golden_gate_userspace 060bd378 payload |
 | golden-gate-root-launchservices | r5 | experiment | post | no: row root_launchservices_golden_gate | - | root_launchservices_golden_gate - root-launchservices-26B131-not-made-yet |
-| golden-gate-shader-caches | r17 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131 | shader_caches_golden_gate e2d206dc shader-caches-26B131-20261112-3834bc34ea70 |
+| golden-gate-shader-caches | r18 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131 | shader_caches_golden_gate e2d206dc shader-caches-26B131-20261112-3834bc34ea70 |
 | golden-gate-shared-cache | r11 | product | oclp-hook | yes | alpha-v0.1.0-fold, dev-beta-candidate-fold, dev-bs-test-fold | rebuilt_cache 22489f4a rebuilt-cache-fold-in-26B131-20261118-5aacad92 |
 | golden-gate-shared-cache-catalog | r9 | experiment | oclp-hook | yes | dev-bs-test-fold-catalog, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-full-witness | rebuilt_cache_catalog bdc91744 rebuilt-cache-fold-in-witness-26B131-20261120 |
-| golden-gate-shared-cache-install | r1 | experiment | oclp-hook | yes | beta-v0.0.1, dev-beta-v0.0.1 | shared_cache_builder b459c7cf cache-builder.tar.gz; swift_metadata_catalog 054f97cf swift-catalog.json.gz |
+| golden-gate-shared-cache-install | r2 | product | oclp-hook | yes | beta-v0.0.1, dev-beta-v0.0.1 | shared_cache_builder b459c7cf cache-builder.tar.gz; swift_metadata_catalog 054f97cf swift-catalog.json.gz |
 | golden-gate-store | r7 | product | oclp-hook | yes | dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-lite-alpha-v0.1.0, dev-ssh-full-witness | store_service 032e5b52 store-26B131-20261116-1f9b799c; edit_engine - edit-engine |
 | golden-gate-unsupported-daemons | r4 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131 | - |
 | golden-gate-update-policy | r3 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131 | - |
 | golden-gate-user-seed | r16 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131 | - |
 | golden-gate-user-template | r11 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131 | user_template_golden_gate 4e8121b7 user-template-26B131-20261113-96e70e178981 |
-| golden-gate-userspace | r97 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-golden-bootstrap, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131, golden-gate | golden_gate_userspace 060bd378 payload; display_state_shim 187c53cd dss_shim.dylib; corewifi_compat ce944f71 corewifi_compat.dylib; display_install_helper - install_dss.py; codeid_carrier 16120d97 codeid-carrier-20261117-002baf5f2e03-ae09c83d (hao-patcher 0ff4a9ae); hao_runtime 50b4175a payload |
+| golden-gate-userspace | r98 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-golden-bootstrap, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131, golden-gate | golden_gate_userspace 060bd378 payload; display_state_shim 187c53cd dss_shim.dylib; corewifi_compat ce944f71 corewifi_compat.dylib; display_install_helper - install_dss.py; codeid_carrier 16120d97 codeid-carrier-20261117-002baf5f2e03-ae09c83d (hao-patcher 0ff4a9ae); hao_runtime 50b4175a payload |
 | golden-gate-wallpaper-export | r2 | product | post | yes | dev-alpha-v0.1.0, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-full-witness | wallpaper_export_golden_gate 089290f7 wallpaper-export-26B131-20261118-f6d4cd4409b6 (hao-patcher e876cc8c) |
 | golden-gate-wifi-compat | r4 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-golden-bootstrap, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131, golden-gate | io80211_compat c0558983 io80211_compat.dylib (hao-patcher e20a3c31); wifip2p_compat 20822cf1 wifip2p_compat.dylib (hao-patcher 9e30dace) |
 | golden-gate-windowserver-filter | r10 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131, golden-gate | windowserver_filter_shim 6cc11d3b windowserver_filter.dylib |
-| hao-command | r15 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131 | python_x86_64 0d6a4a29 cpython-3.12.14+20260924-x86_64-apple-darwin-install_only.tar.gz |
-| hao-opencore | r87 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131, golden-gate | hao_runtime 50b4175a payload; kernel_repair_efi acc92dff kernel-repairs-26B131-r44; kernel_repair_binding 8f87fb25 kernel-binding-26B131-r44; intel_commpage_abi 9e389c17 commpage_abi.hpp |
+| hao-command | r16 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131 | python_x86_64 0d6a4a29 cpython-3.12.14+20260924-x86_64-apple-darwin-install_only.tar.gz |
+| hao-opencore | r88 | product | post | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, generic, golden-gate-26B131, golden-gate | hao_runtime 50b4175a payload; kernel_repair_efi acc92dff kernel-repairs-26B131-r44; kernel_repair_binding 8f87fb25 kernel-binding-26B131-r44; intel_commpage_abi 9e389c17 commpage_abi.hpp |
 | hao-runtime | r95 | product | oclp-hook | yes | alpha-v0.1.0, dev-alpha-v0.1.0, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0, generic, golden-gate-26B131, golden-gate | hao_runtime 50b4175a payload |
 | hao-runtime-fold | r10 | product | oclp-hook | yes | alpha-v0.1.0-fold, dev-beta-candidate-fold, dev-bs-test-fold | hao_runtime_fold 670b1410 payload |
-| hao-runtime-fold-catalog | r6 | experiment | oclp-hook | yes | beta-v0.0.1, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-full-witness | hao_runtime_fold_catalog 425d3c0e payload |
+| hao-runtime-fold-catalog | r7 | product | oclp-hook | yes | beta-v0.0.1, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-full-witness | hao_runtime_fold_catalog 425d3c0e payload |
 | metal-compiler-compat | r13 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131 | metal_compiler_compat 954ee9d0 compiler-service (hao-patcher f479d6c7) |
 | metal-metalold | r4 | unfinished | oclp-hook | yes | - | metalold_22d68 dd1ad676 MetalOld.dylib |
 | metalold-selectors | r10 | product | oclp-hook | yes | alpha-v0.1.0-fold, alpha-v0.1.0, beta-v0.0.1, dev-alpha-v0.1.0, dev-beta-candidate-fold, dev-beta-v0.0.1, dev-bs-test-fold-catalog, dev-bs-test-fold, dev-bs-test, dev-lite-alpha-v0.1.0, dev-metal27, dev-ssh-alpha-v0.1.0-fold-catalog, dev-ssh-alpha-v0.1.0, dev-ssh-full-witness, golden-gate-26B131, golden-gate | metalold_selectors 7075829d metalold-selectors-20261105-03d169d7ddae (hao-patcher 789a8c7d) |
@@ -142,7 +142,7 @@ Undeclared: opencore-generic, opencore-mbp92.
 - **golden-gate-ids** r3
   - `usr/lib/hao/libhao-imessage-wifi-test.dylib`: from hao (row ids_service)
   - `System/Library/PrivateFrameworks/IDS.framework/identityservicesd.app/Contents/MacOS/identityservicesd`: from hao (row ids_service)
-- **golden-gate-launchd-warm** r6
+- **golden-gate-launchd-warm** r7
   - `System/Library/LaunchDaemons/com.apple.kernelmanager_helper.plist`: edited (2 edits) from Apple · Golden Gate System volume
   - `System/Library/LaunchDaemons/com.apple.mbsystemadministration.plist`: edited (2 edits) from Apple · Golden Gate System volume
   - `System/Library/xpc/launchd.plist`: edited (4 edits) from Apple · Golden Gate System volume, after golden-gate-userspace (hybridsearchd disabled)
@@ -186,7 +186,7 @@ Undeclared: opencore-generic, opencore-mbp92.
   - `System/Library/AssetsV2`/ (folder): from every file under it from hao (row mobile_assets)
 - **golden-gate-model-gates-mbp92** r1
   - `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.01`: edited (1 edit) from Apple · RosettaOS x86_64 shared cache (26B131) (row golden_gate_userspace)
-- **golden-gate-native-identities** r15
+- **golden-gate-native-identities** r16
   - `usr/lib/hao/native-identities`: from hao
   - `System/Library/CoreServices/golden-gate-native-identities.json`: from hao
   - `usr/lib/hao/originals/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer`: from Tahoe donor
@@ -198,7 +198,7 @@ Undeclared: opencore-generic, opencore-mbp92.
   - `private/var/db/auth.db`: from hao (row root_launchservices_golden_gate)
   - `private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/0/com.apple.LaunchServices.dv/com.apple.LaunchServices-35651614-v2.csstore`: from hao (row root_launchservices_golden_gate)
   - `private/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/0/com.apple.LaunchServices.dv/SystemDataOnly-com.apple.LaunchServices-35651614-v2.csstore`: from hao (row root_launchservices_golden_gate)
-- **golden-gate-shader-caches** r17
+- **golden-gate-shader-caches** r18
   - 72 files under `Library/Application Support/PerUserSeed/metal/`, from hao (row shader_caches_golden_gate)
   - 46 files under `private/var/folders/zz/`, from hao (row shader_caches_golden_gate)
 - **golden-gate-shared-cache** r11
@@ -213,7 +213,7 @@ Undeclared: opencore-generic, opencore-mbp92.
   - `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.atlas`: from hao (row rebuilt_cache_catalog)
   - `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.map`: from hao (row rebuilt_cache_catalog)
   - `System/Library/CoreServices/golden-gate-shared-cache.json`: from hao
-- **golden-gate-shared-cache-install** r1
+- **golden-gate-shared-cache-install** r2
   - 37 files under `System/`, from hao
 - **golden-gate-store** r7
   - `usr/lib/hao/hao-appstore-policy.dylib`: from hao (row store_service)
@@ -231,7 +231,7 @@ Undeclared: opencore-generic, opencore-mbp92.
   - `Library/User Template/Non_localized/Library/Containers`/ (folder): from every file under it from hao (row user_template_golden_gate)
   - `Library/User Template/Non_localized/Library/Group Containers`/ (folder): from every file under it from hao (row user_template_golden_gate)
   - `Library/User Template/Non_localized/Library/Preferences/com.apple.chronod.plist`: from hao (row user_template_golden_gate)
-- **golden-gate-userspace** r97
+- **golden-gate-userspace** r98
   - `usr/lib/dss_shim.dylib`: from hao (row display_state_shim)
   - `System/Library/PrivateFrameworks/CoreWiFi.framework/Versions/A/CoreWiFi`: from hao (row corewifi_compat)
   - `System/Library/LaunchAgents/com.apple.hybridsearchd.plist`: edited (1 edit) from Apple · Golden Gate System volume
@@ -284,12 +284,12 @@ Undeclared: opencore-generic, opencore-mbp92.
 - **golden-gate-windowserver-filter** r10
   - `usr/lib/dss_shim.dylib`: edited (1 edit) from hao (row display_state_shim)
   - `usr/lib/windowserver_filter.dylib`: from hao (row windowserver_filter_shim)
-- **hao-command** r15
+- **hao-command** r16
   - `usr/local/bin/hao`: from hao
   - `usr/local/lib/hao/python`/ (folder): from every file under it from hao (row python_x86_64)
   - `usr/local/lib/hao/hao`/ (folder): from every file under it from hao
   - `private/var/log/hao`: from hao
-- **hao-opencore** r87
+- **hao-opencore** r88
   - `EFI/OC/config.plist`: edited (5 edits) from OCLP · OCLP's OpenCore config.plist for the target's model, as pipeline/stages/build-efi.py generates it
   - `EFI/OC/Kexts/IntelCommpage.kext`/ (folder): from every file under it from hao · IntelCommpage.kext (row kernel_repair_efi)
   - `EFI/OC/Kexts/HaoExec.kext`/ (folder): from every file under it from hao · HaoExec.kext (row hao_runtime)
@@ -320,7 +320,7 @@ Undeclared: opencore-generic, opencore-mbp92.
   - `usr/lib/hao/aot`/ (folder): from every file under it from hao (row hao_runtime_fold)
   - `usr/lib/dyld`: from hao (row hao_runtime_fold)
   - `usr/lib/hao/install.json`: from hao
-- **hao-runtime-fold-catalog** r6
+- **hao-runtime-fold-catalog** r7
   - `usr/libexec/hao`: from hao (row hao_runtime_fold_catalog)
   - `usr/lib/hao/libhao.dylib`: from hao (row hao_runtime_fold_catalog)
   - `usr/lib/hao/libhao_identity.dylib`: from hao (row hao_runtime_fold_catalog)
@@ -420,7 +420,7 @@ hashes it has. A cell marked * differs from the current one (section 1).
 | golden-gate-hello | r8* | r8* | r8* | r8* | r8* | r8* | r8* | r8* | r8* | r9* | r9* | r11* | r11* | r11* | r11* |
 | golden-gate-icon-caches | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r9* | r9* | r9* | r9* |
 | golden-gate-ids | - | - | - | - | - | r1* | r1* | r1* | - | - | - | - | - | - | - |
-| golden-gate-launchd-warm | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r6 | r6 | r6 | r6 |
+| golden-gate-launchd-warm | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r3* | r6* | r6* | r6* | r6* |
 | golden-gate-live-text-service | r4* | r4* | r4* | r5* | r5* | r5* | r5* | r5* | r5* | r5* | r5* | r7* | r7* | r7* | r7* |
 | golden-gate-live-text-shared | r8* | r9* | r9* | r9* | r9* | r9* | r9* | r9* | r9* | r10* | r10* | r13* | r13* | r13* | r13* |
 | golden-gate-metal-argbuf | r5* | r5* | r5* | r5* | r5* | r5* | r5* | r6* | r6* | r6* | r6* | r10* | r10* | r10* | r10* |
@@ -428,7 +428,7 @@ hashes it has. A cell marked * differs from the current one (section 1).
 | golden-gate-metal-libraries | r21* | r21* | r21* | r21* | r21* | r21* | r21* | r21* | r21* | r21* | r21* | r23* | r23* | r23* | r23* |
 | golden-gate-model-gates-mbp92 | - | - | - | - | - | - | - | - | - | - | - | r1 | r1 | r1 | r1 |
 | golden-gate-native-identities | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r6* | r11* | r11* | r11* | r14* |
-| golden-gate-shader-caches | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r17 | r17 | r17 | r17 |
+| golden-gate-shader-caches | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r14* | r17* | r17* | r17* | r17* |
 | golden-gate-shared-cache | - | - | - | r3* | - | r4* | r4* | r4* | - | - | - | - | - | - | - |
 | golden-gate-shared-cache-catalog | - | - | - | - | r1* | - | - | - | - | - | - | - | - | - | - |
 | golden-gate-store | - | - | - | - | - | r1* | r2* | r2* | r4* | - | r4* | r6* | r6* | r6* | - |
@@ -543,20 +543,22 @@ Image 8fb92d5, pushed 2026-11-14 10:11:23 (built 2026-11-14 09:13 from d970c5b3,
 - golden-gate-hello r13 is newer than every image built with it (newest r11).
 - golden-gate-icon-caches r10 is newer than every image built with it (newest r9).
 - golden-gate-ids r3 is newer than every image built with it (newest r1).
+- golden-gate-launchd-warm r7 is newer than every image built with it (newest r6).
 - golden-gate-live-text-service r8 is newer than every image built with it (newest r7).
 - golden-gate-live-text-shared r14 is newer than every image built with it (newest r13).
 - golden-gate-metal-argbuf r12 is newer than every image built with it (newest r10).
 - golden-gate-metal-framebuffer r14 is newer than every image built with it (newest r13).
 - golden-gate-metal-libraries r24 is newer than every image built with it (newest r23).
-- golden-gate-native-identities r15 is newer than every image built with it (newest r14).
+- golden-gate-native-identities r16 is newer than every image built with it (newest r14).
+- golden-gate-shader-caches r18 is newer than every image built with it (newest r17).
 - golden-gate-shared-cache r11 is newer than every image built with it (newest r4).
 - golden-gate-shared-cache-catalog r9 is newer than every image built with it (newest r1).
 - golden-gate-store r7 is newer than every image built with it (newest r6).
 - golden-gate-user-seed r16 is newer than every image built with it (newest r15).
-- golden-gate-userspace r97 is newer than every image built with it (newest r96).
+- golden-gate-userspace r98 is newer than every image built with it (newest r96).
 - golden-gate-wifi-compat r4 is newer than every image built with it (newest r3).
-- hao-command r15 is newer than every image built with it (newest r13).
-- hao-opencore r87 is newer than every image built with it (newest r85).
+- hao-command r16 is newer than every image built with it (newest r13).
+- hao-opencore r88 is newer than every image built with it (newest r85).
 - hao-runtime r95 is newer than every image built with it (newest r91).
 - hao-runtime-fold r10 is newer than every image built with it (newest r4).
 - metal-compiler-compat r13 is newer than every image built with it (newest r12).

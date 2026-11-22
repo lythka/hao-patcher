@@ -95,9 +95,10 @@ mounted read-only and its record's two sources), on a real System:
 
 ## Validation
 
-NEEDS VALIDATION: r15 (the two store daemons' digests) is not booted yet; the check is a dev-lite build (golden-gate-store in the set) that native-identities accepts, then a boot. Earlier: The fb6542df image builds (golden-gate-store not in the set) give 3 rows and no refusal. Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r13): automatic login to the desktop, and Spotlight searches with no mds report.
+Laptop 2026-11-22, a MacBookPro9,2: the dev-beta image c3c0a5b (26B131, built from 7459d3e6 with r15; profile dev-beta-v0.0.1: the beta set plus dev-access) was pushed, booted to Setup and used (Maps, System Settings, Weather, Control Center). Its QEMU first boot passed in 490 s with the shared cache rebuilt in place and checked against the release (UUID 31DA2287, 36 files). Known issues, not this recipe's: first boot is slow (load above 400 for several minutes) and Setup's Transfer pane leaves its selection ring on "From a Mac".
 
 ## Revisions
+- r16 2026-11-22 Validated r15 on hardware (Validation). Nothing it installs changes.
 - r15 2026-11-20 The content digests of appstored and appstoreagent are those of golden-gate-store r7's output (the policy library's shorter path changes the load command); r12 changed only the library path, so every dev profile with golden-gate-store was refused.
 - r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes.
 - r13 2026-11-19 A programs.txt line whose inserted libraries are not installed (its recipe is not in the set, e.g. golden-gate-store in release profiles) is skipped, not refused.

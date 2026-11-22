@@ -98,10 +98,10 @@ script's bytes and that the hook installs every file the script writes. No input
 
 ## Validation
 
-NEEDS VALIDATION: not built or booted. Host tests pass with the real 26B131 files (read-only System volume of the
-26B131 IPSW).
+Laptop 2026-11-22, a MacBookPro9,2: the dev-beta image c3c0a5b (26B131, built from 7459d3e6 with r6; profile dev-beta-v0.0.1: the beta set plus dev-access) was pushed, booted to Setup and used (Maps, System Settings, Weather, Control Center). Its QEMU first boot passed in 490 s with the shared cache rebuilt in place and checked against the release (UUID 31DA2287, 36 files). Known issues, not this recipe's: first boot is slow (load above 400 for several minutes) and Setup's Transfer pane leaves its selection ring on "From a Mac".
 
 ## Revisions
+- r7 2026-11-22 Validated r6 on hardware (Validation). Nothing it installs changes.
 - r6 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` stays false until a boot proves the re-cut. Nothing it installs changes.
 - r5 2026-11-17 Declares its scope (`requires`, docs/requires.md): launchd job edits used on both builds. Nothing it installs changes.
 - r4 2026-11-16 Declares its pack (base): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

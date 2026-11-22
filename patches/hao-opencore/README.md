@@ -260,40 +260,11 @@ must still die with VM guard flavor 13 (status 137), which shows the fix leaves 
 has a 15-second alarm. Finally load a website in Safari and scroll, navigate and reload.
 
 ## Validation
-NEEDS VALIDATION (r85): an image build of each target in which `apply.sh` and the final EFI check print "every element
-of config.plist has a reason" with the target's `platform_data`. Host: the recorded 26B131 mbp92 EFIs of 2026-11-18 pass
-with mbp92's `platform_data` and fail without it (the moved kexts), as main's check passes them.
-NEEDS VALIDATION (r73): the generic elements in a built generic image (GEN2). Both recorded 9,2 EFIs (golden-26B131-20261117-011907, -20261116-111912) still pass the check.
-NEEDS VALIDATION (r72): the AMFI dyld policy patch. Host tests bind it on three recorded 26B131 Boot KCs. It needs
-an image build and a laptop boot passing the AMFI checks under Verify.
-NEEDS VALIDATION (r71): `hao_crash=1` is not in an end-user image's `kern.bootargs`, and is in a dev image's.
-NEEDS VALIDATION (r70): an image build in which `apply.sh` prints "config-reasons: every element of config.plist has a
-reason". Host: `tests/test_config_reasons.py` passes against a real alpha build's finished EFI (`HAO_OPENCORE_IMAGE_ESP`):
-reasons and kext provenance.
-NEEDS VALIDATION (r69): row `kernel_repair_efi` -> kernel-repairs-26B131-r44, whose IntelCommpage drops the
-`ic_csr_internal` probe and carries the Sandbox adapter fix. Needs a laptop boot in which:
-- the kernel log shows "IntelCommpage: Sandbox profile operation layout adapter installed" and no `ic_csr_internal`
-  line;
-- `strings` of the loaded kext has no `ic_csr_internal`;
-- every check from r68 still holds.
-NEEDS VALIDATION: r52 drops `ic_csr_internal=1` (host tests); needs a laptop boot proving OCLP's Metal still loads
-(dyld edit) and mobileassetd uses the public asset server. r50 writes `Misc.Debug.Target` 0 and never the measurement switches (host tests); not built or
-booted yet. With dev-diagnostics after it, a dev set's config.plist is unchanged (the real-config test on a
-2026-11-13 image of a dev set passes). r48 installs the r42 IntelCommpage on 26B131. It reads its collection addresses from its own table
-at load, so the kext's bytes are new. The table equals r41's compiled values on all 12 recorded 26B131 KCs (host
-tests), but the kext has not been booted (QEMU, then the laptop). config.plist is byte-identical to r47's. r45 binds the repairs with tools/kc-binder (host tests: byte-identical config.plist on the 26B131
-bootstrap KC and nine recorded image KCs; no VM build yet). r44 adds `auxKCAtBoot=false` (not booted yet; see Verify). the hao_runtime row moved to payload 273ba98 (units u4.1) on 2026-11-12; r40 was proven on the earlier payload. The baseline image and its laptop boot re-validate it. Earlier evidence:
 
-Laptop 2026-11-12, image d131d5b (26B131, dev build): boots with r40 (hao d9ea9bd's HaoExec and stamp_identity.py); image 7d0b612 booted with r39 on 2026-11-11.
-Laptop 2026-11-11, image 4d1c48c (26B131, dev build): boots with r33; r34's HaoExec.kext and stamp_identity.py are byte-identical to r33's.
-r35 writes the same config.plist as r34 in a dev build (host test and a direct comparison of the two scripts), so
-the result above stands for dev builds. A non-dev build (`mbp92-26B131.json`, without the two statistics
-boot-args) has not been booted yet.
-Earlier: Host tests pass, and the binder verifies every fileset member and repair site against the
-reference profile. The IOSurface probes and the IntelCommpage SSE and Sandbox adapters pass in QEMU; a full
-Golden Gate boot to the desktop on the laptop was not yet proven.
+Laptop 2026-11-22, a MacBookPro9,2: the dev-beta image c3c0a5b (26B131, built from 7459d3e6 with r87; profile dev-beta-v0.0.1: the beta set plus dev-access) was pushed, booted to Setup and used (Maps, System Settings, Weather, Control Center). Its QEMU first boot passed in 490 s with the shared cache rebuilt in place and checked against the release (UUID 31DA2287, 36 files). Known issues, not this recipe's: first boot is slow (load above 400 for several minutes) and Setup's Transfer pane leaves its selection ring on "From a Mac".
 
 ## Revisions
+- r88 2026-11-22 Validated r87 on hardware (Validation). Nothing it installs changes.
 - r87 2026-11-21 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 497f126 (hao-runtime-26B131-20261120-497f126-stock). No recipe change.
 - r86 2026-11-20 config-reasons.json records SIP 0x807 (dev-capture r4 adds task-for-pid on dev images); without it every dev-lite build stopped at the efi-bundle check. Nothing it installs changes.
 - r85 2026-11-18 Names no model (S15): the reasons and provenance of the mbp92 target's OCLP-generated kexts (USB-Map, USB-Map-Tahoe, ECM-Override) moved to the mbp92 target's `platform_data`, and `config_reasons.py` reads the target's (`--target-data`, default `HAO_TARGET_DATA`). The generic image is known from its target (`opencore_generic`), not an SMBIOS model. README wording names no model or GPU. Nothing it installs changes.

@@ -24,10 +24,10 @@ B+catalog family (cache D3BDB76E, row `rebuilt_cache_catalog`).
 
 ## Validation
 
-NEEDS VALIDATION: not built by golden-run. A QEMU boot of an aae0ab3 image with the B+catalog family D3BDB76E and this
-payload swapped in reached sshd in 559 s, with no panic and no launchd refusal.
+Laptop 2026-11-22, a MacBookPro9,2: the dev-beta image c3c0a5b (26B131, built from 7459d3e6 with r6; profile dev-beta-v0.0.1: the beta set plus dev-access) was pushed, booted to Setup and used (Maps, System Settings, Weather, Control Center). Its QEMU first boot passed in 490 s with the shared cache rebuilt in place and checked against the release (UUID 31DA2287, 36 files). Known issues, not this recipe's: first boot is slow (load above 400 for several minutes) and Setup's Transfer pane leaves its selection ring on "From a Mac".
 
 ## Revisions
+- r7 2026-11-22 Validated r6 on hardware (Validation). Status product: it ships in the beta release. Nothing it installs changes.
 - r6 2026-11-22 Pin the 497f126 payload for 31DA2287; users complete Apple-derived files locally.
 - r5 2026-11-20 Row hao_runtime_fold_catalog is hao-runtime 90c2b9e built for the witness family 31DA2287 (1892 of 1892 units match); libhao 076cc54f.
 - r4 2026-11-20 Row hao_runtime_fold_catalog is hao-runtime b05855f built for the witness family 31DA2287 (row rebuilt_cache_catalog r8): 1892 of 1892 units name its images; libhao 9b40371a.
