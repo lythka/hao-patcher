@@ -1,5 +1,0 @@
-# hao-check payloads: HOST_FOLDER<TAB>LAPTOP_FOLDER, copied (tar over SSH) before the checks; a folder's SHA256SUMS, if any,
-# is verified on the laptop with /sbin/sha256 after the copy. Lanes add their kits here (store paths, never a repository).
-store/artifacts/metal-checks-kit-20261117	/var/tmp/metal-kit
-store/artifacts/metal-argbuf-probes-20261117-be8c1574	/var/tmp/probes
-store/artifacts/laptop-kit-fma-20261117	/var/tmp/hao-check/kit-fma
