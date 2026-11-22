@@ -7,6 +7,11 @@ plans which recipes install their files from the overlays instead of running the
 ROOT is the build's Golden Gate file system (its filesystem.dmg attached read-only), whose files the edits start
 from. Every other recipe, and every step only the target can make, runs its hook as without the flag.
 
+--from PREVIOUS (an image repository, or a build record) plans the build incrementally (pipeline/incremental.py):
+which set entries changed since the build that committed PREVIOUS, and the saved point the build could start from.
+The plan is recorded in build.json ("incremental"); until the builder can start from a saved point the build then runs
+in full. Every build records its fingerprints and the keys of the points its assembly's "checkpoints" names.
+
 golden-gate-userspace's sealed cryptex images are kept in store/cache/cryptex, keyed on everything that decides their
 bytes (its src/cryptex_cache.py), and copied instead of rebuilt when a build has the same key; --no-cryptex-cache
 always builds them.
@@ -37,6 +42,7 @@ GUEST = '/private/var/ssdshare'
 KIT = runpy.run_path(str(TOP/'pipeline/kit.py'))
 PRELINKED = runpy.run_path(str(TOP/'pipeline/prelinked_kc.py'))
 DISK = runpy.run_path(str(TOP/'pipeline/diskguard.py'))
+INCREMENTAL = runpy.run_path(str(TOP/'pipeline/incremental.py'))
 DISK_BUILD_GB, DISK_KIT_GB = 175, 90
 DISK_KIT_ON_DRIVE_GB = 15     # create-installer: the userspace images are on the USB drive, the kit is mostly clones
 
@@ -451,10 +457,31 @@ def skipped_groups(recipe, skip_optional=()):
     return sorted(set(groups)|set(skip_optional))
 
 
+def incremental_record(state, share, input_records, recipe, local, store, previous=None):
+    """Record the build's fingerprints and the keys of the points its assembly asks to save (pipeline/incremental.py)
+    in STATE, and, with PREVIOUS ((record folder, build.json) of the build to start from), the plan. Until the guest
+    can start from a saved point every build runs in full; the plan says what it would have reused."""
+    fps=INCREMENTAL['fingerprints'](share,input_records,recipe,local=local,store=store)
+    state['fingerprints']=fps
+    state['points']=INCREMENTAL['points'](fps,recipe)
+    if previous is None:
+        return None
+    folder,data=previous
+    result=INCREMENTAL['plan'](data,fps,INCREMENTAL['saved_points'](store/'cache/golden-points'))
+    result.update(previous=str(folder),previous_repository=data.get('repository'),
+                  previous_image_revision=data.get('image_revision'))
+    if result['mode']=='incremental':
+        result.update(used=False,why='the builder cannot start from a saved point yet: this build runs in full')
+    state['incremental']=result
+    print(INCREMENTAL['render'](result),flush=True)
+    return result
+
+
 def run(recipe_path, repository, work=None, record=None, base=None, timeout=14400, skip_optional=(), overlays=None,
-        cryptex_cache=True, kit_only=False, recovery_commands=False, link_on_target=False):
+        cryptex_cache=True, kit_only=False, recovery_commands=False, link_on_target=False, previous=None):
     """Stage the kit (WORK/share) and assemble it in a builder VM clone; KIT_ONLY stops after staging (no VM, no
-    builder lock, no repository): the kit is then assembled by pipeline/stages/golden-assemble.sh elsewhere."""
+    builder lock, no repository): the kit is then assembled by pipeline/stages/golden-assemble.sh elsewhere. PREVIOUS:
+    (record folder, build.json) of the build to plan incrementally from (golden-run --from)."""
     recipe_path = Path(recipe_path).resolve(); recipe=json.loads(recipe_path.read_text())
     if recipe['schema'] != 1:
         raise ValueError('unsupported Golden assembly recipe')
@@ -580,6 +607,8 @@ def run(recipe_path, repository, work=None, record=None, base=None, timeout=1440
             shutil.copy2(share/'kit.json',record/'kit.json')
             for name in ('patches.txt','MANIFEST.txt','profile.json',TARGET_DATA):
                 shutil.copy2(share/name,record/name)
+            incremental_record(state,share,input_records,recipe,local,store,previous)
+            write(record/'build.json',state)
             state.update(inputs=sources,source_files={str(p.relative_to(source)):digest(p) for p in source.rglob('*') if p.is_file() and not p.is_symlink()},status='starting')
             # The Boot and System KCs a VM build of this same tree linked (pipeline/prelinked_kc.py): a VM build stores
             # its own after the guest ends; a kit carries them, because the stick's Recovery cannot link them.
@@ -699,6 +728,10 @@ def commit_image(state,image,prepared,command):
     command([ssdimg,'-C',repository,'capture','--force',image])
     command([ssdimg,'-C',repository,'fsck'])
     command([ssdimg,'-C',repository,'commit','-m','Golden Gate '+state['recipe']['golden_build']+'; '+state['commit']])
+    # The image's revision in the repository: an incremental build names the image it started from by it.
+    state['image_revision']=subprocess.run(['git','-c','safe.directory='+str(repository),'-C',str(repository),
+                                            'rev-parse','HEAD'],capture_output=True,
+                                           text=True,check=False).stdout.strip() or None
     if prepared.exists() and json.loads((prepared/'manifest.json').read_text())['kernel_repairs_applied']:
         archive=boot_efi_archive(prepared,repository)
         state['boot_efi']=dict(path=archive,sha256=digest(archive),manifest=json.loads((prepared/'manifest.json').read_text()))
@@ -804,6 +837,9 @@ def main():
     parser.add_argument('--no-cryptex-cache',action='store_true',
                         help='build golden-gate-userspace\'s sealed cryptex images even when store/cache/cryptex has '
                              'them for the same inputs, code and builder tools (and store nothing)')
+    parser.add_argument('--from',dest='previous',type=Path,metavar='PREVIOUS',
+                        help='plan the build incrementally from PREVIOUS (an image repository, or a build record): '
+                             'what changed since it and the saved point to start from (pipeline/incremental.py)')
     parser.add_argument('--recovery-commands',action='store_true',
                         help='assemble with only the commands of the donor build\'s Recovery on PATH '
                              '(pipeline/stages/recovery-commands-BUILD.txt), as the stick\'s install runs')
@@ -813,6 +849,12 @@ def main():
         if not args.overlay_system:parser.error('--from-overlays needs --overlay-system ROOT')
         overlays=dict(system=args.overlay_system,store=args.overlay_store,hooks=args.overlay_hook)
     elif args.overlay_system or args.overlay_hook:parser.error('--overlay-system and --overlay-hook need --from-overlays')
+    previous=None
+    if args.previous:
+        if overlays or args.capture_kit or args.collect_kit or args.capture_record:
+            parser.error('--from plans an assembly build without --from-overlays')
+        try:previous=INCREMENTAL['previous_record'](args.previous)
+        except INCREMENTAL['Refused'] as x:parser.error('--from: %s'%x)
     signal.signal(signal.SIGTERM,lambda *_:(_ for _ in ()).throw(KeyboardInterrupt('terminated')))
     if args.capture_kit:
         if args.recipe or not args.repo or not args.local:parser.error('--capture-kit takes the record, --local and --repo')
@@ -833,7 +875,7 @@ def main():
             print('golden-run: refused: '+'\n'.join(refusal),file=sys.stderr);sys.exit(3)
         run(args.recipe,args.repo,args.work,args.record,args.base,args.timeout,args.skip_optional,overlays,
             cryptex_cache=not args.no_cryptex_cache,kit_only=args.stage_kit,recovery_commands=args.recovery_commands,
-            link_on_target=args.link_on_target)
+            link_on_target=args.link_on_target,previous=previous)
 
 
 if __name__=='__main__':main()

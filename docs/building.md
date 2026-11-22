@@ -214,6 +214,17 @@ each). Their key covers the rows they are made from, the code that makes them an
 copies them (sha256-checked) instead of rebuilding. `build.json` `cryptex_cache` says `hit`, `miss` or `stored`;
 `--no-cryptex-cache` always builds them.
 
+### Planning a build from the last one
+
+Every build records `fingerprints` in `build.json`: the base (what every step before the set's recipes reads) and,
+per set entry, its staged code and the identity of each input row (only the declared parts of a folder row the
+recipe reads in part, `patch.json` `input_reads`). With `--from PREVIOUS` (the image repository the last build
+committed, or its record) the run also records `incremental`: the entries that changed since that build and the saved
+point it could start from (the image just before an `oclp-hook` recipe, or before the snapshot, keyed on everything
+that ran up to there). A different base, no saved point at or before the first change, or a record without
+fingerprints means a full build. The guest cannot start from a point yet, so every build still runs in full
+(`incremental.used` false). `pipeline/incremental.py plan PREVIOUS NEW` prints the same plan for two records.
+
 `golden-run` refuses a set unless:
 - the first two entries are `darwin27-kernel`, then `golden-gate-userspace` (later recipes
   edit their output);
