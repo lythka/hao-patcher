@@ -310,6 +310,11 @@ def check_hao_mirror(release, p, offline, env=None, opener=None, release_path=No
 
 def check_urls(release, p, offline, opener=None):
     rows = (release or {}).get('downloads', [])
+    if (release or {}).get('candidate'):
+        # Rehosted inputs are checked by hash from the staged cut or mirror.
+        # Their eventual public release URLs must not be contacted pre-release.
+        rows = [r for r in rows if not r['url'].startswith(
+            'https://github.com/lythka/hao-assets/releases/download/')]
     if not rows:
         return [check('urls', 'warn', 'no release.json downloads to check')]
     if offline:

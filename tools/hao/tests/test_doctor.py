@@ -81,6 +81,19 @@ class Host(unittest.TestCase):
 
 
 class Downloads(unittest.TestCase):
+    def test_only_candidate_hosted_urls_are_exempt(self):
+        from unittest import mock
+        hosted = 'https://github.com/lythka/hao-assets/releases/download/unpublished/python.tar.gz'
+        rel = dict(candidate=True, downloads=[dict(name='python', url=hosted),
+                                              dict(name='Apple', url='https://swcdn.apple.com/input')])
+        with mock.patch.object(D, 'head', return_value=404) as head:
+            self.assertEqual(state(D.check_urls(rel, P, False), 'urls'), ['fail'])
+            self.assertEqual([c.args[0] for c in head.call_args_list], ['https://swcdn.apple.com/input'])
+            head.reset_mock()
+            rel['candidate'] = False
+            D.check_urls(rel, P, False)
+            self.assertEqual(len(head.call_args_list), 2)
+
     REL = {'downloads': [{'name': 'a.pkg', 'url': 'https://swcdn.apple.com/a', 'mirrors': ['https://m/a']},
                          {'name': 'b.dmg', 'url': 'https://updates.cdn-apple.com/b'}]}
 

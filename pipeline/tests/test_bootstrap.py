@@ -10,6 +10,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 TOP = Path(__file__).resolve().parents[2]
 
@@ -151,3 +152,12 @@ class BootstrapTests(unittest.TestCase):
                                 env=dict(os.environ,HAO_BOOTSTRAP_FILES=str(self.mirror)))
         self.assertEqual(result.returncode,4,result.stderr)
         self.assertIn('bad signature',result.stderr)
+
+    def test_candidate_without_staged_release_refuses_before_network(self):
+        self.script.write_text(self.script.read_text().replace("candidate='false'", "candidate='true'"))
+        self.shim('curl', '#!/bin/sh\necho unexpected-network >&2\nexit 99\n')
+        with mock.patch.dict(os.environ, {}, clear=True):
+            result = self.run_bootstrap()
+        self.assertEqual(result.returncode, 4)
+        self.assertIn('candidate requires HAO_BOOTSTRAP_FILES', result.stderr)
+        self.assertNotIn('unexpected-network', result.stderr)

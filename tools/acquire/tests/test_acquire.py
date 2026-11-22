@@ -217,6 +217,26 @@ class Acquire(unittest.TestCase):
         self.assertEqual(A['final_path'](self.cache, shim).read_bytes(), (stage / 'shim.tar').read_bytes())
         self.assertEqual(Handler.hits, ['/installer.bin'])           # the asset never left the folder
 
+    def test_candidate_missing_or_corrupt_asset_never_tries_origin(self):
+        with tempfile.TemporaryDirectory() as folder:
+            stage = Path(folder)
+            manifest, asset = self.release(stage)
+            release = json.loads(manifest.read_text())
+            release['candidate'] = True
+            manifest.write_text(json.dumps(release))
+            rows = A['load'](manifest)
+            self.assertEqual(rows[1]['mirrors'], [])
+            for data in (None, b'bad bytes'):
+                (stage/'shim.tar').unlink()
+                if data is not None:
+                    (stage/'shim.tar').write_bytes(data)
+                with self.assertRaises(A['AcquireError']):
+                    A['fetch'](rows[1:], self.cache)
+                self.assertFalse(A['intact'](self.cache, rows[1]))
+                self.assertEqual(Handler.hits, [])
+                if data is None:
+                    (stage/'shim.tar').write_bytes(b'temporary')
+
     def test_a_staged_asset_that_differs_is_refused(self):
         stage = Path(tempfile.mkdtemp())
         m, _ = self.release(stage)
@@ -335,6 +355,18 @@ class Mirror(unittest.TestCase):
             got, err = self.fetch([self.served(data)])
         self.assertEqual(Path(got['served']).read_bytes(), data)
         self.assertEqual((Handler.hits, err), (['/mirror/sha256/' + hashlib.sha256(data).hexdigest()], ''))
+
+    def test_candidate_python_from_hash_mirror_without_staged_copy(self):
+        data = b'candidate Python'
+        row = self.served(data)
+        row['url'] = 'https://github.com/lythka/hao-assets/releases/download/unpublished/python.tar.gz'
+        with tempfile.TemporaryDirectory() as folder, self.env(strict=True):
+            manifest = Path(folder)/'release.json'
+            manifest.write_text(json.dumps(dict(candidate=True, downloads=[row])))
+            got, err = self.fetch(A['load'](manifest))
+        self.assertEqual(Path(got['served']).read_bytes(), data)
+        self.assertEqual(Handler.hits, ['/mirror/sha256/'+row['sha256']])
+        self.assertEqual(err, '')
 
     def test_a_miss_falls_back_with_exactly_one_line(self):
         row = self.row()

@@ -316,6 +316,10 @@ def main(argv=None, store=None, run=run_step, worktree=(checkout, remove_checkou
     def step(name, cmd, rec, where):
         log = where / ('%d-%s.log' % (len(rec['steps']) + 1, name))
         env = dict(base_env, HAO_LOGS=str(where / 'logs'))     # create-installer's event log, for the phase times
+        if name.startswith('create-installer'):
+            # Also survives the installer's per-profile manifest view in cache/.
+            rel = Path(cmd[cmd.index('--release') + 1])
+            env['HAO_BOOTSTRAP_FILES'] = str(rel.parent)
         t0 = time.time()
         rc = run(cmd, tree, log, env)
         rec['steps'].append(dict(name=name, rc=rc, seconds=round(time.time() - t0), log=str(log.relative_to(out))))

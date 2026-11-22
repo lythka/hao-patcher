@@ -7,12 +7,60 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 TOP = Path(__file__).resolve().parents[2]
 C = runpy.run_path(str(TOP / 'pipeline' / 'candidate-cut'))
 
 
 class Cut(unittest.TestCase):
+    def test_unpublished_create_installer_fetches_staged_cut(self):
+        # Real installer orchestration, URL preflight and acquisition; mocked
+        # host checks, kit preparation and disks. Hosted origins do not exist.
+        fixtures = runpy.run_path(str(TOP/'tools/hao/tests/test_installer.py'))
+        inst = fixtures['INST']
+        acquire = runpy.run_path(str(TOP/'tools/acquire/acquire'))
+        real = self.fake_run
+        checked = []
+        def run(cmd, cwd, log, env):
+            cmd = [str(c) for c in cmd]
+            if 'pipeline/release-cut' in cmd:
+                rc = real(cmd, cwd, log, env)
+                path = Path(cmd[cmd.index('--write')+1])
+                rel = json.loads(path.read_text())
+                rel.update(assembly='mbp92-26B131', proven_models=['MacBookPro9,2'], downloads=[], assets=[])
+                for name in ('python_arm64', 'python_x86_64', 'kit', 'metal_llvm', 'runtime'):
+                    data = ('pinned '+name).encode()
+                    (path.parent/name).write_bytes(data)
+                    row = dict(row=name, url='https://github.com/lythka/hao-assets/releases/download/unpublished/'+name,
+                               size=len(data), sha256=hashlib.sha256(data).hexdigest())
+                    rel['downloads' if name.startswith('python') else 'assets'].append(
+                        dict(row, **({'name':name} if name.startswith('python') else {'file':name})))
+                path.write_text(json.dumps(rel))
+                return rc
+            if 'create-installer' in cmd:
+                path = Path(cmd[cmd.index('--release')+1])
+                cache = Path(cmd[cmd.index('--cache')+1])
+                self.assertEqual(env['HAO_BOOTSTRAP_FILES'], str(path.parent))
+                def survey(purpose, where, release, cache, **kw):
+                    return inst.DOCTOR.check_urls(release, {}, False,
+                        lambda *a, **k: self.fail('candidate HEAD reached public origin'))
+                c, _, _ = fixtures['console']([])
+                args = fixtures['ns'](release=str(path), cache=str(cache), model='MacBookPro9,2',
+                                      image=cmd[cmd.index('--image')+1], image_size=64*10**9, dry_run=False)
+                with mock.patch.dict('os.environ', env), mock.patch.object(inst, 'DOCTOR_CHECKS', survey), \
+                     fixtures['FakeWriter'](), mock.patch.object(inst, 'finish_kit', return_value=[]):
+                    self.assertEqual(inst.create_installer(args, c, fixtures['FakeMac'](), acquire=acquire), 0)
+                    for row in acquire['load'](path):
+                        self.assertTrue(acquire['intact'](cache, row))
+                        checked.append(row['name'])
+                return real(cmd, cwd, log, env)
+            return real(cmd, cwd, log, env)
+        self.fake_run = run
+        rc, _, _ = self.cut('--no-dev')
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(checked), 5)
+
     def setUp(self):
         self.d = tempfile.TemporaryDirectory()
         self.root = Path(self.d.name).resolve()

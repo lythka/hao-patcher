@@ -29,7 +29,8 @@ cat > "$scratch/allowed" <<'KEY'
 hao-release @KEY@
 KEY
 fetch() {
-    if [ "$candidate" = true ] && [ -n "${HAO_BOOTSTRAP_FILES:-}" ]; then
+    if [ "$candidate" = true ]; then
+        [ -n "${HAO_BOOTSTRAP_FILES:-}" ] || fail 'candidate requires HAO_BOOTSTRAP_FILES pointing to the staged release'
         cp "$HAO_BOOTSTRAP_FILES/${1##*/}" "$2" || fail "local mirror miss: $1"
         return
     fi

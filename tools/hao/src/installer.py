@@ -359,10 +359,10 @@ def origin_of(row):
     return ''
 
 
-def download(c, release_path, cache, acquire, dry_run):
+def download(c, release_path, cache, acquire, dry_run, assets_from=None):
     """Step 1: every file release.json pins, into the cache, each checked by size and sha256."""
     try:
-        rows = acquire['load'](release_path)
+        rows = acquire['load'](release_path, **({'assets_from': assets_from} if assets_from else {}))
     except acquire['AcquireError'] as x:
         raise Stopped('release.json is damaged: %s' % x, why='every file must be pinned by URL, size and sha256',
                       options=['download the release archive again'], untouched='nothing was downloaded or written')
@@ -562,7 +562,10 @@ def create_installer(a, c, host, acquire=None):
     elif release is None:
         c.item('no release.json beside hao: the files to download are not known here', ev='download.plan', files=None)
     else:
-        download(c, release_path, cache, acquire or runpy.run_path(str(ACQUIRE)), a.dry_run)
+        candidate_source = (os.environ.get('HAO_BOOTSTRAP_FILES') or a.signed_release_path.parent
+                            if release.get('candidate') else None)
+        download(c, release_path, cache, acquire or runpy.run_path(str(ACQUIRE)), a.dry_run,
+                 assets_from=candidate_source)
     c.step(STEPS[1], plan=a.dry_run)
     c.item('%d packs, %d recipes chosen for %s' % (len(profile['packs']), sum(len(v) for v in groups.values()),
                                              profile['model']), ok=not a.dry_run, ev='packs', packs=profile['packs'])

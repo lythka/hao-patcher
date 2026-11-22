@@ -18,6 +18,10 @@ cached file is opened without following links and must be a regular file of ours
 the one moved into place. A partial is kept for resuming only when the download stopped; wrong bytes are removed. A download marked "stream" (the IPSW, the installer) is not fetched: the producers
 read only the members they need from its URL, each checked against the release's "pins" (pipeline/unpack/ranged.py).
 
+For a candidate, hosted assets (including rehosted Python downloads) come only from --assets-from,
+HAO_BOOTSTRAP_FILES, or the manifest's folder, in that order, or the hash-addressed mirror below. Missing or corrupt
+candidate files never fall back to their unpublished release URLs. Upstream download rows keep their origins.
+
 A local mirror: with HAO_MIRROR=URL set, each entry's first source is URL/sha256/<its sha256>, then its own url and
 mirrors; the size and sha256 checks are the same. A mirror miss (HTTP error, no connection, fewer bytes than pinned)
 prints one line, `mirror miss NAME SHA256` (stderr), and the origin sources are tried; with HAO_MIRROR_STRICT=1 it is
@@ -115,6 +119,16 @@ def load(manifest, assets_from=None):
                 [row['url']] if row['url'] else []) + row['mirrors']
             row['url'] = asset_source(assets_from) + urllib.parse.quote(row['name'])
         rows.append(row)
+    if m.get('candidate'):
+        # Candidate release URLs do not exist. Never fall back to them, even
+        # when the local copy is absent or corrupt. Fetch still verifies bytes.
+        source = assets_from or os.environ.get('HAO_BOOTSTRAP_FILES') or Path(manifest).parent
+        prefix = asset_source(source)
+        for row in rows:
+            if row['kind'] == 'asset' or str(row.get('url', '')).startswith(
+                    'https://github.com/lythka/hao-assets/releases/download/'):
+                row['url'] = prefix + urllib.parse.quote(row['name'])
+                row['mirrors'] = []
     if not rows:
         raise AcquireError('%s has no downloads or assets' % manifest)
     names = set()
