@@ -185,6 +185,7 @@ def release_view(release, name):
     out = {k: v for k, v in release.items() if k != 'profiles'}
     out.update({k: entry[k] for k in PROFILE_FIELDS if k in entry}, profile=name,
                harvested=list(entry.get('harvested', release.get('harvested', []))))
+    out['install_cache_rebuild'] = bool(entry.get('install_cache_rebuild', False))
     for k in ('downloads', 'assets', 'made_on_mac'):
         out[k] = [x for x in release.get(k, []) if x['row'] in rows]
     return out

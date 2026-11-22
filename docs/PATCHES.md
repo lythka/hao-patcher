@@ -9,7 +9,7 @@ A file made on the target lists what it is made *after* there. A *seed* file is 
 changes after install (`"content": "seed"` with a `"reason"`): `hao verify` checks it is there with its
 attributes, not its bytes.
 
-61 of 63 patches declare their files so far.
+62 of 64 patches declare their files so far.
 
 ## darwin27-kernel
 
@@ -349,6 +349,13 @@ Revision r9, status experiment. [Recipe](../patches/golden-gate-shared-cache-cat
 - `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_x86_64.map`: whole file from hao (row rebuilt_cache_catalog). Rebuilt x86_64 shared cache, B+catalog family (map), in the new sealed OS cryptex (os.dmg, os.clone.dmg) in place of the x86_64 family golden-gate-userspace built; owner, mode and flags of the old main cache file.
 - `System/Library/CoreServices/golden-gate-shared-cache.json`: whole file from hao. The record src/fold.py writes last (artifact, input match, providers {root: sha256}, removed and installed cache files, 4 KiB re-signs, Swift references, roots left on disk). The roots the artifact folds in (src/providers.txt R and C lines) are removed from System before it. Installed mode 0644, owner root:wheel.
 
+## golden-gate-shared-cache-install
+
+Revision r1, status experiment. [Recipe](../patches/golden-gate-shared-cache-install/README.md)
+
+- 36 whole files from hao, under `System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/` (for example `dyld_shared_cache_x86_64`). Generated and verified during installation from the target System and pinned cache inputs; installed by the shared-cache fold recipe. Listed by `patches.py explain golden-gate-shared-cache-install`.
+- `System/Library/CoreServices/golden-gate-shared-cache.json`: whole file from hao. Generated and verified during installation from the target System and pinned cache inputs; installed by the shared-cache fold recipe. Installed mode 0644, owner root:wheel.
+
 ## golden-gate-store
 
 Revision r7, status product. [Recipe](../patches/golden-gate-store/README.md)
@@ -588,7 +595,7 @@ Revision r10, status product. [Recipe](../patches/golden-gate-windowserver-filte
 
 ## hao-command
 
-Revision r14, status product. [Recipe](../patches/hao-command/README.md)
+Revision r15, status product. [Recipe](../patches/hao-command/README.md)
 
 - `usr/local/bin/hao`: whole file from hao. The hao command: a two-line sh launcher written at install (root 755) that starts usr/local/lib/hao/hao/tools/hao/hao with the bundled CPython.
 - `usr/local/lib/hao/python`: whole file from every file under it from hao (row python_x86_64). The kit's x86_64 CPython 3.12 (python-build-standalone install_only), unpacked: macOS 27 has no working python3.
@@ -658,7 +665,7 @@ Revision r10, status product. [Recipe](../patches/hao-runtime-fold/README.md)
 
 ## hao-runtime-fold-catalog
 
-Revision r5, status experiment. [Recipe](../patches/hao-runtime-fold-catalog/README.md)
+Revision r6, status experiment. [Recipe](../patches/hao-runtime-fold-catalog/README.md)
 
 - `usr/libexec/hao`: whole file from hao (row hao_runtime_fold_catalog). The hao launcher (B+catalog payload) that runs ARM64 programs on Intel (payload root/usr/libexec/hao, copied by hao-install.py). Installed mode 0755, owner root:wheel, flags restricted.
 - `usr/lib/hao/libhao.dylib`: whole file from hao (row hao_runtime_fold_catalog). Hao runtime library (payload root). Installed mode 0755, owner root:wheel.

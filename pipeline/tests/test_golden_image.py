@@ -69,6 +69,7 @@ class FakeCommands:
         elif a[0]=='sh' and a[1]==self.config['pristine_script']:
             system=Path(self.config['work'])/'mnt/system'
             if a[2]=='system':
+                (Path(self.config['work'])/'set-id.json').write_text('[]')
                 assert len(self.volumes)==1 and self.volumes[0]['Roles']==['System']
                 p=system/'System/Library/CoreServices';p.mkdir(parents=True);(p/'SystemVersion.plist').write_bytes(plistlib.dumps({'ProductVersion':'27.0','ProductBuildVersion':'26A428'}))
                 p=system/'System/Cryptexes';p.mkdir(parents=True);(p/'OS').symlink_to('../../System/Volumes/Preboot/Cryptexes/OS')
@@ -319,6 +320,60 @@ class ResumeTests(unittest.TestCase):
                environment=dict(self.first['environment'],LOG=str(self.root/'b/log')))
         self.fake.config=c;self.fake.entries=[]
         return c
+
+    def test_interrupted_record_write_keeps_previous_checkpoint(self):
+        from unittest.mock import patch
+        work=self.root/'checkpoint';work.mkdir()
+        golden.write_build_record(work,{'status':'failed','step':'cache-build'})
+        with patch.object(golden.os,'replace',side_effect=OSError('interrupted')):
+            with self.assertRaises(OSError):golden.write_build_record(work,{'status':'assembled'})
+        self.assertEqual(json.loads((work/'build.json').read_text()),{'status':'failed','step':'cache-build'})
+
+    def cache_setup(self):
+        hook=dict(name='cache-fixture',kc_hook='/staged/cache/kc-hook.sh')
+        self.first['hooks'].insert(2,hook)
+        self.first['cache_rebuild_hook']=hook['name']
+        return hook
+
+    def test_cache_build_resumes_without_repeating_source_recipes(self):
+        hook=self.cache_setup()
+        prior=self.fail_at(lambda a:hook['kc_hook'] in a)
+        c=self.second()
+        self.assertEqual(golden.LAYERS[golden.resume_point(c,prior)][0],'cache-build')
+        record=golden.assemble(c,self.fake,prior=prior)
+        calls=[r for r in self.fake.entries if hook['kc_hook'] in r['command']]
+        self.assertEqual([r['environment']['HAO_CACHE_PHASE'] for r in calls],['build','install'])
+        self.assertFalse(any(self.first['hooks'][1]['kc_hook'] in r['command'] for r in self.fake.entries))
+        self.assertEqual(record['status'],'assembled')
+
+    def test_cache_resume_preserves_set_id_gate(self):
+        hook=self.cache_setup();prior=self.fail_at(lambda a:hook['kc_hook'] in a)
+        source=Path(self.first['work'])/'mnt/system/System/Library/KernelCollections/BootKernelExtensions.kc'
+        st=source.stat()
+        expected=[['System/Library/KernelCollections/BootKernelExtensions.kc',0o4755,st.st_uid,st.st_gid]]
+        (Path(prior['work'])/'set-id.json').write_text(json.dumps(expected))
+        c=self.second()
+        with self.assertRaisesRegex(RuntimeError,'not sealed'):golden.assemble(c,self.fake,prior=prior)
+        self.assertEqual(json.loads((Path(c['work'])/'set-id.json').read_text()),expected)
+        self.assertFalse(any('--create-snapshot' in row['command'] for row in self.fake.entries))
+
+    def test_cache_mutation_checkpoint_refuses_resume(self):
+        hook=self.cache_setup(); original=self.fake.run
+        checkpoint=[]
+        def run(args, **kwargs):
+            if hook['kc_hook'] in [str(a) for a in args]:
+                checkpoint.append(json.loads((Path(self.first['work'])/'build.json').read_text()))
+                if kwargs.get('env',{}).get('HAO_CACHE_PHASE')=='install':
+                    raise subprocess.CalledProcessError(1,args)
+            return original(args,**kwargs)
+        self.fake.run=run
+        with self.assertRaises(subprocess.CalledProcessError): golden.assemble(self.first,self.fake)
+        self.assertEqual(len(checkpoint),2)
+        for record,phase in zip(checkpoint,('cache-build','cache-install')):
+            incomplete=[r['name'] for r in record['steps'] if not r.get('complete')]
+            self.assertEqual(incomplete,[phase])
+        prior=checkpoint[-1];prior['work']=self.first['work']
+        with self.assertRaisesRegex(ValueError,'cache-install'):golden.resume_point(self.second(),prior)
 
     def test_resumes_at_boot_and_esp_without_erasing(self):
         prior=self.fail_at(lambda a:a[0]=='ditto' and a[-1].endswith('/mnt/esp'))

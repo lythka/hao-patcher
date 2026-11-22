@@ -26,6 +26,21 @@ class MakeOnMac(unittest.TestCase):
         self.release = {'downloads': [{'row': 'ipsw_27_0', 'stream': True, 'url': 'https://example.invalid/x.ipsw',
                                        'pins': self.pins}]}
 
+    def test_runtime_variants_complete_their_own_payload(self):
+        import types
+        top=self.d/'fold';payload=top/'payload';payload.mkdir(parents=True)
+        self.row('hao_runtime_fold_catalog',payload,None)
+        r=types.SimpleNamespace(input=lambda row:self.d/'userspace',work=self.work,dry=True,
+                                runtime_tool=None,mount=lambda path,name:self.d/name)
+        functions=M['steps'](r,[self.lock],dict(donor_build='TEST'))
+        call=next(fn for rows,fn in functions if rows==['hao_runtime_fold_catalog'])
+        g=call.__globals__
+        with mock.patch.dict(g,find_runtime_tool=mock.Mock(return_value=top/'tools/hao-runtime-on-mac'),
+                             runtime_tool=mock.Mock()) as unused:
+            call()
+            g['runtime_tool'].assert_called_once_with(r,top/'tools/hao-runtime-on-mac',
+                self.work/'root-view-hao_runtime_fold_catalog',self.d/'rosetta/System/Library/dyld',top)
+
     def tearDown(self):
         self.t.cleanup()
 

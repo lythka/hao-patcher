@@ -40,6 +40,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-shader-caches | r17 | post | product | caches | x |  |  |  | **needs** | r17 2026-11-17 The system accounts' Metal cache files (46, under private/var/folders) are declared `"content": |
 | golden-gate-shared-cache | r11 | oclp-hook | product |  |  |  |  |  | **needs** | r11 2026-11-19 The folded OS cryptex is copied into an image sized to what it holds before it is sealed |
 | golden-gate-shared-cache-catalog | r9 | oclp-hook | experiment |  |  |  |  |  | ok | r9 2026-11-20 Verify adds the on-target adoption check (tools/shared-cache prespecialization-adoption.py); r8' |
+| golden-gate-shared-cache-install | r1 | oclp-hook | experiment |  |  |  |  |  | **needs** | r1 2026-11-22 Build and verify the cache on the target before installing it and sealing System. |
 | golden-gate-store | r7 | oclp-hook | product |  |  |  |  |  | **needs** | r7 2026-11-18 The policy library is installed as usr/lib/hao/hao-appstore-policy.dylib, and the three specs lo |
 | golden-gate-unsupported-daemons | r4 | post | product |  | x |  |  |  | ok (r3) | r4 2026-11-19 Validated r3 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-update-policy | r3 | post | product |  | x |  |  |  | ok (r2) | r3 2026-11-18 Validated r2 on hardware (Validation); nothing it installs changes. |
@@ -49,11 +50,11 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-wallpaper-export | r2 | post | product | caches |  |  |  |  | **needs** | r2 2026-11-19 Pack os-extras: dev profiles name it, release profiles leave it out (Apple-derived; returns when |
 | golden-gate-wifi-compat | r4 | oclp-hook | product |  | x | x |  |  | ok (r3) | r4 2026-11-19 Validated r3 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-windowserver-filter | r10 | oclp-hook | product |  | x | x |  |  | ok (r5) | r10 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated |
-| hao-command | r14 | post | product |  | x |  |  |  | **needs** | r14 2026-11-21 Stage the downloader used by the installed cache rebuild command. |
+| hao-command | r15 | post | product |  | x |  |  |  | **needs** | r15 2026-11-22 Show target cache rebuild requirements and permit resume at its build checkpoint. |
 | hao-opencore | r87 | post | product |  | x | x |  |  | **needs** | r87 2026-11-21 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 497f126 (hao-runt |
 | hao-runtime | r95 | oclp-hook | product |  | x | x |  |  | **needs** | r95 2026-11-21 Input row `hao_runtime` (26B131) now names the payload built with hao-runtime 497f126 (hao-runt |
 | hao-runtime-fold | r10 | oclp-hook | product |  |  |  |  |  | **needs** | r10 2026-11-18 Row `hao_runtime_fold` -> hao-runtime cabc1d5 payload for fold family B 31C0215A (manifest 8e45 |
-| hao-runtime-fold-catalog | r5 | oclp-hook | experiment |  |  |  |  |  | **needs** | r5 2026-11-20 Row hao_runtime_fold_catalog is hao-runtime 90c2b9e built for the witness family 31DA2287 (1892  |
+| hao-runtime-fold-catalog | r6 | oclp-hook | experiment |  |  |  |  |  | **needs** | r6 2026-11-22 Pin the 497f126 payload for 31DA2287; users complete Apple-derived files locally. |
 | metal-compiler-compat | r13 | oclp-hook | product |  | x |  |  |  | ok (r12) | r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes. |
 | metal-metalold | r4 | oclp-hook | unfinished |  |  |  |  |  | **needs** | r4 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces |
 | metalold-selectors | r10 | oclp-hook | product |  | x | x |  |  | ok | r10 2026-11-18 Row metalold_selectors hashes and publishes only libmetalold-selectors.dylib (`# hash: release- |

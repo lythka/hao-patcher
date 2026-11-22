@@ -1,0 +1,12 @@
+{
+ "comment": "Boot-validation counterpart of beta-v0.0.1 with test access; never released.",
+ "target": "mbp92",
+ "recipes": [
+  "dev-access"
+ ],
+ "variants": [
+  "cache-fold",
+  "cache-catalog",
+  "cache-install"
+ ]
+}

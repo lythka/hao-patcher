@@ -20,6 +20,13 @@ RELEASE = {'downloads': [
 
 
 class Plan(unittest.TestCase):
+    def test_target_rebuild_is_shown_without_adding_host_scratch(self):
+        stock=space.plan(RELEASE); rebuilt=space.plan(dict(RELEASE,install_cache_rebuild=True))
+        self.assertEqual(stock['mac_peak'],rebuilt['mac_peak'])
+        self.assertEqual(stock['drive_need'],rebuilt['drive_need'])
+        self.assertTrue(any('On the target' in line for line in space.lines(rebuilt)))
+        self.assertFalse(any('On the target' in line for line in space.lines(stock)))
+
     def test_streamed_downloads_are_not_stored_and_the_images_go_to_the_drive(self):
         p = space.plan(RELEASE)
         self.assertAlmostEqual(p['download'], 1.7, places=1)          # the IPSW and the installer are not fetched

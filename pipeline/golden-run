@@ -292,6 +292,7 @@ def guest_config(recipe, share, local, overlays=False, cryptex_cache=False, kit_
                 **(dict(overlays=dict(plan=GUEST+'/overlay-plan.json',files=GUEST+'/overlay-files',
                                       installer=local+'/source/golden-overlays.py',
                                       livepatch=local+'/source/livepatch.py')) if overlays else {}),
+                **(dict(cache_rebuild_hook=recipe['cache_rebuild_hook']) if recipe.get('cache_rebuild_hook') else {}),
                 **(dict(cryptex_cache=GUEST+'/cryptex-cache') if cryptex_cache else {}))
 
 

@@ -173,7 +173,7 @@ def assemble_onto(a, c, host, path, info, policy, run=subprocess.call):
 
 
 # golden-image.py's RESUMABLE: the steps a failed install can continue at (the steps before them completed)
-RESUMABLE = ('boot-and-esp', 'hardware', 'posts')
+RESUMABLE = ('boot-and-esp', 'hardware', 'cache-build', 'posts')
 
 
 def failed_step(work):
@@ -436,6 +436,9 @@ def resolve(a, c, command):
             'files')
     for pack, names in groups.items():
         c.print('  %s %s' % (c.paint('bold', '%-22s' % pack), ', '.join(names) or '-'), 'edits')
+    if asm.get('cache_rebuild_hook'):
+        c.print('Shared cache: rebuilt on the target before first boot; allow 55 GB of free scratch space and '
+                'roughly 25–60 extra minutes on Ivy Bridge (estimate, not a hardware measurement).')
     return profile, path, asm, groups
 
 

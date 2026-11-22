@@ -25,6 +25,7 @@ NEEDS VALIDATION: r14 adds the pinned-asset downloader for `hao cache build`.
 Laptop 2026-11-19, a MacBookPro9,2 with image 8305fdd (26B131, built from fb6542df with r12): `/usr/local/bin/hao verify` runs and reports against 38 pack manifests, and the listing of /private/var/log/hao collected from that boot shows `drwxr-xr-x root wheel`.
 
 ## Revisions
+- r15 2026-11-22 Show target cache rebuild requirements and permit resume at its build checkpoint.
 - r14 2026-11-21 Stage the downloader used by the installed cache rebuild command.
 - r13 2026-11-19 Validated r12 on hardware (Validation). Nothing it installs changes.
 - r12 2026-11-18 Makes hao's log folder /private/var/log/hao root:wheel 755 on Data. launchd created it 744 for the AOT job's log, so per-user hao logs were lost.

@@ -170,6 +170,17 @@ The runtime's ahead-of-time caches make ARM programs start faster. They are in `
 root and the system's services read, so building and removing them needs your password. A start-up job (`hao.aot`)
 builds them once after the first start-up and again after each runtime update; `hao status` shows how far it is.
 
+## Installer cache rebuild
+
+The `beta-v0.0.1` candidate profile builds the cache on the target during `hao install`, before first boot.
+It needs 55 GB free for the build and 40 GB free afterward for cryptex installation. Intermediates are removed before
+that second check. Allow roughly 25–60 additional minutes on Ivy Bridge; this is an estimate from host runs.
+
+A failed `cache-build` stage can use the installer's `--resume` option. A saved family is checked again before reuse.
+Once `cache-install` starts, an interrupted install requires a fresh install. A mismatch stops; it never selects the
+stock cache silently. The existing alpha profile remains the stock-cache option. This candidate still needs boot and
+hardware validation before release.
+
 ## hao cache build
 
 For an installed Intel Mac, build and verify the shared cache pinned by its release:

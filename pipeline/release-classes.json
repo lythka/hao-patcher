@@ -660,6 +660,35 @@
    "publish": "file",
    "producer": "tools/shared-cache/package-user-inputs",
    "reason": "Deterministic gzip of 26B131 image UUID/section/offset references and runtime-built metadata with pointers removed; no executable code."
+  },
+  "hao_runtime_fold_catalog": {
+   "class": "ours",
+   "publish": "file",
+   "unpack": {
+    "strip": 1,
+    "into": "parent"
+   },
+   "source": "../hao-runtime-26B131-497f12609b76-public.tar.gz",
+   "source_sha256": "bbf6d6674ec20895a9fa7253973e9fd327b558d39ff16320f3b9a7f0fdd69070",
+   "reason": "The 497f126 runtime public archive for the 31DA2287 cache. Apple-derived stubs and dyld are completed on the user\u2019s Mac; AOT files are generated after boot.",
+   "made_on_mac_files": [
+    {
+     "path": "payload/embed/stubs",
+     "producer": "tools/hao-embed --skeletons payload/embed/skeletons (GENERATE.md): fills each stub from the 26B131 program, Python and codesign only; must equal stub_sha256 in embed/manifest.json",
+     "from_row": "golden_gate_userspace"
+    },
+    {
+     "path": "payload/replace/dyld",
+     "producer": "tools/dyld-ignition-fix.py ROOT/usr/lib/dyld payload/replace/dyld (GENERATE.md)",
+     "from_row": "golden_gate_userspace"
+    },
+    {
+     "path": "payload/root/usr/lib/hao/aot",
+     "producer": "optional, after the first boot of the installed Mac: sudo /usr/libexec/hao --aot PROGRAM... (writes /private/var/db/hao)",
+     "from_row": "golden_gate_userspace"
+    }
+   ],
+   "file": "hao-runtime-26B131-497f12609b76-fold-witness-public.tar.gz"
   }
  }
 }

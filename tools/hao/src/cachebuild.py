@@ -72,10 +72,11 @@ def configuration(release):
     return spec
 
 
-def preflight(spec, system, os_root, work_parent, *, machine=None, euid=None, free=None):
+def preflight(spec, system, os_root, work_parent, *, machine=None, euid=None, free=None, offline=False):
     machine = platform.machine() if machine is None else machine
     euid = os.geteuid() if euid is None else euid
-    if machine != 'x86_64' or euid != 0:
+    architectures = ('x86_64', 'arm64') if offline else ('x86_64',)
+    if machine not in architectures or euid != 0:
         raise Stopped('cache build runs as root on the installed Intel Mac', code=5)
     try:
         build = plistlib.loads((system / VERSION).read_bytes())['ProductBuildVersion']

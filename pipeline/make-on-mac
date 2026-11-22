@@ -604,30 +604,30 @@ def steps(r, fs, a):
         r.sh(*PY, 'tools/live-text/on-mac', 'compiler-service', P('metal_compiler_compat'),
              '--oclp-hardware', I('oclp_hardware'))
 
-    def runtime():
+    def runtime(row):
         """hao_runtime's stubs and dyld, made from the System and Rosetta images (hao-runtime's tools/hao-runtime-on-mac,
         from the placed archive, or --dev-runtime-tool for an archive older than it); it checks the whole payload."""
-        top = P('hao_runtime').parent
+        top = P(row).parent
         tool = find_runtime_tool(top, r.runtime_tool)
         if tool == top / 'tools/hao-runtime-on-mac' and not r.dry:
             # what runs is the pinned archive's own tools folder, copied from it here, not the placed one
-            tool, why = archive_tool(r.cache, r.release, 'hao_runtime', 'tools/hao-runtime-on-mac')
+            tool, why = archive_tool(r.cache, r.release, row, 'tools/hao-runtime-on-mac')
             if why:
                 raise Failed('hao-runtime-on-mac not run: ' + why)
         rosetta = r.mount(userspace() / 'rosetta.dmg', 'rosetta')
-        runtime_tool(r, tool, root_view(), rosetta / 'System/Library/dyld', top)
+        runtime_tool(r, tool, root_view(row), rosetta / 'System/Library/dyld', top)
 
-    def root_view():
+    def root_view(row):
         """A small real System root for runtime's tool: only the files its manifest reads (each program, the files its
         stub binds, usr/lib/dyld), copied from the System image and the OS and App cryptex images to the paths a booted
         Mac has (System/Volumes/Preboot/Cryptexes/{OS,App}/...). Real copies: hao-embed refuses a path that resolves
         outside ROOT, so symlinks or a read-only System image without those folders do not serve."""
-        view = r.work / 'root-view'
+        view = r.work / ('root-view-' + row)
         if view.exists() or r.dry:
             return view
         system = root()
         cryptexes = {'OS': r.mount(userspace() / 'os.dmg', 'os'), 'App': r.mount(userspace() / 'app.dmg', 'app')}
-        manifest = json.loads((P('hao_runtime') / 'embed/manifest.json').read_text())
+        manifest = json.loads((P(row) / 'embed/manifest.json').read_text())
         rels = {'usr/lib/dyld'}
         for e in manifest['files']:
             rels.add(e['path'])
@@ -646,7 +646,8 @@ def steps(r, fs, a):
                 shutil.copymode(src, dst)
         return view
 
-    completions = [(['hao_runtime'], runtime)]
+    completions = [([row], lambda row=row: runtime(row))
+                   for row in ('hao_runtime', 'hao_runtime_fold', 'hao_runtime_fold_catalog')]
     if (TOP / 'tools/live-text/on-mac').is_file():      # a checkout before metal's producers lists those rows as waiting
         completions += [(['live_text_framework'], live_text), (['metal_compiler_compat'], compiler_service)]
     return [(['golden_gate_userspace'], gg_userspace), (['darwin27_kernel'], kernel), (['python_site'], python_site),

@@ -227,6 +227,16 @@ class GenericImageTest(unittest.TestCase):
         self.assertTrue(a.unproven_reasons[0].startswith('the generic image generic'))
         self.assertEqual(writes(host), [])
 
+    def test_selected_profile_owns_its_cache_rebuild_plan(self):
+        with TwoProfiles() as r:
+            release=json.loads(r.path.read_text())
+            names=list(release['profiles'])
+            release['install_cache_rebuild']=True
+            release['profiles'][names[0]]['install_cache_rebuild']=True
+            release['profiles'][names[1]]['install_cache_rebuild']=False
+            self.assertTrue(INST.release_view(release,names[0])['install_cache_rebuild'])
+            self.assertFalse(INST.release_view(release,names[1])['install_cache_rebuild'])
+
     def test_the_9_2_downloads_only_its_own(self):
         host = FakeMac(uid=0)
         with TwoProfiles() as r, FakeWriter() as w:

@@ -53,6 +53,18 @@ class ReleaseCut(unittest.TestCase):
             self.assertIn(want, rows)
         self.assertEqual(len(rows), len(set(rows)))
 
+    def test_install_profile_uses_inputs_not_a_prebuilt_apple_cache(self):
+        assembly=TOP/'pipeline/assemblies/mbp92-26B131-beta-v0.0.1.json'
+        rows=dict(R['release_rows'](assembly))
+        for row in ('shared_cache_builder','swift_metadata_catalog','hao_runtime_fold_catalog'):
+            self.assertIn(row,rows);self.assertEqual(R['classes']()[row]['class'],'ours')
+        self.assertNotIn('rebuilt_cache_catalog',rows)
+        # Userspace cryptex stubs and OpenCore still consume the stock payload's shared files.
+        self.assertIn('hao_runtime',rows)
+        recipes=(TOP/'pipeline/sets/beta-v0.0.1.txt').read_text().splitlines()
+        self.assertIn('hao-runtime-fold-catalog',recipes)
+        self.assertNotIn('hao-runtime',recipes)
+
     def test_cache_rebuild_is_an_explicit_post_install_input(self):
         config = R['cache_rebuild_config'](ALPHA_ASSEMBLY)
         rows = dict(R['release_rows'](ALPHA_ASSEMBLY))
@@ -166,6 +178,16 @@ class Archive(unittest.TestCase):
         hit = (TOP, ('0' * 64, str(d / 'b.dylib')))
         bad = R['make_asset']('x', hit, {'publish': 'file'})[3]
         self.assertTrue(any('pinned' in b for b in bad), bad)
+
+    def test_public_archive_can_have_a_distinct_variant_filename(self):
+        d = self.folder(); source=d/'b.dylib'
+        hit=(TOP,(R['sha256_file'](source),str(source)))
+        entry={'publish':'file','file':'runtime-fold.tar.gz'}
+        name,size,digest,bad=R['make_asset']('fold',hit,entry)
+        self.assertEqual(name,'runtime-fold.tar.gz');self.assertEqual(bad,[])
+        self.assertEqual(digest,R['sha256_file'](source))
+        for name in ('../escape','/absolute','a/b',''):
+            self.assertTrue(R['make_asset']('fold',hit,dict(entry,file=name))[3])
 
     def test_check_stage(self):
         stage = Path(tempfile.mkdtemp())

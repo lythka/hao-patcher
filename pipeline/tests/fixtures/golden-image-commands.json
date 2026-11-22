@@ -1867,6 +1867,7 @@
     "work": "<root>/work"
    },
    "group_uuid": "DATA-UUID",
+   "manifests": {},
    "operation": "golden-first-image",
    "owners_fixed": {
     "base layers": {
@@ -1940,6 +1941,14 @@
     },
     {
      "complete": true,
+     "name": "cache-build"
+    },
+    {
+     "complete": true,
+     "name": "cache-install"
+    },
+    {
+     "complete": true,
      "name": "snapshot"
     },
     {
@@ -1964,8 +1973,7 @@
     "recovery": "disk71s5",
     "system": "disk71s2",
     "vm": "disk71s6"
-   },
-   "manifests": {}
+   }
   }
  },
  "full": {
@@ -3774,6 +3782,7 @@
     "work": "<root>/work"
    },
    "group_uuid": "DATA-UUID",
+   "manifests": {},
    "operation": "golden-first-image",
    "owners_fixed": {
     "base layers": {
@@ -3847,6 +3856,14 @@
     },
     {
      "complete": true,
+     "name": "cache-build"
+    },
+    {
+     "complete": true,
+     "name": "cache-install"
+    },
+    {
+     "complete": true,
      "name": "snapshot"
     },
     {
@@ -3871,8 +3888,7 @@
     "recovery": "disk71s5",
     "system": "disk71s2",
     "vm": "disk71s6"
-   },
-   "manifests": {}
+   }
   }
  },
  "hardware-failure": {
@@ -5100,6 +5116,7 @@
    },
    "error": "Command '['/staged/python', '-I', '/staged/hardware/apply', 'apply', '--artifact', '/staged/hardware', '--system-root', '<root>/work/mnt/system', '--data-root', '<root>/work/mnt/data', '--report', '<root>/work/hardware.json']' returned non-zero exit status 19.",
    "group_uuid": "DATA-UUID",
+   "manifests": {},
    "operation": "golden-first-image",
    "owners_fixed": {},
    "revision": 1,
@@ -5138,8 +5155,7 @@
     "recovery": "disk71s5",
     "system": "disk71s2",
     "vm": "disk71s6"
-   },
-   "manifests": {}
+   }
   }
  },
  "unmount-failure": {
@@ -6933,6 +6949,7 @@
     "work": "<root>/work"
    },
    "group_uuid": "DATA-UUID",
+   "manifests": {},
    "operation": "golden-first-image",
    "owners_fixed": {
     "base layers": {
@@ -7006,6 +7023,14 @@
     },
     {
      "complete": true,
+     "name": "cache-build"
+    },
+    {
+     "complete": true,
+     "name": "cache-install"
+    },
+    {
+     "complete": true,
      "name": "snapshot"
     },
     {
@@ -7030,8 +7055,7 @@
     "recovery": "disk71s5",
     "system": "disk71s2",
     "vm": "disk71s6"
-   },
-   "manifests": {}
+   }
   }
  }
 }

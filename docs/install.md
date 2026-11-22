@@ -62,6 +62,14 @@ MacBook Pro.
 
    Until then, apps take longer to open the first time.
 
+## Rebuilt-cache candidates
+
+A candidate using profile `beta-v0.0.1` downloads about 27 MB of extra builder inputs when making the stick.
+The target then rebuilds and verifies the cache during installation. Keep it connected to power and allow roughly
+25–60 extra minutes on Ivy Bridge (estimated, not measured on that hardware). The plan shows the scratch-space
+requirement. A failed build can resume; a failure during cache replacement requires a fresh install.
+These candidates require boot and hardware validation before release.
+
 ## Logs
 
 If something doesn't work, save a report and attach it to a

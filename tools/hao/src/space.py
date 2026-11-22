@@ -58,7 +58,8 @@ def plan(release, cache=None, data=None):
     stages.append(('after', mac, drive, 'the staged kit removed from this Mac (--keep-kit keeps it); downloads and '
                    'made rows kept for the next run'))
     return dict(stages=stages, mac_peak=max(s[1] for s in stages), drive_need=max(s[2] for s in stages),
-                download=fetched, read_by_range=read, margin=d['margin_gb'], drive_fraction=d['drive_free_fraction'])
+                download=fetched, read_by_range=read, margin=d['margin_gb'], drive_fraction=d['drive_free_fraction'],
+                install_cache_rebuild=bool(release.get('install_cache_rebuild')))
 
 
 def problems(p, mac_free_bytes, drive_bytes=None):
@@ -94,4 +95,7 @@ def lines(p):
     out.append('peak: %.1f GB on this Mac (plus a %.0f GB margin), %.1f GB on the USB drive (a %d GB drive or larger); '
                '%.1f GB downloaded, %.1f GB read by range from Apple\'s IPSW and installer'
                % (p['mac_peak'], p['margin'], p['drive_need'], drive_size_gb(p), p['download'], p['read_by_range']))
+    if p.get('install_cache_rebuild'):
+        out.append('On the target during install: shared-cache rebuild needs 55 GB free scratch space; '
+                   'allow roughly 25–60 extra minutes on Ivy Bridge (estimated from host measurements).')
     return out

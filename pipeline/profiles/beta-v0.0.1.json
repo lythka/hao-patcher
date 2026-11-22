@@ -1,0 +1,11 @@
+{
+ "comment": "Beta candidate with a cache rebuilt on the target during installation; release gates remain required.",
+ "target": "mbp92",
+ "recipes": [],
+ "variants": [
+  "cache-fold",
+  "cache-catalog",
+  "cache-install"
+ ],
+ "release": true
+}

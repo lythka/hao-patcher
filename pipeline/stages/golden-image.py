@@ -59,6 +59,7 @@ def snapshot_command(system, machine=None):
 # failed attempt left is safe. The steps before one must all have completed. Every other step edits files in place
 # (the recipes, the snapshot, the posts) or makes the volumes (layout, group-volumes): those start from an empty disk.
 RESUMABLE = {
+    'cache-build': 'reads prepared target views and writes only private cache scratch on Data; verified output is reused',
     'boot-and-esp': 'install-role writes into a group folder removed first; the ESP copy writes the same files again',
     'hardware': 'OCLP\'s install_new_file replaces each destination; RSRRepair and the record plist are rewritten',
     'posts': 'only when no post recipe started: the step remounts System read-only and runs every recipe from the first '
@@ -412,6 +413,8 @@ class Assembler:
         print('STEP '+name, flush=True)
         row = dict(name=name, started=time.time())
         self.steps.append(row)
+        if name in ('cache-build', 'cache-install') and self.config.get('cache_rebuild_hook'):
+            self.checkpoint()
         action()
         row['seconds'] = time.time()-row['started']
         row['complete'] = True
@@ -541,6 +544,7 @@ class Assembler:
         for key in ('system','data','preboot','recovery','esp'):
             self.mount(key)
         (self.work/'uuids.env').write_text((Path(prior['work'])/'uuids.env').read_text())
+        (self.work/'set-id.json').write_bytes((Path(prior['work'])/'set-id.json').read_bytes())
 
     def finalize(self):
         c = self.config
@@ -602,7 +606,7 @@ class Assembler:
         # A Spotlight index the builder may have started on the offline System is not image content;
         # drop it before recipes walk System (snapshot drops it again).
         self.run('rm','-rf',self.mounts['system']/'.Spotlight-V100')
-        for hook in c['hooks']:
+        for hook in self.cache_hooks()[0]:
             if self.from_overlays(hook['name']):
                 self.step('overlay '+hook['name'],lambda h=hook:self.install_overlay(h['name']))
                 continue
@@ -618,10 +622,49 @@ class Assembler:
                 for name in ('BootKernelExtensions.kc','BootKernelExtensions.kc.elides','SystemKernelExtensions.kc'):
                     self.run('ditto',self.mounts['system']/'System/Library/KernelCollections'/name,self.work/'kc'/name)
 
+    def cache_hooks(self):
+        hooks = self.config['hooks']
+        name = self.config.get('cache_rebuild_hook')
+        if not name:
+            return hooks, None, []
+        matches = [i for i, hook in enumerate(hooks) if hook['name'] == name]
+        if len(matches) != 1:
+            raise ValueError('cache rebuild hook must appear exactly once')
+        at = matches[0]
+        if at < 2 or self.from_overlays(name):
+            raise ValueError('cache rebuild must follow source recipes and run its hook')
+        return hooks[:at], hooks[at], hooks[at+1:]
+
+    def cache_phase(self, phase):
+        _, hook, rest = self.cache_hooks()
+        if hook is None:
+            return
+        c = self.config
+        environment = dict(self.environment, TAHOE_DRIVERKIT_ARTIFACT=str(c['donors']['driverkit']),
+                           TAHOE_DONOR_TOOL=str(c['donor_tool']), TAHOE_NATIVE_ARTIFACT=str(c['donors']['native']),
+                           HAO_CACHE_PHASE=phase)
+        self.step('recipe '+hook['name']+' '+phase,
+                  lambda: self.run('sh', '-eu', hook['kc_hook'], self.mounts['system'], env=environment))
+        if phase == 'install':
+            for later in rest:
+                if self.from_overlays(later['name']):
+                    self.step('overlay '+later['name'], lambda h=later: self.install_overlay(h['name']))
+                else:
+                    self.step('recipe '+later['name'], lambda h=later: self.run(
+                        'sh', '-eu', h['kc_hook'], self.mounts['system'], env=environment))
+
+    def cache_build(self):
+        self.cache_phase('build')
+
+    def cache_install(self):
+        self.cache_phase('install')
+
     def snapshot(self):
         self.fix_owners('recipes',('system','data','preboot','recovery'))
         system = self.mounts['system']
         record = self.work/'set-id.json'
+        if not record.is_file():
+            raise RuntimeError('missing System set-ID record; refusing to seal')
         if record.is_file():        # before the seal: a System that lost a set-ID mode is never snapshotted
             bad = check_set_id(json.loads(record.read_text()), system)
             if bad:
@@ -885,6 +928,8 @@ LAYERS = [
     ('boot-and-esp', 'bootstrap', 'Tahoe\'s Intel Preboot and Recovery files, because 27 has none; the generated OpenCore ESP'),
     ('hardware', 'hardware', 'OCLP\'s legacy hardware overlay (HD 4000 Metal/OpenGL, wireless, audio) over all of the above'),
     ('recipes', 'recipes', 'the set\'s oclp-hook recipes in set order: darwin27-kernel, golden-gate-userspace, then fixes'),
+    ('cache-build', 'cache_build', 'build and verify the shared cache from prepared target inputs; resumable'),
+    ('cache-install', 'cache_install', 'install the verified cache and finish the remaining recipes; not resumable'),
     ('snapshot', 'snapshot', 'Preboot update, bless and the System snapshot'),
     ('posts', 'posts', 'the set\'s post recipes in set order, System read-only (OpenCore config, dev access)'),
     ('efi-bundle', 'export_efi', 'the final ESP exported with a manifest for installation after restore'),
@@ -921,6 +966,19 @@ def resume_point(config, prior):
     return start
 
 
+def write_build_record(work, record):
+    """Keep the last durable resume checkpoint if writing the next record is interrupted."""
+    destination = work/'build.json'
+    temporary = work/'build.json.new'
+    with temporary.open('w') as stream:
+        json.dump(record, stream, indent=2)
+        stream.write('\n'); stream.flush(); os.fsync(stream.fileno())
+    os.replace(temporary, destination)
+    fd = os.open(work, os.O_RDONLY)
+    try: os.fsync(fd)
+    finally: os.close(fd)
+
+
 def _assemble(config, commands=None, target=None, prior=None):
     start = resume_point(config, prior) if prior else 0
     if prior and 'image' in config:
@@ -936,6 +994,15 @@ def _assemble(config, commands=None, target=None, prior=None):
                   status='building',validation='BUILD ONLY; boot and complete product acceptance remain untested')
     if prior:
         record['resumed'] = dict(work=prior['work'],step=LAYERS[start][0],why=RESUMABLE[LAYERS[start][0]])
+    def checkpoint():
+        for name in ('uuids.env', 'set-id.json'):
+            with (work/name).open('rb') as stream:
+                os.fsync(stream.fileno())
+        value = dict(record, status='failed', error='assembly interrupted at durable cache checkpoint',
+                     volumes=image.devices, group_uuid=image.group, steps=image.steps,
+                     attached_device=target.attached, **target.record())
+        write_build_record(work, value)
+    image.checkpoint = checkpoint
     error = None
     try:
         if prior:
@@ -956,7 +1023,7 @@ def _assemble(config, commands=None, target=None, prior=None):
         record.update(volumes=image.devices,group_uuid=image.group,steps=image.steps,commands=commands.entries,
                       owners_fixed=image.owners, manifests=image.manifests,
                       attached_device=target.attached,**target.record())
-        (work/'build.json').write_text(json.dumps(record,indent=2)+'\n')
+        write_build_record(work, record)
     if error is not None: raise error
     return record
 
