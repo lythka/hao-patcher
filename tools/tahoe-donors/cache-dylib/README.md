@@ -2,7 +2,7 @@
 
 Turns one image of an x86_64 dyld shared cache back into a standalone dylib that dyld can load from disk. On this
 Mac it supplies Tahoe libraries that exist only inside a Tahoe cache, such as CoreWiFi for
-[tools/tahoe-donors](../tahoe-donors/README.md)'s `cache_images`. Apple's extractor (`dsc_extractor`) and
+[tools/tahoe-donors](../README.md)'s `cache_images`. Apple's extractor (`dsc_extractor`) and
 `ipsw dyld extract` write debugger files dyld refuses (no fixups; see tahoe-donors). The output is an Apple binary: it goes under
 `store/` with an input row and is never committed.
 
