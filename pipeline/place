@@ -239,6 +239,8 @@ def place(release_path, cache, dry_run=False, out=print):
     entries = [(d, 'file') for d in release.get('downloads', [])] + \
               [(a, a.get('format', 'file')) for a in release.get('assets', [])]
     for entry, form in entries:
+        if entry.get('role') in ('bootstrap', 'builder-kit'):
+            continue  # consumed before hao starts; not an installed input row
         bad = entry_problem(entry)
         if bad:
             problems.append(bad)

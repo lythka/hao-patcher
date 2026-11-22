@@ -102,6 +102,20 @@ I={share}/in; O={share}/out
 export TMPDIR="$(getconf DARWIN_USER_TEMP_DIR)"
 mark() {{ echo "$(date +%s) $*" >> "$O/stages.txt"; }}
 cd "$HOME" || exit 1
+if [ -f "$I/release/hao" ]; then
+    # A release bootstrap proof must run on a base without development installs.
+    for tool in /Applications/Xcode*.app /Library/Developer/CommandLineTools /Library/Frameworks/Python.framework; do
+        [ ! -e "$tool" ] || {{ echo "fresh Mac has development tools: $tool" >&2; exit 5; }}
+    done
+    mark bootstrap-start
+    HAO_BOOTSTRAP_FILES="$I/release" HAO_MIRROR="$MIRROR" HAO_MIRROR_STRICT=1 \
+        /bin/sh "$I/release/hao" create-installer --model "$MODEL" --image "$HOME/stick.img" --log json \
+        < /dev/null > "$O/create-installer.jsonl" 2> "$O/create-installer.err"
+    rc=$?
+    release=$(plutil -extract release raw -o - "$I/release/release.json")
+    cat "$HOME/hao-$release/kit/pipeline/SOURCE_COMMIT" > "$O/commit"
+    mark bootstrap-end rc=$rc
+else
 mark clone-start
 git clone -q "$I/hao-patcher.bundle" "$HOME/hao-patcher" && cd "$HOME/hao-patcher" && git checkout -q --detach "$COMMIT"
 rc=$?; mark clone-end rc=$rc
@@ -113,6 +127,7 @@ sudo HAO_MIRROR="$MIRROR" HAO_MIRROR_STRICT=1 tools/hao/hao create-installer --m
     --release "$I/release/release.json" --image "$HOME/stick.img" --log json \
     < /dev/null > "$O/create-installer.jsonl" 2> "$O/create-installer.err"
 rc=$?; mark create-installer-end rc=$rc
+fi
 echo $rc > "$O/create-installer.rc"
 if [ $rc = 0 ] && [ -f "$HOME/stick.img" ]; then
     mark stick-hash-start
@@ -200,7 +215,16 @@ def prepare_share(share, release_dir, commit, repo, key, params):
         if 'PRIVATE KEY' in key:
             raise SystemExit('fresh-mac-run: the candidate key file holds a private key')
         (inp / 'candidate-keys.pub').write_text(key)
-    bundle(repo, commit, inp / 'hao-patcher.bundle')
+    bootstrap = Path(release_dir) / 'hao'
+    if bootstrap.is_file():
+        release = json.loads((Path(release_dir) / 'release.json').read_text())
+        names = {'hao'} | {x['url'].rsplit('/', 1)[-1] for x in release['bootstrap'].values()}
+        for name in names:
+            if Path(name).name != name:
+                raise ValueError('unsafe bootstrap filename')
+            shutil.copyfile(Path(release_dir)/name, inp/'release'/name)
+    else:
+        bundle(repo, commit, inp / 'hao-patcher.bundle')
     (inp / 'params').write_text(''.join('%s=%s\n' % (k, shlex.quote(str(v))) for k, v in sorted(params.items())))
     (inp / 'job.sh').write_text(GUEST_JOB.format(share=SHARE))
     (inp / 'user.sh').write_text(USER_SH.format(share=SHARE))
@@ -208,7 +232,8 @@ def prepare_share(share, release_dir, commit, repo, key, params):
     for p in inp.rglob('*'):
         p.chmod(0o555 if p.is_dir() else 0o444)
     inp.chmod(0o555)
-    return dict(release_sha256=sha256(inp / 'release' / 'release.json'), bundle_sha256=sha256(inp / 'hao-patcher.bundle'))
+    return dict(release_sha256=sha256(inp / 'release' / 'release.json'), bundle_sha256=sha256(inp / 'hao-patcher.bundle') if (inp/'hao-patcher.bundle').is_file() else None,
+                bootstrap_sha256=sha256(inp/'release/hao') if bootstrap.is_file() else None)
 
 
 # -- reading what the guest left

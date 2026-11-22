@@ -65,19 +65,20 @@ Use hao-patcher only on a **dedicated test Mac** whose contents you can lose.
 
 ## Install
 
-Developer preview. Installing erases the MacBook Pro's internal disk.
+Use a signed builder-kit release, a Mac on its normal macOS, and a USB drive of
+at least 64 GB. The release supplies Python and the build tools. Allow about 26 GB
+of free space plus the tools, and several hours for preparation and installation.
 
-1. Get hao and the release's file list: `git clone --branch v0.0.1 https://github.com/lythka/hao-patcher`,
-   `cd hao-patcher/tools/hao`, then download `release.json` and `SHA256SUMS` from
-   [hao-assets 27.2.1-26B131.0](https://github.com/lythka/hao-assets/releases/tag/27.2.1-26B131.0) and run
-   `./hao verify-release` ([Verify](docs/verify.md)). Any `FAIL`: stop.
-2. Run `sudo ./hao create-installer --link-on-target`, choose the USB drive and confirm (the drive is erased). Keep the
-   USB installer with you until you install: anyone who can change it can change what it installs.
-3. On the MacBook Pro, hold Option at startup, choose **EFI Boot** (a silent pause of several minutes follows)
-   and run `/Volumes/HAO/install` from the Recovery's Terminal.
-4. After the first start-up, run `sudo /usr/libexec/hao --aot` once.
+Replace `<RELEASE>` with the exact hao-assets release name:
 
-[Install](docs/install.md) has the requirements, logs for a bug report and building from source.
+```sh
+curl -fsSL https://github.com/lythka/hao-assets/releases/download/<RELEASE>/hao -o hao && sh hao
+```
+
+Choose the target Mac and USB drive, confirm, and enter your password when asked.
+Boot the MacBook Pro from **EFI Boot**, then run `/Volumes/HAO/install` in Recovery's
+Terminal. For a problem, run `hao report` on the installed Mac or `sh hao report`
+on the build Mac. [Requirements and steps](docs/install.md).
 
 ## Building
 

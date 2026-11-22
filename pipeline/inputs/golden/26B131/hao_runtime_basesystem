@@ -3,4 +3,4 @@
 # no AOT, no fixed dyld (the BaseSystem's dyld has no x86_64 slice). Its trusted-cdhashes lists all 1,006 BaseSystem
 # programs and guest libraries (anchor apple, the arm64 slice hao runs). Used by tools/gg-recovery (stage A1).
 # check: payload os_build=26B131 layout_version=1 manifest_sha256=549a0863d65b1fd8e438ab7acc819b890c7425f7d4e2e22c398a5a2e8349e3b1
-- store/artifacts/hao-runtime-basesystem-26B131-20261113-0a2c2aad4755/payload
+a2f65298106909ec7b119f48e4d5ef341db819f667756b9629d1fd910fa070ad store/artifacts/hao-runtime-basesystem-26B131-20261113-0a2c2aad4755/payload

@@ -574,7 +574,11 @@ def steps(r, fs, a):
         if all(checks(fs, x) for x in DONOR_ROWS):
             r.discard(d)
 
+    def metal_tools():
+        return I('metal_llvm') if any(x.get('row') == 'metal_llvm' for x in r.release.get('assets', [])) else None
+
     def metallibs():
+        llvm = metal_tools()
         for row, profile in (('hello_metallib_golden_gate', 'hello-golden-gate.txt'),
                              ('metallib_repairs_golden_gate', 'metallib-repairs-golden-gate.txt')):
             if checks(fs, row):
@@ -583,17 +587,19 @@ def steps(r, fs, a):
             if out.exists() and not r.dry:
                 shutil.rmtree(out)
             r.sh(*PY, 'cache/metallib/make', root(), out, '--work', r.work / ('metallib-' + row),
-                 '--paths', 'cache/metallib/profiles/' + profile)
+                 '--paths', 'cache/metallib/profiles/' + profile, *(['--llvm-bin', llvm] if llvm else []))
 
     def quad():
         o = I('oclp_hardware') / 'payload'
+        llvm = metal_tools()
         out = P('metal_quad_runtime_golden_gate')
         if out.exists() and not r.dry:
             shutil.rmtree(out)
         r.sh(*PY, 'cache/metallib/make', 'runtime-build',
              o / '11.7.10/System/Library/Extensions/AppleIntelGraphicsShared.bundle/Contents/Resources/runtime.igil64.split',
              out, '--llvm', o / '13.2.1-25/System/Library/PrivateFrameworks/GPUCompiler.framework/Versions/3802/Libraries/libLLVM.dylib',
-             '--compiler', o / '11.7.10/System/Library/Extensions/AppleIntelHD4000GraphicsGLDriver.bundle/Contents/MacOS/iCBE.dylib')
+             '--compiler', o / '11.7.10/System/Library/Extensions/AppleIntelHD4000GraphicsGLDriver.bundle/Contents/MacOS/iCBE.dylib',
+             *(['--assembler', llvm/'assemble'] if llvm else []))
 
     def live_text():
         """A shipped asset's Apple-derived files, made here (metal's tools/live-text/on-mac; each file is checked

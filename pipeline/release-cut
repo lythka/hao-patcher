@@ -160,7 +160,7 @@ def classify_record(row, hit):
     rel = os.path.relpath(path, TOP)
     if not os.path.exists(path):
         return 'missing', '%s is not in the store' % rel
-    if any(rel == r or rel.startswith(r + '/') for r in DOWNLOAD_ROOTS):
+    if classes().get(row, {}).get('class') == 'download' or any(rel == r or rel.startswith(r + '/') for r in DOWNLOAD_ROOTS):
         return 'download', rel
     if not rel.startswith('store/'):                     # a tracked source file used as a row
         tracked = subprocess.run(['git', '-C', str(TOP), 'ls-files', '--error-unmatch', rel], capture_output=True)
@@ -661,9 +661,16 @@ def merge_releases(cuts):
     return rel, problems
 
 
+def add_builder_assets(rel, stage):
+    runpy.run_path(str(TOP / 'pipeline/builder-kit.py'))['release_assets'](TOP, rel, stage)
+
+
 def build_releases(assemblies, name, stage=None, **kw):
     """build_release for each of ASSEMBLIES (one per profile), merged into one release (merge_releases)."""
-    return merge_releases([build_release(a, name, stage, **kw) for a in assemblies])
+    rel, problems = merge_releases([build_release(a, name, stage, **kw) for a in assemblies])
+    if not problems:
+        add_builder_assets(rel, stage)
+    return rel, problems
 
 
 def origin_holds(entry, sha256):
@@ -755,7 +762,10 @@ def check_stage(rel, stage):
     stage = Path(stage)
     bad = []
     names = {x['file'] for x in rel['assets'] if x.get('url', ASSET_URL).startswith(ASSET_URL.split('%s')[0])}
-    for x in rel['assets']:
+    hosted_downloads = [dict(x, file=x['name']) for x in rel.get('downloads', [])
+                        if x['url'].startswith(ASSET_URL.split('%s')[0])]
+    names.update(x['file'] for x in hosted_downloads)
+    for x in rel['assets'] + hosted_downloads:
         f = (stage if x['file'] in names else stage / 'external') / x['file']
         if not f.is_file():
             bad.append('%s is not staged' % x['file'])

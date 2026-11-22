@@ -22,7 +22,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-dyld-internal | r5 | oclp-hook | product |  | x |  |  |  | ok (r4) | r5 2026-11-19 Validated r4 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-font-registry | r11 | post | product | caches | x |  |  |  | ok (r3) | r11 2026-11-19 The Setup account's fontregistry.user is declared `"content": "seed"`: fontd rewrites it at run |
 | golden-gate-hd4000-planes | r8 | oclp-hook | product |  | x |  |  |  | ok (r7) | r8 2026-11-19 Validated r7 on hardware (Validation). Nothing it installs changes. |
-| golden-gate-hello | r12 | oclp-hook | product |  | x | x |  |  | ok (r11) | r12 2026-11-19 Validated r11 on hardware (Validation). Nothing it installs changes. |
+| golden-gate-hello | r13 | oclp-hook | product |  | x | x |  |  | **needs** | r13 2026-11-22 Pin the portable LLVM 15.0.7 output for 26B131; the builder uses release tools without Xcode. |
 | golden-gate-icon-caches | r10 | post | product | caches | x |  |  |  | ok (r3) | r10 2026-11-19 The store.index of root's and the Setup account's IconServices caches are declared `"content":  |
 | golden-gate-ids | r3 | oclp-hook | product |  |  |  |  |  | **needs** | r3 2026-11-17 Declares its scope (`requires`, docs/requires.md): its row is for 26B131. Nothing it installs ch |
 | golden-gate-launchd-warm | r6 | oclp-hook | product |  | x |  |  |  | **needs** | r6 2026-11-17 Status product (was experiment): it ships in the release profiles. Declaration only; `validated` |
@@ -31,7 +31,7 @@ Optional: the patch's optional group (skipped when its inputs are missing or the
 | golden-gate-metal-argbuf | r12 | oclp-hook | product |  | x |  |  |  | ok | r12 2026-11-20 Row metal_argbuf from f60029d7: the wrapper reads constant pointers through the inline constant |
 | golden-gate-metal-framebuffer | r14 | oclp-hook | product |  | x | x |  |  | ok (r13) | r14 2026-11-19 Validated r13 on hardware (Validation). Nothing it installs changes. |
 | golden-gate-metal-gva | r2 | oclp-hook | product |  |  |  |  |  | **needs** | r2 2026-11-20 Current recipe format: kc-hook.sh, pack metal-3802-extras (opt-in), 26B131 requires; overlaps no |
-| golden-gate-metal-libraries | r23 | oclp-hook | product |  | x | x |  |  | **needs** | r23 2026-11-17 `requires`: os 26A428/26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmwar |
+| golden-gate-metal-libraries | r24 | oclp-hook | product |  | x | x |  |  | **needs** | r24 2026-11-22 Pin the portable LLVM 15.0.7 output for 26B131; the builder uses release tools without Xcode. |
 | golden-gate-metal27 | r6 | oclp-hook | dev |  |  |  |  |  | **needs** | r6 2026-11-17 `requires`: os 26B131, donor 25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces |
 | golden-gate-mobile-assets | r3 | post | product | caches |  |  |  |  | **needs** | r3 2026-11-19 Pack os-extras: dev profiles name it, release profiles leave it out (Apple-derived; returns when |
 | golden-gate-model-gates-mbp92 | r1 | oclp-hook | product |  | x |  |  |  | **needs** | r1 2026-11-17 New (GEN1): golden-gate-userspace's model-gates edit, declared for pack mbp92; the 9,2 and its n |

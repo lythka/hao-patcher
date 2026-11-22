@@ -272,7 +272,8 @@
    "producer": "cache/metallib (profiles/hello-golden-gate.txt)",
    "inputs": [
     "ipsw_27_0",
-    "oclp_hardware"
+    "oclp_hardware",
+    "metal_llvm"
    ],
    "reason": "Apple's SetupAssistantSupportUI default.metallib rewritten for the HD 4000 compiler"
   },
@@ -281,7 +282,8 @@
    "producer": "cache/metallib make (profiles/metallib-repairs-26B131.txt)",
    "inputs": [
     "ipsw_27_0",
-    "oclp_hardware"
+    "oclp_hardware",
+    "metal_llvm"
    ],
    "reason": "Apple's framework metallibs rewritten AIR module by AIR module"
   },
@@ -289,7 +291,8 @@
    "class": "made-on-mac",
    "producer": "cache/metallib make runtime-build",
    "inputs": [
-    "oclp_hardware"
+    "oclp_hardware",
+    "metal_llvm"
    ],
    "reason": "Apple's Intel runtime.igil64.split extended with our bitcode and Apple's iCBE.dylib repaired (both from the legacy Intel GPU drivers OCLP installs)"
   },
@@ -689,6 +692,11 @@
     }
    ],
    "file": "hao-runtime-26B131-497f12609b76-fold-witness-public.tar.gz"
+  },
+  "metal_llvm": {
+   "class": "ours",
+   "publish": "tar",
+   "reason": "LLVM 15.0.7 universal AIR tools and the legacy runtime assembler, built by tools/metal-llvm/make"
   }
  }
 }

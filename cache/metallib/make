@@ -192,7 +192,7 @@ def main():
     parser.add_argument('--overlay', type=Path, action='append', default=[],
                         help='a System-rooted artifact whose copy of a library is the source instead of SYSTEM; the last overlay holding the path wins')
     parser.add_argument('--llvm-bin', type=Path,
-                        help='folder with LLVM 15.0.7 llvm-as and llvm-dis: used instead of xcrun metal-as/metal-objdump (no Xcode needed; recipes needing metal -c or metallib are refused)')
+                        help='folder with pinned LLVM 15.0.7 llvm-as, llvm-dis and opt (portable AIR assembly and linking)')
     args = parser.parse_args()
     sys.path.insert(0, str(HERE/'lib'))
     import toolchain
@@ -212,8 +212,6 @@ def main():
             raise ValueError('unknown recipe: ' + line)
         if len([step for step in steps if step != 'lower']) > 1:
             raise ValueError('one rewrite step per library: ' + line)
-        if args.llvm_bin and 'rewrite' in steps:
-            sys.exit('rewrite needs Xcode (metal -c, metallib); with --llvm-bin use golden-gate (profile line %d)' % (number + 1))
         relative = Path(path.lstrip('/'))
         if '..' in relative.parts:
             raise ValueError('library path escapes System: ' + line)

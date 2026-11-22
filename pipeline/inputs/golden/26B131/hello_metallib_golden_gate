@@ -1,3 +1,3 @@
 # Golden Gate hello shaders rewritten for the HD 4000 compiler by cache/metallib from 26B131 (SOURCES checked at install).
 # hash: without build.json README.txt  # build records and intermediates: a remake of the same payload matches
-0ff25dac690ec39e1eaef7073172d5a39edcb95edc739b15396920df28d0a2eb store/artifacts/hello-metallib-26B131-20261111-b4c0156d117e
+df65c1dde9534220874d55c39af2cace4c3ff0cc401181c5033eb35bb16147d8 store/artifacts/hello-metallib-llvm15-20261122

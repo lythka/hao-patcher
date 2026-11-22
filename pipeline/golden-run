@@ -51,6 +51,8 @@ def source_identity():
     """{commit, dirty} of this checkout: from git, or on a Mac without git from TOP/.hao-source (written when the
     source archive was fetched: {"commit": ..., "source": URL}); dirty is then None (unknown)."""
     try:
+        if not (TOP/'.git').exists():
+            raise FileNotFoundError('not a checkout')
         git=['git','-c','safe.directory='+str(TOP),'-C',str(TOP)]   # this checkout only: it may be a user's, run under sudo
         commit=subprocess.run(git+['rev-parse','HEAD'],capture_output=True,text=True,check=True).stdout.strip()
         dirty=bool(subprocess.run(git+['status','--porcelain'],capture_output=True,text=True,check=True).stdout)

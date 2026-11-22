@@ -1,0 +1,140 @@
+#!/usr/bin/env python3.14
+"""Compare portable Metal outputs with Xcode references on both host architectures.
+
+This host-only gate reads a mounted System; it never formats or writes a disk.
+Xcode tools are denied in both legs. Outputs and per-module evidence are retained.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import subprocess
+import sys
+
+TOP = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(TOP/'cache/metallib/lib'))
+import mtlb
+from build_metallib import md_blob, same_metadata
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def compare(reference, made, llvm, scratch):
+    checks, cache = [], {}
+    def disassemble(blob):
+        sha = hashlib.sha256(blob).hexdigest()
+        if sha not in cache:
+            path = scratch/(sha+'.air')
+            path.write_bytes(blob)
+            result = subprocess.check_output([str(llvm/'llvm-dis'), '-opaque-pointers=0', str(path), '-o', '-'], text=True)
+            cache[sha] = '\n'.join(l for l in result.splitlines() if not l.startswith('; ModuleID'))
+            path.unlink()
+        return cache[sha]
+    for file in sorted(reference.rglob('*.metallib')):
+        relative = file.relative_to(reference)
+        other = made/relative
+        a, b = file.read_bytes(), other.read_bytes()
+        left, right = mtlb.check(a), mtlb.check(b)
+        if [f['name'] for f in left['fns']] != [f['name'] for f in right['fns']]:
+            raise ValueError('function table differs: '+str(relative))
+        same = equal = 0
+        for old, new in zip(left['fns'], right['fns']):
+            if not all(same_metadata(md_blob(a,left,old,i), md_blob(b,right,new,i)) for i in (0,1)):
+                raise ValueError('container metadata differs: '+old['name'])
+            x, y = mtlb.bitcode(a,left,old), mtlb.bitcode(b,right,new)
+            if x == y:
+                same += 1
+            elif disassemble(x) == disassemble(y):
+                equal += 1
+            else:
+                (scratch/'different-reference.ll').write_text(disassemble(x))
+                (scratch/'different-portable.ll').write_text(disassemble(y))
+                raise ValueError('module differs: '+str(relative)+' '+old['name'])
+        checks.append(dict(path=str(relative), identical_modules=same, equal_modules=equal,
+                           sha256=digest(other)))
+    if not checks:
+        raise ValueError('reference has no metallibs')
+    return checks
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('system', 'llvm', 'hello-reference', 'libraries-reference', 'out'):
+        parser.add_argument('--'+name, type=Path, required=True)
+    parser.add_argument('--oclp', type=Path)
+    parser.add_argument('--runtime-reference', type=Path)
+    args = parser.parse_args()
+    if bool(args.oclp) != bool(args.runtime_reference):
+        parser.error('--oclp and --runtime-reference are used together')
+    args.out.mkdir(parents=True, exist_ok=False)
+    source = args.out/'source'
+    shutil.copytree(TOP/'cache/metallib', source/'cache/metallib',
+                    ignore=shutil.ignore_patterns('__pycache__', '.DS_Store'))
+    commit = subprocess.check_output(['git','-C',str(TOP),'rev-parse','HEAD'],text=True).strip()
+    (source/'.hao-source').write_text(json.dumps({'commit':commit}))
+    report = dict(legs=[], passed=False, commit=commit,
+                  source_sha256={str(p.relative_to(source)):digest(p) for p in sorted(source.rglob('*')) if p.is_file()})
+    hashes = []
+    for architecture in ('arm64','x86_64'):
+        leg = args.out/architecture
+        leg.mkdir()
+        wrappers = leg/'tools'
+        wrappers.mkdir()
+        denied = leg/'denied.log'
+        for name in ('xcrun','xcodebuild','clang','clang++','swiftc','metal','metallib'):
+            path = wrappers/name
+            path.write_text('#!/bin/sh\necho "$0 $*" >> '+shlex.quote(str(denied))+'\nexit 99\n')
+            path.chmod(0o755)
+        for name in ('llvm-as','llvm-dis','opt'):
+            path = wrappers/name
+            path.write_text('#!/bin/sh\nexec /usr/bin/arch -'+architecture+' '+shlex.quote(str(args.llvm/name))+' "$@"\n')
+            path.chmod(0o755)
+        env = dict(os.environ, PATH=str(wrappers)+':/usr/bin:/bin:/usr/sbin:/sbin',
+                   DEVELOPER_DIR=str(leg/'no-xcode'), HAO_METAL_LLVM=str(wrappers))
+        row = dict(architecture=architecture, checks=[], passed=False)
+        report['legs'].append(row)
+        try:
+            for label, profile, reference in (
+                    ('hello','hello-golden-gate.txt',args.hello_reference),
+                    ('libraries','metallib-repairs-golden-gate.txt',args.libraries_reference)):
+                command = ['/usr/bin/arch','-'+architecture,sys.executable,'-I',str(source/'cache/metallib/make'),
+                           str(args.system),str(leg/label),'--work',str(leg/(label+'-work')),
+                           '--paths',str(source/'cache/metallib/profiles'/profile),'--llvm-bin',str(wrappers)]
+                with (leg/(label+'.log')).open('w') as log:
+                    subprocess.run(command,env=env,check=True,stdout=log,stderr=subprocess.STDOUT)
+                row['checks'] += compare(reference,leg/label,args.llvm,leg)
+            if args.oclp:
+                payload = args.oclp/'payload'
+                command = ['/usr/bin/arch','-'+architecture,sys.executable,'-I',str(source/'cache/metallib/make'),
+                           'runtime-build', str(payload/'11.7.10/System/Library/Extensions/AppleIntelGraphicsShared.bundle/Contents/Resources/runtime.igil64.split'),
+                           str(leg/'runtime'), '--llvm',
+                           str(payload/'13.2.1-25/System/Library/PrivateFrameworks/GPUCompiler.framework/Versions/3802/Libraries/libLLVM.dylib'),
+                           '--compiler', str(payload/'11.7.10/System/Library/Extensions/AppleIntelHD4000GraphicsGLDriver.bundle/Contents/MacOS/iCBE.dylib'),
+                           '--assembler', str(args.llvm/'assemble')]
+                with (leg/'runtime.log').open('w') as log:
+                    subprocess.run(command,env=env,check=True,stdout=log,stderr=subprocess.STDOUT)
+                for file in sorted((args.runtime_reference/'System').rglob('*')):
+                    if file.is_file():
+                        relative = file.relative_to(args.runtime_reference)
+                        if digest(file) != digest(leg/'runtime'/relative):
+                            raise ValueError('runtime bytes differ: '+str(relative))
+                row['runtime_bytes_equal'] = True
+            row['denied_calls'] = denied.read_text().splitlines() if denied.exists() else []
+            row['passed'] = not row['denied_calls']
+            hashes.append({x['path']:x['sha256'] for x in row['checks']})
+        except Exception as error:
+            row['error'] = str(error)
+        (args.out/'result.json').write_text(json.dumps(report,indent=2)+'\n')
+    report['cross_architecture_identical'] = len(hashes)==2 and hashes[0]==hashes[1]
+    report['passed'] = all(r['passed'] for r in report['legs']) and report['cross_architecture_identical']
+    (args.out/'result.json').write_text(json.dumps(report,indent=2)+'\n')
+    return 0 if report['passed'] else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

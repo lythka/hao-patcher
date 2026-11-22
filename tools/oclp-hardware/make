@@ -55,9 +55,11 @@ def build(psp_root, psp_archive, rsr_repair, output, profile_path=HERE/'profiles
     shutil.copy2(HERE/'make', tools/'apply')
     shutil.copytree(HERE/'lib', tools/'lib', ignore=shutil.ignore_patterns('__pycache__'))
     shutil.copy2(HERE/'LICENSE.txt', tools/'LICENSE.txt')
-    git = lambda *args: subprocess.check_output(['git', '-C', str(HERE), *args], text=True).strip()
+    import runpy
+    top = HERE.parents[1]
+    source = runpy.run_path(str(top/'pipeline/source_commit.py'))
     record = dict(unit='tools/oclp-hardware', revision=REVISION, date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                  commit=git('rev-parse', 'HEAD'), dirty=bool(git('status', '--porcelain')),
+                  commit=source['commit'](top), dirty=source['dirty'](top),
                   source_files={str(path.relative_to(HERE)):sha(path) for path in sorted(HERE.rglob('*'))
                                 if path.is_file() and '__pycache__' not in path.parts},
                   oclp_source_commit=profile['source_commit'], donor_policy=profile['donor_policy'],

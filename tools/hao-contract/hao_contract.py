@@ -318,6 +318,26 @@ def check_release_file(path, stage=None, url_prefix=URL_PREFIX):
             out.append('release: %s url is not https' % label)
         return out
 
+    infrastructure = {'hao_bootstrap': 'bootstrap', 'hao_builder_kit': 'builder-kit'}
+    for entry in r['assets']:
+        role = entry.get('role')
+        if role is not None and infrastructure.get(entry.get('row')) != role:
+            bad.append('release: unknown infrastructure role for %s' % entry.get('row'))
+    if 'bootstrap' in r:
+        entries = {e['row']: e for k in ('assets', 'downloads') for e in r[k]}
+        bootstrap_rows = [('kit', 'hao_builder_kit'), ('python_arm64', 'python_arm64'),
+                          ('python_x86_64', 'python_x86_64')]
+        if 'metal' in r['bootstrap']:
+            bootstrap_rows.append(('metal', 'metal_llvm'))
+        for key, row in bootstrap_rows:
+            pin = r['bootstrap'].get(key)
+            expected = entries.get(row)
+            if not isinstance(pin, dict) or expected is None or any(
+                    pin.get(k) != expected.get(k) for k in ('url', 'sha256', 'size')):
+                bad.append('release: bootstrap %s does not match its asset row' % key)
+        if entries.get('hao_builder_kit', {}).get('role') != 'builder-kit' or \
+                entries.get('hao_bootstrap', {}).get('role') != 'bootstrap':
+            bad.append('release: bootstrap infrastructure assets are missing')
     rows = {}
     for e in r['downloads']:
         bad += pinned('download', e, DOWNLOAD_FIELDS)

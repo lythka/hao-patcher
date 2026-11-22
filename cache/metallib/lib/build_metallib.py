@@ -148,7 +148,8 @@ def main():
         fix = golden_gate
     if '--legacy-sync-only' in sys.argv:
         fix = legacy_sync
-    direct_assembly = fix in (golden_gate, legacy_sync)
+    portable_link = toolchain.bundled() is not None and fix not in (golden_gate, legacy_sync)
+    direct_assembly = fix in (golden_gate, legacy_sync) or portable_link
     identity = '--identity-control' in sys.argv
     output.mkdir(parents=True)
     data = source.read_bytes()
@@ -178,6 +179,9 @@ def main():
             if len(aliases) > 1 and not re.search(r'^source_filename =', rewritten, re.M):
                 rewritten = rewritten.replace('target datalayout =', 'source_filename = \"air-module-' + sha(blob) + '.air\"\n' + 'target datalayout =', 1)
                 row['stable_source_filename'] = True
+            if portable_link:
+                rewritten = toolchain.optimize_ir(rewritten, 'instcombine', link=True)
+                row['portable_link'] = 'instcombine without floating-point reassociation'
             (directory / 'fixed.ll').write_text(rewritten)
             # The frontend upgrades old intrinsic ABIs and can narrow repaired
             # texture coordinates again. Keep the exact rewritten AIR on GG.

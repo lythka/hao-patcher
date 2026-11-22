@@ -1,5 +1,5 @@
 {
- "revision": 23,
+ "revision": 24,
  "pack": "metal-3802",
  "stage": "oclp-hook",
  "inputs": ["metallib_repairs_golden_gate", "metal_quad_runtime_golden_gate"],

@@ -115,10 +115,13 @@ def rewrite(text):
         source = Path(directory) / 'marked.ll'
         output = Path(directory) / 'inlined.ll'
         source.write_text('\n'.join(lines))
-        result = subprocess.run(toolchain.resolve(['xcrun', 'metal-opt', '-S', '-passes=' + PASSES,
-                                 str(source), '-o', str(output)]), capture_output=True, text=True, timeout=90)
-        if result.returncode:
-            raise ValueError('private helper LLVM pass refused: ' + result.stderr[:1200])
+        if toolchain.bundled():
+            output.write_text(toolchain.optimize_ir(source.read_text(), PASSES))
+        else:
+            result = subprocess.run(['xcrun', 'metal-opt', '-S', '-passes=' + PASSES,
+                                     str(source), '-o', str(output)], capture_output=True, text=True, timeout=90)
+            if result.returncode:
+                raise ValueError('private helper LLVM pass refused: ' + result.stderr[:1200])
         if output.stat().st_size > MAX_OUTPUT:
             raise ValueError('private helper expansion exceeds output bound')
         rewritten = output.read_text()

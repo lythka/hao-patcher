@@ -69,8 +69,8 @@ def build(output, inputs):
                  date=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                  inputs={ROW: dict(row=rel(Path(inputs)/ROW), path=rel(main), sha256=sha(main))},
                  cache_dylib=dict(commit=source['commit'](CACHE_DYLIB) if (CACHE_DYLIB/'.git').exists() else
-                                  source['_git'](CACHE_DYLIB, 'rev-parse', 'HEAD') or '',
-                                  dirty=bool(source['_git'](CACHE_DYLIB, 'status', '--porcelain', '--', '.'))),
+                                  source['commit'](REPO),
+                                  dirty=source['dirty'](REPO, rel(CACHE_DYLIB))),
                  commands=['cache_dylib.extract(%s, x86_64h, %s)' % (rel(main.parent), IMAGE),
                            'codesign -f -s - libKernelCollectionBuilder.dylib',
                            'tools/tahoe-donors/adhoc_signature.py libKernelCollectionBuilder.dylib', 'check.check'],

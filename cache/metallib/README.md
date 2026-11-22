@@ -120,12 +120,16 @@ make assembler ASSEMBLER                      # once, where Xcode is: the x86_64
 make runtime-build SPLIT OUT --llvm LIBLLVM_3802 --compiler ICBE --assembler ASSEMBLER
 ```
 
-`--llvm-bin` (or `HAO_METAL_LLVM`) maps `xcrun metal-as` and `xcrun metal-objdump --disassemble` to the bundled
-tools (`lib/toolchain.py`) and refuses every other `xcrun` tool, so the `rewrite` recipe (`metal -c`, `metallib`)
-fails at once instead of opening the developer-tools dialog; only the `golden-gate` recipe works this way. Build
-records take the commit from git when the checkout has `.git`, otherwise from `.hao-source`, and never call git
-without a `.git`. With `--llvm-bin` the output is the same modules, not the same bytes (producer string, metadata
-kinds, use lists); `runtime-build` with `--assembler` is byte-identical, as it drives the same 3802 libLLVM.
+`--llvm-bin` (or `HAO_METAL_LLVM`) uses the pinned LLVM 15.0.7 tools built by
+`tools/metal-llvm/make`. The `golden-gate` and `legacy-sync` paths assemble directly.
+The hello `rewrite` path uses `opt` instruction combining with floating-point
+reassociation withheld to match the Metal linker, then `llvm-as`; it preserves
+the container and checks reachable metadata. Runtime extensions use the prebuilt
+`assemble` helper with the pinned legacy LLVM library from OCLP.
+
+`tools/metal-llvm/arch-gate` compares both architecture outputs with Xcode-produced
+reference modules while denying Xcode tools. Its result records module equality
+separately from byte equality. Build records use `.hao-source` in a frozen kit.
 
 ## Controls
 
@@ -165,6 +169,8 @@ Tests that need Apple binaries are skipped unless `METALLIB_RUNTIME` (a prepared
   every application's constants.
 
 ## Revisions
+
+- r60 2026-11-22 The portable hello path assembles AIR and runs instruction combining with reassociation withheld, replacing the Metal frontend/linker. Portable inlining preserves the AIR triple around target-independent LLVM passes.
 
 - r59 2026-11-16 runtime-build signs the repaired iCBE.dylib through `lib/adhoc_sign.py`: codesign, then the signature's reserved space trimmed to macOS 27 codesign's size and the page hashes refreshed. macOS 26's codesign reserved about 18 KB more, so the row differed on a Tahoe Mac. Output on a macOS 27 Mac unchanged (row d0f0f4e3).
 - r58 2026-11-16 translation-build links gpu-client.dylib and compat.dylib with a fixed install name (callers set the real one), so the output folder no longer changes their header size and UUID: the same source gives the same bytes in any folder. Code unchanged; the metallib repairs are unaffected.

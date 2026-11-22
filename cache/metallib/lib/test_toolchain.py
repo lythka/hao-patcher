@@ -76,3 +76,19 @@ class SourceTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PortableOptimizerTests(unittest.TestCase):
+    def test_ambiguous_flags_refused_before_running_optimizer(self):
+        from unittest.mock import patch
+        text = ('target triple = "air64_v29-apple-macosx27.0.0"\n'
+                '  %x = fadd nnan ninf nsz arcp contract afn float %a, %b\n')
+        with patch.object(toolchain, 'bundled', return_value=Path('/unused')):
+            with self.assertRaisesRegex(toolchain.Unavailable, 'ambiguous'):
+                toolchain.optimize_ir(text, 'instcombine', link=True)
+
+    def test_missing_triple_refused(self):
+        from unittest.mock import patch
+        with patch.object(toolchain, 'bundled', return_value=Path('/unused')):
+            with self.assertRaisesRegex(toolchain.Unavailable, 'triple'):
+                toolchain.optimize_ir('define void @f() { ret void }', 'instcombine', link=True)

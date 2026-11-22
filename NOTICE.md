@@ -25,6 +25,14 @@ you supply. Those keep their own terms.
 | Audio fix sources | See NOTICE | [tools/audiomxd-fix/NOTICE.md](tools/audiomxd-fix/NOTICE.md) |
 | CoreSpotlight adapter sources | See NOTICE | [patches/golden-gate-corespotlight-compat/build/NOTICE.md](patches/golden-gate-corespotlight-compat/build/NOTICE.md) |
 
+## Release builder tools
+
+The builder uses python-build-standalone CPython 3.12.14 (release 20260924),
+PSF-2.0 and the bundled dependencies' licenses, carried in the Python archives.
+The release pins both upstream architecture archives and redistributes them unchanged.
+LLVM 15.0.7 tools use Apache-2.0 WITH LLVM-exception; see
+[their notice](tools/metal-llvm/NOTICE.md). Their license accompanies the binaries.
+
 ## Downloaded on your Mac
 
 Fetched from their projects by `hao` while it makes the USB installer, checked against the sha256 in `release.json`,

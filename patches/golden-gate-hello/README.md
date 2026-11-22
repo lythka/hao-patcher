@@ -40,9 +40,12 @@ Boot with NVRAM `prev-lang:kbd` cleared so the Mac starts at the Language Choose
 Setup Assistant, with no MTLCompilerService crash report. The hook log lists the SHA-256 of the three files.
 
 ## Validation
+
+NEEDS VALIDATION: portable LLVM-produced input bytes need installation acceptance. Host module comparisons are recorded separately.
 Laptop 2026-11-19, a MacBookPro9,2 with the release-EFI image 8acc07f (26B131, built from fb6542df with r11) and `prev-lang:kbd` cleared: hello drew at the Language Chooser 76.5 s after kernel start, then Setup Assistant ran to the desktop with 0 crash reports (MTLCompilerService included). The build log lists the SHA-256 of the three files. Frame rate on the HD 4000 and `textFragment_watchPreview` are untested.
 
 ## Revisions
+- r13 2026-11-22 Pin the portable LLVM 15.0.7 output for 26B131; the builder uses release tools without Xcode.
 - r12 2026-11-19 Validated r11 on hardware (Validation). Nothing it installs changes.
 - r11 2026-11-17 `requires`: os 26A428/26B131, donor 25G332/25G342, gpu intel-ivb (the HD 4000), cpu and firmware any; replaces `applies`. status product: it ships in the release profiles (what it installs is unchanged; `validated` stays false until the re-cut's laptop boots prove it).
 - r10 2026-11-16 Declares its pack (metal-3802): recipe layout format pass; its pack decides the machines (applies.models dropped); nothing it installs changes.

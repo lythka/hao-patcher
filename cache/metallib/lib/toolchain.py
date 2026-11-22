@@ -75,3 +75,38 @@ def source(unit):
         return dict(commit=git('rev-parse', 'HEAD'), dirty=bool(git('status', '--porcelain', '--', str(unit))))
     data = json.loads((top / '.hao-source').read_text())
     return dict(commit=data['commit'], dirty=None)
+
+
+def optimize_ir(text, passes, link=False):
+    """Run target-independent LLVM passes on AIR, preserving its triple and FP contract.
+
+    The Metal linker combines instructions without LLVM 15's reassociation folds.
+    Temporarily withholding that permission reproduces that behavior; restoring
+    it afterwards never grants a permission absent from the original input.
+    """
+    import re
+    import subprocess
+    import tempfile
+    folder = bundled()
+    if folder is None:
+        raise Unavailable('portable AIR optimization requires bundled LLVM')
+    triple = re.search(r'^target triple = "[^"\n]+"$', text, re.M)
+    if triple is None:
+        raise Unavailable('AIR module has no target triple')
+    flags = 'nnan ninf nsz arcp contract afn'
+    instruction = r'^(\s+(?:%[-\w.$]+ = )?(?:(?:tail|musttail|notail) )?(?:call|fneg|fadd|fsub|fmul|fdiv|frem|fcmp|select|phi) )'
+    if link and re.search(instruction + flags + r' ', text, re.M):
+        raise Unavailable('ambiguous pre-existing fast-math flag group')
+    portable = text.replace(triple[0], 'target triple = "unknown-unknown-unknown"', 1)
+    if link:
+        portable = re.sub(instruction + r'fast ', lambda m: m[1] + flags + ' ', portable, flags=re.M)
+    with tempfile.TemporaryDirectory(prefix='hao-air-') as directory:
+        source, output = Path(directory)/'input.ll', Path(directory)/'output.ll'
+        source.write_text(portable)
+        subprocess.run([str(folder/'opt'), '-opaque-pointers=0', '-S', '-passes='+passes,
+                        str(source), '-o', str(output)], check=True, capture_output=True, timeout=90)
+        result = output.read_text()
+    result = re.sub(r'^target triple = "unknown-unknown-unknown"$', lambda _: triple[0], result, flags=re.M)
+    if link:
+        result = re.sub(instruction + flags + r' ', lambda m: m[1] + 'fast ', result, flags=re.M)
+    return result
