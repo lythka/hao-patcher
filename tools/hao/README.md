@@ -2,12 +2,12 @@
 
 ## For users
 
-1. Download the release archive from the project's GitHub Releases page and unpack it.
-2. In Terminal, in the unpacked folder, run `sudo ./hao create-installer`. It asks which Mac the installer is for
-   and which disk is the USB drive, asks you to type the drive's name, then downloads and checks everything and
-   writes the USB installer.
-3. Plug the USB installer into the Intel Mac, hold Option while it starts, and choose **hao Installer**.
-4. If something fails, run `./hao report` and attach the file it writes to a GitHub issue. It holds no serial
+1. On any Mac, run the one command from the [install guide](../../docs/install.md):
+   `curl -fsSL https://github.com/lythka/hao-assets/releases/download/RELEASE/hao -o hao && sh hao`.
+   It asks which Mac the installer is for and which disk is the USB drive, asks you to type the drive's name and your
+   password, then downloads and checks everything and writes the USB installer.
+2. Plug the USB installer into the Intel Mac, hold Option while it starts, and choose **EFI Boot**.
+3. If something fails, run `sh hao report` and attach the file it writes to a GitHub issue. It holds no serial
    number, user names or Wi-Fi names.
 
 | You need | |
@@ -15,11 +15,7 @@
 | An Intel Mac | proven: MacBookPro9,2 (MacBook Pro 13-inch, Mid 2012) |
 | A USB drive | at least 64 GB; everything on it is erased |
 | An internet connection | for Apple's and the project's files, each checked by size and sha256 |
-| A Mac to make the USB installer on | any Mac; it can be the Intel Mac itself |
-| Python 3.14 | python.org's. `./hao` runs the first `python3.14` (else `python3`) on PATH; `sudo ./hao` runs only python.org's, and only while it and its folders are root's alone (checked before Python starts; `hao doctor` prints the fix) |
-
-Not built yet: making the macOS 27 files from Apple's downloads on your Mac. Until then `create-installer` writes
-the USB installer only on a developer's Mac that has the project's files.
+| A Mac to make the USB installer on | any Mac with macOS 13 or newer; `sh hao` brings its own Python and tools |
 
 On the Intel Mac, in the USB installer's Recovery, open Terminal (Utilities menu) and run `/Volumes/HAO/install`; if
 something fails, `/Volumes/HAO/report` writes the report onto the USB installer (`HAO/reports`).

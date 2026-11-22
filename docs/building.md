@@ -32,29 +32,31 @@ build, which still uses the builder VM:
    [`oclp-hardware`](../tools/oclp-hardware/README.md)).
 3. Point the rows in `pipeline/inputs/` at them ([Input rows](inputs.md#input-rows)).
 
-### From a release (developer alpha)
+### From a release (developers)
 
-A release (`release.json` on [hao-assets](https://github.com/lythka/hao-assets/releases)) pins every input. On an
-Apple silicon Mac with the builder VM's base at `store/vm/base` and its tools (Requirements), with the release's
-files downloaded into `ASSETS` (`gh release download TAG -R lythka/hao-assets -D ASSETS`):
+A release (`release.json` on [hao-assets](https://github.com/lythka/hao-assets/releases)) pins every input; our own
+files are the members of its one archive, `hao-RELEASE.tar`. On an Apple silicon Mac with the builder VM's base at
+`store/vm/base` and its tools (Requirements), with the release's four files downloaded into `ASSETS`
+(`gh release download TAG -R lythka/hao-assets -D ASSETS`):
 
 ```sh
 git clone https://github.com/lythka/hao-patcher && cd hao-patcher && git checkout COMMIT   # release.json "hao_patcher"
 mkdir -p ../store && ln -s ../store store                                                 # an empty store
 python3.14 -I tools/hao/hao fetch ASSETS/release.json --cache ../fetch --assets-from ASSETS
 python3.14 -I pipeline/place ASSETS/release.json ../fetch
+python3.14 -I pipeline/make-on-mac ASSETS/release.json --cache ../fetch
 tools/ssdvm/build.sh store/vm/bin
 python3.14 -I tools/hao/hao build-image ../image --model MacBookPro9,2 --assembly ASSEMBLY      # release.json "assembly"
 ```
 
-- `fetch` downloads Apple's and the third-party files from their own servers and takes our assets from `ASSETS`,
-  each checked by size and sha256 (about 43 GB, 10 minutes on a fast line).
+- `fetch` downloads Apple's and the third-party files from their own servers and takes our files out of
+  `ASSETS/hao-RELEASE.tar`, each checked by size and sha256.
 - `place` puts each where its input row reads it and checks it. It ends by listing what is still missing: the
   rows in the release's `made_on_mac` and the harvested caches. The harvested ones are optional and the build
-  skips them (Optional cache recipes, below). The made-on-Mac rows are made from Apple's files by the producer
-  each entry names; **the producers that read the IPSW cannot run from a release yet**, so for now those rows come
-  from a store that has them (the image build refuses any row whose sha256 differs). Run `place` again after
-  adding them: it completes the rows that wait for a copy out of another row.
+  skips them (Optional cache recipes, below).
+- `make-on-mac` makes the made-on-Mac rows from Apple's files (it streams what it needs from the IPSW) and checks each
+  against its row; `create-installer` runs the same `place` and `make-on-mac`. It needs the release's pinned Metal
+  tools: set `HAO_METAL_LLVM` to the unpacked `metal_llvm` folder, as `sh hao` does.
 - `build-image` needs the release's `assembly`: without it, it takes the target's default assembly.
 
 `plan` prints a set's run order and every input it needs:

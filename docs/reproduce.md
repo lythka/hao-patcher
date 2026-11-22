@@ -11,6 +11,9 @@ For anyone checking a release's source: rebuild its files from the public tag an
   only there; the rest of the release reproduces on the build Mac.
 
 Download the source archives for the exact hao-patcher and hao-runtime release tags, or use the clones below.
+For v0.0.1-beta.1, `release.json` and the runtime archives' names give hao-runtime commit `497f126`: its ID before the
+2026-11-22 history rewrite, which changed commit messages only. The tag v0.0.1-beta.1 (`a2e29a4`) is the same source
+tree (`5dd9b17f`). hao-patcher IDs from before that rewrite resolve through `pipeline/rewritten-commits.tsv`.
 The release's files of ours are the members of `hao-RELEASE.tar`; unpack it with `tar -xf` to compare them.
 The small `hao-kit-RELEASE.tar.gz` in it contains installer recipes and helpers; it deliberately omits native build
 sources, so compiling our binaries needs the full source archives. Keep the signed release manifest and checksums

@@ -47,7 +47,7 @@ Intel Macs are untested. Tested with macOS 27.2.1 (26B131).
 | Accounts | Apple Account sign-in in Setup Assistant |
 | ARM-only programs | macOS 27's ARM-only programs run on the Intel CPU through hao-runtime |
 
-**Releases:** the current release is v0.0.1-beta.1; [Releases](https://github.com/lythka/hao-patcher/releases) (each lists its known issues); planned versions are the
+**Releases:** the current release is v0.0.1-beta.1; [Releases](https://github.com/lythka/hao-patcher/releases) (each links its known issues); planned versions are the
 [milestones](https://github.com/lythka/hao-patcher/milestones). [Progress](docs/progress.md) has the detailed lists and every fix.
 
 ## Risks
