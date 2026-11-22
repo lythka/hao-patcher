@@ -16,6 +16,8 @@ import report as REP       # noqa: E402
 import verify as VERIFY    # noqa: E402
 
 
+OTHER_PYTHON = '/opt/homebrew/bin/python3.14'   # not ROOT_PYTHON, whatever runs the tests
+
 class Files(unittest.TestCase):
     def test_create_refuses_a_planted_symlink_and_an_existing_file(self):
         with tempfile.TemporaryDirectory() as d:

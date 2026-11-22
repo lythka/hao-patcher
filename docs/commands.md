@@ -50,10 +50,8 @@ Run `./hao verify-release` right before it, as yourself: `sudo` runs hao's files
 `sudo ./hao` runs only python.org's Python 3.14, and only while it is root's alone (`./hao doctor` checks this and
 prints the fix). It refuses a release whose signature does not hold (exit 4).
 
-**v0.0.1 is unsigned** (the project's decision for this first release). Download `SHA256SUMS` with
-`release.json` and put both beside hao: hao checks every file against them, says UNSIGNED on
-every command that reads the release, and refuses any file that does not match (exit 4). An unsigned release
-proves its files are unchanged, not who made them.
+Download `SHA256SUMS`, `release.json` and their `.sig` files and put them beside hao. The release key is
+`SHA256:HPvLz28RozOa/bJ+7bJ0ha4s27LBEjQ/B3TxSqQCdek`; a missing or wrong signature stops hao (exit 4).
 
 Asks which Mac the installer is for (a proven model, or a profile file from `hao detect`) and which USB drive to use,
 and needs its name typed before erasing it. Then it downloads what the release pins (each file checked against its

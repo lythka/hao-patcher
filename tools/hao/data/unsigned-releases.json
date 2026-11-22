@@ -1,6 +1,4 @@
 {
- "about": "Releases this hao accepts without a signature (owner waivers), each by version with the owner's words. A release named here is used when its signature file is missing (a bad signature is still refused); its files are still checked against SHA256SUMS and release.json's sha256 pins, and every command says it is unsigned. Empty again in 0.0.2, when signing returns.",
- "releases": {
-  "v0.0.1": "owner 2026-11-18: \"Ship v0.0.1 as unsigned\" (DECISIONS 2026-11-18 [scope] waiver)"
- }
+ "about": "Releases this hao accepts without a signature (owner waivers), each by version with the owner's words. A release named here is used when its signature file is missing (a bad signature is still refused); its files are still checked against SHA256SUMS and release.json's sha256 pins, and every command says it is unsigned. Empty: every release from v0.0.1 on is signed.",
+ "releases": {}
 }
