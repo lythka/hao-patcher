@@ -1,0 +1,87 @@
+#!/usr/bin/env python3.14
+"""Build universal LLVM 15.0.7 AIR tools: make OUTPUT --archive SOURCE.tar.xz.
+
+The producer needs CMake and Xcode. Published tools need neither. The x86_64
+legacy assembler loads the release's pinned Apple LLVM on the user's Mac.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tarfile
+
+TOP = Path(__file__).resolve().parents[2]
+SOURCE_URL = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.7/llvm-project-15.0.7.src.tar.xz'
+SOURCE_SHA256 = '8b5fcb24b4128cf04df1b0b9410ce8b1a729cb3c544e6da885d234280dedeac6'
+
+
+def digest(path):
+    with Path(path).open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def capture(*args):
+    return subprocess.check_output(args, cwd=TOP, text=True).strip()
+
+
+def build(out, archive, jobs):
+    commit = capture('git', 'rev-parse', 'HEAD')
+    if capture('git', 'status', '--porcelain', '--untracked-files=no'):
+        raise SystemExit('producer requires a clean committed tree')
+    if digest(archive) != SOURCE_SHA256:
+        raise SystemExit('LLVM source hash mismatch')
+    out.mkdir(parents=True, exist_ok=False)
+    work = out / 'work'
+    work.mkdir()
+    with tarfile.open(archive) as source:
+        source.extractall(work, filter='data')
+    source = work / 'llvm-project-15.0.7.src'
+    sdk = capture('xcrun', '--sdk', 'macosx', '--show-sdk-path')
+    flags = f'-Os -g0 -ffile-prefix-map={work}=/llvm-build'
+    options = ['-DCMAKE_POLICY_VERSION_MINIMUM=3.5', '-DCMAKE_BUILD_TYPE=MinSizeRel',
+               '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64', '-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0',
+               '-DCMAKE_OSX_SYSROOT=' + sdk, '-DLLVM_TARGETS_TO_BUILD=',
+               '-DLLVM_ENABLE_PROJECTS=', '-DLLVM_INCLUDE_TESTS=OFF',
+               '-DLLVM_INCLUDE_EXAMPLES=OFF', '-DLLVM_INCLUDE_BENCHMARKS=OFF',
+               '-DLLVM_ENABLE_BINDINGS=OFF', '-DLLVM_ENABLE_ASSERTIONS=OFF',
+               '-DLLVM_ENABLE_ZLIB=OFF', '-DLLVM_ENABLE_ZSTD=OFF', '-DLLVM_ENABLE_LIBXML2=OFF',
+               '-DLLVM_ENABLE_TERMINFO=OFF', '-DLLVM_ENABLE_LIBEDIT=OFF',
+               '-DLLVM_BUILD_LLVM_DYLIB=OFF', '-DLLVM_LINK_LLVM_DYLIB=OFF', '-DBUILD_SHARED_LIBS=OFF',
+               '-DCMAKE_C_FLAGS=' + flags, '-DCMAKE_CXX_FLAGS=' + flags]
+    env = dict(os.environ, ZERO_AR_DATE='1', MACOSX_DEPLOYMENT_TARGET='13.0')
+    def run(*args):
+        subprocess.run(list(map(str, args)), env=env, check=True)
+    run('cmake', '-G', 'Unix Makefiles', '-S', source/'llvm', '-B', work/'build', *options)
+    run('cmake', '--build', work/'build', '--target', 'llvm-as', 'llvm-dis', 'opt', '--parallel', jobs)
+    payload = out/'payload'
+    payload.mkdir()
+    for name in ('llvm-as', 'llvm-dis', 'opt'):
+        dest = payload/name
+        shutil.copyfile(work/'build/bin'/name, dest)
+        dest.chmod(0o755)
+        run('strip', '-x', dest)
+        run('codesign', '--force', '--sign', '-', '--timestamp=none', '--identifier', 'org.hao.'+name, dest)
+        if set(capture('lipo', '-archs', str(dest)).split()) != {'arm64', 'x86_64'}:
+            raise SystemExit('missing architecture: '+name)
+    assembler = TOP/'cache/metallib/shader-runtime-helpers/assemble.c'
+    run('xcrun', 'clang', '-arch', 'x86_64', '-O2', '-Wall', '-Wextra', '-Werror', assembler, '-o', payload/'assemble')
+    run('codesign', '--force', '--sign', '-', '--timestamp=none', '--identifier', 'org.hao.assemble', payload/'assemble')
+    shutil.copyfile(source/'llvm/LICENSE.TXT', payload/'LICENSE.TXT')
+    files = {p.name: digest(p) for p in sorted(payload.iterdir())}
+    record = dict(commit=commit, dirty=False, source_url=SOURCE_URL, source_sha256=SOURCE_SHA256,
+                  producer='tools/metal-llvm/make', assembler_source_sha256=digest(assembler),
+                  compiler=capture('xcrun', 'clang', '--version'), options=options, files=files)
+    (out/'build.json').write_text(json.dumps(record, indent=2)+'\n')
+    (payload/'SHA256SUMS').write_text(''.join(h+'  '+n+'\n' for n, h in files.items()))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('output', type=Path)
+    parser.add_argument('--archive', required=True, type=Path)
+    parser.add_argument('--jobs', type=int, default=8)
+    args = parser.parse_args()
+    build(args.output.resolve(), args.archive.resolve(), args.jobs)
