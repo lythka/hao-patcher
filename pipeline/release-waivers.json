@@ -27,6 +27,13 @@
       "revision": 11,
       "reason": "owner 2026-11-19: approved for v0.0.1; prove it in v0.0.2. iCloud part (#47) not shown; non-iCloud part K4 PASS (no Mail container before Mail's first launch, Mail's link and first launch without an abort). Known issue: #47, Mail after iCloud sign-in. (beta profile, same recipe revision.)",
       "decided": "2026-11-19"
+    },
+    {
+      "profile": "beta-v0.0.1",
+      "recipe": "golden-gate-hello",
+      "revision": 13,
+      "reason": "owner 2026-11-22: waived for beta.1. Its one metallib (Setup Assistant hello animation) is built by the same pinned LLVM 15 tools as the eleven metal-libraries ones, which render on the HD 4000 (r25 validation); the hello animation itself runs only during first Setup and was not rerun with it. Known issue: the hello animation with the LLVM-built library is not yet seen on hardware.",
+      "decided": "2026-11-22"
     }
   ]
 }
