@@ -82,6 +82,26 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(result.returncode, 4, result.stderr)
         self.assertIn('bad signature', result.stderr)
 
+    def test_replacement_failure_preserves_store(self):
+        self.assertEqual(self.run_bootstrap().returncode, 0)
+        sentinel = self.root/'hao-fixture/store/verified-sentinel'
+        sentinel.write_text('keep')
+        self.shim('mv', '#!/bin/sh\nfor last do :; done\n[ "$last" != runtime ] || exit 1\nexec /bin/mv "$@"\n')
+        self.assertNotEqual(self.run_bootstrap().returncode, 0)
+        self.assertEqual(sentinel.read_text(), 'keep')
+
+    def test_symlinked_kit_refused(self):
+        work = self.root/'hao-fixture'
+        work.mkdir()
+        outside = self.root/'outside'
+        (outside/'store').mkdir(parents=True)
+        sentinel = outside/'store/keep'
+        sentinel.write_text('keep')
+        (work/'kit').symlink_to(outside, target_is_directory=True)
+        result = self.run_bootstrap()
+        self.assertEqual(result.returncode, 4, result.stderr)
+        self.assertEqual(sentinel.read_text(), 'keep')
+
     def test_bad_hash(self):
         (self.mirror / 'kit.tar.gz').write_bytes(b'damaged')
         result = self.run_bootstrap()

@@ -65,7 +65,7 @@ Use hao-patcher only on a **dedicated test Mac** whose contents you can lose.
 
 ## Install
 
-Use a signed builder-kit release, a Mac on its normal macOS, and a USB drive of
+Use a signed builder-kit release, a Mac running macOS 13 or newer, and a USB drive of
 at least 64 GB. The release supplies Python and the build tools. Allow about 26 GB
 of free space plus the tools, and several hours for preparation and installation.
 

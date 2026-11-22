@@ -437,7 +437,6 @@ class PendingRows(unittest.TestCase):
                 return rc, out.exists()
         finally:
             g['build_release'] = saved
-            g['add_builder_assets'] = infrastructure
 
     def test_only_the_named_rows_may_be_pending(self):
         self.assertEqual(self.cut('alpha'), (1, False))

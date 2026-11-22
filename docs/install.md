@@ -7,7 +7,7 @@ For installing hao on a MacBook Pro (13-inch, Mid 2012) from a signed release ki
 
 ## Requirements
 
-- A Mac, Intel or Apple silicon, running its normal macOS, with internet access and power.
+- A Mac, Intel or Apple silicon, running macOS 13 or newer, with internet access and power.
 - A USB drive of at least 64 GB; it will be erased.
 - About 26 GB free on the build Mac, plus the release's builder tools. hao checks the exact requirement before writing.
 - Allow roughly 30–60 minutes to prepare the drive and several hours to install and rebuild the shared cache. Download speed and the target Mac affect the time.

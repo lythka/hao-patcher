@@ -1,8 +1,11 @@
 """The builder snapshot is deterministic and independent of working-tree edits."""
 import hashlib
+import os
 from pathlib import Path
 import runpy
+import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -11,6 +14,32 @@ KIT = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'builder-kit.py')
 
 
 class BuilderKitTests(unittest.TestCase):
+    def test_beta_recipe_staging_without_checkout(self):
+        original = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            kit = root/'kit'
+            for prefix in (*KIT['ROOTS'], *KIT['FILES']):
+                source = original/prefix
+                paths = source.rglob('*') if source.is_dir() else [source]
+                for path in paths:
+                    relative = str(path.relative_to(original))
+                    if path.is_file() and KIT['selected'](relative):
+                        destination = kit/relative
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(path, destination)
+            (kit/'pipeline/SOURCE_COMMIT').write_text('fixture\n')
+            binary = root/'bin'
+            binary.mkdir()
+            (binary/'python3').symlink_to(sys.executable)
+            env = dict(os.environ, PATH=str(binary)+':/usr/bin:/bin:/usr/sbin:/sbin',
+                       DEVELOPER_DIR=str(root/'no-xcode'))
+            for recipe in ('golden-gate-userspace', 'golden-gate-shared-cache-install',
+                           'hao-opencore', 'hao-command'):
+                result = subprocess.run(['sh', str(kit/'patches'/recipe/'make.sh'), str(root/recipe)],
+                                        env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, recipe+': '+result.stderr)
+
     def test_frozen_commit_and_archive_metadata(self):
         with tempfile.TemporaryDirectory() as folder:
             top = Path(folder)

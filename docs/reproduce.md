@@ -4,11 +4,21 @@ For anyone checking a release's source: rebuild its files from the public tag an
 
 ## You need
 
-- The build Mac from [Install](install.md#requirements): any Mac on its normal macOS, Xcode with its Metal toolchain,
-  Python 3.14 (python.org's build), about 26 GB free, an internet connection.
+- A development Mac with Xcode, Python 3.14 and an internet connection. These development tools are for compiling
+  every release binary from source; the [USB installer command](install.md) supplies its own Python and LLVM.
 - Nothing from this project beyond its public repositories at the tag.
 - For the hao-runtime archive only: macOS 27 with Xcode 27.2 (a macOS 27 virtual machine is enough). It reproduces
   only there; the rest of the release reproduces on the build Mac.
+
+Download the source archives for the exact hao-patcher and hao-runtime release tags, or use the clones below.
+The small `hao-kit-RELEASE.tar.gz` contains installer recipes and helpers; it deliberately omits native build
+sources, so compiling our binaries needs the full source archives. Keep the signed release manifest and checksums
+with them. Rebuilding also needs the Apple inputs named in that manifest and the pinned upstream sources for any
+third-party tools you choose to compile, including LLVM 15.0.7.
+
+libhao compiles from the committed `.inc` tables. The shared-cache builder uses the release's Swift metadata
+catalog with the pinned Apple cache inputs. Those are separate inputs: the catalog alone is not a substitute for
+libhao's `.inc` tables. Patch recipes and their build sources are in the full hao-patcher source archive.
 
 ## Commands
 

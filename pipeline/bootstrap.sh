@@ -16,6 +16,9 @@ mkdir -p "$work"
 [ "$(stat -f %u "$work")" = "$(id -u)" ] || fail 'work folder belongs to another account'
 chmod 700 "$work"
 cd "$work"
+for managed in kit runtime metal downloads store; do
+    [ ! -L "$managed" ] || fail "managed folder is a symbolic link: $managed"
+done
 lock="$work/.lock"
 mkdir "$lock" 2>/dev/null || fail "another hao run owns $lock; after an interrupted run remove that empty folder"
 mkdir -p downloads
@@ -80,8 +83,16 @@ fi
 py="$scratch/runtime/python/bin/python3.12"
 [ -x "$py" ] || fail 'pinned Python archive has no interpreter'
 "$py" -I -S -c 'import platform,sys; sys.exit(platform.machine()!=sys.argv[1])' "$arch" || fail 'wrong Python architecture'
-# Install the immutable sources beside the persistent store; downloads survive reruns.
-if [ -d kit/store ] && [ ! -L kit/store ]; then mv kit/store "$scratch/store"; fi
+# The store lives outside both the replaceable kit and disposable scratch folder.
+# Migrate an earlier kit only to this persistent location; never delete it on failure.
+if [ -L kit/store ]; then
+    [ "$(readlink kit/store)" = ../store ] || fail 'kit store has an unexpected symbolic link'
+elif [ -e kit/store ]; then
+    [ ! -e store ] || fail 'both old and new stores exist; preserve them before retrying'
+    mv kit/store store || fail 'cannot preserve existing store'
+fi
+mkdir -p store
+ln -s ../store "$scratch/kit/store"
 rm -rf kit runtime metal
 mv "$scratch/kit" kit
 mv "$scratch/runtime" runtime
@@ -90,7 +101,6 @@ if [ -n "$metal_asset" ]; then
     HAO_METAL_LLVM="$work/metal"
     export HAO_METAL_LLVM
 fi
-if [ -d "$scratch/store" ]; then mv "$scratch/store" kit/store; fi
 cp "$scratch/release.json" "$scratch/release.json.sig" "$scratch/SHA256SUMS" "$scratch/SHA256SUMS.sig" kit/tools/hao/
 PATH="$work/runtime/python/bin:$PATH"
 export PATH

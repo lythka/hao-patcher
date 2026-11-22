@@ -12,11 +12,13 @@ ROOTS = ('pipeline/', 'packs/', 'patches/', 'tools/hao/', 'tools/acquire/',
          'tools/tahoe-donors/', 'tools/oclp-hardware/', 'tools/oclp-integration/',
          'tools/kc-binder/', 'tools/live-text/', 'tools/shared-cache/',
          'tools/first-boot-seeds/', 'tools/cache-dylib/', 'tools/gg-recovery/', 'cache/metallib/')
+ROOTS += ('tools/audiomxd-fix/', 'tools/metal-fixes/')
+FILES = ('LICENSE', 'NOTICE.md', 'tools/kernel-fixes/profiles/26B131/kc-recipe.json')
 
 
 def selected(name):
     parts = Path(name).parts
-    if not name.startswith(ROOTS) and name not in ('LICENSE', 'NOTICE.md'):
+    if not name.startswith(ROOTS) and name not in FILES:
         return False
     if any(p in ('tests', '__pycache__', '.DS_Store') for p in parts):
         return False
